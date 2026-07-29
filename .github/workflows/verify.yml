@@ -20,6 +20,12 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - name: Generate local-only JWT test keys
+        working-directory: .
+        run: |
+          mkdir -p zhiguang-be/src/main/resources/keys
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out zhiguang-be/src/main/resources/keys/private.pem
+          openssl pkey -in zhiguang-be/src/main/resources/keys/private.pem -pubout -out zhiguang-be/src/main/resources/keys/public.pem
       - run: mvn -B test
 
   frontend:
