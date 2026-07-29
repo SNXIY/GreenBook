@@ -1,0 +1,194 @@
+name: content-moderation-platform
+
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-content_moderation}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:8.0-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.1
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  moderation_migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - .env
+    environment:
+      - MODERATION_DATABASE_URL=
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-content_moderation}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  moderation_service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    ports:
+      - "8088:8080"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-content_moderation}
+      - MODERATION_DATABASE_URL=
+      - MODERATION_AUTO_CREATE_SCHEMA=false
+      - COMMUNITY_PROVIDER=java
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - MODERATION_ASYNC_ENABLED=true
+      - MODERATION_EMBEDDED_WORKER_ENABLED=false
+    depends_on:
+      moderation_migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5).read()",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Volume mount of development-only credentials since compose watch doesn't sync ignored files and doesn't do initial sync when the service starts
+    volumes:
+      - ./privatecredentials:/privatecredentials
+    develop:
+      watch:
+        - path: src/agents/
+          action: sync+restart
+          target: /app/agents/
+        - path: src/schema/
+          action: sync+restart
+          target: /app/schema/
+        - path: src/service/
+          action: sync+restart
+          target: /app/service/
+        - path: src/core/
+          action: sync+restart
+          target: /app/core/
+        - path: src/memory/
+          action: sync+restart
+          target: /app/memory/
+        - path: src/database/
+          action: sync+restart
+          target: /app/database/
+        - path: src/community/
+          action: sync+restart
+          target: /app/community/
+        - path: src/moderation/
+          action: sync+restart
+          target: /app/moderation/
+        - path: src/rag/
+          action: sync+restart
+          target: /app/rag/
+
+  moderation_worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    command: ["python", "run_moderation_worker.py"]
+    env_file:
+      - .env
+    environment:
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-content_moderation}
+      - MODERATION_DATABASE_URL=
+      - MODERATION_AUTO_CREATE_SCHEMA=false
+      - COMMUNITY_PROVIDER=java
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - MODERATION_ASYNC_ENABLED=true
+      - MODERATION_EMBEDDED_WORKER_ENABLED=false
+    depends_on:
+      moderation_migrate:
+        condition: service_completed_successfully
+      moderation_service:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    volumes:
+      - ./privatecredentials:/privatecredentials
+    develop:
+      watch:
+        - path: src/agents/
+          action: sync+restart
+          target: /app/agents/
+        - path: src/core/
+          action: sync+restart
+          target: /app/core/
+        - path: src/community/
+          action: sync+restart
+          target: /app/community/
+        - path: src/moderation/
+          action: sync+restart
+          target: /app/moderation/
+        - path: src/rag/
+          action: sync+restart
+          target: /app/rag/
+        - path: src/memory/
+          action: sync+restart
+          target: /app/memory/
+        - path: src/database/
+          action: sync+restart
+          target: /app/database/
+        - path: src/run_moderation_worker.py
+          action: sync+restart
+          target: /app/run_moderation_worker.py
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:

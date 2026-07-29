@@ -1,0 +1,113 @@
+name: greenbook
+
+# Development Compose intentionally contains infrastructure only.
+# Run Java, Vite, Creator Agent and Moderation Agent on the host so their logs,
+# breakpoints and hot reload remain visible during development.
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  zhiguang-mysql:
+    <<: *restart
+    container_name: greenbook-mysql
+    image: mysql:8.0
+    ports:
+      - "127.0.0.1:${ZHIGUANG_MYSQL_HOST_PORT:-33306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${ZHIGUANG_MYSQL_PASSWORD:-123456}
+      MYSQL_DATABASE: ${ZHIGUANG_MYSQL_DB:-zhiguang}
+    volumes:
+      - zhiguang-mysql-data:/var/lib/mysql
+      - ./zhiguang-be/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./zhiguang-be/db/comments_migration.sql:/docker-entrypoint-initdb.d/02-comments.sql:ro
+      - ./zhiguang-be/db/assistant_comment_migration.sql:/docker-entrypoint-initdb.d/03-assistant-comments.sql:ro
+      - ./zhiguang-be/db/assistant_capability_migration.sql:/docker-entrypoint-initdb.d/04-assistant-capabilities.sql:ro
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${ZHIGUANG_MYSQL_PASSWORD:-123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  zhiguang-kafka:
+    <<: *restart
+    container_name: greenbook-kafka
+    image: redpandadata/redpanda:v24.3.18
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=768M
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://127.0.0.1:${ZHIGUANG_KAFKA_HOST_PORT:-39092}
+    ports:
+      - "127.0.0.1:${ZHIGUANG_KAFKA_HOST_PORT:-39092}:9092"
+    volumes:
+      - zhiguang-kafka-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q Healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  creator-postgres:
+    <<: *restart
+    # Shared PostgreSQL instance: Creator/Assistant use mindflow_creator;
+    # Moderation uses content_moderation.
+    container_name: greenbook-postgres
+    image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:${GREENBOOK_POSTGRES_HOST_PORT:-25432}:5432"
+    environment:
+      POSTGRES_DB: ${CREATOR_POSTGRES_DB:-mindflow_creator}
+      POSTGRES_USER: ${GREENBOOK_POSTGRES_USER:-mindflow}
+      POSTGRES_PASSWORD: ${GREENBOOK_POSTGRES_PASSWORD:-mindflow}
+    volumes:
+      - creator-postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/01-create-databases.sql:/docker-entrypoint-initdb.d/01-create-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  creator-redis:
+    <<: *restart
+    # Shared Redis instance: Creator/Assistant DB0, Java DB1, Moderation DB2.
+    container_name: greenbook-redis
+    image: redis:8.0-alpine
+    ports:
+      - "127.0.0.1:${GREENBOOK_REDIS_HOST_PORT:-26379}:6379"
+    command: ["redis-server", "--requirepass", "${GREENBOOK_REDIS_PASSWORD:-mindflow}", "--appendonly", "yes"]
+    volumes:
+      - creator-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${GREENBOOK_REDIS_PASSWORD:-mindflow}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  greenbook-qdrant:
+    <<: *restart
+    container_name: greenbook-qdrant
+    image: qdrant/qdrant:v1.18.2
+    ports:
+      - "127.0.0.1:${QDRANT_HTTP_HOST_PORT:-26333}:6333"
+      - "127.0.0.1:${QDRANT_GRPC_HOST_PORT:-26334}:6334"
+    volumes:
+      - greenbook-qdrant-data:/qdrant/storage
+
+volumes:
+  zhiguang-mysql-data:
+  zhiguang-kafka-data:
+  creator-postgres-data:
+  creator-redis-data:
+  greenbook-qdrant-data:

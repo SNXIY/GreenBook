@@ -1,0 +1,33 @@
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--color-text-muted);
+}
+
+.number {
+  color: var(--color-text-strong);
+  font-weight: 700;
+}
+
+.label {
+  font-size: 12px;
+}
+
+.clickable {
+  border: 0;
+  padding: 4px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.clickable:hover .number {
+  color: var(--color-primary);
+}

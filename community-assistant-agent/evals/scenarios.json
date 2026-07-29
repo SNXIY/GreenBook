@@ -1,0 +1,131 @@
+[
+  {
+    "id": "search-only",
+    "prompt": "帮我找三篇关于 Java 并发的帖子",
+    "expected_domain": "search_query",
+    "required_capabilities": ["search"],
+    "expected_agents": ["SearchAgent"],
+    "required_tools": ["community.search_posts"],
+    "forbidden_tools": ["creator.create_draft", "publication.publish_now"]
+  },
+  {
+    "id": "context-summary",
+    "prompt": "总结这个帖子，列出三个关键结论",
+    "context_post_id": "10001",
+    "expected_domain": "search_query",
+    "required_capabilities": ["summarize"],
+    "expected_agents": ["SearchAgent"],
+    "required_tools": ["community.summarize_post"],
+    "forbidden_tools": ["creator.create_draft", "publication.publish_now"]
+  },
+  {
+    "id": "create-draft",
+    "prompt": "参考社区内容，帮我写一篇零基础学 Java 的帖子",
+    "expected_domain": "content_publish",
+    "required_capabilities": ["generation"],
+    "expected_agents": ["ContentCreationAgent"],
+    "required_tools": ["creator.create_draft"],
+    "forbidden_tools": ["publication.publish_now"]
+  },
+  {
+    "id": "scheduled-publish",
+    "prompt": "明天上午八点发布一篇如何学好 Java 的帖子",
+    "expected_domain": "content_publish",
+    "required_capabilities": ["generation", "schedule_publish"],
+    "expected_agents": ["ContentCreationAgent", "PublishAgent"],
+    "required_tools": ["creator.create_draft", "publication.schedule"],
+    "forbidden_tools": ["publication.publish_now"]
+  },
+  {
+    "id": "immediate-publish-approval",
+    "prompt": "现在创作一篇 Java 学习路线并立即发布",
+    "expected_domain": "content_publish",
+    "required_capabilities": ["generation", "publishing"],
+    "expected_agents": ["ContentCreationAgent", "PublishAgent"],
+    "required_tools": ["creator.create_draft", "publication.publish_now"],
+    "requires_approval": true
+  },
+  {
+    "id": "no-unrelated-tool",
+    "prompt": "解释一下什么是 JVM",
+    "expected_domain": "general_answer",
+    "required_capabilities": [],
+    "expected_agents": [],
+    "required_tools": [],
+    "forbidden_tools": ["creator.create_draft", "publication.publish_now"]
+  },
+  {
+    "id": "community-operation",
+    "prompt": "帮我运营一下 AI 专区，提高最近一周活跃度",
+    "expected_domain": "community_operation",
+    "required_capabilities": [
+      "analysis",
+      "trend_analysis",
+      "user_insight",
+      "generation",
+      "moderation",
+      "publishing"
+    ],
+    "required_tools": [
+      "community.analyze_engagement",
+      "creator.create_draft",
+      "moderation.check_draft",
+      "publication.publish_now"
+    ],
+    "expected_agents": [
+      "AnalyticsAgent",
+      "UserInsightAgent",
+      "ContentCreationAgent",
+      "ModerationAgent",
+      "PublishAgent"
+    ],
+    "forbidden_tools": ["community.delete_post"]
+  },
+  {
+    "id": "batch-create-moderate-schedule",
+    "prompt": "分析最近社区热点，写 10 篇不同角度的帖子，审核后从明天上午八点起每隔一小时发布",
+    "expected_domain": "community_operation",
+    "required_capabilities": [
+      "analysis",
+      "generation",
+      "moderation",
+      "schedule_publish"
+    ],
+    "required_tools": [
+      "community.analyze_engagement",
+      "creator.create_draft",
+      "moderation.check_draft",
+      "publication.schedule_batch"
+    ],
+    "expected_agents": [
+      "AnalyticsAgent",
+      "ContentCreationAgent",
+      "ModerationAgent",
+      "PublishAgent"
+    ],
+    "forbidden_tools": [
+      "publication.schedule",
+      "publication.publish_now"
+    ]
+  },
+  {
+    "id": "delete-all-own-posts",
+    "prompt": "帮我删除所有帖子",
+    "expected_domain": "content_delete",
+    "required_capabilities": [
+      "list_own_content",
+      "delete_content"
+    ],
+    "required_tools": [
+      "community.list_own_posts",
+      "community.delete_own_posts_batch"
+    ],
+    "expected_agents": [
+      "ContentManagementAgent"
+    ],
+    "forbidden_tools": [
+      "community.search_posts",
+      "community.delete_post"
+    ]
+  }
+]

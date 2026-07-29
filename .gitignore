@@ -1,0 +1,38 @@
+# Local configuration and secrets
+.env
+**/.env
+privatecredentials/
+**/privatecredentials/
+zhiguang-be/src/main/resources/keys/*.pem
+
+# Python
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.jbeval/
+**/.uv-cache/
+
+# Node / Java build output
+**/node_modules/
+**/dist/
+**/target/
+
+# IDE / OS
+**/.idea/
+**/.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Runtime data
+**/*.log
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+data/
+var/
+backups/
+refrence/

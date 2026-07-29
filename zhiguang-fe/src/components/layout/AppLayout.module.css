@@ -1,0 +1,40 @@
+.container {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.content,
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pageCard {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: clamp(20px, 3vw, 36px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(255, 253, 248, 0.97), rgba(249, 251, 245, 0.95));
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 760px) {
+  .container {
+    gap: 14px;
+  }
+
+  .pageCard {
+    padding: 18px 16px;
+    border-radius: var(--radius-lg);
+  }
+}

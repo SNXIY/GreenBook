@@ -1,0 +1,225 @@
+.page {
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 60px 24px;
+  background:
+    radial-gradient(ellipse at 12% 10%, rgba(112, 150, 82, 0.24), transparent 30rem),
+    radial-gradient(ellipse at 92% 86%, rgba(31, 107, 69, 0.18), transparent 28rem),
+    linear-gradient(145deg, #eff5e9, #fafbf5 55%, #e8f1e4);
+}
+
+.card {
+  width: min(480px, 100%);
+  border: 1px solid rgba(184, 210, 185, 0.82);
+  background: rgba(255, 253, 248, 0.96);
+  border-radius: 32px;
+  box-shadow: 0 28px 64px rgba(14, 57, 36, 0.16);
+  padding: 48px 42px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.title {
+  font-family: var(--font-editorial);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text-strong);
+}
+
+.subtitle {
+  font-size: 15px;
+  color: var(--color-text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.input,
+.select {
+  min-height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 14px 18px;
+  background: var(--color-surface-subtle);
+  font-size: 16px;
+  color: var(--color-text-strong);
+  transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+}
+
+.input:focus,
+.select:focus {
+  border-color: var(--color-primary);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(31, 107, 69, 0.14);
+}
+
+/* 统一下拉样式并防止箭头与文本重叠 */
+.select {
+  -webkit-appearance: none;
+  appearance: none;
+  /* 使用主题主色的自定义箭头 */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23176b52' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  padding-right: 32px;
+}
+
+.codeRow {
+  display: flex;
+  gap: 12px;
+}
+
+.codeRow input {
+  flex: 1;
+}
+
+.codeButton {
+  min-height: 48px;
+  min-width: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(23, 107, 82, 0.22);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-primary-strong);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 16px;
+}
+
+.codeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.submitButton {
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #28794e 0%, #123e2a 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 18px 38px rgba(18, 62, 42, 0.26);
+  transition: background-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+.submitButton:active,
+.codeButton:active,
+.switchLink button:active {
+  transform: scale(0.97);
+}
+
+.submitButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.switchLink {
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.switchLink button {
+  background: none;
+  border: none;
+  color: var(--color-primary-strong);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tips {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkboxRow input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.checkboxRow a {
+  color: var(--color-primary-strong);
+  font-weight: 600;
+}
+
+.error {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(185, 58, 67, 0.12);
+  color: #b93a43;
+  font-size: 13px;
+}
+
+.success {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(18, 192, 123, 0.12);
+  color: #0f8a5c;
+  font-size: 13px;
+}
+
+@media (max-width: 540px) {
+  .card {
+    padding: 36px 24px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .submitButton:not(:disabled):hover {
+    box-shadow: 0 22px 46px rgba(18, 62, 42, 0.31);
+    transform: translateY(-1px);
+  }
+
+  .switchLink button:hover,
+  .checkboxRow a:hover {
+    color: var(--color-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .select,
+  .submitButton {
+    transition-duration: 0ms;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "outDir": "./dist-node",
+    "rootDir": "."
+  },
+  "include": [
+    "vite.config.ts"
+  ]
+}
