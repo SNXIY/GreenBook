@@ -17,7 +17,6 @@ flowchart TD
     S --> A[AnalyticsAgent]
     S --> UI[UserInsightAgent]
     S --> C[ContentCreationAgent]
-    S --> M[ModerationAgent]
     S --> PA[PublishAgent]
     S --> SE[SearchAgent]
     S --> MCP[MCPAgent]
@@ -25,7 +24,6 @@ flowchart TD
     UI --> J
     SE --> J
     C --> CA[Creator Agent / RAG]
-    M --> MA[Moderation Agent / Policy RAG]
     PA --> H{Human Approval}
     H --> J
     S --> PG[(Progress Ledger / Checkpoint)]
@@ -38,7 +36,7 @@ flowchart TD
 - 无依赖只读任务按 DAG frontier 并行；写入任务由副作用账本和幂等键保护。
 - Run、Step、Artifact 引用、审批、Capability、事件、租约和 Runtime Identity 都可审计。
 - 暂停会释放租约；恢复从完成步骤继续；旧执行者提交结果时必须仍持有当前租约。
-- Creator 和 Moderation 长任务使用 `WAITING_DEPENDENCY` 释放 Worker，以轮询或事件信号恢复。
+- Creator 长任务使用 `WAITING_DEPENDENCY` 释放 Worker，以轮询或事件信号恢复。
 - 删除、立即发布等外部写入绑定 `run version + plan hash + exact input hash` 后人工确认。
 - “删除全部帖子”中的“全部”固定解释为当前登录用户的全部未删除内容。系统必须先调用
   `community.list_own_posts` 枚举完整资源，再调用 `community.delete_own_posts_batch`；
@@ -50,13 +48,14 @@ flowchart TD
 
 ```text
 AnalyzeTrend ─────┐
-                  ├─> GenerateContent -> ModerationCheck -[PASS]-> Publish
+                  ├─> GenerateContent -> HumanApproval -> Publish
 AnalyzeUsers ─────┘
 ```
 
 AnalyticsAgent 与 UserInsightAgent 可以并行。ContentCreationAgent 只能使用两者的真实
-输出作为参考；ModerationAgent 读取 Java 中与 Creator SHA-256 绑定的草稿；PublishAgent
-只有在审核 PASS 且用户确认后才能发布。
+输出作为参考；PublishAgent 只能发布当前 Run 中由 Creator 生成、SHA-256 未变化且用户
+已经确认的草稿。普通 AI 创作不重复调用 Moderation Agent；手动创作与管理员治理仍由
+Java 的独立审核状态机接入 Moderation Agent。
 
 ## MCP
 
@@ -80,8 +79,12 @@ ASSISTANT_MCP_SERVERS_JSON=[{"name":"research","url":"http://127.0.0.1:9000/mcp"
 - Tool Selection Accuracy
 - Agent Selection Accuracy
 
-运行结果评估还应结合恢复成功率、过期结果拒绝率、人工等待时间、端到端耗时和最终社区
-指标。规划分数高并不等于运营目标已经提升。
+`evals/run_runtime_report.py` 从 PostgreSQL 生成真实运行聚合，包括执行路径、模型和工具
+耗时、重试恢复、审批、Artifact 与 Tool Job。没有标注的数据不会被包装成准确率；
+`run_runtime_eval.py --fixture` 只验证指标公式，不能作为项目性能数据。
+
+运行结果评估还应结合过期结果拒绝故障注入、人工等待时间和最终社区指标。规划分数高
+并不等于运营目标已经提升。
 # 四层记忆（2026-07-29）
 
 社区助手的记忆不是一个无限增长的 Prompt，而是四个职责不同的层次：

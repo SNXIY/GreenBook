@@ -46,10 +46,22 @@ Invoke-ProjectCheck -Name "Frontend typecheck and build" -Path "$Root\zhiguang-f
 }
 
 Invoke-ProjectCheck -Name "Creator Agent tests" -Path "$Root\creator-agent" -Command {
+  & ".\.venv\Scripts\ruff.exe" check app tests
+  if ($LASTEXITCODE -ne 0) {
+    throw "Creator Ruff check failed."
+  }
   & ".\.venv\Scripts\python.exe" -m pytest -q
 }
 
 Invoke-ProjectCheck -Name "Moderation Agent tests" -Path "$Root\moderation-agent" -Command {
+  & ".\.venv\Scripts\ruff.exe" check src tests
+  if ($LASTEXITCODE -ne 0) {
+    throw "Moderation Ruff check failed."
+  }
+  & ".\.venv\Scripts\mypy.exe" src
+  if ($LASTEXITCODE -ne 0) {
+    throw "Moderation Mypy check failed."
+  }
   & ".\.venv\Scripts\python.exe" -m pytest -q
 }
 

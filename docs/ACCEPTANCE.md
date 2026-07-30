@@ -1,36 +1,74 @@
-# Acceptance checklist for GreenBook fusion
+# GreenBook 联调验收
 
-## Pre-reqs
-- [ ] Root `.env` copied from `.env.example`
-- [ ] MySQL applied `zhiguang-be/db/content_origin_migration.sql` (or fresh schema.sql)
-- [ ] moderation-agent on :8088
-- [ ] creator-agent Studio on :8092
-- [ ] community-assistant-agent on :8094
-- [ ] zhiguang-be on :8080 with local storage, moderation URL and Creator handoff secret
-- [ ] zhiguang-fe on :5173 with `VITE_CREATOR_STUDIO_URL`
+## 自动化检查
 
-## Checks
-1. Open http://127.0.0.1:5173/create — see **自己创作** and **AI 创作**
-2. AI 创作 opens Creator Studio and the Studio status shows the current Java user
-3. Creator validates the Java JWT through JWKS; handoff creates a Java `AI_ASSISTED` draft
-4. Open `/create/manual?draftId=<id>` — content prefilled; publish → `published` (skip external review)
-5. Manual compose on `/create/manual` → publish → UI shows AI 审核中; PASS → `published` / REJECT → `rejected`
-6. Calling `POST /api/v1/knowposts/ai-drafts` without the service secret is rejected
-7. Restarting Java while a post is `reviewing` does not lose or duplicate the moderation task
-8. Home page **知光助手** opens a keyboard-accessible dialog with typed execution steps
-9. “找几篇关于减肥的帖子” returns only public, published MySQL results and source titles
-10. “明天上午八点发布一篇 Java 学习帖子” creates one Creator `AUTO` task, one
-    Java `AI_ASSISTED` draft and one durable scheduled action
-11. Restart Community Assistant after the draft step; the run reuses completed steps and
-    does not create a second draft
-12. A scheduled action cannot publish a `MANUAL` draft or another user's draft
-13. Comment `@助手 总结这个帖子` uses that post as context and shows the persisted reply
+提交前运行：
 
-## Ports
-| Service | Port |
-|---------|------|
-| zhiguang-be | 8080 |
-| zhiguang-fe | 5173 |
-| creator-agent | 8092 |
-| moderation-agent | 8088 |
-| community-assistant-agent | 8094 |
+```powershell
+.\scripts\verify-all.ps1
+```
+
+该命令检查 Compose 配置、Java 测试、前端类型与生产构建，以及三个 Agent 的测试。
+
+应用全部启动后先检查真实服务：
+
+```powershell
+.\scripts\e2e-test.ps1 -HealthOnly
+```
+
+使用专用 `USER` 测试账号执行 Java JWT → Creator → Assistant 直接回答链路：
+
+```dotenv
+GREENBOOK_E2E_IDENTIFIER_TYPE=EMAIL
+GREENBOOK_E2E_IDENTIFIER=<专用测试账号>
+GREENBOOK_E2E_PASSWORD=<测试账号密码>
+```
+
+```powershell
+.\scripts\e2e-test.ps1 -Scenario Direct
+```
+
+验证 Assistant → Creator → Java 草稿交接：
+
+```powershell
+.\scripts\e2e-test.ps1 -Scenario CreatorDraft
+```
+
+CreatorDraft 场景只删除本次运行创建的测试草稿；删除失败时会输出草稿 ID，供手工清理。
+脚本不会打印密码、access token 或服务密钥。
+
+生成真实 Assistant 运行聚合：
+
+```powershell
+.\scripts\runtime-report.ps1 -Days 30
+```
+
+## 人工产品验收
+
+- [ ] `/create` 同时显示“自己创作”和“AI 创作”。
+- [ ] AI 创作使用当前 Java 用户身份进入 Creator Studio。
+- [ ] Creator 完成后返回 Java `AI_ASSISTED` 草稿，并进入同一补图和发布向导。
+- [ ] AI 草稿标题、摘要、正文和内容指纹与 Creator 最终版本一致。
+- [ ] AI 草稿被编辑后，旧人工确认或定时发布授权失效。
+- [ ] 手动创作上传正文和图片后可以预览，刷新后图片仍然存在。
+- [ ] 手动创作提交真实审核，页面正确展示 `published`、`rejected` 或待人工复核。
+- [ ] 管理员登录进入审核台，普通用户不能访问管理员接口。
+- [ ] 主页一次加载20条帖子，滚动到底后继续加载下一页。
+- [ ] Assistant 对话框可使用键盘打开、关闭和循环焦点。
+- [ ] 简单问题使用 DIRECT，单只读工具使用 TOOL，创作任务使用 CREATOR。
+- [ ] 复杂任务展示动态步骤、依赖、审批、失败原因和重试入口。
+- [ ] 评论区多次 `@助手` 都能执行，结果 Markdown 正常渲染。
+- [ ] 创建定时发布后重启 Assistant，任务不会丢失或重复创建草稿。
+- [ ] 暂停和恢复任务后，已完成步骤不会再次产生副作用。
+- [ ] 取消定时发布会撤销 Java Capability。
+- [ ] “删除我的所有帖子”必须先枚举本人资源并等待一次人工确认。
+
+## 服务地址
+
+| 服务 | 地址 |
+| --- | --- |
+| Java | `http://127.0.0.1:8080/actuator/health` |
+| Creator | `http://127.0.0.1:8092/actuator/health/ready` |
+| Moderation | `http://127.0.0.1:8088/health` |
+| Assistant | `http://127.0.0.1:8094/actuator/health` |
+| Frontend | `http://127.0.0.1:5173` |

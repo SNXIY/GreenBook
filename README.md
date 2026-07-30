@@ -133,11 +133,18 @@ Creator、Moderation、Assistant 的启动脚本会先执行各自 Alembic 迁�
 - Creator 产物通过版本号和 SHA-256 绑定，旧 Worker 或被编辑的草稿不能越权发布。
 - Moderation 仅提供真实 `/moderation/*` API；旧模拟社区控制台和测试数据接口已删除。
 - 管理员在 GreenBook `/admin/moderation` 审核，普通用户进入社区界面。
-- Assistant 执行 Intent → Planner → Supervisor → Tool/Agent → Verify/Replan。
+- Assistant 先由 Adaptive Supervisor 选择 DIRECT、TOOL、CREATOR 或
+  ORCHESTRATED；只有复杂任务才进入 Planner → DAG → Verify/Replan。
+- 同一用户的只读任务允许受限并发，创作、发布、删除等写入任务保持串行。
+- Assistant 的 Skill Registry 从版本化 `SKILL.md` 动态加载社区能力，Planner 不再依赖固定关键词流程。
+- 每个步骤输出为不可变 Artifact，并通过 Blackboard 记录父版本、任务依赖、审批和 Checkpoint。
+- Tool Gateway 在每次调用前执行默认拒绝的社区策略；Java 仍是权限、帖子和发布状态的事实源。
+- 远程 MCP 工具通过持久化 Tool Job Queue 执行，支持幂等、租约、限流、指数重试和 Dead Letter。
 - 删除、批量发布和管理动作需要 Human-in-the-loop 审批。
 - 长任务具备 checkpoint、lease、fencing、retry、interrupt、resume 与 SideEffect Ledger。
 - 评论区 `@助手` 会携带受控帖子上下文，可检索、总结、创作、互动或安排发布。
 - 用户偏好记忆只保存用户明确添加的内容；情景记忆和语义记忆均可关闭与清理。
+- 普通 AI 创作和社区运营不强制调用 Moderation Agent；审核仍由手动发布和管理员治理链路负责。
 
 ## 验证
 
@@ -158,12 +165,38 @@ Creator、Moderation、Assistant 的启动脚本会先执行各自 Alembic 迁�
 - `docker compose config`
 - Java 全部测试
 - 前端类型检查与生产构建
-- Creator 全部测试
-- Moderation 全部测试
+- Creator Ruff 与全部测试
+- Moderation Ruff、Mypy 与全部测试
 - Assistant 全部测试
 
 根目录 `.github/workflows/verify.yml` 在 CI 中并行执行同一组项目检查，任何 Agent
 都不会使用 mock provider。
+
+应用全部启动后执行真实服务健康检查：
+
+```powershell
+.\scripts\e2e-test.ps1 -HealthOnly
+```
+
+配置专用 `USER` 测试账号后，可执行 Java JWT → Assistant 以及
+Assistant → Creator → Java 草稿交接场景：
+
+```powershell
+.\scripts\e2e-test.ps1 -Scenario Direct
+.\scripts\e2e-test.ps1 -Scenario CreatorDraft
+```
+
+CreatorDraft 场景只软删除本次测试创建的草稿。完整说明见
+[验收清单](docs/ACCEPTANCE.md)。
+
+从真实 Assistant PostgreSQL 记录生成不含 Prompt 和用户内容的运行报告：
+
+```powershell
+.\scripts\runtime-report.ps1 -Days 30
+```
+
+当前本地基线保存在
+[Assistant Runtime Baseline](docs/reports/assistant-runtime-baseline.json)。
 
 ## 相关文档
 

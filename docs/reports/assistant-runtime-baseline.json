@@ -1,0 +1,75 @@
+{
+  "mode": "observed_runtime_report",
+  "benchmark": false,
+  "generated_at": "2026-07-30T01:27:10.129830+00:00",
+  "window_days": 30,
+  "sample_sizes": {
+    "runs": 30,
+    "completed_runs": 20,
+    "events": 578,
+    "approvals": 6,
+    "artifacts": 11,
+    "tool_jobs": 0
+  },
+  "runs": {
+    "status_distribution": {
+      "COMPLETED": 20,
+      "FAILED": 8,
+      "WAITING_APPROVAL": 2
+    },
+    "execution_path_distribution": {
+      "ORCHESTRATED": 2,
+      "ROUTING": 27,
+      "TOOL": 1
+    },
+    "workload_lane_distribution": {
+      "ROUTING": 27,
+      "WRITE": 3
+    },
+    "completion_rate": 0.6667,
+    "average_model_calls": 3.17,
+    "average_tool_calls": 1.4,
+    "average_model_duration_ms": 14117.23,
+    "average_tool_duration_ms": 819.8,
+    "end_to_end_duration_ms": {
+      "average": 42778.2,
+      "p50": 12301,
+      "p95": 105407
+    }
+  },
+  "recovery": {
+    "retried_runs": 4,
+    "retried_runs_completed": 4,
+    "retry_recovery_rate": 1.0,
+    "resumed_runs": 0,
+    "resumed_runs_completed": 0,
+    "resume_recovery_rate": null
+  },
+  "tool_queue": {
+    "status_distribution": {},
+    "terminal_completion_rate": null,
+    "dead_lettered": 0
+  },
+  "approvals": {
+    "status_distribution": {
+      "APPROVED": 4,
+      "PENDING": 2
+    }
+  },
+  "artifacts": {
+    "type_distribution": {
+      "CONTENT_DRAFT": 2,
+      "FINAL_RESPONSE": 5,
+      "PUBLICATION_RECEIPT": 2,
+      "SEARCH_EVIDENCE": 1,
+      "TOOL_RESULT": 1
+    },
+    "structural_integrity_rate": 1.0
+  },
+  "limitations": [
+    "This report contains observed operational aggregates, not semantic quality labels.",
+    "Approval accuracy and stale-result rejection accuracy require injected fault cases with expected outcomes.",
+    "Intent accuracy, tool selection accuracy, RAG HitRate and MRR require a versioned labeled dataset.",
+    "Small or zero sample sizes are reported as null rather than treated as perfect scores."
+  ]
+}

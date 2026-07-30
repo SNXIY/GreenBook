@@ -2,9 +2,9 @@
 
 ## 信任边界
 
-知光 Java API 是用户身份和帖子来源的唯一权威。
+GreenBook Java API 是用户身份和帖子来源的唯一权威。
 
-1. 前端登录后取得知光 JWT。
+1. 前端登录后取得 GreenBook JWT。
 2. AI 创作 iframe 通过 URL fragment 接收 JWT；fragment 不发送到 HTTP 服务，
    Creator 读取后立即从地址栏移除。
 3. Creator 使用 Java 的 `/.well-known/jwks.json` 校验签名、issuer、audience、
@@ -48,7 +48,7 @@ AI_ASSISTED: draft -------------> published
 
 ```http
 GET /api/v1/knowposts/{id}/publish-status
-Authorization: Bearer <zhiguang JWT>
+Authorization: Bearer <greenbook JWT>
 ```
 
 返回 `status`、`moderationTaskId` 和最新 `reason`。
@@ -124,7 +124,7 @@ Authorization: Bearer <admin JWT>
 
 ```http
 POST /api/v1/assistant/conversations/{conversationId}/messages
-Authorization: Bearer <zhiguang JWT>
+Authorization: Bearer <greenbook JWT>
 Idempotency-Key: <uuid>
 ```
 

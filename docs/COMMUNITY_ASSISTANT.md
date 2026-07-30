@@ -2,7 +2,7 @@
 
 ## 目标
 
-Community Assistant 是知光社区的任务型入口，不复制帖子、用户或 Creator 的业务能力。
+Community Assistant 是 GreenBook 社区的任务型入口，不复制帖子、用户或 Creator 的业务能力。
 它负责理解自然语言、规划步骤、调用受控工具，并让长运行任务能够恢复、审计和重放。
 
 典型任务：
