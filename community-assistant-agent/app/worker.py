@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import aliased, selectinload
 
 from app.clients import (
@@ -25,23 +25,40 @@ from app.database import (
     Database,
     Message,
     Approval,
+    PolicyAudit,
     Run,
     RunStep,
     ScheduledAction,
     ScheduledActionAttempt,
     SideEffect,
+    ToolJob,
     UserMemory,
     append_event,
     utc_now,
 )
-from app.domain import AgentPlan, AgentPlanStep
+from app.artifacts import publish_final_artifact, publish_step_artifact
+from app.domain import AdaptiveExecutionDecision, AgentPlan, AgentPlanStep
+from app.execution import (
+    ExecutionPath,
+    normalize_execution_decision,
+    render_creator_result,
+    requires_verification,
+    workload_lane,
+)
 from app.graph_runtime import graph_descriptor
 from app.llm import DeepSeekClient
 from app.mcp_gateway import McpGateway
 from app.memory import AssistantMemory
+from app.policy import (
+    CommunityPolicyEngine,
+    PolicyContext,
+    PolicyDecision,
+    PolicyDecisionType,
+    community_policy,
+)
 from app.rate_limit import DistributedLimitExceeded, DistributedRateLimiter
 from app.token_vault import DelegatedTokenVault
-from app.tools import RiskLevel, ToolRegistry
+from app.tools import ExecutionMode, RiskLevel, ToolDefinition, ToolRegistry
 from app.untrusted_content import guard_post_payload
 
 
@@ -88,6 +105,7 @@ class AgentWorker:
         registry: ToolRegistry,
         rate_limiter: DistributedRateLimiter | None = None,
         memory: AssistantMemory | None = None,
+        policy: CommunityPolicyEngine = community_policy,
     ) -> None:
         self.settings = settings
         self.database = database
@@ -99,12 +117,27 @@ class AgentWorker:
         self.registry = registry
         self.rate_limiter = rate_limiter
         self.memory = memory
+        self.policy = policy
         self.token_vault = DelegatedTokenVault(settings.service_shared_secret)
         self.worker_id = f"assistant-{uuid.uuid4()}"
         self._stopping = asyncio.Event()
         self._active_runs: set[asyncio.Task[None]] = set()
         self._active_schedules: set[asyncio.Task[None]] = set()
+        self._active_tool_jobs: set[asyncio.Task[None]] = set()
         self._dependency_watchers: dict[str, asyncio.Task[None]] = {}
+        self._register_builtin_tool_handlers()
+
+    def _register_builtin_tool_handlers(self) -> None:
+        """Install the compatibility handlers for built-in community tools.
+
+        The orchestration loop now asks the registry for a handler. Keeping the
+        legacy implementations behind this boundary preserves behavior while
+        allowing new tools to register independent handlers without editing the
+        worker dispatch loop.
+        """
+        for name in self.registry.names():
+            if self.registry.handler_for(name) is None:
+                self.registry.register_handler(name, self._dispatch_tool_legacy)
 
     def stop(self) -> None:
         self._stopping.set()
@@ -115,6 +148,13 @@ class AgentWorker:
         await asyncio.gather(
             self.run_jobs_forever(),
             self.schedule_jobs_forever(),
+            self.tool_jobs_forever(),
+        )
+
+    async def run_and_tool_jobs_forever(self) -> None:
+        await asyncio.gather(
+            self.run_jobs_forever(),
+            self.tool_jobs_forever(),
         )
 
     async def run_jobs_forever(self) -> None:
@@ -181,6 +221,47 @@ class AgentWorker:
                     *self._active_schedules, return_exceptions=True
                 )
 
+    async def tool_jobs_forever(self) -> None:
+        try:
+            while not self._stopping.is_set():
+                self._active_tool_jobs = {
+                    task for task in self._active_tool_jobs if not task.done()
+                }
+                did_work = False
+                try:
+                    while (
+                        len(self._active_tool_jobs)
+                        < self.settings.tool_job_concurrency
+                    ):
+                        job_id = await self._claim_tool_job()
+                        if not job_id:
+                            break
+                        did_work = True
+                        task = asyncio.create_task(
+                            self._execute_tool_job(job_id),
+                            name=f"assistant-tool-job:{job_id}",
+                        )
+                        self._active_tool_jobs.add(task)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception("Assistant tool queue claim loop failed")
+                if did_work:
+                    continue
+                try:
+                    await asyncio.wait_for(
+                        self._stopping.wait(),
+                        timeout=self.settings.tool_job_poll_seconds,
+                    )
+                except TimeoutError:
+                    pass
+        finally:
+            if self._active_tool_jobs:
+                await asyncio.gather(
+                    *self._active_tool_jobs,
+                    return_exceptions=True,
+                )
+
     async def _idle_when_needed(self, did_work: bool) -> None:
         if did_work:
             return
@@ -211,6 +292,7 @@ class AgentWorker:
                     active.user_id == Run.user_id,
                     active.id != Run.id,
                     active.status == "RUNNING",
+                    active.workload_lane == Run.workload_lane,
                     active.lease_expires_at.is_not(None),
                     active.lease_expires_at >= now,
                 )
@@ -230,11 +312,28 @@ class AgentWorker:
                 select(Run)
                 .where(
                     Run.status.in_(
-                        ["QUEUED", "RETRYING", "RUNNING", "WAITING_DEPENDENCY"]
+                        [
+                            "QUEUED",
+                            "RETRYING",
+                            "RUNNING",
+                            "WAITING_DEPENDENCY",
+                            "WAITING_LANE",
+                        ]
                     ),
                     (Run.retry_after.is_(None)) | (Run.retry_after <= now),
                     (Run.lease_expires_at.is_(None)) | (Run.lease_expires_at < now),
-                    active_for_user < self.settings.max_concurrent_runs_per_user,
+                    or_(
+                        and_(
+                            Run.workload_lane == "READ",
+                            active_for_user
+                            < self.settings.max_concurrent_read_runs_per_user,
+                        ),
+                        and_(
+                            Run.workload_lane != "READ",
+                            active_for_user
+                            < self.settings.max_concurrent_runs_per_user,
+                        ),
+                    ),
                     active_globally < self.settings.run_concurrency,
                 )
                 .order_by(Run.created_at)
@@ -244,6 +343,7 @@ class AgentWorker:
             if candidate is None:
                 return None
             resumed_dependency = candidate.status == "WAITING_DEPENDENCY"
+            resumed_lane = candidate.status == "WAITING_LANE"
             candidate.status = "RUNNING"
             if candidate.started_at is None:
                 candidate.started_at = now
@@ -256,7 +356,7 @@ class AgentWorker:
                     ),
                 )
                 candidate.dependency_wait_started_at = None
-            if not resumed_dependency:
+            if not resumed_dependency and not resumed_lane:
                 candidate.attempts += 1
             candidate.retry_after = None
             candidate.version += 1
@@ -273,6 +373,185 @@ class AgentWorker:
             )
             return candidate.id
 
+    async def _claim_tool_job(self) -> str | None:
+        now = utc_now()
+        async with self.database.sessions() as session, session.begin():
+            candidate = await session.scalar(
+                select(ToolJob)
+                .where(
+                    ToolJob.status.in_(["PENDING", "RETRYING", "RUNNING"]),
+                    (ToolJob.next_attempt_at.is_(None))
+                    | (ToolJob.next_attempt_at <= now),
+                    (ToolJob.lease_expires_at.is_(None))
+                    | (ToolJob.lease_expires_at < now),
+                )
+                .order_by(ToolJob.created_at)
+                .with_for_update(skip_locked=True)
+                .limit(1)
+            )
+            if candidate is None:
+                return None
+            run = await session.get(Run, candidate.run_id)
+            if run is None or run.status in {
+                "COMPLETED",
+                "FAILED",
+                "CANCELLED",
+            }:
+                candidate.status = "CANCELLED"
+                candidate.error = "所属任务已结束"
+                candidate.lease_owner = None
+                candidate.lease_expires_at = None
+                candidate.updated_at = now
+                return None
+            candidate.status = "RUNNING"
+            candidate.attempts += 1
+            candidate.next_attempt_at = None
+            candidate.lease_owner = self.worker_id
+            candidate.lease_expires_at = now + timedelta(
+                seconds=self.settings.tool_job_lease_seconds
+            )
+            candidate.updated_at = now
+            await append_event(
+                session,
+                candidate.run_id,
+                "TOOL_JOB_STARTED",
+                {
+                    "job_id": candidate.id,
+                    "tool": candidate.tool_name,
+                    "attempt": candidate.attempts,
+                },
+            )
+            return candidate.id
+
+    async def _execute_tool_job(self, job_id: str) -> None:
+        started = time.perf_counter()
+        async with self.database.sessions() as session:
+            job = await session.get(ToolJob, job_id)
+            if (
+                job is None
+                or job.status != "RUNNING"
+                or job.lease_owner != self.worker_id
+            ):
+                return
+            run = await session.get(Run, job.run_id)
+            if run is None:
+                return
+            tool_name = job.tool_name
+            arguments = dict(job.arguments)
+            ordinal = job.step_ordinal
+            operation_key = job.idempotency_key
+            attempt = job.attempts
+            max_attempts = job.max_attempts
+        definition = self.registry.get(tool_name)
+        try:
+            raw_output = await self._dispatch_tool(
+                run=run,
+                tool=tool_name,
+                args=arguments,
+                ordinal=ordinal,
+                timeout_seconds=definition.timeout_seconds,
+                operation_key=operation_key,
+                continuation=None,
+            )
+            output = self.registry.validate_output(
+                tool_name,
+                raw_output,
+                arguments,
+                run_id=run.id,
+            )
+        except Exception as exc:
+            transient = _is_transient_exception(exc)
+            now = utc_now()
+            async with self.database.sessions() as session, session.begin():
+                current = await session.get(ToolJob, job_id, with_for_update=True)
+                if (
+                    current is None
+                    or current.lease_owner != self.worker_id
+                    or current.status != "RUNNING"
+                ):
+                    return
+                terminal = not transient or attempt >= max_attempts
+                current.status = "DEAD_LETTER" if terminal else "RETRYING"
+                current.error = str(exc)[:4_000]
+                current.lease_owner = None
+                current.lease_expires_at = None
+                current.next_attempt_at = (
+                    None
+                    if terminal
+                    else now
+                    + timedelta(seconds=min(60, 2 ** max(0, attempt - 1)))
+                )
+                current.dead_lettered_at = now if terminal else None
+                current.updated_at = now
+                owning_run = await session.get(Run, current.run_id)
+                if owning_run is not None and owning_run.status == "WAITING_DEPENDENCY":
+                    owning_run.retry_after = (
+                        now if terminal else current.next_attempt_at
+                    )
+                    owning_run.updated_at = now
+                await append_event(
+                    session,
+                    current.run_id,
+                    "TOOL_JOB_DEAD_LETTERED"
+                    if terminal
+                    else "TOOL_JOB_RETRYING",
+                    {
+                        "job_id": current.id,
+                        "tool": current.tool_name,
+                        "attempt": current.attempts,
+                        "max_attempts": current.max_attempts,
+                        "error": current.error,
+                        "next_attempt_at": (
+                            current.next_attempt_at.isoformat()
+                            if current.next_attempt_at
+                            else None
+                        ),
+                    },
+                )
+            return
+
+        elapsed_ms = max(0, int((time.perf_counter() - started) * 1000))
+        now = utc_now()
+        async with self.database.sessions() as session, session.begin():
+            current = await session.get(ToolJob, job_id, with_for_update=True)
+            if (
+                current is None
+                or current.lease_owner != self.worker_id
+                or current.status != "RUNNING"
+            ):
+                return
+            owning_run = await session.get(Run, current.run_id, with_for_update=True)
+            if owning_run is None or owning_run.status == "CANCELLED":
+                current.status = "CANCELLED"
+                current.error = "所属任务已取消，迟到结果被拒绝"
+            else:
+                current.status = "COMPLETED"
+                current.result = output
+                current.error = None
+                owning_run.tool_duration_ms = int(
+                    owning_run.tool_duration_ms or 0
+                ) + elapsed_ms
+                if owning_run.status == "WAITING_DEPENDENCY":
+                    owning_run.retry_after = now
+                    owning_run.updated_at = now
+            current.lease_owner = None
+            current.lease_expires_at = None
+            current.next_attempt_at = None
+            current.updated_at = now
+            await append_event(
+                session,
+                current.run_id,
+                "TOOL_JOB_COMPLETED"
+                if current.status == "COMPLETED"
+                else "TOOL_JOB_CANCELLED",
+                {
+                    "job_id": current.id,
+                    "tool": current.tool_name,
+                    "attempt": current.attempts,
+                    "duration_ms": elapsed_ms,
+                },
+            )
+
     async def _execute_run(self, run_id: str) -> None:
         lease_task = asyncio.create_task(self._renew_run_lease(run_id))
         try:
@@ -282,32 +561,21 @@ class AgentWorker:
                 run=run,
                 tenant_id=tenant_id,
             )
+            execution_path: ExecutionPath
             if run.plan:
                 plan = AgentPlan.model_validate(run.plan)
+                execution_path = (
+                    run.execution_path
+                    if run.execution_path
+                    in {"DIRECT", "TOOL", "CREATOR", "ORCHESTRATED"}
+                    else "ORCHESTRATED"
+                )
             else:
                 await self._consume_budget(run_id, "model")
-                intent = await self._track_duration(
+                decision: AdaptiveExecutionDecision = await self._track_duration(
                     run_id,
                     "model_duration_ms",
-                    self.llm.understand_intent(
-                        prompt=run.prompt,
-                        context_post_id=run.context_post_id,
-                        context_comment_id=run.context_comment_id,
-                        history=history,
-                        memories=memories,
-                        recalled_memories=recalled_memories,
-                        on_structured_retry=lambda: self._structured_output_retry(
-                            run_id, "Intent"
-                        ),
-                    ),
-                )
-                await self._save_intent(run_id, intent.model_dump(mode="json"))
-                run.intent_detail = intent.model_dump(mode="json")
-                await self._consume_budget(run_id, "model")
-                plan = await self._track_duration(
-                    run_id,
-                    "model_duration_ms",
-                    self.llm.plan(
+                    self.llm.decide_execution(
                         prompt=run.prompt,
                         context_post_id=run.context_post_id,
                         context_comment_id=run.context_comment_id,
@@ -315,13 +583,91 @@ class AgentWorker:
                         history=history,
                         memories=memories,
                         recalled_memories=recalled_memories,
-                        structured_intent=intent,
                         on_structured_retry=lambda: self._structured_output_retry(
-                            run_id, "Planner"
+                            run_id, "Adaptive Router"
                         ),
                     ),
                 )
+                intent = decision.intent
+                await self._save_intent(run_id, intent.model_dump(mode="json"))
+                run.intent_detail = intent.model_dump(mode="json")
+                execution_path, plan = normalize_execution_decision(
+                    decision, self.registry
+                )
+                if execution_path == "ORCHESTRATED" and not plan.steps:
+                    await self._consume_budget(run_id, "model")
+                    plan = await self._track_duration(
+                        run_id,
+                        "model_duration_ms",
+                        self.llm.plan(
+                            prompt=run.prompt,
+                            context_post_id=run.context_post_id,
+                            context_comment_id=run.context_comment_id,
+                            client_timezone=run.client_timezone,
+                            history=history,
+                            memories=memories,
+                            recalled_memories=recalled_memories,
+                            structured_intent=intent,
+                            on_structured_retry=lambda: self._structured_output_retry(
+                                run_id, "Planner"
+                            ),
+                        ),
+                    )
                 await self._save_plan(run_id, plan)
+                run.plan = plan.model_dump(mode="json")
+
+                lane = workload_lane(
+                    path=execution_path,
+                    plan=plan,
+                    registry=self.registry,
+                    persists_comment_reply=bool(
+                        run.context_comment_id and run.context_post_id
+                    ),
+                )
+                entered_lane = await self._enter_workload_lane(
+                    run_id=run_id,
+                    path=execution_path,
+                    lane=lane,
+                    classification_summary=decision.classification_summary,
+                    direct_response=decision.direct_response,
+                )
+                if not entered_lane:
+                    return
+                run.execution_path = execution_path
+                run.workload_lane = lane
+                run.checkpoint = {
+                    **dict(run.checkpoint or {}),
+                    "execution_path": execution_path,
+                    "workload_lane": lane,
+                    "classification_summary": decision.classification_summary,
+                    **(
+                        {"direct_response": decision.direct_response}
+                        if decision.direct_response
+                        else {}
+                    ),
+                }
+
+            if run.workload_lane == "ROUTING":
+                lane = workload_lane(
+                    path=execution_path,
+                    plan=plan,
+                    registry=self.registry,
+                    persists_comment_reply=bool(
+                        run.context_comment_id and run.context_post_id
+                    ),
+                )
+                entered_lane = await self._enter_workload_lane(
+                    run_id=run_id,
+                    path=execution_path,
+                    lane=lane,
+                    classification_summary="恢复已有任务并进入受控执行通道",
+                    direct_response=None,
+                )
+                if not entered_lane:
+                    return
+                run.execution_path = execution_path
+                run.workload_lane = lane
+
             outputs: list[dict[str, Any]] = []
             while True:
                 ordinals = {
@@ -464,6 +810,9 @@ class AgentWorker:
                         active_layer=layer_index,
                     )
 
+                if not requires_verification(execution_path):
+                    break
+
                 await self._consume_budget(run_id, "model")
                 verification = await self._track_duration(
                     run_id,
@@ -510,19 +859,27 @@ class AgentWorker:
             if isinstance(pending_response, str) and pending_response.strip():
                 final_response = pending_response
             else:
-                await self._consume_budget(run_id, "model")
-                final_response = await self._track_duration(
-                    run_id,
-                    "model_duration_ms",
-                    self.llm.answer(
-                        prompt=run.prompt,
-                        plan=plan,
-                        tool_outputs=outputs,
-                        history=history,
-                        memories=memories,
-                        recalled_memories=recalled_memories,
-                    ),
-                )
+                if execution_path == "DIRECT":
+                    direct_response = (run.checkpoint or {}).get("direct_response")
+                    if not isinstance(direct_response, str) or not direct_response.strip():
+                        raise RuntimeError("DIRECT execution lost its checkpointed response")
+                    final_response = direct_response.strip()
+                elif execution_path == "CREATOR":
+                    final_response = render_creator_result(outputs)
+                else:
+                    await self._consume_budget(run_id, "model")
+                    final_response = await self._track_duration(
+                        run_id,
+                        "model_duration_ms",
+                        self.llm.answer(
+                            prompt=run.prompt,
+                            plan=plan,
+                            tool_outputs=outputs,
+                            history=history,
+                            memories=memories,
+                            recalled_memories=recalled_memories,
+                        ),
+                    )
                 await self._save_pending_final_response(run_id, final_response)
             if run.context_comment_id and run.context_post_id:
                 await self._consume_budget(run_id, "tool")
@@ -862,9 +1219,9 @@ class AgentWorker:
             run.intent_detail = intent_detail
             goal = str(intent_detail.get("goal") or "").strip()
             run.summary = (
-                f"已理解：{goal[:180]}，正在生成执行计划"
+                f"已理解：{goal[:180]}，正在选择执行路径"
                 if goal
-                else "已理解需求，正在生成执行计划"
+                else "已理解需求，正在选择执行路径"
             )
             run.updated_at = utc_now()
             await append_event(
@@ -873,6 +1230,95 @@ class AgentWorker:
                 "INTENT_UNDERSTOOD",
                 intent_detail,
             )
+
+    async def _enter_workload_lane(
+        self,
+        *,
+        run_id: str,
+        path: ExecutionPath,
+        lane: str,
+        classification_summary: str,
+        direct_response: str | None,
+    ) -> bool:
+        now = utc_now()
+        capacity = (
+            self.settings.max_concurrent_read_runs_per_user
+            if lane == "READ"
+            else self.settings.max_concurrent_runs_per_user
+        )
+        async with self.database.sessions() as session, session.begin():
+            run = await session.get(Run, run_id, with_for_update=True)
+            if (
+                run is None
+                or run.lease_owner != self.worker_id
+                or run.status != "RUNNING"
+            ):
+                raise RuntimeError("过期 Worker 不能选择执行通道")
+            if session.get_bind().dialect.name == "postgresql":
+                await session.scalar(
+                    select(
+                        func.pg_advisory_xact_lock(
+                            func.hashtext(
+                                f"assistant:lane:{run.user_id}:{lane}"
+                            )
+                        )
+                    )
+                )
+            active_in_lane = await session.scalar(
+                select(func.count(Run.id)).where(
+                    Run.user_id == run.user_id,
+                    Run.id != run.id,
+                    Run.status == "RUNNING",
+                    Run.workload_lane == lane,
+                    Run.lease_expires_at.is_not(None),
+                    Run.lease_expires_at >= now,
+                )
+            )
+            run.execution_path = path
+            run.workload_lane = lane
+            checkpoint = {
+                **dict(run.checkpoint or {}),
+                "execution_path": path,
+                "workload_lane": lane,
+                "classification_summary": classification_summary,
+                "execution_selected_at": now.isoformat(),
+            }
+            if direct_response:
+                checkpoint["direct_response"] = direct_response
+            run.checkpoint = checkpoint
+            run.updated_at = now
+
+            if int(active_in_lane or 0) >= capacity:
+                run.status = "WAITING_LANE"
+                run.retry_after = now + timedelta(
+                    seconds=max(0.1, self.settings.worker_poll_seconds)
+                )
+                run.lease_owner = None
+                run.lease_expires_at = None
+                await append_event(
+                    session,
+                    run.id,
+                    "WORKLOAD_LANE_WAITING",
+                    {
+                        "execution_path": path,
+                        "workload_lane": lane,
+                        "capacity": capacity,
+                    },
+                )
+                return False
+
+            await append_event(
+                session,
+                run.id,
+                "EXECUTION_PATH_SELECTED",
+                {
+                    "execution_path": path,
+                    "workload_lane": lane,
+                    "classification_summary": classification_summary,
+                    "capacity": capacity,
+                },
+            )
+            return True
 
     async def _structured_output_retry(
         self, run_id: str, phase: str
@@ -1122,6 +1568,11 @@ class AgentWorker:
             step.status = "COMPLETED"
             step.output = output
             step.completed_at = utc_now()
+            artifact = await publish_step_artifact(
+                session,
+                step=step,
+                output=output,
+            )
             await append_event(
                 session,
                 step.run_id,
@@ -1130,6 +1581,9 @@ class AgentWorker:
                     "step_id": step.id,
                     "ordinal": step.ordinal,
                     "tool": step.tool_name,
+                    "artifact_id": artifact.id,
+                    "artifact_type": artifact.artifact_type,
+                    "artifact_version": artifact.version,
                     "output": output,
                 },
             )
@@ -1284,10 +1738,42 @@ class AgentWorker:
             previous_outputs=previous_outputs,
         )
         definition = self.registry.get(tool)
-        if definition.risk == RiskLevel.EXTERNAL_WRITE:
-            if not await self._has_approval(run.id, ordinal, args):
-                raise ApprovalRequired(args)
         args = self.registry.validate(tool, args)
+        approval_granted = (
+            await self._has_approval(run.id, ordinal, args)
+            if definition.risk == RiskLevel.EXTERNAL_WRITE
+            else False
+        )
+        decision = self.policy.evaluate(
+            context=PolicyContext(
+                run_id=run.id,
+                user_id=run.user_id,
+                tenant_id=run.tenant_id,
+                principal_role=run.principal_role,
+                action=tool,
+                resource=_policy_resource(tool, args, definition),
+                approval_granted=approval_granted,
+            ),
+            definition=definition,
+            registry=self.registry,
+        )
+        await self._record_policy_decision(
+            run=run,
+            tool=tool,
+            resource=_policy_resource(tool, args, definition),
+            decision=decision,
+        )
+        if decision.decision == PolicyDecisionType.DENY:
+            raise PermissionError(decision.reason)
+        if decision.decision == PolicyDecisionType.REQUIRE_APPROVAL:
+            raise ApprovalRequired(args)
+        if definition.execution_mode == ExecutionMode.ASYNC:
+            return await self._enqueue_or_read_tool_job(
+                run=run,
+                tool=tool,
+                args=args,
+                ordinal=ordinal,
+            )
         if definition.side_effecting:
             return await self._execute_side_effect(
                 run=run,
@@ -1310,7 +1796,162 @@ class AgentWorker:
             tool, raw_output, args, run_id=run.id
         )
 
+    async def _record_policy_decision(
+        self,
+        *,
+        run: Run,
+        tool: str,
+        resource: dict[str, Any],
+        decision: PolicyDecision,
+    ) -> None:
+        async with self.database.sessions() as session, session.begin():
+            session.add(
+                PolicyAudit(
+                    run_id=run.id,
+                    user_id=run.user_id,
+                    tenant_id=run.tenant_id,
+                    principal_role=run.principal_role,
+                    action=tool,
+                    resource=resource,
+                    decision=decision.decision.value,
+                    reason=decision.reason,
+                    policy_version=decision.policy_version,
+                    context={"limits": decision.limits},
+                )
+            )
+            await append_event(
+                session,
+                run.id,
+                "POLICY_DECIDED",
+                {
+                    "action": tool,
+                    "decision": decision.decision.value,
+                    "reason": decision.reason,
+                    "policy_version": decision.policy_version,
+                },
+            )
+
+    async def _enqueue_or_read_tool_job(
+        self,
+        *,
+        run: Run,
+        tool: str,
+        args: dict[str, Any],
+        ordinal: int,
+    ) -> dict[str, Any]:
+        request_hash = _stable_hash({"tool": tool, "arguments": args})
+        idempotency_key = f"assistant-tool-job-{run.id}-{ordinal}"
+        async with self.database.sessions() as session, session.begin():
+            job = await session.scalar(
+                select(ToolJob)
+                .where(
+                    ToolJob.run_id == run.id,
+                    ToolJob.step_ordinal == ordinal,
+                    ToolJob.tool_name == tool,
+                )
+                .with_for_update()
+            )
+            if job is None:
+                owning_run = await session.get(Run, run.id, with_for_update=True)
+                if (
+                    owning_run is None
+                    or owning_run.lease_owner != self.worker_id
+                ):
+                    raise RuntimeError("过期 Worker 不能创建异步工具任务")
+                if owning_run.tool_calls >= owning_run.max_tool_calls:
+                    raise RuntimeError("工具调用预算已耗尽")
+                owning_run.tool_calls += 1
+                job = ToolJob(
+                    run_id=run.id,
+                    step_ordinal=ordinal,
+                    tool_name=tool,
+                    arguments=args,
+                    request_hash=request_hash,
+                    idempotency_key=idempotency_key,
+                    status="PENDING",
+                    max_attempts=self.settings.tool_job_max_attempts,
+                    next_attempt_at=utc_now(),
+                )
+                session.add(job)
+                await session.flush()
+                await append_event(
+                    session,
+                    run.id,
+                    "BUDGET_UPDATED",
+                    {
+                        "model_calls": owning_run.model_calls,
+                        "tool_calls": owning_run.tool_calls,
+                        "replan_count": owning_run.replan_count,
+                    },
+                )
+                await append_event(
+                    session,
+                    run.id,
+                    "TOOL_JOB_QUEUED",
+                    {
+                        "job_id": job.id,
+                        "tool": tool,
+                        "max_attempts": job.max_attempts,
+                    },
+                )
+            elif job.request_hash != request_hash:
+                raise RuntimeError(
+                    "同一步骤的异步工具参数已变化，拒绝复用旧任务"
+                )
+            if job.status == "COMPLETED" and job.result is not None:
+                return self.registry.validate_output(
+                    tool,
+                    dict(job.result),
+                    args,
+                    run_id=run.id,
+                )
+            if job.status == "DEAD_LETTER":
+                raise RuntimeError(
+                    f"异步工具任务进入 Dead Letter：{job.error or tool}"
+                )
+            if job.status == "CANCELLED":
+                raise RuntimeError("异步工具任务已取消")
+            job_id = job.id
+            job_status = job.status
+            state = {
+                "job_id": job.id,
+                "tool": tool,
+                "status": job.status,
+                "attempts": job.attempts,
+                "max_attempts": job.max_attempts,
+            }
+        raise DependencyPending(
+            task_id=job_id,
+            status=job_status,
+            state=state,
+            dependency_type="TOOL_JOB",
+        )
+
     async def _dispatch_tool(
+        self,
+        *,
+        run: Run,
+        tool: str,
+        args: dict[str, Any],
+        ordinal: int,
+        timeout_seconds: int,
+        operation_key: str,
+        continuation: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        handler = self.registry.handler_for(tool)
+        if handler is None:
+            raise ValueError(f"No execution handler registered for tool: {tool}")
+        return await handler(
+            run=run,
+            tool=tool,
+            args=args,
+            ordinal=ordinal,
+            timeout_seconds=timeout_seconds,
+            operation_key=operation_key,
+            continuation=continuation,
+        )
+
+    async def _dispatch_tool_legacy(
         self,
         *,
         run: Run,
@@ -1595,10 +2236,14 @@ class AgentWorker:
             }
         if tool == "publication.schedule":
             run_at = _parse_run_at(args["run_at"])
-            if run_at <= utc_now() + timedelta(seconds=15):
+            if run_at <= utc_now() + timedelta(
+                seconds=self.settings.publication_min_lead_seconds
+            ):
                 raise ValueError("定时发布时间必须至少晚于当前时间 15 秒")
             ttl_seconds = int((run_at - utc_now()).total_seconds()) + 3_600
-            if ttl_seconds > 604_800:
+            if ttl_seconds > int(
+                timedelta(days=self.settings.publication_max_schedule_days).total_seconds()
+            ):
                 raise ValueError("定时发布目前最多可提前约 6 天安排")
             capability = await self._issue_capability(
                 run,
@@ -1642,9 +2287,13 @@ class AgentWorker:
             final_run_at = base_run_at + timedelta(
                 minutes=interval * (len(items) - 1)
             )
-            if base_run_at <= utc_now() + timedelta(seconds=15):
+            if base_run_at <= utc_now() + timedelta(
+                seconds=self.settings.publication_min_lead_seconds
+            ):
                 raise ValueError("批量定时发布时间必须至少晚于当前时间 15 秒")
-            if final_run_at > utc_now() + timedelta(days=6):
+            if final_run_at > utc_now() + timedelta(
+                days=self.settings.publication_max_schedule_days
+            ):
                 raise ValueError("批量定时发布目前最多可提前约 6 天安排")
             actions: list[dict[str, Any]] = []
             for index, item in enumerate(items):
@@ -1761,8 +2410,9 @@ class AgentWorker:
             deleted = 0
             already_deleted = 0
             completed_ids: list[str] = []
-            for chunk_index, start in enumerate(range(0, len(post_ids), 20)):
-                chunk = post_ids[start : start + 20]
+            chunk_size = self.settings.deletion_batch_chunk_size
+            for chunk_index, start in enumerate(range(0, len(post_ids), chunk_size)):
+                chunk = post_ids[start : start + chunk_size]
                 capability = await self._issue_capability(
                     run,
                     action="community.delete_own_posts_batch",
@@ -2068,33 +2718,32 @@ class AgentWorker:
                 ),
                 None,
             )
-            if (
-                isinstance(getattr(run, "intent_detail", None), dict)
-                and getattr(run, "intent_detail").get("domain")
-                == "community_operation"
-                and moderation is None
-            ):
-                raise ValueError("社区运营草稿必须先经过审核 Agent 才能发布")
             if moderation and moderation.get("final_action") != "PASS":
                 raise ValueError("草稿未通过审核，发布步骤已阻止")
         elif tool == "publication.schedule_batch":
-            approved_drafts: dict[str, dict[str, str]] = {}
+            bound_drafts: dict[str, dict[str, str]] = {}
             for item in previous_outputs:
-                if item.get("tool") != "moderation.check_draft":
+                if item.get("tool") != "creator.create_draft":
                     continue
                 result = item.get("result", {})
-                if result.get("final_action") != "PASS":
-                    continue
                 draft_id = str(result.get("draft_id") or "")
                 content_sha = str(result.get("content_sha256") or "").lower()
                 if draft_id and content_sha:
-                    approved_drafts[draft_id] = {
+                    bound_drafts[draft_id] = {
                         "draft_id": draft_id,
                         "expected_content_sha256": content_sha,
                     }
-            if not 2 <= len(approved_drafts) <= 10:
-                raise ValueError("批量定时发布需要 2—10 篇已通过审核的草稿")
-            args["items"] = list(approved_drafts.values())
+            failed_moderation = {
+                str(item.get("result", {}).get("draft_id") or "")
+                for item in previous_outputs
+                if item.get("tool") == "moderation.check_draft"
+                and item.get("result", {}).get("final_action") != "PASS"
+            }
+            if failed_moderation & set(bound_drafts):
+                raise ValueError("显式审核未通过的草稿不能进入批量发布")
+            if not 2 <= len(bound_drafts) <= 10:
+                raise ValueError("批量定时发布需要当前任务生成的 2—10 篇草稿")
+            args["items"] = list(bound_drafts.values())
             args.setdefault("interval_minutes", 30)
         elif tool == "community.reply_comment":
             args["post_id"] = str(args.get("post_id") or run.context_post_id or "")
@@ -2208,6 +2857,13 @@ class AgentWorker:
     def _is_draft_placeholder(value: str) -> bool:
         text = value.strip()
         if text.startswith("$"):
+            return True
+        lowered = text.lower()
+        if (
+            text.startswith("{{")
+            and text.endswith("}}")
+            and "draft" in lowered
+        ):
             return True
         normalized = text.upper().replace("-", "_").replace(" ", "_")
         return normalized in {
@@ -2392,11 +3048,20 @@ class AgentWorker:
                     run_id=run.id,
                 )
             )
+            final_artifact = await publish_final_artifact(
+                session,
+                run=run,
+                final_response=final_response,
+            )
             await append_event(
                 session,
                 run.id,
                 "RUN_COMPLETED",
-                {"status": "COMPLETED", "response": final_response},
+                {
+                    "status": "COMPLETED",
+                    "response": final_response,
+                    "final_artifact_id": final_artifact.id,
+                },
             )
         if self.memory is not None:
             try:
@@ -2667,6 +3332,29 @@ def _effect_resource_id(tool: str, arguments: dict[str, Any]) -> str | None:
             str(value) for value in list(arguments.get("post_ids") or [])
         )
     return None
+
+
+def _policy_resource(
+    tool: str,
+    arguments: dict[str, Any],
+    definition: ToolDefinition,
+) -> dict[str, Any]:
+    if tool.startswith(("community.", "publication.")):
+        authority = "JAVA"
+    elif tool.startswith("creator."):
+        authority = "CREATOR_AGENT"
+    elif tool.startswith("moderation."):
+        authority = "MODERATION_AGENT"
+    else:
+        authority = "MCP"
+    return {
+        "authority": authority,
+        "resource_id": _effect_resource_id(tool, arguments),
+        "side_effecting": definition.side_effecting,
+        "risk": definition.risk.value,
+        "open_world": tool.startswith("mcp.")
+        and not tool.startswith("mcp.creator."),
+    }
 
 
 def _remote_operation_id(output: dict[str, Any]) -> str | None:

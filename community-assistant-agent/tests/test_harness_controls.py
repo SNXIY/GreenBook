@@ -71,6 +71,8 @@ def test_model_cannot_replace_creator_content_fingerprint() -> None:
         "draft from previous step",
         "LAST_DRAFT",
         "AUTO",
+        "{{steps.create_draft.output.draft_id}}",
+        "{{ steps.create_draft.result.draft_id }}",
     ],
 )
 def test_publish_placeholder_resolves_to_current_run_creator_output(

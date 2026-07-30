@@ -11,7 +11,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from app.config import Settings
-from app.tools import ToolRegistry
+from app.tools import RiskLevel, ToolRegistry
 
 
 @dataclass(frozen=True)
@@ -28,6 +28,8 @@ class McpBinding:
     server: McpServer
     remote_name: str
     input_schema: dict[str, Any]
+    risk: RiskLevel
+    side_effecting: bool
 
 
 class McpGateway:
@@ -88,11 +90,29 @@ class McpGateway:
                 qualified = f"mcp.{server.name}.{tool.name}"
                 schema = dict(tool.inputSchema or {"type": "object"})
                 Draft202012Validator.check_schema(schema)
+                annotations = getattr(tool, "annotations", None)
+                read_only = bool(
+                    getattr(annotations, "readOnlyHint", False)
+                )
+                destructive = bool(
+                    getattr(annotations, "destructiveHint", False)
+                )
+                risk = (
+                    RiskLevel.READ
+                    if read_only
+                    else (
+                        RiskLevel.EXTERNAL_WRITE
+                        if destructive
+                        else RiskLevel.REVERSIBLE
+                    )
+                )
                 binding = McpBinding(
                     qualified_name=qualified,
                     server=server,
                     remote_name=tool.name,
                     input_schema=schema,
+                    risk=risk,
+                    side_effecting=not read_only,
                 )
                 self.bindings[qualified] = binding
                 registry.register_mcp_tool(
@@ -102,7 +122,18 @@ class McpGateway:
                         f"通过受控 MCP Server {server.name} 调用 {tool.name}。"
                         f"{tool.description or ''}"
                     )[:1_000],
+                    risk=risk,
+                    side_effecting=not read_only,
+                    handler=self._handler_for(qualified),
                 )
+
+    def _handler_for(self, qualified_name: str):
+        async def handler(
+            *, args: dict[str, Any], timeout_seconds: int, **_: Any
+        ) -> dict[str, Any]:
+            return await self.call(qualified_name, args)
+
+        return handler
 
     async def call(self, qualified_name: str, arguments: dict[str, Any]) -> dict:
         try:
@@ -149,7 +180,8 @@ class McpGateway:
                 "server": binding.server.name,
                 "remote_name": binding.remote_name,
                 "input_schema": binding.input_schema,
-                "risk": "READ",
+                "risk": binding.risk.value,
+                "side_effecting": binding.side_effecting,
             }
             for binding in sorted(
                 self.bindings.values(), key=lambda item: item.qualified_name

@@ -52,7 +52,9 @@ export type AssistantRun = {
   run_id: string;
   conversation_id: string;
   goal: string;
-  status: "QUEUED" | "RUNNING" | "RETRYING" | "WAITING_DEPENDENCY" | "WAITING_APPROVAL" | "PAUSED" | "COMPLETED" | "FAILED" | "CANCELLED";
+  status: "QUEUED" | "RUNNING" | "RETRYING" | "WAITING_DEPENDENCY" | "WAITING_LANE" | "WAITING_APPROVAL" | "PAUSED" | "COMPLETED" | "FAILED" | "CANCELLED";
+  execution_path: "ROUTING" | "DIRECT" | "TOOL" | "CREATOR" | "ORCHESTRATED";
+  workload_lane: "ROUTING" | "READ" | "WRITE";
   intent?: string | null;
   summary?: string | null;
   final_response?: string | null;

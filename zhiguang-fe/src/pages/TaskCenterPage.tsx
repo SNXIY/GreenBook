@@ -58,6 +58,7 @@ const assistantStatus = (status: AssistantRun["status"]): [string, TaskGroup] =>
     RUNNING: ["执行中", "active"],
     RETRYING: ["重试中", "active"],
     WAITING_DEPENDENCY: ["等待依赖", "active"],
+    WAITING_LANE: ["等待执行通道", "active"],
     WAITING_APPROVAL: ["等待确认", "attention"],
     PAUSED: ["已暂停", "attention"],
     COMPLETED: ["已完成", "completed"],
@@ -418,7 +419,7 @@ const TaskCenterPage = () => {
           </button>
         );
       }
-      if (["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY"].includes(run.status)) {
+      if (["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY", "WAITING_LANE"].includes(run.status)) {
         return (
           <>
             <button

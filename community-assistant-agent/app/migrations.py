@@ -25,6 +25,8 @@ ASSISTANT_REVISIONS = {
     "006_concurrency_latency",
     "007_orchestration_platform",
     "008_four_layer_memory",
+    "009_governed_runtime",
+    "010_adaptive_execution",
 }
 
 

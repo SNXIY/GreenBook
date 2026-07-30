@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import AssistantMarkdown from "@/components/content/AssistantMarkdown";
 import {
   AssistantIcon,
   CheckIcon,
@@ -220,7 +221,7 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
   };
 
   const interruptRun = async () => {
-    if (!token || !run || !["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY"].includes(run.status)) return;
+    if (!token || !run || !["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY", "WAITING_LANE"].includes(run.status)) return;
     runControllerRef.current?.abort();
     setError(null);
     try {
@@ -505,7 +506,11 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
                   {message.role === "assistant" ? (
                     <span className={styles.messageAuthor}><AssistantIcon width={16} height={16} aria-hidden="true" /> GREEN-BOOK 助手</span>
                   ) : null}
-                  <div className={styles.messageText}>{message.content}</div>
+                  <div className={styles.messageText}>
+                    {message.role === "assistant"
+                      ? <AssistantMarkdown content={message.content} />
+                      : message.content}
+                  </div>
                   {message.parts?.length ? (
                     <details className={styles.executionDetails}>
                       <summary>查看本次执行记录</summary>
@@ -524,7 +529,7 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
                   <div className={styles.runHeading}>
                     <span className={run.status === "CANCELLED" ? styles.stopped : styles.pulse} aria-hidden="true" />
                     <strong>{run.summary || "正在理解并执行任务"}</strong>
-                    {!run.approval && ["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY"].includes(run.status) ? (
+                    {!run.approval && ["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY", "WAITING_LANE"].includes(run.status) ? (
                       <button className={styles.cancelRun} type="button" onClick={() => void interruptRun()}>
                         暂停
                       </button>
@@ -609,6 +614,16 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
                   <details className={styles.runMeta}>
                     <summary>运行详情</summary>
                     <span>追踪号 {run.trace_id.slice(0, 8)}</span>
+                    <span>
+                      路径 {{
+                        ROUTING: "路由中",
+                        DIRECT: "直接回答",
+                        TOOL: "单工具",
+                        CREATOR: "AI 创作",
+                        ORCHESTRATED: "完整编排"
+                      }[run.execution_path]}
+                    </span>
+                    <span>通道 {run.workload_lane === "WRITE" ? "串行写入" : run.workload_lane === "READ" ? "并发只读" : "路由中"}</span>
                     <span>模型 {run.budget.model_calls}/{run.budget.max_model_calls}</span>
                     <span>工具 {run.budget.tool_calls}/{run.budget.max_tool_calls}</span>
                     <span>模型耗时 {(run.timing.model_ms / 1000).toFixed(1)}s</span>

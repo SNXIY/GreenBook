@@ -38,8 +38,13 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = 0.8
     run_concurrency: int = 4
     scheduler_concurrency: int = 2
+    tool_job_concurrency: int = 2
     max_concurrent_runs_per_user: int = 1
+    max_concurrent_read_runs_per_user: int = 3
     lease_seconds: int = 90
+    tool_job_lease_seconds: int = 90
+    tool_job_max_attempts: int = 4
+    tool_job_poll_seconds: float = 0.8
     creator_timeout_seconds: int = 240
     creator_dependency_poll_seconds: float = 30.0
     event_stream_poll_seconds: float = 1.0
@@ -54,6 +59,9 @@ class Settings(BaseSettings):
     max_replans: int = 2
     max_run_attempts: int = 3
     run_timeout_seconds: int = 600
+    publication_min_lead_seconds: int = 15
+    publication_max_schedule_days: int = 6
+    deletion_batch_chunk_size: int = 20
     conversation_context_max_chars: int = 16_000
     tool_context_max_chars: int = 24_000
     post_context_max_chars: int = 32_000
@@ -86,25 +94,38 @@ class Settings(BaseSettings):
             )
         if not self.service_shared_secret.strip():
             raise ValueError("ASSISTANT_SERVICE_SHARED_SECRET is required")
-        if not self.moderation_auth_secret.strip():
+        if self.process_role not in {
+            "all",
+            "api",
+            "run-worker",
+            "scheduler-worker",
+            "tool-worker",
+        }:
             raise ValueError(
-                "MODERATION_AGENT_AUTH_SECRET is required for real moderation"
-            )
-        if self.process_role not in {"all", "api", "run-worker", "scheduler-worker"}:
-            raise ValueError(
-                "ASSISTANT_PROCESS_ROLE must be all, api, run-worker or scheduler-worker"
+                "ASSISTANT_PROCESS_ROLE must be all, api, run-worker, "
+                "scheduler-worker or tool-worker"
             )
         if min(
             self.run_concurrency,
             self.scheduler_concurrency,
+            self.tool_job_concurrency,
             self.max_concurrent_runs_per_user,
+            self.max_concurrent_read_runs_per_user,
         ) < 1:
             raise ValueError("Assistant concurrency limits must be positive")
+        if min(self.tool_job_lease_seconds, self.tool_job_max_attempts) < 1:
+            raise ValueError("Assistant tool queue limits must be positive")
         if min(
             self.model_requests_per_minute,
             self.user_model_requests_per_minute,
         ) < 1:
             raise ValueError("Assistant distributed rate limits must be positive")
+        if min(
+            self.publication_min_lead_seconds,
+            self.publication_max_schedule_days,
+            self.deletion_batch_chunk_size,
+        ) < 1:
+            raise ValueError("Assistant side-effect policy limits must be positive")
         if self.episodic_memory_retention_days < 1:
             raise ValueError("ASSISTANT_EPISODIC_MEMORY_RETENTION_DAYS must be positive")
         if not 1 <= self.episodic_memory_recall_limit <= 20:

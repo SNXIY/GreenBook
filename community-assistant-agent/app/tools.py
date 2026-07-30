@@ -5,6 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 import hashlib
 import json
+from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
@@ -362,6 +363,11 @@ class RiskLevel(StrEnum):
     EXTERNAL_WRITE = "EXTERNAL_WRITE"
 
 
+class ExecutionMode(StrEnum):
+    INLINE = "INLINE"
+    ASYNC = "ASYNC"
+
+
 @dataclass(frozen=True)
 class ToolDefinition:
     name: str
@@ -373,11 +379,18 @@ class ToolDefinition:
     timeout_seconds: int
     planner_visible: bool = True
     side_effecting: bool = False
+    execution_mode: ExecutionMode = ExecutionMode.INLINE
+
+
+# Tool implementations are deliberately kept out of the model-facing schema.
+# The registry owns the execution boundary so new tools can be added without
+# changing the worker's orchestration loop.
+ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
 
 
 class ToolRegistry:
-    def __init__(self) -> None:
-        definitions = [
+    def __init__(self, definitions: Iterable[ToolDefinition] | None = None) -> None:
+        definitions = list((definitions if definitions is not None else [
             ToolDefinition(
                 "community.search_posts",
                 "检索社区",
@@ -432,6 +445,7 @@ class ToolRegistry:
                 ModerationOutput,
                 RiskLevel.REVERSIBLE,
                 180,
+                planner_visible=False,
                 side_effecting=True,
             ),
             ToolDefinition(
@@ -504,24 +518,60 @@ class ToolRegistry:
                 False,
                 True,
             ),
-        ]
+        ]))
         self._definitions = {item.name: item for item in definitions}
+        self._handlers: dict[str, ToolHandler] = {}
+
+    def register_handler(self, name: str, handler: ToolHandler) -> None:
+        """Bind an execution handler to an already registered tool.
+
+        Registration is intentionally separate from the model-facing
+        definition. This allows the same tool contract to be used by the
+        worker, a test harness, or a future plugin process.
+        """
+        self.get(name)
+        if name in self._handlers:
+            raise ValueError(f"Duplicate tool handler: {name}")
+        self._handlers[name] = handler
+
+    def register(self, definition: ToolDefinition, handler: ToolHandler | None = None) -> None:
+        """Register a new tool contract and optionally its implementation."""
+        if definition.name in self._definitions:
+            raise ValueError(f"Duplicate tool: {definition.name}")
+        self._definitions[definition.name] = definition
+        if handler is not None:
+            self._handlers[definition.name] = handler
+
+    def handler_for(self, name: str) -> ToolHandler | None:
+        self.get(name)
+        return self._handlers.get(name)
+
+    def names(self) -> tuple[str, ...]:
+        return tuple(sorted(self._definitions))
 
     def register_mcp_tool(
-        self, *, name: str, label: str, description: str
+        self, *, name: str, label: str, description: str,
+        risk: RiskLevel = RiskLevel.READ,
+        side_effecting: bool = False,
+        handler: ToolHandler | None = None,
     ) -> None:
         if not name.startswith("mcp."):
             raise ValueError("MCP tool name must use the mcp.* namespace")
         if name in self._definitions:
             raise ValueError(f"Duplicate tool: {name}")
-        self._definitions[name] = ToolDefinition(
-            name,
-            label,
-            description,
-            McpArguments,
-            McpOutput,
-            RiskLevel.READ,
-            60,
+        self.register(
+            ToolDefinition(
+                name,
+                label,
+                description,
+                McpArguments,
+                McpOutput,
+                risk,
+                60,
+                side_effecting=side_effecting,
+                execution_mode=ExecutionMode.ASYNC,
+            ),
+            handler=handler,
         )
 
     def get(self, name: str) -> ToolDefinition:
@@ -584,7 +634,10 @@ class ToolRegistry:
 
     def catalog_prompt(self) -> str:
         return "\n".join(
-            f"- {item.name}：{item.description} 风险={item.risk.value}"
+            (
+                f"- {item.name}：{item.description} 风险={item.risk.value} "
+                f"执行={item.execution_mode.value}"
+            )
             for item in self._definitions.values()
             if item.planner_visible
         )
@@ -597,6 +650,7 @@ class ToolRegistry:
                 "output": item.output_model.model_json_schema(),
                 "risk": item.risk.value,
                 "side_effecting": item.side_effecting,
+                "execution_mode": item.execution_mode.value,
                 "planner_visible": item.planner_visible,
             }
             for item in sorted(self._definitions.values(), key=lambda value: value.name)

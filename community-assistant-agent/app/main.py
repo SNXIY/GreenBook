@@ -24,6 +24,9 @@ from app.database import (
     Message,
     Run,
     RunStep,
+    Artifact,
+    PolicyAudit,
+    ToolJob,
     ScheduledAction,
     ScheduledActionAttempt,
     SideEffect,
@@ -35,6 +38,7 @@ from app.database import (
 )
 from app.domain import (
     AgentPlan,
+    ArtifactView,
     ConversationCreate,
     ConversationView,
     MessageCreate,
@@ -47,6 +51,7 @@ from app.domain import (
     MemoryProfileView,
     EpisodicMemoryView,
     Principal,
+    PolicyAuditView,
     RunAccepted,
     RunListItemView,
     RunListStepView,
@@ -54,17 +59,21 @@ from app.domain import (
     ScheduledActionAttemptView,
     ScheduledActionView,
     StepView,
+    ToolJobView,
 )
 from app.agent_registry import agent_registry
+from app.artifacts import blackboard_snapshot
 from app.graph_runtime import graph_descriptor
 from app.llm import DeepSeekClient
 from app.mcp_gateway import McpGateway
 from app.memory import AssistantMemory
+from app.policy import community_policy
 from app.rate_limit import DistributedRateLimiter
 from app.security import current_principal
 from app.token_vault import DelegatedTokenVault
 from app.worker import AgentWorker
 from app.tools import tool_registry
+from app.skill_registry import skill_registry
 
 
 class Runtime:
@@ -107,10 +116,16 @@ class Runtime:
         if self.settings.process_role == "all":
             self.worker_task = asyncio.create_task(self.worker.run_forever())
         elif self.settings.process_role == "run-worker":
-            self.worker_task = asyncio.create_task(self.worker.run_jobs_forever())
+            self.worker_task = asyncio.create_task(
+                self.worker.run_and_tool_jobs_forever()
+            )
         elif self.settings.process_role == "scheduler-worker":
             self.worker_task = asyncio.create_task(
                 self.worker.schedule_jobs_forever()
+            )
+        elif self.settings.process_role == "tool-worker":
+            self.worker_task = asyncio.create_task(
+                self.worker.tool_jobs_forever()
             )
 
     async def close(self) -> None:
@@ -172,6 +187,8 @@ async def health(rt: RuntimeDep) -> dict:
                 "database": "UP",
                 "model": rt.settings.deepseek_model,
                 "mcp_tools": len(rt.mcp.bindings),
+                "skills": len(skill_registry.public_catalog()),
+                "policy_version": community_policy.version,
                 "episodic_memory": memory.episodic,
                 "semantic_memory": memory.semantic,
                 "memory_backend": memory.backend,
@@ -260,18 +277,21 @@ async def list_messages(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def send_message(
-    conversation_id: str,
-    body: MessageCreate,
-    principal: PrincipalDep,
-    rt: RuntimeDep,
+    conversation_id: str, # 会话ID
+    body: MessageCreate, # 消息内容
+    principal: PrincipalDep, # 当前用户
+    rt: RuntimeDep, # 运行时
     idempotency_key: Annotated[
         str, Header(alias="Idempotency-Key", min_length=8, max_length=128)
-    ],
-) -> RunAccepted:
+    ],# 幂等性键
+) -> RunAccepted: # 返回任务接受结果
+    # 验证当前用户是否拥有该会话，如果会话不存在或不属于该用户，会抛出异常。
     conversation = await _owned_conversation(rt, conversation_id, principal.user_id)
+    # 计算请求的哈希值，用于后续幂等性验证。
     request_hash = hashlib.sha256(
         f"{conversation_id}\0{body.model_dump_json()}".encode()
     ).hexdigest()
+    # 在数据库中查找幂等性记录，确保同一幂等性键只能用于一次请求。
     async with rt.database.sessions() as session, session.begin():
         existing = await session.scalar(
             select(IdempotencyRecord).where(
@@ -279,12 +299,15 @@ async def send_message(
                 IdempotencyRecord.key == idempotency_key,
             )
         )
+        # 如果幂等性记录存在，则需要验证请求的哈希值是否与记录中的哈希值一致。
         if existing:
             if existing.request_hash != request_hash:
+                # 如果请求的哈希值与记录中的哈希值不一致，则抛出冲突异常。
                 raise HTTPException(
                     status.HTTP_409_CONFLICT,
                     "同一 Idempotency-Key 不能用于不同请求",
                 )
+            # 如果请求的哈希值与记录中的哈希值一致，则返回已有的任务ID。
             return RunAccepted(
                 run_id=existing.run_id,
                 conversation_id=conversation_id,
@@ -292,9 +315,12 @@ async def send_message(
                 events_url=f"/api/v1/assistant/runs/{existing.run_id}/events/stream",
                 replayed=True,
             )
+        # 如果幂等性记录不存在，则创建新的任务。
         run = Run(
             conversation_id=conversation_id,
             user_id=principal.user_id,
+            tenant_id=principal.tenant_id,
+            principal_role=principal.role,
             prompt=body.content.strip(),
             context_post_id=body.context_post_id or conversation.context_post_id,
             context_comment_id=body.context_comment_id,
@@ -309,8 +335,10 @@ async def send_message(
             deadline_at=utc_now()
             + timedelta(seconds=rt.settings.run_timeout_seconds),
         )
+        # 将任务添加到数据库。
         session.add(run)
         await session.flush()
+        # 创建用户消息记录。
         session.add(
             Message(
                 conversation_id=conversation_id,
@@ -320,6 +348,7 @@ async def send_message(
                 run_id=run.id,
             )
         )
+        # 创建幂等性记录。
         session.add(
             IdempotencyRecord(
                 user_id=principal.user_id,
@@ -328,17 +357,25 @@ async def send_message(
                 run_id=run.id,
             )
         )
+        # 更新会话标题。
         conversation.title = (
             body.content.strip()[:32]
             if conversation.title == "新的对话"
             else conversation.title
         )
+        # 更新会话更新时间。
         conversation.updated_at = utc_now()
+        # 追加任务排队事件。
         await append_event(session, run.id, "RUN_QUEUED", {"status": "QUEUED"})
+    # 返回任务接受结果。
     return RunAccepted(
+        # 任务ID。
         run_id=run.id,
+        # 会话ID。
         conversation_id=conversation_id,
+        # 任务状态。
         status="QUEUED",
+        # 事件流URL。
         events_url=f"/api/v1/assistant/runs/{run.id}/events/stream",
     )
 
@@ -388,10 +425,194 @@ async def list_agents(principal: PrincipalDep) -> dict:
     }
 
 
+@app.get("/api/v1/assistant/skills")
+async def list_skills(principal: PrincipalDep) -> dict:
+    del principal
+    return {
+        "skills": skill_registry.public_catalog(),
+        "registry_signature": skill_registry.signature(),
+    }
+
+
+@app.get("/api/v1/assistant/policy")
+async def get_policy(principal: PrincipalDep) -> dict:
+    del principal
+    return {
+        **community_policy.public_summary(),
+        "policy_signature": community_policy.signature(),
+    }
+
+
 @app.get("/api/v1/assistant/mcp/tools")
 async def list_mcp_tools(principal: PrincipalDep, rt: RuntimeDep) -> dict:
     del principal
     return {"tools": rt.mcp.public_catalog()}
+
+
+@app.get(
+    "/api/v1/assistant/runs/{run_id}/artifacts",
+    response_model=list[ArtifactView],
+)
+async def list_run_artifacts(
+    run_id: str,
+    principal: PrincipalDep,
+    rt: RuntimeDep,
+) -> list[ArtifactView]:
+    await _owned_run(rt, run_id, principal.user_id)
+    async with rt.database.sessions() as session:
+        artifacts = list(
+            (
+                await session.scalars(
+                    select(Artifact)
+                    .where(Artifact.run_id == run_id)
+                    .order_by(Artifact.created_at, Artifact.id)
+                )
+            ).all()
+        )
+    return [
+        ArtifactView(
+            artifact_id=item.id,
+            run_id=item.run_id,
+            step_id=item.step_id,
+            task_id=item.task_key,
+            agent=item.agent_name,
+            artifact_type=item.artifact_type,
+            parent_artifact_ids=list(item.parent_artifact_ids or []),
+            version=item.version,
+            content=dict(item.content or {}),
+            content_hash=item.content_hash,
+            created_at=item.created_at,
+        )
+        for item in artifacts
+    ]
+
+
+@app.get("/api/v1/assistant/runs/{run_id}/blackboard")
+async def get_run_blackboard(
+    run_id: str,
+    principal: PrincipalDep,
+    rt: RuntimeDep,
+) -> dict:
+    await _owned_run(rt, run_id, principal.user_id)
+    async with rt.database.sessions() as session:
+        return await blackboard_snapshot(session, run_id=run_id)
+
+
+@app.get(
+    "/api/v1/assistant/runs/{run_id}/tool-jobs",
+    response_model=list[ToolJobView],
+)
+async def list_run_tool_jobs(
+    run_id: str,
+    principal: PrincipalDep,
+    rt: RuntimeDep,
+) -> list[ToolJobView]:
+    await _owned_run(rt, run_id, principal.user_id)
+    async with rt.database.sessions() as session:
+        jobs = list(
+            (
+                await session.scalars(
+                    select(ToolJob)
+                    .where(ToolJob.run_id == run_id)
+                    .order_by(ToolJob.created_at)
+                )
+            ).all()
+        )
+    return [_tool_job_view(item) for item in jobs]
+
+
+@app.post(
+    "/api/v1/assistant/tool-jobs/{job_id}/retry",
+    response_model=ToolJobView,
+)
+async def retry_tool_job(
+    job_id: str,
+    principal: PrincipalDep,
+    rt: RuntimeDep,
+) -> ToolJobView:
+    async with rt.database.sessions() as session, session.begin():
+        job = await session.scalar(
+            select(ToolJob).where(ToolJob.id == job_id).with_for_update()
+        )
+        if job is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "工具任务不存在")
+        run = await session.scalar(
+            select(Run)
+            .where(
+                Run.id == job.run_id,
+                Run.user_id == principal.user_id,
+            )
+            .with_for_update()
+        )
+        if run is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "工具任务不存在")
+        if job.status != "DEAD_LETTER":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "只有 Dead Letter 工具任务可以人工重试",
+            )
+        now = utc_now()
+        job.status = "PENDING"
+        job.attempts = 0
+        job.error = None
+        job.dead_lettered_at = None
+        job.next_attempt_at = now
+        job.lease_owner = None
+        job.lease_expires_at = None
+        job.updated_at = now
+        if run.status == "FAILED":
+            run.status = "QUEUED"
+            run.error = None
+            run.completed_at = None
+            run.delegated_token = rt.token_vault.encrypt(principal.token)
+            run.deadline_at = now + timedelta(
+                seconds=rt.settings.run_timeout_seconds
+            )
+            run.retry_after = now
+            run.version += 1
+            run.updated_at = now
+        await append_event(
+            session,
+            run.id,
+            "TOOL_JOB_MANUAL_RETRY",
+            {"job_id": job.id, "tool": job.tool_name},
+        )
+    return _tool_job_view(job)
+
+
+@app.get(
+    "/api/v1/assistant/runs/{run_id}/policy-audits",
+    response_model=list[PolicyAuditView],
+)
+async def list_run_policy_audits(
+    run_id: str,
+    principal: PrincipalDep,
+    rt: RuntimeDep,
+) -> list[PolicyAuditView]:
+    await _owned_run(rt, run_id, principal.user_id)
+    async with rt.database.sessions() as session:
+        audits = list(
+            (
+                await session.scalars(
+                    select(PolicyAudit)
+                    .where(PolicyAudit.run_id == run_id)
+                    .order_by(PolicyAudit.created_at)
+                )
+            ).all()
+        )
+    return [
+        PolicyAuditView(
+            audit_id=item.id,
+            run_id=item.run_id,
+            action=item.action,
+            resource=dict(item.resource or {}),
+            decision=item.decision,
+            reason=item.reason,
+            policy_version=item.policy_version,
+            created_at=item.created_at,
+        )
+        for item in audits
+    ]
 
 
 @app.get("/api/v1/assistant/runs/{run_id}/graph")
@@ -421,7 +642,13 @@ async def get_run_graph(
 async def interrupt_run(
     run_id: str, principal: PrincipalDep, rt: RuntimeDep
 ) -> RunView:
-    allowed = {"QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY"}
+    allowed = {
+        "QUEUED",
+        "RUNNING",
+        "RETRYING",
+        "WAITING_DEPENDENCY",
+        "WAITING_LANE",
+    }
     async with rt.database.sessions() as session, session.begin():
         run = await session.scalar(
             select(Run)
@@ -620,6 +847,24 @@ async def cancel_run(
             effect.status = "CANCELLED"
             effect.error = propagation_error
             effect.updated_at = now
+
+        tool_jobs = (
+            await session.scalars(
+                select(ToolJob).where(
+                    ToolJob.run_id == run_id,
+                    ToolJob.status.not_in(
+                        ["COMPLETED", "DEAD_LETTER", "CANCELLED"]
+                    ),
+                )
+            )
+        ).all()
+        for job in tool_jobs:
+            job.status = "CANCELLED"
+            job.error = "所属任务已取消"
+            job.next_attempt_at = None
+            job.lease_owner = None
+            job.lease_expires_at = None
+            job.updated_at = now
 
         await append_event(
             session,
@@ -856,6 +1101,25 @@ async def operation_metrics(
                 .group_by(Run.status)
             )
         ).all()
+        path_rows = (
+            await session.execute(
+                select(
+                    Run.execution_path,
+                    func.count(Run.id),
+                    func.coalesce(func.avg(Run.model_calls), 0),
+                    func.coalesce(func.avg(Run.model_duration_ms), 0),
+                )
+                .where(Run.user_id == principal.user_id)
+                .group_by(Run.execution_path)
+            )
+        ).all()
+        lane_rows = (
+            await session.execute(
+                select(Run.workload_lane, func.count(Run.id))
+                .where(Run.user_id == principal.user_id)
+                .group_by(Run.workload_lane)
+            )
+        ).all()
         totals = (
             await session.execute(
                 select(
@@ -872,6 +1136,17 @@ async def operation_metrics(
     return {
         "runs": int(totals[0]),
         "status_counts": {str(name): int(count) for name, count in status_rows},
+        "execution_paths": {
+            str(name): {
+                "runs": int(count),
+                "average_model_calls": round(float(model_calls), 2),
+                "average_model_duration_ms": round(float(model_ms), 2),
+            }
+            for name, count, model_calls, model_ms in path_rows
+        },
+        "workload_lane_counts": {
+            str(name): int(count) for name, count in lane_rows
+        },
         "average_model_calls": round(float(totals[1]), 2),
         "average_tool_calls": round(float(totals[2]), 2),
         "average_replans": round(float(totals[3]), 2),
@@ -1133,6 +1408,19 @@ async def _owned_conversation(
     return conversation
 
 
+async def _owned_run(rt: Runtime, run_id: str, user_id: str) -> Run:
+    async with rt.database.sessions() as session:
+        run = await session.scalar(
+            select(Run).where(
+                Run.id == run_id,
+                Run.user_id == user_id,
+            )
+        )
+    if run is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "任务不存在")
+    return run
+
+
 def _conversation_view(item: Conversation) -> ConversationView:
     return ConversationView(
         conversation_id=item.id,
@@ -1158,6 +1446,8 @@ def _run_view(run: Run) -> RunView:
         conversation_id=run.conversation_id,
         goal=run.prompt,
         status=run.status,
+        execution_path=run.execution_path,
+        workload_lane=run.workload_lane,
         intent=run.intent,
         summary=run.summary,
         final_response=run.final_response,
@@ -1300,6 +1590,24 @@ def _scheduled_view(item: ScheduledAction) -> ScheduledActionView:
         attempts=item.attempts,
         result=item.result,
         error=item.error,
+    )
+
+
+def _tool_job_view(item: ToolJob) -> ToolJobView:
+    return ToolJobView(
+        job_id=item.id,
+        run_id=item.run_id,
+        step_ordinal=item.step_ordinal,
+        tool_name=item.tool_name,
+        status=item.status,
+        attempts=item.attempts,
+        max_attempts=item.max_attempts,
+        next_attempt_at=item.next_attempt_at,
+        result=dict(item.result) if item.result else None,
+        error=item.error,
+        dead_lettered_at=item.dead_lettered_at,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
     )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+from pathlib import Path
 from typing import Iterable
 
 from app.domain import AgentPlan, AgentPlanStep
@@ -28,11 +29,47 @@ class AgentDescriptor:
 
 
 class AgentRegistry:
+    """Capability-based routing over a versioned, loadable Agent manifest."""
+
     def __init__(self, agents: Iterable[AgentDescriptor]) -> None:
         materialized = list(agents)
         self._agents = {agent.name: agent for agent in materialized}
         if len(self._agents) != len(materialized):
             raise ValueError("Agent Registry contains duplicate names")
+
+    @classmethod
+    def from_manifest(cls, path: str | Path) -> "AgentRegistry":
+        manifest_path = Path(path)
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError("Agent manifest must be a JSON array")
+        agents: list[AgentDescriptor] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                raise ValueError("Each Agent manifest entry must be an object")
+            name = str(item.get("name") or "").strip()
+            description = str(item.get("description") or "").strip()
+            capabilities = item.get("capabilities")
+            tools = item.get("tools")
+            if (
+                not name
+                or not description
+                or not isinstance(capabilities, list)
+                or not isinstance(tools, list)
+            ):
+                raise ValueError(
+                    "Agent manifest entries require name, description, capabilities and tools"
+                )
+            agents.append(
+                AgentDescriptor(
+                    name=name,
+                    description=description,
+                    capabilities=frozenset(str(value) for value in capabilities),
+                    tools=frozenset(str(value) for value in tools),
+                    max_parallel_tasks=max(1, int(item.get("max_parallel_tasks", 1))),
+                )
+            )
+        return cls(agents)
 
     def get(self, name: str) -> AgentDescriptor:
         try:
@@ -60,11 +97,14 @@ class AgentRegistry:
         return candidates[0]
 
     def route_plan(self, plan: AgentPlan) -> AgentPlan:
-        routed_steps = []
-        for step in plan.steps:
-            selected = self.route(step)
-            routed_steps.append(step.model_copy(update={"agent": selected.name}))
-        return plan.model_copy(update={"steps": routed_steps})
+        return plan.model_copy(
+            update={
+                "steps": [
+                    step.model_copy(update={"agent": self.route(step).name})
+                    for step in plan.steps
+                ]
+            }
+        )
 
     def catalog_prompt(self) -> str:
         return "\n".join(
@@ -97,83 +137,6 @@ class AgentRegistry:
         return hashlib.sha256(encoded).hexdigest()
 
 
-agent_registry = AgentRegistry(
-    [
-        AgentDescriptor(
-            "SearchAgent",
-            "检索、读取并基于社区证据回答问题。",
-            frozenset({"search", "read_post", "summarize"}),
-            frozenset(
-                {
-                    "community.search_posts",
-                    "community.get_post",
-                    "community.summarize_post",
-                }
-            ),
-            max_parallel_tasks=4,
-        ),
-        AgentDescriptor(
-            "AnalyticsAgent",
-            "分析社区主题趋势、帖子表现和时间窗口指标。",
-            frozenset({"analysis", "trend_analysis"}),
-            frozenset({"community.analyze_engagement"}),
-            max_parallel_tasks=2,
-        ),
-        AgentDescriptor(
-            "UserInsightAgent",
-            "分析用户互动、贡献者和受众活跃结构。",
-            frozenset({"analysis", "user_insight"}),
-            frozenset({"community.analyze_engagement"}),
-            max_parallel_tasks=2,
-        ),
-        AgentDescriptor(
-            "ContentCreationAgent",
-            "委派 Creator Agent 生成或改写社区内容草稿。",
-            frozenset({"generation", "rewrite_content"}),
-            frozenset({"creator.create_draft"}),
-        ),
-        AgentDescriptor(
-            "ModerationAgent",
-            "委派内容审核 Agent 对待发布草稿进行风险检查。",
-            frozenset({"moderation", "risk_check"}),
-            frozenset({"moderation.check_draft"}),
-        ),
-        AgentDescriptor(
-            "PublishAgent",
-            "在人工确认和版本边界内立即或定时发布。",
-            frozenset({"publishing", "schedule_publish"}),
-            frozenset(
-                {
-                    "publication.publish_now",
-                    "publication.schedule",
-                    "publication.schedule_batch",
-                }
-            ),
-        ),
-        AgentDescriptor(
-            "InteractionAgent",
-            "处理评论区助手回复。",
-            frozenset({"comment_interaction"}),
-            frozenset({"community.reply_comment"}),
-        ),
-        AgentDescriptor(
-            "ContentManagementAgent",
-            "在当前用户身份和精确资源清单内查询、删除社区内容。",
-            frozenset({"list_own_content", "delete_content"}),
-            frozenset(
-                {
-                    "community.list_own_posts",
-                    "community.delete_post",
-                    "community.delete_own_posts_batch",
-                }
-            ),
-        ),
-        AgentDescriptor(
-            "MCPAgent",
-            "通过白名单 MCP Server 使用受控的外部工具。",
-            frozenset({"external_research", "mcp_tool"}),
-            frozenset({"mcp.*"}),
-            max_parallel_tasks=2,
-        ),
-    ]
+agent_registry = AgentRegistry.from_manifest(
+    Path(__file__).with_name("agent_manifest.json")
 )

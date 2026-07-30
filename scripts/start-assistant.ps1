@@ -12,9 +12,7 @@ if ([string]::IsNullOrWhiteSpace($env:DEEPSEEK_API_KEY)) {
 }
 
 $sharedSecret = Get-GreenBookEnvValue -Name "ASSISTANT_SERVICE_SHARED_SECRET" -DefaultValue ""
-$moderationSecret = Get-GreenBookEnvValue -Name "MODERATION_AGENT_AUTH_SECRET" -DefaultValue ""
 Assert-GreenBookSecret -Name "ASSISTANT_SERVICE_SHARED_SECRET" -Value $sharedSecret -ForbiddenValues @("change-me-assistant-service")
-Assert-GreenBookSecret -Name "MODERATION_AGENT_AUTH_SECRET" -Value $moderationSecret -ForbiddenValues @("change-me-moderation-secret")
 
 $postgresUser = Get-GreenBookEnvValue -Name "GREENBOOK_POSTGRES_USER" -DefaultValue "mindflow"
 $postgresPassword = Get-GreenBookEnvValue -Name "GREENBOOK_POSTGRES_PASSWORD" -DefaultValue "mindflow"
@@ -36,7 +34,6 @@ $env:ASSISTANT_IDENTITY_AUDIENCE = "community-assistant-agent"
 $env:ASSISTANT_IDENTITY_JWKS_URL = "http://127.0.0.1:8080/.well-known/jwks.json"
 $env:ASSISTANT_ALLOW_INSECURE_HTTP = "true"
 $env:ASSISTANT_SERVICE_SHARED_SECRET = $sharedSecret
-$env:MODERATION_AGENT_AUTH_SECRET = $moderationSecret
 $env:ASSISTANT_API_HOST = "127.0.0.1"
 $env:ASSISTANT_API_PORT = $assistantPort
 $env:ASSISTANT_DEV_RELOAD = if ($NoReload) { "false" } else { "true" }

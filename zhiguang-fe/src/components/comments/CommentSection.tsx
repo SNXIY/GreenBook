@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { useAuth } from "@/context/AuthContext";
+import AssistantMarkdown from "@/components/content/AssistantMarkdown";
 import { commentService } from "@/services/commentService";
 import type { CommentItem } from "@/types/comment";
 import { AssistantIcon, CheckIcon } from "@/components/icons/Icon";
@@ -18,26 +17,6 @@ const formatTime = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("zh-CN", { hour12: false });
 };
-
-const AssistantMarkdown = ({ content }: { content: string }) => (
-  <div className={styles.assistantMarkdown}>
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        a: ({ node, ...props }) => (
-          <a {...props} target="_blank" rel="noreferrer" />
-        ),
-        img: ({ src, alt }) => (
-          <a href={src} target="_blank" rel="noreferrer">
-            {alt?.trim() || "查看图片"}
-          </a>
-        )
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  </div>
-);
 
 const CommentSection = ({ postId, authorId }: Props) => {
   const { tokens, user, isLoading: authLoading } = useAuth();

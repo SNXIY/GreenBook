@@ -76,12 +76,20 @@ class Run(Base):
         ForeignKey("assistant_conversations.id"), index=True
     )
     user_id: Mapped[str] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), default="zhiguang", index=True)
+    principal_role: Mapped[str] = mapped_column(String(32), default="USER")
     prompt: Mapped[str] = mapped_column(Text)
     context_post_id: Mapped[str | None] = mapped_column(String(64))
     context_comment_id: Mapped[str | None] = mapped_column(String(64))
     client_timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
     delegated_token: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(24), default="QUEUED", index=True)
+    execution_path: Mapped[str] = mapped_column(
+        String(24), default="ROUTING", index=True
+    )
+    workload_lane: Mapped[str] = mapped_column(
+        String(16), default="ROUTING", index=True
+    )
     version: Mapped[int] = mapped_column(Integer, default=1)
     intent: Mapped[str | None] = mapped_column(String(64))
     intent_detail: Mapped[dict | None] = mapped_column(JSON)
@@ -288,6 +296,96 @@ class Approval(Base):
     run: Mapped[Run] = relationship(back_populates="approvals")
 
 
+class Artifact(Base):
+    """An immutable, versioned output published by an Agent or the Harness."""
+
+    __tablename__ = "assistant_artifacts"
+    __table_args__ = (
+        UniqueConstraint("run_id", "task_key", "version"),
+        UniqueConstraint("run_id", "step_id", "content_hash"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_runs.id"), index=True
+    )
+    step_id: Mapped[str | None] = mapped_column(
+        ForeignKey("assistant_run_steps.id"), index=True
+    )
+    task_key: Mapped[str] = mapped_column(String(80), index=True)
+    agent_name: Mapped[str] = mapped_column(String(80), index=True)
+    artifact_type: Mapped[str] = mapped_column(String(64), index=True)
+    parent_artifact_ids: Mapped[list] = mapped_column(JSON, default=list)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    content: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+
+
+class PolicyAudit(Base):
+    """Durable record of every runtime authorization decision."""
+
+    __tablename__ = "assistant_policy_audits"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(String(36), index=True)
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), index=True)
+    principal_role: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(120), index=True)
+    resource: Mapped[dict] = mapped_column(JSON, default=dict)
+    decision: Mapped[str] = mapped_column(String(32), index=True)
+    reason: Mapped[str] = mapped_column(String(500))
+    policy_version: Mapped[str] = mapped_column(String(64), index=True)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+
+
+class ToolJob(Base):
+    """Durable queue item for slow or remotely executed registered tools."""
+
+    __tablename__ = "assistant_tool_jobs"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key"),
+        UniqueConstraint("run_id", "step_ordinal", "tool_name"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_runs.id"), index=True
+    )
+    step_ordinal: Mapped[int] = mapped_column(Integer)
+    tool_name: Mapped[str] = mapped_column(String(120), index=True)
+    arguments: Mapped[dict] = mapped_column(JSON)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    idempotency_key: Mapped[str] = mapped_column(String(180))
+    status: Mapped[str] = mapped_column(String(32), default="PENDING", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    lease_owner: Mapped[str | None] = mapped_column(String(80))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    result: Mapped[dict | None] = mapped_column(JSON)
+    error: Mapped[str | None] = mapped_column(Text)
+    dead_lettered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
 class UserMemory(Base):
     __tablename__ = "assistant_user_memories"
     __table_args__ = (UniqueConstraint("user_id", "key"),)
@@ -380,6 +478,12 @@ class Database:
 async def append_event(
     session: AsyncSession, run_id: str, event_type: str, payload: dict
 ) -> None:
+    # Serialize sequence allocation per run. Parallel read-only DAG steps can
+    # finish at the same time; without this row lock both transactions could
+    # observe the same MAX(sequence) and violate the unique constraint.
+    await session.execute(
+        select(Run.id).where(Run.id == run_id).with_for_update()
+    )
     current = await session.scalar(
         select(func.max(AgentEvent.sequence)).where(AgentEvent.run_id == run_id)
     )

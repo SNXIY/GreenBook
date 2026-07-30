@@ -75,11 +75,54 @@ class StepView(ApiModel):
     max_attempts: int = 1
 
 
+class ArtifactView(ApiModel):
+    artifact_id: str
+    run_id: str
+    step_id: str | None
+    task_id: str
+    agent: str
+    artifact_type: str
+    parent_artifact_ids: list[str]
+    version: int
+    content: dict[str, Any]
+    content_hash: str
+    created_at: datetime
+
+
+class ToolJobView(ApiModel):
+    job_id: str
+    run_id: str
+    step_ordinal: int
+    tool_name: str
+    status: str
+    attempts: int
+    max_attempts: int
+    next_attempt_at: datetime | None
+    result: dict[str, Any] | None
+    error: str | None
+    dead_lettered_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PolicyAuditView(ApiModel):
+    audit_id: str
+    run_id: str
+    action: str
+    resource: dict[str, Any]
+    decision: str
+    reason: str
+    policy_version: str
+    created_at: datetime
+
+
 class RunView(ApiModel):
     run_id: str
     conversation_id: str
     goal: str
     status: str
+    execution_path: str
+    workload_lane: str
     intent: str | None
     summary: str | None
     final_response: str | None
@@ -141,16 +184,9 @@ class ScheduledActionAttemptView(ApiModel):
 
 
 class CommunityIntent(ApiModel):
-    domain: Literal[
-        "content_publish",
-        "content_edit",
-        "content_delete",
-        "comment_interaction",
-        "search_query",
-        "data_analysis",
-        "community_operation",
-        "general_answer",
-    ]
+    # Intent labels are catalog-driven instead of a closed Python enum. New
+    # community abilities can extend the catalog without changing this schema.
+    domain: str = Field(pattern=r"^[a-z][a-z0-9_]{2,63}$")
     goal: str = Field(min_length=1, max_length=500)
     priority: Literal["low", "normal", "high", "urgent"] = "normal"
     constraints: list[str] = Field(default_factory=list, max_length=20)
@@ -182,17 +218,7 @@ class AgentPlanStep(ApiModel):
 
 
 class AgentPlan(ApiModel):
-    intent: Literal[
-        "ANSWER",
-        "SEARCH",
-        "SUMMARIZE",
-        "CREATE",
-        "SCHEDULE_CREATE_AND_PUBLISH",
-        "CREATE_AND_PUBLISH",
-        "DELETE",
-        "ANALYZE",
-        "OPERATE",
-    ]
+    intent: str = Field(pattern=r"^[A-Z][A-Z0-9_]{1,63}$")
     summary: str = Field(min_length=1, max_length=240)
     response_guidance: str = Field(default="", max_length=1_000)
     intent_detail: CommunityIntent | None = None
@@ -258,6 +284,36 @@ class AgentPlan(ApiModel):
                 completed.add(task_id)
                 del remaining[task_id]
         return layers
+
+
+class AdaptiveExecutionDecision(ApiModel):
+    execution_path: Literal["DIRECT", "TOOL", "CREATOR", "ORCHESTRATED"]
+    classification_summary: str = Field(min_length=1, max_length=240)
+    intent: CommunityIntent
+    direct_response: str | None = Field(default=None, max_length=10_000)
+    plan: AgentPlan | None = None
+
+    @model_validator(mode="after")
+    def validate_execution_contract(self) -> "AdaptiveExecutionDecision":
+        if self.execution_path == "DIRECT":
+            if not self.direct_response or not self.direct_response.strip():
+                raise ValueError("DIRECT execution requires direct_response")
+            if self.plan is not None and self.plan.steps:
+                raise ValueError("DIRECT execution cannot contain tool steps")
+        elif self.execution_path in {"TOOL", "CREATOR"}:
+            if self.plan is None or not self.plan.steps:
+                raise ValueError(
+                    f"{self.execution_path} execution requires an executable plan"
+                )
+            if self.direct_response is not None:
+                raise ValueError(
+                    f"{self.execution_path} execution cannot precompute a response"
+                )
+        elif self.direct_response is not None:
+            raise ValueError(
+                "ORCHESTRATED execution cannot precompute a final response"
+            )
+        return self
 
 
 class VerificationDecision(ApiModel):

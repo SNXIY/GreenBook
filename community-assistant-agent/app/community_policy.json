@@ -1,0 +1,43 @@
+{
+  "version": "greenbook-community-v1",
+  "default_decision": "DENY",
+  "hard_guards": {
+    "registered_tools_only": true,
+    "direct_database_access": false,
+    "internet_access": false,
+    "java_authority_for_community_writes": true,
+    "publish_state_machine_bypass": false
+  },
+  "roles": {
+    "USER": {
+      "allow": [
+        "community.*",
+        "creator.*",
+        "publication.*"
+      ],
+      "require_approval": [
+        "community.delete_post",
+        "community.delete_own_posts_batch",
+        "publication.publish_now",
+        "publication.schedule_batch"
+      ]
+    },
+    "ADMIN": {
+      "allow": [
+        "community.*",
+        "creator.*",
+        "publication.*",
+        "moderation.*"
+      ],
+      "require_approval": [
+        "community.delete_post",
+        "community.delete_own_posts_batch",
+        "publication.publish_now",
+        "publication.schedule_batch"
+      ]
+    }
+  },
+  "allowed_mcp_namespaces": [
+    "mcp.creator.*"
+  ]
+}

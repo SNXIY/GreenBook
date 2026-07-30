@@ -1,4 +1,4 @@
-from app.agent_registry import agent_registry
+from app.agent_registry import AgentRegistry, agent_registry
 from app.domain import AgentPlan, CommunityIntent
 from app.evaluation import evaluate_plan
 from app.graph_runtime import graph_descriptor
@@ -34,27 +34,12 @@ def operation_plan() -> AgentPlan:
                     "depends_on": ["trend", "users"],
                 },
                 {
-                    "task_id": "moderate",
-                    "agent": "ModerationAgent",
-                    "capabilities": ["moderation"],
-                    "tool": "moderation.check_draft",
-                    "label": "审核内容",
-                    "depends_on": ["create"],
-                },
-                {
                     "task_id": "publish",
                     "agent": "PublishAgent",
                     "capabilities": ["publishing"],
                     "tool": "publication.publish_now",
                     "label": "发布内容",
-                    "depends_on": ["moderate"],
-                    "condition": {
-                        "source_task": "moderate",
-                        "path": "final_action",
-                        "operator": "eq",
-                        "value": "PASS",
-                        "on_false": "skip",
-                    },
+                    "depends_on": ["create"],
                 },
             ],
         }
@@ -66,14 +51,12 @@ def test_operation_dag_has_parallel_analysis_frontier() -> None:
     assert graph_descriptor(plan)["layers"] == [
         ["trend", "users"],
         ["create"],
-        ["moderate"],
         ["publish"],
     ]
     assert [step.agent for step in agent_registry.route_plan(plan).steps] == [
         "AnalyticsAgent",
         "UserInsightAgent",
         "ContentCreationAgent",
-        "ModerationAgent",
         "PublishAgent",
     ]
 
@@ -102,7 +85,6 @@ def test_evaluation_scores_complete_operation_plan() -> None:
             "trend_analysis",
             "user_insight",
             "generation",
-            "moderation",
             "publishing",
         ],
         confidence=0.95,
@@ -116,7 +98,6 @@ def test_evaluation_scores_complete_operation_plan() -> None:
         required_tools={
             "community.analyze_engagement",
             "creator.create_draft",
-            "moderation.check_draft",
             "publication.publish_now",
         },
         forbidden_tools={"community.delete_post"},
@@ -124,7 +105,6 @@ def test_evaluation_scores_complete_operation_plan() -> None:
             "AnalyticsAgent",
             "UserInsightAgent",
             "ContentCreationAgent",
-            "ModerationAgent",
             "PublishAgent",
         },
     )
@@ -155,3 +135,29 @@ def test_batch_schedule_is_one_exact_external_write_approval_boundary() -> None:
     assert definition.risk == RiskLevel.EXTERNAL_WRITE
     assert definition.side_effecting is True
     assert len(arguments["items"]) == 2
+
+
+def test_agent_registry_manifest_can_extend_without_worker_changes(tmp_path) -> None:
+    manifest = tmp_path / "agents.json"
+    manifest.write_text(
+        '[{"name":"BookmarkAgent","description":"Bookmark posts",'
+        '"capabilities":["bookmark"],"tools":["community.bookmark"]}]',
+        encoding="utf-8",
+    )
+    registry = AgentRegistry.from_manifest(manifest)
+    plan = AgentPlan.model_validate(
+        {
+            "intent": "ANSWER",
+            "summary": "bookmark",
+            "steps": [
+                {
+                    "task_id": "bookmark",
+                    "agent": "AutoRouter",
+                    "capabilities": ["bookmark"],
+                    "tool": "community.bookmark",
+                    "label": "bookmark",
+                }
+            ],
+        }
+    )
+    assert registry.route(plan.steps[0]).name == "BookmarkAgent"

@@ -63,44 +63,38 @@
       "trend_analysis",
       "user_insight",
       "generation",
-      "moderation",
       "publishing"
     ],
     "required_tools": [
       "community.analyze_engagement",
       "creator.create_draft",
-      "moderation.check_draft",
       "publication.publish_now"
     ],
     "expected_agents": [
       "AnalyticsAgent",
       "UserInsightAgent",
       "ContentCreationAgent",
-      "ModerationAgent",
       "PublishAgent"
     ],
     "forbidden_tools": ["community.delete_post"]
   },
   {
     "id": "batch-create-moderate-schedule",
-    "prompt": "分析最近社区热点，写 10 篇不同角度的帖子，审核后从明天上午八点起每隔一小时发布",
+    "prompt": "分析最近社区热点，写 10 篇不同角度的帖子，从明天上午八点起每隔一小时发布",
     "expected_domain": "community_operation",
     "required_capabilities": [
       "analysis",
       "generation",
-      "moderation",
       "schedule_publish"
     ],
     "required_tools": [
       "community.analyze_engagement",
       "creator.create_draft",
-      "moderation.check_draft",
       "publication.schedule_batch"
     ],
     "expected_agents": [
       "AnalyticsAgent",
       "ContentCreationAgent",
-      "ModerationAgent",
       "PublishAgent"
     ],
     "forbidden_tools": [
