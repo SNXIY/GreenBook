@@ -1,6 +1,5 @@
 from moderation.schemas import ModerationAction, RiskType
 
-
 _PREFLIGHT_MESSAGES = {
     "L0_ABUSE_HARD": "内容包含高置信度的人身攻击、辱骂或威胁表达，请修改后重新提交。",
     "L0_ADVERTISING_HARD": "内容包含联系方式引流或广告推广信息，请移除相关内容后重新提交。",

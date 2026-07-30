@@ -6,8 +6,8 @@ MindFlow Creator 是一个面向知识社区创作者的可恢复、多 Agent �
 
 当前仓库只包含 Creator 业务，不包含聊天、咨询、风险评估或后台报告系统。
 
-与知光 Java/React 项目的双路径创作、HMAC 身份、真实社区数据和发布溯源约定见
-[知光集成说明](../cankao/zhiguang_be-main/docs/creator-agent-integration.md)。
+与 GreenBook Java/React 项目的双路径创作、OIDC 身份、真实社区数据和发布溯源约定见
+[GreenBook 集成说明](../docs/INTEGRATION.md)。
 
 ## 创作流程
 
@@ -166,7 +166,7 @@ app/
 │   ├── evaluation/          # Dataset、Metric、Judge、报告持久化
 │   ├── infrastructure/      # SQLAlchemy、UoW、Artifact Store
 │   ├── memory/              # Redis、SQL、Qdrant Memory
-│   ├── providers/           # Zhiguang Java Community Provider
+│   ├── providers/           # GreenBook Java Community Provider
 │   ├── retrieval/           # Agentic RAG
 │   ├── runtime/             # LangGraph、Supervisor、Checkpoint
 │   ├── tools/               # Tool Gateway、审计和 MCP 适配
@@ -206,7 +206,7 @@ CREATOR_BASIC_USERNAME=creator
 CREATOR_BASIC_PASSWORD=<local-development-password>
 CREATOR_BASIC_CREATOR_ID=creator-local
 CREATOR_BASIC_ACTOR_ID=creator-local
-CREATOR_BASIC_DISPLAY_NAME=Demo Creator
+CREATOR_BASIC_DISPLAY_NAME=GreenBook Creator
 CREATOR_LOCAL_AUTO_LOGIN=true
 CREATOR_API_TENANT_ID=tenant-local
 ```
@@ -397,10 +397,10 @@ Tools、OIDC、API/SSE、Migration、Outbox Worker 和 Evaluation。
 
 ## 当前边界
 
-- 社区数据只来自 Zhiguang Java 服务，缺少连接参数时服务拒绝启动。
+- 社区数据只来自 GreenBook Java 服务，缺少连接参数时服务拒绝启动。
 - AI 生成与 AI 辅助内容经过 Creator Critic/Evaluation，不进入独立内容审核流程。
 - Critic 负责事实、结构、风格和内容质量，不承担政策合规审核。
-- 最终发布仍由外部系统负责；知光集成通过签名交接创建带 Artifact Lineage 的
+- 最终发布仍由外部系统负责；GreenBook 集成通过签名交接创建带 Artifact Lineage 的
   `AI_ASSISTED` 草稿，再由用户在现有编辑器确认发布。
 - 当前素材支持文本、链接摘录和本地文本文件；网页抓取、PDF/Office 解析与向量化摄取
   仍需接入独立的异步解析管线。

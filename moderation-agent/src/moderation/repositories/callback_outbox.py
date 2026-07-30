@@ -116,6 +116,8 @@ class ModerationCallbackOutboxRepository:
             task_version=task_version,
         ):
             return False
+        if delivery is None:
+            return False
         now = utc_now()
         delivery.status = "DELIVERED"
         delivery.lease_owner = None
@@ -150,6 +152,8 @@ class ModerationCallbackOutboxRepository:
             expected_attempt=expected_attempt,
             task_version=task_version,
         ):
+            return False
+        if delivery is None:
             return False
         now = utc_now()
         delivery.last_error = error[:2_000]

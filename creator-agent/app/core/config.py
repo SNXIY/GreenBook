@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     creator_basic_password: str = ""
     creator_basic_creator_id: str = "creator-local"
     creator_basic_actor_id: str = "creator-local"
-    creator_basic_display_name: str = "Demo Creator"
+    creator_basic_display_name: str = "GreenBook Creator"
     creator_basic_roles: str = "CREATOR"
     creator_local_auto_login: bool = False
 

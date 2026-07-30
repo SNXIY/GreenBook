@@ -85,3 +85,33 @@ async def test_callback_outbox_retries_and_resets_for_new_task_version(
         assert delivery.available_at <= utc_now() + timedelta(seconds=1)
     finally:
         await database.close()
+
+
+@pytest.mark.asyncio
+async def test_callback_outbox_rejects_missing_or_stale_delivery(tmp_path) -> None:
+    database = DatabaseManager()
+    await database.start(f"sqlite+aiosqlite:///{tmp_path / 'callback-stale.db'}")
+    outbox = ModerationCallbackOutboxRepository()
+    try:
+        async with database.session() as session:
+            missing_id = uuid4()
+            assert not await outbox.mark_delivered(
+                session,
+                delivery_id=missing_id,
+                worker_id="callback-1",
+                expected_attempt=1,
+                task_version=1,
+            )
+            assert not await outbox.mark_failed(
+                session,
+                delivery_id=missing_id,
+                worker_id="callback-1",
+                expected_attempt=1,
+                task_version=1,
+                error="late callback",
+                http_status=503,
+                retry_base_seconds=0.1,
+                retry_max_seconds=1,
+            )
+    finally:
+        await database.close()

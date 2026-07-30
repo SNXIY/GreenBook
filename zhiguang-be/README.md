@@ -1,30 +1,141 @@
-# 项目详细文档购买：
-**小红书搜：程序员流年**
+# GreenBook Java Backend
 
-**项目说明：开源代码中缺少配置文件，购买后获得全部代码**
+GreenBook 的 Java 服务是社区业务的唯一事实源，负责身份、用户、帖子、评论、关系、
+通知、存储和发布状态机。三个 Agent 只能通过受控 HTTP 契约使用社区能力，不能直接
+访问 MySQL，也不能绕过 Java 的资源归属与角色校验。
 
-商品详情：https://www.xiaohongshu.com/goods-detail/691f20586ea74e00019b3a3d
+## 技术栈
 
-# 文档示例
-<div style="display: flex; gap: 10px;">
-  <img src="http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/11a8438f.png" width="250" />
-  <img src="http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/4035ca79.png" width="250" />
-  <img src="http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/40b80f25.png" width="250" />
-</div>
+- Java 21、Spring Boot 3.2
+- Spring Security、OAuth2 Resource Server、RS256 JWT
+- MyBatis、MySQL
+- Redis、Redisson、Caffeine
+- Kafka API（本地使用 Redpanda）
+- 阿里云 OSS / 本地文件存储
+- Spring Boot Actuator
 
-![文档1](http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/43eb8fe1.png)
-![文档2](http://zhiguangapp.oss-cn-beijing.aliyuncs.com/posts/262804640385601536/images/20251226/42b24575.png)
+## 业务边界
 
-# 知光平台-知识获取与分享社区
-后端 & 前端开发（前端采用 AI 辅助开发）
-- **后端地址**：https://github.com/G-Pegasus/zhiguang_be
-- **前端地址**：https://github.com/G-Pegasus/zhiguang_fe
-- **项目概述**：知识社区 APP（后续考虑支持付费），支持发布知识、点赞/收藏、关注取关、首页 Feed 展示与对象存储直传，AI 生成摘要等等。项目各模块进行了充分详细的设计以满足高并发和高可用需求
-- **技术栈**：后端 Java 21 + Spring Boot + Spring Security + Spring AI + MyBatis + MySQL + Redis + Kafka + Caffeine + 阿里云 OSS + Canal；前端 React + Vite
-- **项目细节与亮点**：
-    - **认证系统**：开发基于 Spring Security 的 JWT 双令牌认证系统，采用 RS256 签名 + Redis 刷新令牌白名单，实现 15 分钟访问令牌 + 7 天刷新令牌的安全会话管理，支持即时令牌撤销，兼顾高安全与高性能。
-    - **计数系统**：笔记维度(点赞收藏)与用户维度(关注取关) 以 Redis 作为底层存储系统，采用定制化 Redis SDS 二进制紧凑计数，使用 Lua 脚本进行原子更新，并实现了采样一致性校验与自愈重建。定制化 Redis SDS
-    - **发布系统**：采用渐进式发布流程，发布的图片、视频，Markdown 文档等都存入 OSS 对象存储系统，采用后端发布预签名+前端直传的形式上传，节省前后端传输资源渐进式发布流程。并接入 DeepSeek AI 一键生成文章摘要。
-    - **用户关系系统**：实现关注功能，采用一主多从+事件驱动模型。粉丝表，计数系统，列表缓存都作为关注表的伪从。关注事件发生时，在同一事务中插入关注表和 Outbox 表，使用 Canal 订阅 Outbox 表的 binlog，并将变更事件发布到 Kafka 异步更新其他数据源。Outbox 模式
-    - **点赞系统**：采用异步写+写聚合Kafka 异步写+写聚合的形式应对高并发写场景。采用位图的结构高效实现幂等和判重。读取遇到异常或缺失时，基于位图做按需重建，保证最终一致。并用 Kafka 做“灾难回放”的兜底操作。分片位图+计数重建策略
-    - **Feed 流**：采用三级缓存架构且设计了缓存一致性策略，本地 Caffeine + Redis 页面缓存 + Redis 片段缓存。自定义 hotkey 探测机制自定义 hotkey 探测，基于热点检测按层级延长缓存时长，叠加随机抖动抗雪崩。并设置单飞锁(single-flight)避免同一页并发回源风暴。Feed 三级缓存设计
+```text
+Browser / React
+       │ user JWT
+       ▼
+GreenBook Java API
+       ├─ Auth / User / Profile
+       ├─ KnowPost / Comment / Relation / Notification
+       ├─ Storage / OSS
+       ├─ Publication state machine
+       ├─ Creator handoff
+       ├─ Moderation callback
+       └─ Assistant capability tools
+```
+
+Java 负责：
+
+- 签发同时面向 Java、Creator 和 Assistant 的用户 JWT；
+- 校验 `USER`、`ADMIN` 等业务角色；
+- 维护帖子所有权、可见性和发布状态；
+- 为 Creator 接收带内容指纹的 `AI_ASSISTED` 草稿；
+- 为手动创作提交真实 Moderation Agent，并幂等应用审核回调；
+- 为 Assistant 签发绑定用户、动作、资源、Run、期限和使用次数的短时 Capability；
+- 在最终写入前再次执行权限、状态和内容版本校验。
+
+## 发布状态机
+
+```text
+MANUAL:
+draft -> reviewing -> published
+                  \-> rejected -> reviewing
+
+AI_ASSISTED:
+draft -> published
+```
+
+AI 内容不重复走普通发布审核，但 Creator 产物的 SHA-256 会贯穿草稿交接、人工确认、
+定时任务和最终发布；内容被编辑后，旧审批与旧授权自动失效。
+
+手动内容由 `moderation-agent` 异步审核。Java 不在线程中持续轮询，而是接收带服务
+身份的幂等回调，并用定时对账修复断线或重启期间的遗漏。
+
+## Assistant 工具边界
+
+`/api/v1/assistant-tools/**` 使用独立的内部认证协议：
+
+1. Assistant 以服务密钥和当前用户 access token 兑换短时 Capability；
+2. Capability 只允许一个声明过的动作，并绑定资源、Run、用户和有效期；
+3. 后续工具调用同时携带服务密钥与 Capability；
+4. Java 在 Controller/Service 中重新检查资源归属、角色、状态和幂等键。
+
+Spring Security 中这些端点不消费用户 Bearer JWT，因为 Capability 与用户登录令牌属于
+不同认证域；`permitAll` 不代表匿名可用，内部控制器仍会强制校验服务密钥和 Capability。
+
+## 本地启动
+
+从仓库根目录执行：
+
+```powershell
+.\scripts\dev-up.ps1
+.\scripts\start-be.ps1
+```
+
+根目录 `.env` 是本地配置来源，不要在本目录创建包含真实密钥的配置文件。
+
+默认地址：
+
+```text
+http://127.0.0.1:8080
+GET /actuator/health
+GET /.well-known/jwks.json
+```
+
+本地依赖：
+
+| 依赖 | 地址 |
+| --- | --- |
+| MySQL | `127.0.0.1:33306/zhiguang` |
+| Redis | `127.0.0.1:26379`，DB 1 |
+| Redpanda / Kafka | `127.0.0.1:39092` |
+
+## 配置
+
+主要环境变量由根目录启动脚本注入：
+
+```dotenv
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=33306
+MYSQL_DB=zhiguang
+REDIS_HOST=127.0.0.1
+REDIS_PORT=26379
+REDIS_DATABASE=1
+KAFKA_HOST=127.0.0.1
+KAFKA_PORT=39092
+STORAGE_PROVIDER=local
+MODERATION_AGENT_BASE_URL=http://127.0.0.1:8088
+```
+
+项目间服务密钥和外部 API Key 只保存在被 Git 忽略的根 `.env` 中。
+
+## 数据与迁移
+
+- 新环境由 `db/schema.sql` 初始化；
+- 增量 SQL 位于 `db/*_migration.sql`；
+- 本地存储文件默认位于 `data/storage`；
+- MySQL 数据保存在 Docker volume，停止应用不会丢失。
+
+## 验证
+
+```powershell
+mvn test
+```
+
+或从仓库根目录运行全仓验证：
+
+```powershell
+.\scripts\verify-all.ps1
+```
+
+跨服务契约和手工发布链路见：
+
+- [集成契约](../docs/INTEGRATION.md)
+- [自动化 E2E](../scripts/e2e-test.ps1)
+- [验收清单](../docs/ACCEPTANCE.md)

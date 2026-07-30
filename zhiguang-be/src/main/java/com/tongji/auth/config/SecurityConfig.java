@@ -2,6 +2,7 @@ package com.tongji.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -23,8 +24,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -34,6 +36,9 @@ public class SecurityConfig {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+
+    @Value("${app.cors.allowed-origins:http://127.0.0.1:5173,http://localhost:5173}")
+    private String allowedOrigins;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -83,7 +88,7 @@ public class SecurityConfig {
                 )
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
 
-        // ===================== 修复：正确位置 + 正确注入 =====================
+        // Redis allow-list validation requires the authenticated JWT principal.
         http.addFilterAfter(
                 new JwtRedisCheckFilter(redisTemplate, objectMapper),
                 BearerTokenAuthenticationFilter.class
@@ -107,15 +112,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
+        configuration.setAllowedOrigins(
+                Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .filter(value -> !value.isBlank())
+                        .toList()
+        );
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
                 "Authorization", "Content-Type", "X-Requested-With",
-                "X-Moderation-Service-Secret",
-                "X-Creator-Handoff-Secret", "X-Assistant-Service-Secret", "X-Assistant-Capability",
-                "Idempotency-Key", "X-Zhiguang-Service",
-                "X-Zhiguang-User-Id", "X-Zhiguang-Roles", "X-Trace-Id",
-                "X-Zhiguang-Timestamp", "X-Zhiguang-Nonce", "X-Zhiguang-Signature"
+                "Idempotency-Key", "X-Trace-Id"
         ));
         configuration.setExposedHeaders(List.of("ETag", "X-Trace-ID"));
         configuration.setAllowCredentials(false);
