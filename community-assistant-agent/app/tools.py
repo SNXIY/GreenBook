@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 import hashlib
@@ -8,9 +8,10 @@ import json
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from app.untrusted_content import guard_post_payload, inspect_untrusted_text
+from app.artifact_contracts import ArtifactBinding, ArtifactKind
 
 
 class ToolArguments(BaseModel):
@@ -48,10 +49,50 @@ class CreateDraftArguments(ToolArguments):
     references: list[dict[str, Any]] = Field(default_factory=list, max_length=10)
 
 
+class ReviseDraftArguments(CreateDraftArguments):
+    draft_id: str = Field(min_length=1, max_length=64)
+    expected_content_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+
+
+class OwnDraftArguments(ToolArguments):
+    draft_id: str = Field(min_length=1, max_length=64)
+
+
 class ScheduleArguments(ToolArguments):
-    run_at: str = Field(min_length=10, max_length=64)
+    run_at: str | None = Field(default=None, min_length=10, max_length=64)
+    delay_seconds: int | None = Field(default=None, ge=15, le=518_400)
     draft_id: str = Field(min_length=1, max_length=64)
     expected_content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def validate_schedule_time(self) -> "ScheduleArguments":
+        if (self.run_at is None) == (self.delay_seconds is None):
+            raise ValueError("run_at 与 delay_seconds 必须且只能提供一个")
+        return self
+
+
+class ScheduleLookupArguments(ToolArguments):
+    action_id: str = Field(min_length=1, max_length=64)
+
+
+class ScheduleUpdateArguments(ToolArguments):
+    action_id: str = Field(min_length=1, max_length=64)
+    run_at: str | None = Field(default=None, min_length=10, max_length=64)
+    delay_seconds: int | None = Field(default=None, ge=15, le=518_400)
+    draft_id: str | None = Field(default=None, min_length=1, max_length=64)
+    expected_content_sha256: str | None = Field(
+        default=None, pattern=r"^[0-9a-fA-F]{64}$"
+    )
+
+    @model_validator(mode="after")
+    def validate_update(self) -> "ScheduleUpdateArguments":
+        if self.run_at is not None and self.delay_seconds is not None:
+            raise ValueError("run_at 与 delay_seconds 不能同时提供")
+        if (self.draft_id is None) != (self.expected_content_sha256 is None):
+            raise ValueError("draft_id 与 expected_content_sha256 必须同时提供")
+        if self.run_at is None and self.delay_seconds is None and self.draft_id is None:
+            raise ValueError("至少需要修改发布时间或草稿版本")
+        return self
 
 
 class ScheduleBatchItem(ToolArguments):
@@ -82,9 +123,15 @@ class AnalyzeEngagementArguments(ToolArguments):
     limit: int = Field(default=10, ge=1, le=20)
 
 
-class ModerationDraftArguments(ToolArguments):
-    draft_id: str = Field(min_length=1, max_length=64)
-    expected_content_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+class ListActiveUsersArguments(ToolArguments):
+    days: int = Field(default=30, ge=1, le=365)
+    limit: int = Field(default=10, ge=1, le=20)
+
+
+class UserScopedAnalyticsArguments(ToolArguments):
+    user_ids: list[str] = Field(min_length=1, max_length=20)
+    days: int = Field(default=30, ge=1, le=365)
+    limit: int = Field(default=10, ge=1, le=20)
 
 
 class DeletePostArguments(ToolArguments):
@@ -125,6 +172,9 @@ class SearchPostItem(ToolOutput):
 class SearchPostsOutput(ToolOutput):
     query: str = Field(min_length=1, max_length=200)
     results: list[SearchPostItem] = Field(default_factory=list, max_length=10)
+    truncated: bool = False
+    search_complete: bool = True
+    stop_reason: str | None = Field(default=None, max_length=64)
 
 
 class PostContextOutput(ToolOutput):
@@ -180,13 +230,44 @@ class DraftOutput(ToolOutput):
     handoff_id: str | None = Field(default=None, max_length=64)
     status: str | None = Field(default=None, max_length=32)
     content_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    description: str | None = Field(default=None, max_length=2_000)
+    body_markdown: str | None = Field(default=None, max_length=524_288)
+    supersedes_draft_id: str | None = Field(default=None, max_length=64)
+
+
+class OwnedDraftOutput(ToolOutput):
+    draft_id: str = Field(
+        validation_alias=AliasChoices("draft_id", "draftId", "id"),
+        min_length=1,
+        max_length=64,
+    )
+    title: str | None = Field(default=None, max_length=256)
+    description: str | None = Field(default=None, max_length=1_000)
+    body_markdown: str | None = Field(default=None, max_length=524_288)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    status: str = Field(pattern=r"^READY$")
+    content_sha256: str = Field(
+        validation_alias=AliasChoices("content_sha256", "contentSha256"),
+        pattern=r"^[0-9a-fA-F]{64}$",
+    )
+    untrusted_content: bool = True
+    injection_signals: list[str] = Field(default_factory=list, max_length=10)
 
 
 class ScheduleOutput(ToolOutput):
     action_id: str = Field(min_length=1, max_length=64)
     draft_id: str = Field(min_length=1, max_length=64)
     run_at: datetime
-    status: str = Field(pattern=r"^SCHEDULED$")
+    status: str = Field(
+        pattern=r"^(SCHEDULED|RETRYING|RUNNING|COMPLETED|CANCELLED|FAILED)$"
+    )
+
+
+class ScheduleCancelledOutput(ToolOutput):
+    action_id: str = Field(min_length=1, max_length=64)
+    draft_id: str = Field(min_length=1, max_length=64)
+    run_at: datetime
+    status: str = Field(pattern=r"^CANCELLED$")
 
 
 class ScheduleBatchOutput(ToolOutput):
@@ -298,16 +379,66 @@ class EngagementAnalyticsOutput(ToolOutput):
     limitations: list[str] = Field(default_factory=list)
 
 
-class ModerationOutput(ToolOutput):
-    task_id: str
-    draft_id: str
-    status: str
-    final_action: str | None = None
-    risk_type: str | None = None
-    risk_score: float | None = Field(default=None, ge=0, le=1)
-    requires_human_review: bool = False
-    reason: str | None = None
-    content_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+class ActiveUserInsight(ToolOutput):
+    user_id: str = Field(validation_alias=AliasChoices("user_id", "userId"))
+    nickname: str | None = None
+    published_post_count: int = Field(
+        ge=0,
+        validation_alias=AliasChoices(
+            "published_post_count", "publishedPostCount"
+        ),
+    )
+    comment_count: int = Field(
+        ge=0,
+        validation_alias=AliasChoices("comment_count", "commentCount"),
+    )
+    activity_score: int = Field(
+        ge=0,
+        validation_alias=AliasChoices("activity_score", "activityScore"),
+    )
+
+
+class ActiveUsersOutput(ToolOutput):
+    period_start: datetime = Field(
+        validation_alias=AliasChoices("period_start", "periodStart")
+    )
+    period_end: datetime = Field(
+        validation_alias=AliasChoices("period_end", "periodEnd")
+    )
+    users: list[ActiveUserInsight] = Field(default_factory=list, max_length=20)
+
+
+class UserPostInsight(ToolOutput):
+    post_id: str = Field(validation_alias=AliasChoices("post_id", "postId"))
+    author_id: str = Field(validation_alias=AliasChoices("author_id", "authorId"))
+    title: str = Field(min_length=1, max_length=256)
+    description: str | None = Field(default=None, max_length=1_000)
+    tags: list[str] = Field(default_factory=list, max_length=30)
+    type: str | None = Field(default=None, max_length=64)
+    publish_time: datetime | None = Field(
+        default=None,
+        validation_alias=AliasChoices("publish_time", "publishTime"),
+    )
+
+
+class UserPostsOutput(ToolOutput):
+    posts: list[UserPostInsight] = Field(default_factory=list, max_length=400)
+
+
+class TopicInsight(ToolOutput):
+    topic: str = Field(min_length=1, max_length=100)
+    post_count: int = Field(
+        ge=0,
+        validation_alias=AliasChoices("post_count", "postCount"),
+    )
+    creator_count: int = Field(
+        ge=0,
+        validation_alias=AliasChoices("creator_count", "creatorCount"),
+    )
+
+
+class PostTopicsOutput(ToolOutput):
+    topics: list[TopicInsight] = Field(default_factory=list, max_length=20)
 
 
 class DeletePostOutput(ToolOutput):
@@ -368,6 +499,39 @@ class ExecutionMode(StrEnum):
     ASYNC = "ASYNC"
 
 
+class TransportType(StrEnum):
+    LEGACY_BUILTIN = "LEGACY_BUILTIN"
+    BUILTIN = "BUILTIN"
+    HTTP = "HTTP"
+    MCP = "MCP"
+    ASYNC_JOB = "ASYNC_JOB"
+
+
+class IdempotencyMode(StrEnum):
+    NONE = "NONE"
+    READ_DEDUP = "READ_DEDUP"
+    SIDE_EFFECT_REQUIRED = "SIDE_EFFECT_REQUIRED"
+
+
+@dataclass(frozen=True)
+class RetryPolicy:
+    """Declarative retry contract. Step 1 defaults preserve legacy behavior."""
+
+    max_attempts: int = 1
+    initial_backoff_ms: int = 200
+    max_backoff_ms: int = 2_000
+    retryable_http_statuses: tuple[int, ...] = ()
+    retryable_error_codes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CapabilityBudget:
+    """Logical invocation capability budget. Step 2+ applies this formally."""
+
+    base_uses: int = 1
+    max_internal_calls: int = 1
+
+
 @dataclass(frozen=True)
 class ToolDefinition:
     name: str
@@ -380,6 +544,33 @@ class ToolDefinition:
     planner_visible: bool = True
     side_effecting: bool = False
     execution_mode: ExecutionMode = ExecutionMode.INLINE
+    artifact_type: str = ArtifactKind.TOOL_RESULT
+    artifact_bindings: tuple[ArtifactBinding, ...] = ()
+    required_target_roles: frozenset[str] = frozenset()
+    optional_target_roles: frozenset[str] = frozenset()
+    argument_defaults: dict[str, Any] = field(default_factory=dict)
+    prompt_argument: str | None = None
+    context_arguments: dict[str, str] = field(default_factory=dict)
+    requires_progress_review: bool = True
+    transport: TransportType = TransportType.LEGACY_BUILTIN
+    retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
+    idempotency_mode: IdempotencyMode = IdempotencyMode.NONE
+    capability_budget: CapabilityBudget = field(default_factory=CapabilityBudget)
+
+    @property
+    def runtime_bound_arguments(self) -> frozenset[str]:
+        return frozenset(
+            binding.argument
+            for binding in self.artifact_bindings
+            if not binding.allow_planner_value
+        )
+
+    @property
+    def runtime_argument_examples(self) -> dict[str, Any]:
+        return {
+            binding.argument: binding.validation_example
+            for binding in self.artifact_bindings
+        }
 
 
 # Tool implementations are deliberately kept out of the model-facing schema.
@@ -399,6 +590,23 @@ class ToolRegistry:
                 SearchPostsOutput,
                 RiskLevel.READ,
                 15,
+                artifact_type=ArtifactKind.POST_SEARCH_RESULTS,
+                argument_defaults={"limit": 5},
+                prompt_argument="query",
+                transport=TransportType.HTTP,
+                idempotency_mode=IdempotencyMode.READ_DEDUP,
+                capability_budget=CapabilityBudget(base_uses=1, max_internal_calls=5),
+                retry_policy=RetryPolicy(
+                    max_attempts=2,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(429, 502, 503, 504),
+                    retryable_error_codes=(
+                        "TIMEOUT",
+                        "RATE_LIMITED",
+                        "TRANSIENT_UPSTREAM",
+                    ),
+                ),
             ),
             ToolDefinition(
                 "community.get_post",
@@ -408,6 +616,8 @@ class ToolRegistry:
                 PostContextOutput,
                 RiskLevel.READ,
                 15,
+                artifact_type=ArtifactKind.POST_CONTENT,
+                context_arguments={"post_id": "context_post_id"},
             ),
             ToolDefinition(
                 "community.analyze_engagement",
@@ -417,6 +627,53 @@ class ToolRegistry:
                 EngagementAnalyticsOutput,
                 RiskLevel.READ,
                 30,
+                artifact_type=ArtifactKind.ENGAGEMENT_ANALYSIS,
+                argument_defaults={"topic": None, "days": 7, "limit": 10},
+            ),
+            ToolDefinition(
+                "community.list_active_users",
+                "列出社区活跃用户",
+                "按公开发帖数和评论数列出指定时间窗口内的活跃用户，参数 days、limit。",
+                ListActiveUsersArguments,
+                ActiveUsersOutput,
+                RiskLevel.READ,
+                30,
+                artifact_type=ArtifactKind.USER_SET,
+                argument_defaults={"days": 30, "limit": 10},
+            ),
+            ToolDefinition(
+                "community.list_posts_by_users",
+                "读取活跃用户的公开帖子",
+                "批量读取上一步活跃用户在指定时间窗口内的公开帖子，user_ids 由执行器绑定真实结果。",
+                UserScopedAnalyticsArguments,
+                UserPostsOutput,
+                RiskLevel.READ,
+                30,
+                artifact_type=ArtifactKind.POST_COLLECTION,
+                artifact_bindings=(ArtifactBinding(
+                    "user_ids",
+                    frozenset({ArtifactKind.USER_SET}),
+                    "user_ids",
+                    ["1"],
+                ),),
+                argument_defaults={"days": 30, "limit": 10},
+            ),
+            ToolDefinition(
+                "community.aggregate_post_topics",
+                "聚合用户发帖主题",
+                "按公开帖子的标签和类型聚合活跃用户的主题分布，user_ids 由执行器绑定真实结果。",
+                UserScopedAnalyticsArguments,
+                PostTopicsOutput,
+                RiskLevel.READ,
+                30,
+                artifact_type=ArtifactKind.TOPIC_ANALYSIS,
+                artifact_bindings=(ArtifactBinding(
+                    "user_ids",
+                    frozenset({ArtifactKind.USER_SET}),
+                    "user_ids",
+                    ["1"],
+                ),),
+                argument_defaults={"days": 30, "limit": 10},
             ),
             ToolDefinition(
                 "community.summarize_post",
@@ -426,6 +683,8 @@ class ToolRegistry:
                 SummaryOutput,
                 RiskLevel.READ,
                 90,
+                artifact_type=ArtifactKind.POST_SUMMARY,
+                context_arguments={"post_id": "context_post_id"},
             ),
             ToolDefinition(
                 "creator.create_draft",
@@ -436,17 +695,92 @@ class ToolRegistry:
                 RiskLevel.REVERSIBLE,
                 300,
                 side_effecting=True,
+                artifact_type=ArtifactKind.CONTENT_DRAFT,
+                artifact_bindings=(ArtifactBinding(
+                    "references",
+                    frozenset({
+                        ArtifactKind.POST_SEARCH_RESULTS,
+                        ArtifactKind.POST_CONTENT,
+                        ArtifactKind.POST_SUMMARY,
+                        ArtifactKind.ENGAGEMENT_ANALYSIS,
+                        ArtifactKind.USER_SET,
+                        ArtifactKind.POST_COLLECTION,
+                        ArtifactKind.TOPIC_ANALYSIS,
+                        ArtifactKind.CONTENT_DRAFT,
+                    }),
+                    "creator_references",
+                    [],
+                    required=False,
+                ),),
+                prompt_argument="instruction",
+                transport=TransportType.BUILTIN,
+                idempotency_mode=IdempotencyMode.SIDE_EFFECT_REQUIRED,
+                capability_budget=CapabilityBudget(base_uses=0, max_internal_calls=0),
+                retry_policy=RetryPolicy(
+                    max_attempts=1,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(),
+                    retryable_error_codes=(),
+                ),
             ),
             ToolDefinition(
-                "moderation.check_draft",
-                "调用审核 Agent",
-                "读取当前用户的 AI 草稿并提交真实审核 Agent，参数 draft_id、expected_content_sha256。",
-                ModerationDraftArguments,
-                ModerationOutput,
+                "creator.revise_draft",
+                "修订现有草稿",
+                "基于重新核验的当前草稿调用创作 Agent 生成新版本；instruction 描述本轮修改要求，草稿和版本由执行器绑定。"
+                "（Assistant 修订语义；Creator 当前仍提交 CREATE_CONTENT，原生 REVISE_CONTENT 为后续协议债务。）",
+                ReviseDraftArguments,
+                DraftOutput,
                 RiskLevel.REVERSIBLE,
-                180,
-                planner_visible=False,
+                300,
                 side_effecting=True,
+                artifact_type=ArtifactKind.CONTENT_DRAFT,
+                artifact_bindings=(
+                    ArtifactBinding(
+                        "draft_id",
+                        frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_draft_id",
+                        "1",
+                        target_role="CONTENT",
+                    ),
+                    ArtifactBinding(
+                        "expected_content_sha256",
+                        frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_content_sha256",
+                        "0" * 64,
+                        target_role="CONTENT",
+                    ),
+                    ArtifactBinding(
+                        "references",
+                        frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "creator_references",
+                        [],
+                    ),
+                ),
+                prompt_argument="instruction",
+                required_target_roles=frozenset({"CONTENT"}),
+                transport=TransportType.BUILTIN,
+                idempotency_mode=IdempotencyMode.SIDE_EFFECT_REQUIRED,
+                capability_budget=CapabilityBudget(base_uses=1, max_internal_calls=1),
+                retry_policy=RetryPolicy(
+                    max_attempts=1,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(),
+                    retryable_error_codes=(),
+                ),
+            ),
+            ToolDefinition(
+                "community.get_own_draft",
+                "核验我的 AI 草稿",
+                "按草稿号从 Java 重新读取当前登录用户自己的 AI 草稿，确认草稿状态和最新内容版本；用于跨轮次继续发布或定时发布。",
+                OwnDraftArguments,
+                OwnedDraftOutput,
+                RiskLevel.READ,
+                30,
+                artifact_type=ArtifactKind.CONTENT_DRAFT,
+                requires_progress_review=False,
+                required_target_roles=frozenset({"CONTENT"}),
             ),
             ToolDefinition(
                 "community.delete_post",
@@ -457,6 +791,8 @@ class ToolRegistry:
                 RiskLevel.EXTERNAL_WRITE,
                 30,
                 side_effecting=True,
+                artifact_type=ArtifactKind.DELETION_RECEIPT,
+                context_arguments={"post_id": "context_post_id"},
             ),
             ToolDefinition(
                 "community.list_own_posts",
@@ -466,6 +802,23 @@ class ToolRegistry:
                 ListOwnPostsOutput,
                 RiskLevel.READ,
                 60,
+                artifact_type=ArtifactKind.OWNED_POST_SET,
+                argument_defaults={"max_items": 1_000},
+                transport=TransportType.HTTP,
+                idempotency_mode=IdempotencyMode.READ_DEDUP,
+                # Java caps maxUses at 5; one grant covers up to 5 pages (≤500 items).
+                capability_budget=CapabilityBudget(base_uses=1, max_internal_calls=5),
+                retry_policy=RetryPolicy(
+                    max_attempts=2,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(429, 502, 503, 504),
+                    retryable_error_codes=(
+                        "TIMEOUT",
+                        "RATE_LIMITED",
+                        "TRANSIENT_UPSTREAM",
+                    ),
+                ),
             ),
             ToolDefinition(
                 "community.delete_own_posts_batch",
@@ -476,16 +829,152 @@ class ToolRegistry:
                 RiskLevel.EXTERNAL_WRITE,
                 120,
                 side_effecting=True,
+                artifact_type=ArtifactKind.DELETION_RECEIPT,
+                artifact_bindings=(ArtifactBinding(
+                    "post_ids",
+                    frozenset({ArtifactKind.OWNED_POST_SET}),
+                    "owned_post_ids",
+                    ["1"],
+                ),),
             ),
             ToolDefinition(
                 "publication.schedule",
                 "安排定时发布",
-                "为草稿创建可取消的定时发布任务，参数 run_at、draft_id。",
+                "为草稿创建可取消的定时发布任务。相对时间使用 delay_seconds，绝对时间使用 run_at；两者只能提供一个。草稿ID和版本由执行器绑定。",
                 ScheduleArguments,
                 ScheduleOutput,
                 RiskLevel.REVERSIBLE,
                 20,
                 side_effecting=True,
+                artifact_type=ArtifactKind.SCHEDULE_RECEIPT,
+                artifact_bindings=(
+                    ArtifactBinding(
+                        "draft_id", frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_draft_id", "1",
+                        target_role="CONTENT",
+                    ),
+                    ArtifactBinding(
+                        "expected_content_sha256",
+                        frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_content_sha256", "0" * 64,
+                        target_role="CONTENT",
+                    ),
+                ),
+                required_target_roles=frozenset({"CONTENT"}),
+                transport=TransportType.BUILTIN,
+                idempotency_mode=IdempotencyMode.SIDE_EFFECT_REQUIRED,
+                capability_budget=CapabilityBudget(base_uses=1, max_internal_calls=2),
+                retry_policy=RetryPolicy(
+                    max_attempts=1,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(),
+                    retryable_error_codes=(),
+                ),
+            ),
+            ToolDefinition(
+                "publication.get_schedule",
+                "核验定时发布任务",
+                "按 action_id 重新读取当前用户的定时发布任务，确认状态、发布时间和所绑定草稿。",
+                ScheduleLookupArguments,
+                ScheduleOutput,
+                RiskLevel.READ,
+                15,
+                artifact_type=ArtifactKind.SCHEDULE_RECEIPT,
+                requires_progress_review=False,
+                required_target_roles=frozenset({"SCHEDULE"}),
+                transport=TransportType.BUILTIN,
+                idempotency_mode=IdempotencyMode.READ_DEDUP,
+                # Local DB lookup — no Java capability grant.
+                capability_budget=CapabilityBudget(base_uses=0, max_internal_calls=0),
+                retry_policy=RetryPolicy(
+                    max_attempts=2,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(429, 502, 503, 504),
+                    retryable_error_codes=(
+                        "TIMEOUT",
+                        "RATE_LIMITED",
+                        "TRANSIENT_UPSTREAM",
+                    ),
+                ),
+            ),
+            ToolDefinition(
+                "publication.update_schedule",
+                "修改定时发布任务",
+                "原子修改已核验定时任务的发布时间和/或替换为当前任务中新修订的草稿。action_id 由上游定时任务绑定；相对时间用 delay_seconds。",
+                ScheduleUpdateArguments,
+                ScheduleOutput,
+                RiskLevel.REVERSIBLE,
+                30,
+                side_effecting=True,
+                artifact_type=ArtifactKind.SCHEDULE_RECEIPT,
+                artifact_bindings=(
+                    ArtifactBinding(
+                        "action_id",
+                        frozenset({ArtifactKind.SCHEDULE_RECEIPT}),
+                        "target_schedule_action_id",
+                        "00000000-0000-0000-0000-000000000000",
+                        target_role="SCHEDULE",
+                    ),
+                    ArtifactBinding(
+                        "draft_id",
+                        frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_draft_id",
+                        "1",
+                        target_role="CONTENT",
+                        required=False,
+                    ),
+                    ArtifactBinding(
+                        "expected_content_sha256",
+                        frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_content_sha256",
+                        "0" * 64,
+                        target_role="CONTENT",
+                        required=False,
+                    ),
+                ),
+                required_target_roles=frozenset({"SCHEDULE"}),
+                optional_target_roles=frozenset({"CONTENT"}),
+                transport=TransportType.BUILTIN,
+                idempotency_mode=IdempotencyMode.SIDE_EFFECT_REQUIRED,
+                capability_budget=CapabilityBudget(base_uses=1, max_internal_calls=2),
+                retry_policy=RetryPolicy(
+                    max_attempts=1,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(),
+                    retryable_error_codes=(),
+                ),
+            ),
+            ToolDefinition(
+                "publication.cancel_schedule",
+                "取消定时发布任务",
+                "取消已核验且仍未执行的定时发布任务；action_id 由上游定时任务绑定。已取消任务再次取消返回幂等成功。",
+                ScheduleLookupArguments,
+                ScheduleCancelledOutput,
+                RiskLevel.REVERSIBLE,
+                30,
+                side_effecting=True,
+                artifact_type=ArtifactKind.SCHEDULE_RECEIPT,
+                artifact_bindings=(ArtifactBinding(
+                    "action_id",
+                    frozenset({ArtifactKind.SCHEDULE_RECEIPT}),
+                        "target_schedule_action_id",
+                        "00000000-0000-0000-0000-000000000000",
+                        target_role="SCHEDULE",
+                ),),
+                required_target_roles=frozenset({"SCHEDULE"}),
+                transport=TransportType.BUILTIN,
+                idempotency_mode=IdempotencyMode.SIDE_EFFECT_REQUIRED,
+                capability_budget=CapabilityBudget(base_uses=0, max_internal_calls=1),
+                retry_policy=RetryPolicy(
+                    max_attempts=1,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(),
+                    retryable_error_codes=(),
+                ),
             ),
             ToolDefinition(
                 "publication.schedule_batch",
@@ -496,6 +985,16 @@ class ToolRegistry:
                 RiskLevel.EXTERNAL_WRITE,
                 60,
                 side_effecting=True,
+                artifact_type=ArtifactKind.SCHEDULE_RECEIPT,
+                artifact_bindings=(ArtifactBinding(
+                    "items", frozenset({ArtifactKind.CONTENT_DRAFT}),
+                    "draft_items",
+                    [
+                        {"draft_id": "1", "expected_content_sha256": "0" * 64},
+                        {"draft_id": "2", "expected_content_sha256": "1" * 64},
+                    ],
+                ),),
+                argument_defaults={"interval_minutes": 30},
             ),
             ToolDefinition(
                 "publication.publish_now",
@@ -506,6 +1005,22 @@ class ToolRegistry:
                 RiskLevel.EXTERNAL_WRITE,
                 30,
                 side_effecting=True,
+                artifact_type=ArtifactKind.PUBLICATION_RECEIPT,
+                artifact_bindings=(
+                    ArtifactBinding(
+                        "draft_id", frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_draft_id", "1",
+                        target_role="CONTENT",
+                    ),
+                    ArtifactBinding(
+                        "expected_content_sha256",
+                        frozenset({ArtifactKind.CONTENT_DRAFT}),
+                        "target_content_sha256", "0" * 64,
+                        target_role="CONTENT",
+                    ),
+                ),
+                required_target_roles=frozenset({"CONTENT"}),
+                optional_target_roles=frozenset({"SCHEDULE"}),
             ),
             ToolDefinition(
                 "community.reply_comment",
@@ -517,17 +1032,46 @@ class ToolRegistry:
                 20,
                 False,
                 True,
+                artifact_type=ArtifactKind.COMMENT_RECEIPT,
+                artifact_bindings=(ArtifactBinding(
+                    "content",
+                    frozenset({ArtifactKind.POST_SUMMARY}),
+                    "summary_reply",
+                    "基于上游总结生成的回复",
+                    required=False,
+                    allow_planner_value=True,
+                ),),
+                context_arguments={
+                    "post_id": "context_post_id",
+                    "parent_comment_id": "context_comment_id",
+                },
             ),
         ]))
         self._definitions = {item.name: item for item in definitions}
+        # Compat staging only: MCP discover / bootstrap may park handlers here
+        # before a ToolRuntime instance adopts them. Authoritative mutable
+        # handlers live on ToolRuntime — not on this shared definition registry.
         self._handlers: dict[str, ToolHandler] = {}
 
-    def register_handler(self, name: str, handler: ToolHandler) -> None:
-        """Bind an execution handler to an already registered tool.
+    def register_definition(self, definition: ToolDefinition) -> None:
+        """Register an immutable tool definition without a handler."""
+        if definition.name in self._definitions:
+            raise ValueError(f"Duplicate tool: {definition.name}")
+        self._definitions[definition.name] = definition
 
-        Registration is intentionally separate from the model-facing
-        definition. This allows the same tool contract to be used by the
-        worker, a test harness, or a future plugin process.
+    def get_definition(self, name: str) -> ToolDefinition:
+        return self.get(name)
+
+    def list_definitions(self) -> tuple[ToolDefinition, ...]:
+        return tuple(
+            sorted(self._definitions.values(), key=lambda item: item.name)
+        )
+
+    def register_handler(self, name: str, handler: ToolHandler) -> None:
+        """Park a handler for later adoption by a ToolRuntime instance.
+
+        Prefer ``ToolRuntime.register_handler``. This method remains for MCP
+        bootstrap and tests that register before a Worker exists.
         """
         self.get(name)
         if name in self._handlers:
@@ -535,7 +1079,7 @@ class ToolRegistry:
         self._handlers[name] = handler
 
     def register(self, definition: ToolDefinition, handler: ToolHandler | None = None) -> None:
-        """Register a new tool contract and optionally its implementation."""
+        """Register a new tool contract and optionally stage its handler."""
         if definition.name in self._definitions:
             raise ValueError(f"Duplicate tool: {definition.name}")
         self._definitions[definition.name] = definition
@@ -543,8 +1087,20 @@ class ToolRegistry:
             self._handlers[definition.name] = handler
 
     def handler_for(self, name: str) -> ToolHandler | None:
+        """Return a staged (pre-runtime) handler, if any."""
         self.get(name)
         return self._handlers.get(name)
+
+    def take_handler(self, name: str) -> ToolHandler | None:
+        """Remove and return a staged handler for ToolRuntime adoption."""
+        self.get(name)
+        return self._handlers.pop(name, None)
+
+    def drain_handlers(self) -> dict[str, ToolHandler]:
+        """Move all staged handlers out of the shared definition registry."""
+        handlers = dict(self._handlers)
+        self._handlers.clear()
+        return handlers
 
     def names(self) -> tuple[str, ...]:
         return tuple(sorted(self._definitions))
@@ -570,6 +1126,7 @@ class ToolRegistry:
                 60,
                 side_effecting=side_effecting,
                 execution_mode=ExecutionMode.ASYNC,
+                artifact_type=ArtifactKind.MCP_RESULT,
             ),
             handler=handler,
         )
@@ -627,6 +1184,20 @@ class ToolRegistry:
                 item["injection_signals"] = list(title.signals)
                 guarded_posts.append(item)
             candidate["posts"] = guarded_posts
+        elif name == "community.list_posts_by_users":
+            guarded_posts = []
+            for raw in candidate.get("posts") or []:
+                item = dict(raw)
+                title = inspect_untrusted_text(item.get("title"), max_chars=256)
+                description = inspect_untrusted_text(
+                    item.get("description"),
+                    max_chars=1_000,
+                )
+                item["title"] = title.text
+                if item.get("description") is not None:
+                    item["description"] = description.text
+                guarded_posts.append(item)
+            candidate["posts"] = guarded_posts
         validated = definition.output_model.model_validate(candidate)
         data = validated.model_dump(mode="json", exclude_none=True)
         self._validate_semantics(name, data, arguments, run_id)
@@ -652,6 +1223,26 @@ class ToolRegistry:
                 "side_effecting": item.side_effecting,
                 "execution_mode": item.execution_mode.value,
                 "planner_visible": item.planner_visible,
+                "requires_progress_review": item.requires_progress_review,
+                "artifact_type": item.artifact_type,
+                "required_target_roles": sorted(item.required_target_roles),
+                "optional_target_roles": sorted(item.optional_target_roles),
+                "runtime_bound_arguments": sorted(item.runtime_bound_arguments),
+                "runtime_argument_examples": item.runtime_argument_examples,
+                "artifact_bindings": [
+                    {
+                        "argument": binding.argument,
+                        "accepts": sorted(binding.accepts),
+                        "resolver": binding.resolver,
+                        "required": binding.required,
+                        "allow_planner_value": binding.allow_planner_value,
+                        "target_role": binding.target_role,
+                    }
+                    for binding in item.artifact_bindings
+                ],
+                "argument_defaults": item.argument_defaults,
+                "prompt_argument": item.prompt_argument,
+                "context_arguments": item.context_arguments,
             }
             for item in sorted(self._definitions.values(), key=lambda value: value.name)
         ]
@@ -681,6 +1272,12 @@ class ToolRegistry:
                 arguments["draft_id"]
             ):
                 raise ValueError("发布结果与批准草稿不一致")
+        elif name in {"publication.get_schedule", "publication.update_schedule", "publication.cancel_schedule"}:
+            if output["action_id"] != str(arguments["action_id"]):
+                raise ValueError("定时任务结果与请求对象不一致")
+            if name == "publication.update_schedule" and arguments.get("draft_id"):
+                if output["draft_id"] != str(arguments["draft_id"]):
+                    raise ValueError("改期结果没有绑定修订后的草稿")
         elif name == "publication.schedule_batch":
             expected = {
                 str(item["draft_id"]): str(item["expected_content_sha256"]).lower()
@@ -691,13 +1288,13 @@ class ToolRegistry:
             }
             if actual != set(expected):
                 raise ValueError("批量定时结果与批准的草稿清单不一致")
-        elif name == "moderation.check_draft":
-            if (
-                output["draft_id"] != str(arguments["draft_id"])
-                or output["content_sha256"].lower()
-                != str(arguments["expected_content_sha256"]).lower()
+        elif name == "community.list_posts_by_users":
+            allowed_users = {str(value) for value in arguments["user_ids"]}
+            if any(
+                str(item["author_id"]) not in allowed_users
+                for item in output.get("posts", [])
             ):
-                raise ValueError("审核结果与绑定草稿版本不一致")
+                raise ValueError("用户帖子分析返回了请求范围外的作者")
         elif name == "community.delete_post":
             if output["post_id"] != str(arguments["post_id"]):
                 raise ValueError("删除结果与批准的帖子不一致")

@@ -1,0 +1,10 @@
+[
+  {"operation":"adaptive.route","expected_tier":"fast","expected_thinking":false},
+  {"operation":"intent.understand","expected_tier":"fast","expected_thinking":false},
+  {"operation":"planner.plan","expected_tier":"strong","expected_thinking":true},
+  {"operation":"progress.assess","expected_tier":"judge","expected_thinking":false},
+  {"operation":"verifier.verify","expected_tier":"judge","expected_thinking":false},
+  {"operation":"answer.compose","expected_tier":"fast","expected_thinking":false},
+  {"operation":"summary.post","expected_tier":"fast","expected_thinking":false},
+  {"operation":"structured.repair","expected_tier":"judge","expected_thinking":false}
+]

@@ -17,7 +17,12 @@ from sqlalchemy import (
     select,
     text,
 )
-from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncAttrs,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -51,6 +56,94 @@ class Conversation(Base):
     )
 
 
+class ConversationGoal(Base):
+    """Durable business goal shared by multiple assistant Runs."""
+
+    __tablename__ = "assistant_conversation_goals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_conversations.id"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(String(64), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), default="zhiguang", index=True)
+    intent: Mapped[str] = mapped_column(String(64), default="UNKNOWN")
+    summary: Mapped[str | None] = mapped_column(String(500))
+    aliases: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(32), default="ACTIVE", index=True)
+    phase: Mapped[str] = mapped_column(String(32), default="DISCOVERING", index=True)
+    active_target_ref: Mapped[str | None] = mapped_column(String(160), index=True)
+    target_context: Mapped[dict | None] = mapped_column(JSON)
+    pending_clarification: Mapped[dict | None] = mapped_column(JSON)
+    pending_delta_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, index=True
+    )
+
+
+class TargetBinding(Base):
+    """A concrete, versioned target selected for a ConversationGoal."""
+
+    __tablename__ = "assistant_target_bindings"
+    __table_args__ = (
+        UniqueConstraint("goal_id", "version"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    goal_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_conversation_goals.id"), index=True
+    )
+    target_type: Mapped[str] = mapped_column(String(24), index=True)
+    role: Mapped[str] = mapped_column(String(24), default="CONTENT", index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    artifact_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    content_sha256: Mapped[str | None] = mapped_column(String(64))
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    resolution_method: Mapped[str] = mapped_column(String(32), default="ACTIVE_TARGET")
+    schedule_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    content_artifact_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    content_artifact_version: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class IntentDelta(Base):
+    """One structured change proposed by a user turn for a Goal."""
+
+    __tablename__ = "assistant_intent_deltas"
+    __table_args__ = (UniqueConstraint("run_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    goal_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_conversation_goals.id"), index=True
+    )
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_runs.id"), index=True
+    )
+    message_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_messages.id"), index=True
+    )
+    operation: Mapped[str] = mapped_column(String(32), index=True)
+    operation_class: Mapped[str] = mapped_column(
+        String(16), default="WRITE", index=True
+    )
+    target_role: Mapped[str | None] = mapped_column(String(24), index=True)
+    target_ref: Mapped[str | None] = mapped_column(String(160), index=True)
+    delta: Mapped[dict] = mapped_column(JSON, default=dict)
+    preserve: Mapped[dict] = mapped_column(JSON, default=dict)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    status: Mapped[str] = mapped_column(String(24), default="ACTIVE", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
 class Message(Base):
     __tablename__ = "assistant_messages"
 
@@ -77,6 +170,9 @@ class Run(Base):
     )
     user_id: Mapped[str] = mapped_column(String(64), index=True)
     tenant_id: Mapped[str] = mapped_column(String(64), default="zhiguang", index=True)
+    goal_id: Mapped[str | None] = mapped_column(
+        ForeignKey("assistant_conversation_goals.id"), index=True
+    )
     principal_role: Mapped[str] = mapped_column(String(32), default="USER")
     prompt: Mapped[str] = mapped_column(Text)
     context_post_id: Mapped[str | None] = mapped_column(String(64))
@@ -237,6 +333,34 @@ class SideEffect(Base):
     )
 
 
+class ToolExecutionReceipt(Base):
+    """Durable idempotency boundary for a mutating tool execution."""
+
+    __tablename__ = "assistant_tool_execution_receipts"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key"),
+        UniqueConstraint("run_id", "step_id"),
+    )
+
+    execution_id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=new_id
+    )
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_runs.id"), index=True
+    )
+    step_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_run_steps.id"), index=True
+    )
+    tool_name: Mapped[str] = mapped_column(String(80), index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(160))
+    input_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24), default="PREPARED", index=True)
+    result_ref: Mapped[str | None] = mapped_column(String(200), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+
+
 class ScheduledActionAttempt(Base):
     __tablename__ = "assistant_scheduled_action_attempts"
     __table_args__ = (UniqueConstraint("action_id", "attempt"),)
@@ -319,6 +443,36 @@ class Artifact(Base):
     version: Mapped[int] = mapped_column(Integer, default=1)
     content: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    parent_artifact_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    change_type: Mapped[str | None] = mapped_column(String(32), index=True)
+    provenance_key: Mapped[str | None] = mapped_column(
+        String(160), unique=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, index=True
+    )
+
+
+class ArtifactRelation(Base):
+    """Explicit lifecycle relation between immutable artifacts."""
+
+    __tablename__ = "assistant_artifact_relations"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_artifact_id",
+            "target_artifact_id",
+            "relation_type",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_artifact_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_artifacts.id"), index=True
+    )
+    target_artifact_id: Mapped[str] = mapped_column(
+        ForeignKey("assistant_artifacts.id"), index=True
+    )
+    relation_type: Mapped[str] = mapped_column(String(32), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, index=True
     )
@@ -460,12 +614,30 @@ class SemanticMemoryDocument(Base):
 
 class Database:
     def __init__(self, url: str) -> None:
+        # 解析 URL，创建引擎和连接池配置，但是还未真正链接数据库，runtime.start()
         self.engine = create_async_engine(url, pool_pre_ping=True)
-        self.sessions = async_sessionmaker(self.engine, expire_on_commit=False)
-
+        # 创建异步会话工厂，参数：引擎、事务管理模式
+        # 以后要用数据库时，用它“生产”会话，而不是现在就打开连接
+        self.sessions = async_sessionmaker[AsyncSession](self.engine, expire_on_commit=False)
+    # 建立数据库连接（之前 create_async_engine 只是准备引擎）
+    # 确保表存在（assistant_runs、assistant_conversations 等）
     async def initialize(self) -> None:
         async with self.engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
+            # Drop the conversation-wide version constraint that causes
+            # INSERT collisions when multiple Goals exist with version=1.
+            # Per-goal optimistic locking uses row-level FOR UPDATE, not
+            # cross-Goal version uniqueness.
+            try:
+                await connection.execute(
+                    text(
+                        "ALTER TABLE assistant_conversation_goals "
+                        "DROP CONSTRAINT IF EXISTS "
+                        "assistant_conversation_goals_conversation_id_version_key"
+                    )
+                )
+            except Exception:
+                pass  # constraint already dropped or different DB dialect
 
     async def ping(self) -> None:
         async with self.engine.connect() as connection:
@@ -478,12 +650,24 @@ class Database:
 async def append_event(
     session: AsyncSession, run_id: str, event_type: str, payload: dict
 ) -> None:
-    # Serialize sequence allocation per run. Parallel read-only DAG steps can
-    # finish at the same time; without this row lock both transactions could
-    # observe the same MAX(sequence) and violate the unique constraint.
-    await session.execute(
-        select(Run.id).where(Run.id == run_id).with_for_update()
-    )
+    # Do not use the Run row as the event-stream mutex. State transitions also
+    # lock RunStep rows, so an implicit Run lock here can invert Run/RunStep
+    # lock order when parallel DAG steps finish together.
+    bind = session.get_bind()
+    if bind.dialect.name == "postgresql":
+        await session.execute(
+            text(
+                "SELECT pg_advisory_xact_lock("
+                "hashtextextended(:event_stream_key, 0))"
+            ),
+            {"event_stream_key": f"assistant-event:{run_id}"},
+        )
+    else:
+        # SQLite uses a database-wide writer lock; retain a portable fallback
+        # for tests and non-PostgreSQL local tooling.
+        await session.execute(
+            select(Run.id).where(Run.id == run_id).with_for_update()
+        )
     current = await session.scalar(
         select(func.max(AgentEvent.sequence)).where(AgentEvent.run_id == run_id)
     )

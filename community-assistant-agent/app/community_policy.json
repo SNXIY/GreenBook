@@ -26,8 +26,7 @@
       "allow": [
         "community.*",
         "creator.*",
-        "publication.*",
-        "moderation.*"
+        "publication.*"
       ],
       "require_approval": [
         "community.delete_post",

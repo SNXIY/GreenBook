@@ -48,6 +48,279 @@ class MessageView(ApiModel):
     created_at: datetime
 
 
+class TargetBinding(ApiModel):
+    """A concrete object selected for the current conversation goal.
+
+    Workspace entities are candidates; a TargetBinding is the control-plane
+    reference that a write-capable tool is allowed to consume.
+    """
+
+    target_type: Literal["DRAFT", "POST", "SCHEDULE", "ARTIFACT"]
+    role: Literal["CONTENT", "SCHEDULE", "PUBLICATION", "INTERACTION"] = "CONTENT"
+    target_id: str = Field(min_length=1, max_length=128)
+    artifact_id: str | None = Field(default=None, max_length=128)
+    content_sha256: str | None = Field(default=None, max_length=64)
+    version: int = Field(default=1, ge=1)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    resolution_method: Literal[
+        "ACTIVE_TARGET",
+        "EXPLICIT_ID",
+        "EXPLICIT_TITLE",
+        "LINEAGE",
+        "SEMANTIC_MATCH",
+        "USER_SELECTION",
+        "TOOL_OUTPUT",
+    ] = "ACTIVE_TARGET"
+    schedule_id: str | None = Field(default=None, max_length=128)
+    content_artifact_id: str | None = Field(default=None, max_length=128)
+    content_artifact_version: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def infer_role_from_legacy_target_type(self) -> "TargetBinding":
+        """Keep pre-role bindings readable while making role explicit."""
+        if self.role == "CONTENT" and self.target_type == "SCHEDULE":
+            self.role = "SCHEDULE"
+        elif self.role == "CONTENT" and self.target_type == "ARTIFACT":
+            self.role = "INTERACTION"
+        return self
+
+
+class ResolvedTargetView(ApiModel):
+    """An operation-scoped, read-only projection of a Goal target."""
+
+    goal_id: str
+    role: Literal["CONTENT", "SCHEDULE", "PUBLICATION", "INTERACTION"]
+    target_type: Literal["DRAFT", "POST", "SCHEDULE", "ARTIFACT"]
+    target_id: str = Field(min_length=1, max_length=128)
+    artifact_id: str | None = Field(default=None, max_length=128)
+    content_sha256: str | None = Field(default=None, max_length=64)
+    schedule_id: str | None = Field(default=None, max_length=128)
+    content_artifact_id: str | None = Field(default=None, max_length=128)
+    content_artifact_version: int | None = Field(default=None, ge=1)
+    resolution_method: Literal["GOAL_TARGET_CONTEXT"] = "GOAL_TARGET_CONTEXT"
+
+    @classmethod
+    def from_binding(
+        cls,
+        *,
+        goal_id: str,
+        binding: TargetBinding,
+    ) -> "ResolvedTargetView":
+        return cls(
+            goal_id=goal_id,
+            role=binding.role,
+            target_type=binding.target_type,
+            target_id=binding.target_id,
+            artifact_id=binding.artifact_id,
+            content_sha256=binding.content_sha256,
+            schedule_id=binding.schedule_id,
+            content_artifact_id=binding.content_artifact_id,
+            content_artifact_version=binding.content_artifact_version,
+        )
+
+
+class TargetCandidate(ApiModel):
+    """An authorized object candidate considered for the current turn."""
+
+    target_id: str = Field(min_length=1, max_length=128)
+    artifact_id: str | None = Field(default=None, max_length=128)
+    type: Literal["DRAFT", "POST", "SCHEDULE", "ARTIFACT"]
+    label: str | None = Field(default=None, max_length=240)
+    score: float = Field(ge=0.0, le=1.0)
+    reason: str = Field(min_length=1, max_length=500)
+    content_artifact_id: str | None = Field(default=None, max_length=128)
+    content_artifact_version: int | None = Field(default=None, ge=1)
+
+
+class TargetContext(ApiModel):
+    """Typed conversation focus separated by side-effect domain.
+
+    A draft is not a schedule. Keeping these bindings in separate slots
+    prevents a content target from being proposed for schedule mutations.
+    ``active_target`` remains on older records for backward compatibility, but
+    resolution must use this context first.
+    """
+
+    content_target: TargetBinding | None = None
+    schedule_target: TargetBinding | None = None
+    publication_target: TargetBinding | None = None
+    interaction_target: TargetBinding | None = None
+
+    def for_operation(self, operation: str) -> TargetBinding | None:
+        if operation in {"OPEN_PLAN", "CREATE_POST"}:
+            return None
+        if operation in {"UPDATE_SCHEDULE", "CANCEL_SCHEDULE", "QUERY_SCHEDULE"}:
+            return self.schedule_target
+        if operation in {
+            "APPEND_CONTENT",
+            "REPLACE_CONTENT",
+            "UPDATE_TITLE",
+            "QUERY_CONTENT",
+        }:
+            return self.content_target
+        if operation == "QUERY_PUBLICATION_STATUS":
+            return (
+                self.publication_target
+                or self.schedule_target
+                or self.content_target
+            )
+        if operation == "PUBLISH_NOW":
+            return self.content_target or self.publication_target or self.schedule_target
+        return self.content_target or self.interaction_target
+
+
+class PendingClarification(ApiModel):
+    """A user decision required before a side-effecting plan may run."""
+
+    kind: Literal["TARGET", "TEMPORAL_SCHEDULE"] = "TARGET"
+    question: str = Field(min_length=1, max_length=1_000)
+    candidates: list[TargetCandidate] = Field(default_factory=list, max_length=8)
+    delta_id: str | None = None
+    goal_id: str | None = Field(default=None, max_length=64)
+    original_message: str | None = Field(default=None, max_length=10_000)
+    temporal: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def _target_requires_candidates(self) -> PendingClarification:
+        if self.kind == "TARGET" and not self.candidates:
+            raise ValueError("TARGET clarification requires at least one candidate")
+        return self
+
+
+class TurnIntent(ApiModel):
+    """Goal-agnostic interpretation of one user turn."""
+
+    operation: Literal[
+        "CREATE_POST",
+        "APPEND_CONTENT",
+        "REPLACE_CONTENT",
+        "UPDATE_TITLE",
+        "UPDATE_SCHEDULE",
+        "PUBLISH_NOW",
+        "CANCEL_SCHEDULE",
+        "QUERY_SCHEDULE",
+        "QUERY_CONTENT",
+        "QUERY_PUBLICATION_STATUS",
+        "OPEN_PLAN",
+        "REPLY_COMMENT",
+        "CONTINUE_ANALYSIS",
+    ]
+    operation_class: Literal["READ", "WRITE", "SIDE_EFFECT"]
+    target_role: Literal["CONTENT", "SCHEDULE", "PUBLICATION", "INTERACTION"] | None = None
+    semantic_subject: str = Field(default="", max_length=500)
+    raw_message: str = Field(default="", max_length=10_000)
+    explicit_refs: list[str] = Field(default_factory=list, max_length=12)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
+class GoalMatch(ApiModel):
+    goal_id: str
+    label: str
+    score: float = Field(ge=0.0, le=1.0)
+    resolution_method: Literal[
+        "EXPLICIT_ID",
+        "ARTIFACT_TITLE",
+        "ARTIFACT_TITLE_EXACT",
+        "GOAL_SUMMARY",
+        "GOAL_SUMMARY_EXACT",
+        "SEMANTIC_SIMILARITY",
+        "SOLE_GOAL",
+        "RECENT_ACTIVE",
+        "WORD_MATCH",
+    ]
+
+
+class GoalResolution(ApiModel):
+    outcome: Literal[
+        "RESOLVED",
+        "NEW_GOAL",
+        "NEEDS_CLARIFICATION",
+        "NOT_FOUND",
+    ]
+    goal_id: str | None = None
+    candidates: list[GoalMatch] = Field(default_factory=list, max_length=8)
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class ConversationGoal(ApiModel):
+    """Durable business goal shared by multiple Runs in one conversation."""
+
+    goal_id: str
+    conversation_id: str
+    intent: str = Field(min_length=1, max_length=64)
+    summary: str | None = Field(default=None, max_length=500)
+    aliases: list[str] = Field(default_factory=list, max_length=12)
+    artifact_titles: list[str] = Field(default_factory=list, max_length=20)
+    artifact_topics: list[str] = Field(default_factory=list, max_length=30)
+    explicit_refs: list[str] = Field(default_factory=list, max_length=40)
+    status: Literal[
+        "ACTIVE",
+        "WAITING_CLARIFICATION",
+        "WAITING_APPROVAL",
+        "PAUSED",
+        "COMPLETED",
+        "CANCELLED",
+        "FAILED",
+    ] = "ACTIVE"
+    phase: str = Field(default="DISCOVERING", min_length=1, max_length=32)
+    active_target_ref: str | None = Field(default=None, max_length=160)
+    # Deprecated compatibility projection. Business decisions must use
+    # target_context, never this field.
+    active_target: TargetBinding | None = None
+    target_context: TargetContext = Field(default_factory=TargetContext)
+    pending_clarification: PendingClarification | None = None
+    pending_delta_id: str | None = None
+    version: int = Field(default=1, ge=1)
+    updated_at: datetime | None = None
+
+
+class IntentDelta(ApiModel):
+    """A turn-level change applied to an existing ConversationGoal."""
+
+    delta_id: str
+    goal_id: str
+    run_id: str
+    message_id: str
+    operation: Literal[
+        "CREATE_POST",
+        "APPEND_CONTENT",
+        "REPLACE_CONTENT",
+        "UPDATE_TITLE",
+        "UPDATE_SCHEDULE",
+        "PUBLISH_NOW",
+        "CANCEL_SCHEDULE",
+        "QUERY_SCHEDULE",
+        "QUERY_CONTENT",
+        "QUERY_PUBLICATION_STATUS",
+        "OPEN_PLAN",
+        "REPLY_COMMENT",
+        "CONTINUE_ANALYSIS",
+    ]
+    operation_class: Literal["READ", "WRITE", "SIDE_EFFECT"] = "WRITE"
+    target_role: Literal["CONTENT", "SCHEDULE", "PUBLICATION", "INTERACTION"] | None = None
+    target_ref: str | None = Field(default=None, max_length=160)
+    delta: dict[str, Any] = Field(default_factory=dict)
+    preserve: dict[str, Any] = Field(default_factory=dict)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    status: Literal["ACTIVE", "APPLIED", "REJECTED", "FAILED", "SUPERSEDED"] = "ACTIVE"
+
+    @model_validator(mode="before")
+    @classmethod
+    def infer_operation_class(cls, value: Any) -> Any:
+        if not isinstance(value, dict) or value.get("operation_class") is not None:
+            return value
+        operation = str(value.get("operation") or "")
+        if operation.startswith("QUERY_"):
+            operation_class = "READ"
+        elif operation in {"UPDATE_SCHEDULE", "PUBLISH_NOW", "CANCEL_SCHEDULE"}:
+            operation_class = "SIDE_EFFECT"
+        elif operation == "OPEN_PLAN":
+            operation_class = "WRITE"
+        else:
+            operation_class = "WRITE"
+        return {**value, "operation_class": operation_class}
+
+
 class RunAccepted(ApiModel):
     run_id: str
     conversation_id: str
@@ -83,7 +356,9 @@ class ArtifactView(ApiModel):
     agent: str
     artifact_type: str
     parent_artifact_ids: list[str]
+    parent_artifact_id: str | None = None
     version: int
+    change_type: str | None = None
     content: dict[str, Any]
     content_hash: str
     created_at: datetime
@@ -131,6 +406,7 @@ class RunView(ApiModel):
     budget: dict[str, int]
     timing: dict[str, int | None]
     intent_detail: dict[str, Any] | None = None
+    pending_clarification: dict[str, Any] | None = None
     task_ledger: dict[str, Any] = Field(default_factory=dict)
     progress_ledger: dict[str, Any] = Field(default_factory=dict)
     approval: "ApprovalView | None" = None
@@ -208,13 +484,36 @@ class TaskCondition(ApiModel):
 class AgentPlanStep(ApiModel):
     task_id: str | None = Field(default=None, min_length=1, max_length=80)
     agent: str = Field(default="AutoRouter", min_length=2, max_length=80)
+    primary_capability: str | None = Field(
+        default=None,
+        pattern=r"^[a-z][a-z0-9_]{1,63}$",
+    )
     capabilities: list[str] = Field(default_factory=list, max_length=20)
     tool: str = Field(min_length=3, max_length=80)
     label: str = Field(min_length=1, max_length=120)
+    success_criteria: list[str] = Field(default_factory=list, max_length=10)
+    expected_artifact_type: str | None = Field(
+        default=None,
+        pattern=r"^[a-z][a-z0-9_.-]{1,63}$",
+    )
     arguments: dict[str, Any] = Field(default_factory=dict)
     depends_on: list[str] = Field(default_factory=list, max_length=20)
+    artifact_sources: dict[str, list[str]] = Field(default_factory=dict)
     condition: TaskCondition | None = None
     max_attempts: int = Field(default=2, ge=1, le=5)
+
+    @model_validator(mode="after")
+    def normalize_capability_contract(self) -> "AgentPlanStep":
+        normalized = list(dict.fromkeys(self.capabilities))
+        if self.primary_capability is None and normalized:
+            self.primary_capability = normalized[0]
+        if (
+            self.primary_capability is not None
+            and self.primary_capability not in normalized
+        ):
+            normalized.insert(0, self.primary_capability)
+        self.capabilities = normalized
+        return self
 
 
 class AgentPlan(ApiModel):
@@ -290,8 +589,20 @@ class AdaptiveExecutionDecision(ApiModel):
     execution_path: Literal["DIRECT", "TOOL", "CREATOR", "ORCHESTRATED"]
     classification_summary: str = Field(min_length=1, max_length=240)
     intent: CommunityIntent
+    turn_relation: Literal[
+        "NEW_GOAL",
+        "CONTINUE",
+        "MODIFY",
+        "CANCEL",
+        "RETRY",
+        "QUERY_STATE",
+    ] = "NEW_GOAL"
+    referenced_entities: list[str] = Field(default_factory=list, max_length=8)
     direct_response: str | None = Field(default=None, max_length=10_000)
     plan: AgentPlan | None = None
+    primary_operation: str | None = Field(default=None, max_length=64)
+    open_plan: bool | None = None
+    follow_up_prompts: list[str] = Field(default_factory=list, max_length=3)
 
     @model_validator(mode="after")
     def validate_execution_contract(self) -> "AdaptiveExecutionDecision":
@@ -316,10 +627,61 @@ class AdaptiveExecutionDecision(ApiModel):
         return self
 
 
+class AdaptiveRoutingDecision(ApiModel):
+    """Lean semantic output produced by the Adaptive Router model.
+
+    Executable AgentPlan objects are compiled by deterministic code after this
+    boundary. Keeping the model contract shallow prevents a simple route choice
+    from failing because one nested plan field was omitted or misspelled.
+    """
+
+    execution_path: Literal["DIRECT", "TOOL", "CREATOR", "ORCHESTRATED"]
+    classification_summary: str = Field(min_length=1, max_length=240)
+    intent: CommunityIntent
+    turn_relation: Literal[
+        "NEW_GOAL",
+        "CONTINUE",
+        "MODIFY",
+        "CANCEL",
+        "RETRY",
+        "QUERY_STATE",
+    ] = "NEW_GOAL"
+    referenced_entities: list[str] = Field(default_factory=list, max_length=8)
+    direct_response: str | None = Field(default=None, max_length=10_000)
+    tool: str | None = Field(default=None, min_length=3, max_length=80)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    # Optional TurnPlan hints — validated by the control plane; never trusted
+    # for authorization or tool selection alone.
+    primary_operation: str | None = Field(default=None, max_length=64)
+    open_plan: bool | None = None
+    follow_up_prompts: list[str] = Field(default_factory=list, max_length=3)
+
+
 class VerificationDecision(ApiModel):
     decision: Literal["COMPLETE", "REPLAN", "FAILED"]
     reason: str = Field(min_length=1, max_length=500)
     next_focus: str = Field(default="", max_length=500)
+
+
+class ProgressDecision(ApiModel):
+    decision: Literal["CONTINUE", "REPLAN", "FAILED"]
+    progress_made: bool
+    in_loop: bool = False
+    reason: str = Field(min_length=1, max_length=500)
+    next_focus: str = Field(default="", max_length=500)
+
+
+class PlanDiagnostic(ApiModel):
+    code: str = Field(pattern=r"^[A-Z][A-Z0-9_]{2,79}$")
+    message: str = Field(min_length=1, max_length=1_000)
+    task_id: str | None = Field(default=None, max_length=80)
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlanCompileResult(ApiModel):
+    status: Literal["EXECUTABLE", "NEEDS_REPLAN", "NEEDS_INPUT", "UNSUPPORTED"]
+    diagnostics: list[PlanDiagnostic] = Field(default_factory=list, max_length=50)
+    compiled_plan: AgentPlan | None = None
 
 
 class ApprovalView(ApiModel):

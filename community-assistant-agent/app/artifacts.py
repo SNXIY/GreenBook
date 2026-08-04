@@ -7,7 +7,15 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import Artifact, Approval, Run, RunStep
+from app.database import Artifact, ArtifactRelation, Approval, Run, RunStep
+
+# Test-only fault injection: called after provenance miss, before INSERT.
+_ARTIFACT_BEFORE_INSERT_HOOK: Any | None = None
+
+
+def set_artifact_before_insert_hook(hook: Any | None) -> None:
+    global _ARTIFACT_BEFORE_INSERT_HOOK
+    _ARTIFACT_BEFORE_INSERT_HOOK = hook
 
 
 def content_hash(content: dict[str, Any]) -> str:
@@ -21,6 +29,7 @@ def content_hash(content: dict[str, Any]) -> str:
 
 
 def artifact_type_for_tool(tool_name: str | None) -> str:
+    """Fallback for artifacts restored from plans created before typed tools."""
     if not tool_name:
         return "HARNESS_OUTPUT"
     if tool_name == "creator.create_draft":
@@ -31,8 +40,6 @@ def artifact_type_for_tool(tool_name: str | None) -> str:
         return "ANALYSIS_REPORT"
     if tool_name.startswith("community.summarize"):
         return "CONTENT_SUMMARY"
-    if tool_name.startswith("moderation."):
-        return "MODERATION_RESULT"
     if tool_name.startswith("publication."):
         return "PUBLICATION_RECEIPT"
     if tool_name.startswith("mcp."):
@@ -45,15 +52,27 @@ async def publish_step_artifact(
     *,
     step: RunStep,
     output: dict[str, Any],
+    artifact_type: str | None = None,
+    parent_artifact_id: str | None = None,
+    parent_artifact_ids: list[str] | None = None,
+    version: int | None = None,
+    change_type: str | None = None,
+    provenance_key: str | None = None,
 ) -> Artifact:
+    resolved_hash = content_hash(output)
+    resolved_provenance = provenance_key or f"tool-step:{step.id}"
     existing = await session.scalar(
-        select(Artifact).where(
-            Artifact.run_id == step.run_id,
-            Artifact.step_id == step.id,
-            Artifact.content_hash == content_hash(output),
-        )
+        select(Artifact).where(Artifact.provenance_key == resolved_provenance)
     )
     if existing is not None:
+        if (
+            existing.run_id != step.run_id
+            or existing.step_id != step.id
+            or existing.content_hash != resolved_hash
+        ):
+            raise ValueError(
+                "Artifact provenance key was reused with different execution data"
+            )
         return existing
     parent_ids: list[str] = []
     if step.depends_on:
@@ -83,16 +102,27 @@ async def publish_step_artifact(
             Artifact.task_key == (step.task_key or f"step-{step.ordinal}"),
         )
     )
+    resolved_parent_ids = list(dict.fromkeys(parent_artifact_ids or parent_ids))
+    if _ARTIFACT_BEFORE_INSERT_HOOK is not None:
+        await _ARTIFACT_BEFORE_INSERT_HOOK(
+            session=session,
+            step=step,
+            provenance_key=resolved_provenance,
+            output=output,
+        )
     artifact = Artifact(
         run_id=step.run_id,
         step_id=step.id,
         task_key=step.task_key or f"step-{step.ordinal}",
         agent_name=step.agent_name or "Harness",
-        artifact_type=artifact_type_for_tool(step.tool_name),
-        parent_artifact_ids=parent_ids,
-        version=int(current_version or 0) + 1,
+        artifact_type=artifact_type or artifact_type_for_tool(step.tool_name),
+        parent_artifact_ids=resolved_parent_ids,
+        parent_artifact_id=parent_artifact_id,
+        version=version if version is not None else int(current_version or 0) + 1,
+        change_type=change_type,
+        provenance_key=resolved_provenance,
         content=output,
-        content_hash=content_hash(output),
+        content_hash=resolved_hash,
     )
     session.add(artifact)
     await session.flush()
@@ -106,14 +136,13 @@ async def publish_final_artifact(
     final_response: str,
 ) -> Artifact:
     content = {"response": final_response}
+    provenance_key = f"run-final:{run.id}"
     existing = await session.scalar(
-        select(Artifact).where(
-            Artifact.run_id == run.id,
-            Artifact.task_key == "__final__",
-            Artifact.content_hash == content_hash(content),
-        )
+        select(Artifact).where(Artifact.provenance_key == provenance_key)
     )
     if existing is not None:
+        if existing.content_hash != content_hash(content):
+            raise ValueError("Final Artifact provenance produced different content")
         return existing
     candidates = list(
         (
@@ -145,11 +174,59 @@ async def publish_final_artifact(
         artifact_type="FINAL_RESPONSE",
         parent_artifact_ids=parent_ids,
         version=1,
+        provenance_key=provenance_key,
         content=content,
         content_hash=content_hash(content),
     )
     session.add(artifact)
     await session.flush()
+    return artifact
+
+
+async def rollback_artifact(
+    session: AsyncSession,
+    *,
+    target_artifact_id: str,
+    run_id: str,
+    task_key: str,
+    agent_name: str = "Supervisor",
+) -> Artifact:
+    """Create a new immutable artifact restoring a historical version."""
+    target = await session.get(Artifact, target_artifact_id)
+    if target is None:
+        raise ValueError("Rollback target artifact does not exist")
+    if target.run_id != run_id:
+        raise ValueError("Rollback target belongs to another run")
+    current_version = await session.scalar(
+        select(func.max(Artifact.version)).where(
+            Artifact.run_id == run_id,
+            Artifact.task_key == task_key,
+        )
+    )
+    content = dict(target.content or {})
+    artifact = Artifact(
+        run_id=run_id,
+        step_id=None,
+        task_key=task_key,
+        agent_name=agent_name,
+        artifact_type=target.artifact_type,
+        parent_artifact_ids=[target.id],
+        parent_artifact_id=target.id,
+        version=int(current_version or 0) + 1,
+        change_type="ROLLBACK",
+        provenance_key=f"rollback:{run_id}:{task_key}:{int(current_version or 0) + 1}",
+        content=content,
+        content_hash=content_hash(content),
+    )
+    session.add(artifact)
+    await session.flush()
+    session.add(
+        ArtifactRelation(
+            source_artifact_id=artifact.id,
+            target_artifact_id=target.id,
+            relation_type="DERIVED_FROM",
+        )
+    )
     return artifact
 
 
@@ -216,7 +293,9 @@ async def blackboard_snapshot(
                 "agent": item.agent_name,
                 "type": item.artifact_type,
                 "version": item.version,
+                "parent_artifact_id": item.parent_artifact_id,
                 "parent_artifact_ids": list(item.parent_artifact_ids or []),
+                "change_type": item.change_type,
                 "content_hash": item.content_hash,
                 "created_at": item.created_at.isoformat(),
             }

@@ -17,12 +17,14 @@ dependencies = [
     "langgraph==1.2.9",
     "mcp>=1.28,<2",
     "jsonschema>=4.23,<5",
+    "tzdata>=2024.1",
 ]
 
 [dependency-groups]
 dev = [
     "pytest==8.4.1",
     "pytest-asyncio==1.1.0",
+    "aiosqlite==0.21.0",
 ]
 
 [tool.uv]
@@ -31,3 +33,7 @@ package = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "regression: Canonical Phase 5 regression suite",
+    "external: Requires external services",
+]

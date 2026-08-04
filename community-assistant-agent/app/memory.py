@@ -39,7 +39,6 @@ _ARTIFACT_KEYS = {
     "draft_id",
     "action_id",
     "creator_task_id",
-    "moderation_task_id",
 }
 
 
@@ -125,6 +124,14 @@ class MemoryHealth:
 
 
 class AssistantMemory:
+    # 任务完成后写入
+    # Postgres：权威存储（情节记忆等）
+    # Qdrant（若开启）：语义向量索引，加速相似检索
+    # 下次执行任务前检索
+
+    # recall 按用户/上下文把相关记忆捞出来
+    # 塞进规划/回答的 prompt 里
+    # 注释里也写了：Postgres 是主库，Qdrant 只是加速索引。Qdrant 挂了还可以退回用 Postgres 召回；本地没配复杂 embedding 时，可用 hashing 向量做简单相似匹配。
     """Four-layer memory coordinator.
 
     Run/checkpoint state remains working memory, messages remain conversational

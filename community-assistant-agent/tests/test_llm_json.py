@@ -59,9 +59,17 @@ async def test_structured_chat_repairs_invalid_first_response() -> None:
         ]
     )
 
-    async def fake_chat(messages, *, temperature, json_mode=False):
-        del messages, temperature
+    async def fake_chat(
+        messages,
+        *,
+        temperature,
+        json_mode=False,
+        operation,
+        force_repair=False,
+    ):
+        del messages, temperature, force_repair
         assert json_mode is True
+        assert operation in {"intent.understand", "structured.repair"}
         return next(responses)
 
     client._chat = fake_chat
@@ -69,6 +77,7 @@ async def test_structured_chat_repairs_invalid_first_response() -> None:
         [{"role": "system", "content": "return JSON"}],
         model_type=CommunityIntent,
         temperature=0.0,
+        operation="intent.understand",
     )
     assert result.goal == "回答今天的日期"
 
@@ -78,9 +87,16 @@ async def test_structured_chat_fails_after_one_bounded_repair() -> None:
     client = object.__new__(DeepSeekClient)
     call_count = 0
 
-    async def fake_chat(messages, *, temperature, json_mode=False):
+    async def fake_chat(
+        messages,
+        *,
+        temperature,
+        json_mode=False,
+        operation,
+        force_repair=False,
+    ):
         nonlocal call_count
-        del messages, temperature, json_mode
+        del messages, temperature, json_mode, operation, force_repair
         call_count += 1
         return '{"invalid":true}'
 
@@ -90,5 +106,6 @@ async def test_structured_chat_fails_after_one_bounded_repair() -> None:
             [{"role": "system", "content": "return JSON"}],
             model_type=CommunityIntent,
             temperature=0.0,
+            operation="intent.understand",
         )
     assert call_count == 2

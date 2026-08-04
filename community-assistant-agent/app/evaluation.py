@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.domain import AgentPlan, CommunityIntent
+from app.domain import AgentPlan, CommunityIntent, PlanCompileResult
 
 
 @dataclass(frozen=True)
@@ -12,6 +12,8 @@ class PlanningEvaluation:
     planning_efficiency: float
     tool_selection_accuracy: float
     agent_selection_accuracy: float
+    goal_capability_coverage: float
+    plan_executability: float
 
     @property
     def overall(self) -> float:
@@ -22,8 +24,10 @@ class PlanningEvaluation:
                 + self.planning_efficiency
                 + self.tool_selection_accuracy
                 + self.agent_selection_accuracy
+                + self.goal_capability_coverage
+                + self.plan_executability
             )
-            / 5,
+            / 7,
             4,
         )
 
@@ -34,6 +38,8 @@ class PlanningEvaluation:
             "planning_efficiency": self.planning_efficiency,
             "tool_selection_accuracy": self.tool_selection_accuracy,
             "agent_selection_accuracy": self.agent_selection_accuracy,
+            "goal_capability_coverage": self.goal_capability_coverage,
+            "plan_executability": self.plan_executability,
             "overall": self.overall,
         }
 
@@ -89,6 +95,7 @@ def evaluate_plan(
     required_tools: set[str],
     forbidden_tools: set[str],
     expected_agents: set[str],
+    compile_result: PlanCompileResult | None = None,
 ) -> PlanningEvaluation:
     planned_capabilities = {
         capability for step in plan.steps for capability in step.capabilities
@@ -136,12 +143,21 @@ def evaluate_plan(
         _recall(expected_agents, planned_agents),
         4,
     )
+    goal_capability_coverage = round(
+        _recall(required_capabilities, planned_capabilities),
+        4,
+    )
+    plan_executability = float(
+        compile_result is None or compile_result.status == "EXECUTABLE"
+    )
     return PlanningEvaluation(
         intent_accuracy=intent_accuracy,
         task_coverage=task_coverage,
         planning_efficiency=planning_efficiency,
         tool_selection_accuracy=tool_selection_accuracy,
         agent_selection_accuracy=agent_selection_accuracy,
+        goal_capability_coverage=goal_capability_coverage,
+        plan_executability=plan_executability,
     )
 
 

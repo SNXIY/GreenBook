@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import get_settings
 from app.evaluation import evaluate_plan
 from app.llm import DeepSeekClient
+from app.agent_registry import agent_registry
+from app.plan_compiler import PlanCompiler
 from app.tools import tool_registry
 
 
@@ -18,6 +20,7 @@ async def main() -> None:
         (Path(__file__).parent / "scenarios.json").read_text(encoding="utf-8")
     )
     client = DeepSeekClient(get_settings(), tool_registry)
+    compiler = PlanCompiler(tools=tool_registry, agents=agent_registry)
     passed = 0
     totals: dict[str, float] = {}
     try:
@@ -41,6 +44,7 @@ async def main() -> None:
             tools = [step.tool for step in plan.steps]
             required = set(scenario.get("required_tools", []))
             forbidden = set(scenario.get("forbidden_tools", []))
+            compile_result = compiler.compile(plan)
             evaluation = evaluate_plan(
                 intent=intent,
                 plan=plan,
@@ -51,11 +55,13 @@ async def main() -> None:
                 required_tools=required,
                 forbidden_tools=forbidden,
                 expected_agents=set(scenario.get("expected_agents", [])),
+                compile_result=compile_result,
             )
             metrics = evaluation.as_dict()
             ok = (
                 required.issubset(tools)
                 and forbidden.isdisjoint(tools)
+                and compile_result.status == "EXECUTABLE"
                 and metrics["overall"] >= 0.8
             )
             passed += int(ok)
@@ -70,6 +76,11 @@ async def main() -> None:
                         "agents": [step.agent for step in plan.steps],
                         "intent": intent.model_dump(mode="json"),
                         "metrics": metrics,
+                        "compile_status": compile_result.status,
+                        "compile_diagnostics": [
+                            item.model_dump(mode="json")
+                            for item in compile_result.diagnostics
+                        ],
                         "summary": plan.summary,
                     },
                     ensure_ascii=False,

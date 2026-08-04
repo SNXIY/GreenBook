@@ -40,10 +40,14 @@ class McpGateway:
     """
 
     def __init__(self, settings: Settings) -> None:
+        # 设置
         self.settings = settings
+        # 解析 MCP 服务器配置
         self.servers = self._parse_servers(settings.mcp_servers_json)
+        # 绑定关系
         self.bindings: dict[str, McpBinding] = {}
 
+    # 解析 MCP 服务器配置
     @staticmethod
     def _parse_servers(raw: str) -> list[McpServer]:
         payload = json.loads(raw or "[]")
@@ -80,6 +84,7 @@ class McpGateway:
             )
         return servers
 
+    # 服务启动时做的 MCP 工具发现与注册：把外部 MCP Server 上允许的工具，挂进本地的 ToolRegistry
     async def discover(self, registry: ToolRegistry) -> None:
         for server in self.servers:
             async with self._session(server) as session:

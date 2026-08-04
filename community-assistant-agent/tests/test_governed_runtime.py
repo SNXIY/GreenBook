@@ -54,16 +54,6 @@ def test_policy_allows_reads_and_requires_exact_write_approval() -> None:
     assert approved.decision == PolicyDecisionType.ALLOW
 
 
-def test_policy_keeps_moderation_out_of_user_assistant_scope() -> None:
-    definition = tool_registry.get("moderation.check_draft")
-    decision = community_policy.evaluate(
-        context=context_for("moderation.check_draft"),
-        definition=definition,
-        registry=tool_registry,
-    )
-    assert decision.decision == PolicyDecisionType.DENY
-
-
 def test_skill_registry_activates_only_relevant_capabilities() -> None:
     intent = CommunityIntent(
         domain="content_delete",

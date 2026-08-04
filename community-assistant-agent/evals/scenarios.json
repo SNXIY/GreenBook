@@ -103,6 +103,28 @@
     ]
   },
   {
+    "id": "active-user-topic-analysis",
+    "prompt": "分析一下社区的活跃用户，以及他们主要发布什么类型的帖子",
+    "expected_domain": "data_analysis",
+    "required_capabilities": [
+      "user_insight",
+      "trend_analysis"
+    ],
+    "required_tools": [
+      "community.list_active_users",
+      "community.list_posts_by_users",
+      "community.aggregate_post_topics"
+    ],
+    "expected_agents": [
+      "UserInsightAgent",
+      "AnalyticsAgent"
+    ],
+    "forbidden_tools": [
+      "creator.create_draft",
+      "publication.publish_now"
+    ]
+  },
+  {
     "id": "delete-all-own-posts",
     "prompt": "帮我删除所有帖子",
     "expected_domain": "content_delete",
@@ -121,5 +143,25 @@
       "community.search_posts",
       "community.delete_post"
     ]
+  },
+  {
+    "id": "research-create-without-publish",
+    "prompt": "检索社区里关于 Spring Boot 性能优化的内容，综合参考后生成一篇新草稿，但不要发布",
+    "expected_domain": "content_publish",
+    "required_capabilities": ["search", "generation"],
+    "required_tools": ["community.search_posts", "creator.create_draft"],
+    "expected_agents": ["SearchAgent", "ContentCreationAgent"],
+    "forbidden_tools": ["publication.publish_now", "publication.schedule"]
+  },
+  {
+    "id": "context-comment-interaction",
+    "prompt": "先总结当前帖子，再把三条关键结论回复到当前评论下",
+    "context_post_id": "10001",
+    "context_comment_id": "20001",
+    "expected_domain": "comment_interaction",
+    "required_capabilities": ["summarize", "comment_interaction"],
+    "required_tools": ["community.summarize_post", "community.reply_comment"],
+    "expected_agents": ["SearchAgent", "InteractionAgent"],
+    "forbidden_tools": ["creator.create_draft", "publication.publish_now"]
   }
 ]

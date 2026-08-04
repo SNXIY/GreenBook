@@ -27,6 +27,16 @@ ASSISTANT_REVISIONS = {
     "008_four_layer_memory",
     "009_governed_runtime",
     "010_adaptive_execution",
+    "011_goal_target_binding",
+    "012_intent_deltas",
+    "013_target_resolution",
+    "014_target_context",
+    "015_target_binding_roles",
+    "016_intent_delta_target_role",
+    "017_artifact_lifecycle",
+    "018_intent_delta_operation_class",
+    "019_goal_resolution_metadata",
+    "020_execution_reliability",
 }
 
 

@@ -3,9 +3,12 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Annotated, AsyncIterator
+
+logger = logging.getLogger(__name__)
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,15 +16,17 @@ from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from app.clients import CommunityClient, CreatorClient, ModerationClient
+from app.clients import CommunityClient, CreatorClient
 from app.config import Settings, get_settings
 from app.database import (
     AgentEvent,
     Approval,
     Conversation,
+    ConversationGoal as ConversationGoalRecord,
     Database,
     IdempotencyRecord,
     Message,
+    IntentDelta as IntentDeltaRecord,
     Run,
     RunStep,
     Artifact,
@@ -75,45 +80,66 @@ from app.worker import AgentWorker
 from app.tools import tool_registry
 from app.skill_registry import skill_registry
 
-
+# 运行时，管理助手服务的所有组件和资源，自研agent runtime
 class Runtime:
     def __init__(self, settings: Settings) -> None:
+        # 读配置。
         self.settings = settings
+        # 初始化数据库。
         self.database = Database(settings.database_url)
+        # 初始化 LLM 客户端。大模型客户端不只负责发 HTTP，还要 知道有哪些工具能用，规划时才能写进提示词、校验计划。
+        # 所以参数传入工具注册表。
         self.llm = DeepSeekClient(settings, tool_registry)
+        # 初始化社区客户端。
         self.community = CommunityClient(settings)
+        # 初始化创作者客户端。
         self.creator = CreatorClient(settings)
-        self.moderation = ModerationClient(settings)
+        # 初始化 MCP 网关。
         self.mcp = McpGateway(settings)
+        # 初始化内存。
         self.memory = AssistantMemory(settings, self.database)
+        # 这是在创建 令牌保险库：用服务密钥把用户的 JWT 加密后存库，用时再解密。
         self.token_vault = DelegatedTokenVault(settings.service_shared_secret)
-        self.rate_limiter = DistributedRateLimiter(
-            redis_url=settings.redis_url,
-            enabled=settings.distributed_limits_enabled,
-            required=settings.distributed_limits_required,
-            global_requests_per_minute=settings.model_requests_per_minute,
-            user_requests_per_minute=settings.user_model_requests_per_minute,
+        # 初始化限流器。
+        self.rate_limiter = DistributedRateLimiter( # 分布式限流器，用于限制模型请求和用户模型请求的频率。
+            redis_url=settings.redis_url, # Redis 连接 URL。
+            enabled=settings.distributed_limits_enabled, # 是否启用分布式限流。
+            required=settings.distributed_limits_required, # 是否必须启用分布式限流。
+            global_requests_per_minute=settings.model_requests_per_minute, # 每分钟允许的全局模型请求数。
+            user_requests_per_minute=settings.user_model_requests_per_minute, # 每分钟允许的单个用户模型请求数。
         )
+        # 初始化 worker。AgentWorker 是助手的后台执行引擎：负责把库里排队的任务真正跑完。
         self.worker = AgentWorker(
             settings=settings,
             database=self.database,
             llm=self.llm,
             community=self.community,
             creator=self.creator,
-            moderation=self.moderation,
             mcp=self.mcp,
             registry=tool_registry,
             rate_limiter=self.rate_limiter,
             memory=self.memory,
         )
+        # 初始化 worker 任务。
         self.worker_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
+        # 发现 MCP 服务器上的工具，并注册到工具注册表中。
         await self.mcp.discover(tool_registry)
+        # 建立数据库连接，确保表存在。
         await self.database.initialize()
+        # 启动内存。内存是助手记忆的核心：存放对话历史、情节记忆、用户偏好等。
         await self.memory.start()
+        # 启动限流器。
         await self.rate_limiter.start()
+        # 启动 worker。
+        # all：所有角色都跑
+        # run-worker：只跑 run 任务
+        # scheduler-worker：只跑 scheduler 任务
+        # tool-worker：只跑 tool 任务
         if self.settings.process_role == "all":
+            # 会把 run_forever() 丢进事件循环里后台跑，当前的 start() 不用等它结束，马上继续往下执行
+            # 后台跑完后，通过事件流/查询 run/拉消息拿到的。
             self.worker_task = asyncio.create_task(self.worker.run_forever())
         elif self.settings.process_role == "run-worker":
             self.worker_task = asyncio.create_task(
@@ -135,19 +161,19 @@ class Runtime:
         await self.llm.close()
         await self.community.close()
         await self.creator.close()
-        await self.moderation.close()
         await self.rate_limiter.close()
         await self.memory.close()
         await self.database.close()
 
-
+# 生命周期管理，服务启动和关闭
+# lifespan / Runtime ≈ Spring 里 @PostConstruct + 单例 Bean 初始化（应用级）
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    runtime = Runtime(get_settings())
-    await runtime.start()
-    app.state.runtime = runtime
-    yield
-    await runtime.close()
+    runtime = Runtime(get_settings())  # 1. 读配置，创建运行时（DB、LLM、worker 等）
+    await runtime.start()              # 2. 初始化：建表、连 Redis、启动轮询任务
+    app.state.runtime = runtime        # 3. 挂到fastapi app 上，接口里才能用 rt
+    yield                              # 4. 到这里表示“服务已就绪，开始接请求”
+    await runtime.close()              # 5. 进程退出时：停 worker、关连接
 
 
 app = FastAPI(
@@ -186,6 +212,7 @@ async def health(rt: RuntimeDep) -> dict:
             "checks": {
                 "database": "UP",
                 "model": rt.settings.deepseek_model,
+                "model_router": rt.llm.model_router.health(),
                 "mcp_tools": len(rt.mcp.bindings),
                 "skills": len(skill_registry.public_catalog()),
                 "policy_version": community_policy.version,
@@ -199,6 +226,7 @@ async def health(rt: RuntimeDep) -> dict:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
 
 
+# 用户第一次注册之后，然后点击助手按钮，会创建一个会话，会话id是conversation_id，会话标题是title，会话内容是body.content，会话创建时间是created_at，会话更新时间是updated_at。
 @app.post(
     "/api/v1/assistant/conversations",
     response_model=ConversationView,
@@ -219,7 +247,7 @@ async def create_conversation(
         await session.flush()
     return _conversation_view(conversation)
 
-
+# 用户登录之后，会列出用户所有的会话，会话id是conversation_id，会话标题是title，会话内容是body.content，会话创建时间是created_at，会话更新时间是updated_at。
 @app.get(
     "/api/v1/assistant/conversations", response_model=list[ConversationView]
 )
@@ -270,7 +298,10 @@ async def list_messages(
         for item in rows
     ]
 
-
+# 运行时依赖
+# RuntimeDep = Annotated[Runtime, Depends(runtime)]
+# 当前用户依赖
+# PrincipalDep = Annotated[Principal, Depends(current_principal)]
 @app.post(
     "/api/v1/assistant/conversations/{conversation_id}/messages",
     response_model=RunAccepted,
@@ -281,20 +312,22 @@ async def send_message(
     body: MessageCreate, # 消息内容
     principal: PrincipalDep, # 当前用户
     rt: RuntimeDep, # 运行时
-    idempotency_key: Annotated[
+    idempotency_key: Annotated[ # 幂等性键 前端传递的 UUID，放在HTTP 请求头
         str, Header(alias="Idempotency-Key", min_length=8, max_length=128)
     ],# 幂等性键
 ) -> RunAccepted: # 返回任务接受结果
     # 验证当前用户是否拥有该会话，如果会话不存在或不属于该用户，会抛出异常。
     conversation = await _owned_conversation(rt, conversation_id, principal.user_id)
-    # 计算请求的哈希值，用于后续幂等性验证。
+    # 根据会话ID和消息内容计算请求的哈希值，用于后续幂等性验证。
     request_hash = hashlib.sha256(
         f"{conversation_id}\0{body.model_dump_json()}".encode()
     ).hexdigest()
     # 在数据库中查找幂等性记录，确保同一幂等性键只能用于一次请求。
     async with rt.database.sessions() as session, session.begin():
+        # 查到了 → 说明这次请求可能是重试；若内容哈希也一样，直接返回原来的 run_id，不新建任务
+        # 没查到 → 第一次请求，继续往下创建新的 Run
         existing = await session.scalar(
-            select(IdempotencyRecord).where(
+            select(IdempotencyRecord).where(# 从表 assistant_idempotency 查询，条件是 user_id 和 key 相等
                 IdempotencyRecord.user_id == principal.user_id,
                 IdempotencyRecord.key == idempotency_key,
             )
@@ -316,6 +349,9 @@ async def send_message(
                 replayed=True,
             )
         # 如果幂等性记录不存在，则创建新的任务。
+        # 排队靠的是status="QUEUED"。
+        # 后台 worker 轮询数据库，用 _claim_run() 把 QUEUED 抢成 RUNNING，再 _execute_run。
+        # 没有 Redis/Kafka 那种独立消息队列；DB 里的 run 表就是任务队列
         run = Run(
             conversation_id=conversation_id,
             user_id=principal.user_id,
@@ -335,20 +371,25 @@ async def send_message(
             deadline_at=utc_now()
             + timedelta(seconds=rt.settings.run_timeout_seconds),
         )
-        # 将任务添加到数据库。
+        # 将任务添加到数据库。assistant_runs
         session.add(run)
+        # 刷新数据库，确保任务被添加到数据库。
         await session.flush()
-        # 创建用户消息记录。
-        session.add(
-            Message(
-                conversation_id=conversation_id,
-                role="user",
-                content=body.content.strip(),
-                parts=[],
-                run_id=run.id,
-            )
+        # 创建用户消息记录。assistant_messages
+        user_message = Message(
+            conversation_id=conversation_id,
+            role="user",
+            content=body.content.strip(),
+            parts=[],
+            run_id=run.id,
         )
-        # 创建幂等性记录。
+        session.add(user_message)
+        await session.flush()
+        run.checkpoint = {
+            **dict(run.checkpoint or {}),
+            "message_id": user_message.id,
+        }
+        # 创建幂等性记录。assistant_idempotency
         session.add(
             IdempotencyRecord(
                 user_id=principal.user_id,
@@ -357,7 +398,7 @@ async def send_message(
                 run_id=run.id,
             )
         )
-        # 更新会话标题。
+        # 更新会话标题。assistant_conversations
         conversation.title = (
             body.content.strip()[:32]
             if conversation.title == "新的对话"
@@ -365,7 +406,7 @@ async def send_message(
         )
         # 更新会话更新时间。
         conversation.updated_at = utc_now()
-        # 追加任务排队事件。
+        # 追加任务排队事件。assistant_events
         await append_event(session, run.id, "RUN_QUEUED", {"status": "QUEUED"})
     # 返回任务接受结果。
     return RunAccepted(
@@ -402,7 +443,7 @@ async def list_runs(
         )
     return [_run_list_item_view(run) for run in runs]
 
-
+# 这是 查询单个任务详情 的接口
 @app.get("/api/v1/assistant/runs/{run_id}", response_model=RunView)
 async def get_run(run_id: str, principal: PrincipalDep, rt: RuntimeDep) -> RunView:
     async with rt.database.sessions() as session:
@@ -478,7 +519,9 @@ async def list_run_artifacts(
             agent=item.agent_name,
             artifact_type=item.artifact_type,
             parent_artifact_ids=list(item.parent_artifact_ids or []),
+            parent_artifact_id=item.parent_artifact_id,
             version=item.version,
+            change_type=item.change_type,
             content=dict(item.content or {}),
             content_hash=item.content_hash,
             created_at=item.created_at,
@@ -690,6 +733,7 @@ async def resume_run(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "任务不存在")
         if run.status != "PAUSED":
             raise HTTPException(status.HTTP_409_CONFLICT, "只有暂停任务可以恢复")
+        rerouted = _clear_invalid_plan_for_reroute(run)
         run.status = "QUEUED"
         run.interrupted_at = None
         run.deadline_at = utc_now() + timedelta(
@@ -701,7 +745,11 @@ async def resume_run(
             session,
             run.id,
             "RUN_RESUMED",
-            {"status": "QUEUED", "version": run.version},
+            {
+                "status": "QUEUED",
+                "version": run.version,
+                "rerouted": rerouted,
+            },
         )
     return await _reload_run(rt, run_id)
 
@@ -720,12 +768,21 @@ async def retry_run(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "任务不存在")
         if run.status != "FAILED":
             raise HTTPException(status.HTTP_409_CONFLICT, "只有失败任务可以重试")
+        rerouted = _clear_invalid_plan_for_reroute(run)
         run.status = "QUEUED"
         run.error = None
         run.final_response = None
         run.completed_at = None
         run.retry_after = None
         run.attempts = 0
+        previous_budget = {
+            "model_calls": run.model_calls,
+            "tool_calls": run.tool_calls,
+            "replan_count": run.replan_count,
+        }
+        run.model_calls = 0
+        run.tool_calls = 0
+        run.replan_count = 0
         run.delegated_token = rt.token_vault.encrypt(principal.token)
         run.deadline_at = utc_now() + timedelta(
             seconds=rt.settings.run_timeout_seconds
@@ -736,7 +793,13 @@ async def retry_run(
             session,
             run.id,
             "RUN_MANUAL_RETRY",
-            {"status": "QUEUED", "version": run.version},
+            {
+                "status": "QUEUED",
+                "version": run.version,
+                "previous_budget": previous_budget,
+                "budget_reset": True,
+                "rerouted": rerouted,
+            },
         )
     return await _reload_run(rt, run_id)
 
@@ -808,6 +871,42 @@ async def cancel_run(
         run.lease_expires_at = None
         run.version += 1
         run.updated_at = now
+
+        # Cancelling a run that is presenting a target clarification also
+        # cancels that suspended turn.  Otherwise the ConversationGoal keeps a
+        # stale pending delta and every later message is mistaken for an answer
+        # to the old selection question.
+        checkpoint = dict(run.checkpoint or {})
+        checkpoint_clarification = checkpoint.get("pending_clarification")
+        checkpoint_delta_id = (
+            str(checkpoint_clarification.get("delta_id") or "")
+            if isinstance(checkpoint_clarification, dict)
+            else ""
+        )
+        if run.goal_id and checkpoint_delta_id:
+            goal = await session.get(
+                ConversationGoalRecord,
+                run.goal_id,
+                with_for_update=True,
+            )
+            if goal is not None and goal.pending_delta_id == checkpoint_delta_id:
+                pending_delta = await session.get(
+                    IntentDeltaRecord,
+                    checkpoint_delta_id,
+                    with_for_update=True,
+                )
+                if pending_delta is not None and pending_delta.status == "ACTIVE":
+                    pending_delta.status = "SUPERSEDED"
+                    pending_delta.updated_at = now
+                goal.pending_clarification = None
+                goal.pending_delta_id = None
+                goal.status = "ACTIVE"
+                goal.version += 1
+                goal.updated_at = now
+                checkpoint.pop("pending_clarification", None)
+                if checkpoint.get("intent_delta_id") == checkpoint_delta_id:
+                    checkpoint.pop("intent_delta_id", None)
+                run.checkpoint = checkpoint
 
         approvals = (
             await session.scalars(
@@ -886,7 +985,7 @@ async def cancel_run(
     assert refreshed is not None
     return _run_view(refreshed)
 
-
+# 这是 任务事件流（SSE） 接口：前端用它实时听某个 run_id 的进度。
 @app.get("/api/v1/assistant/runs/{run_id}/events/stream")
 async def stream_events(
     run_id: str,
@@ -941,6 +1040,7 @@ async def stream_events(
                 "CANCELLED",
                 "PAUSED",
                 "WAITING_APPROVAL",
+                "WAITING_CLARIFICATION",
             } and not events:
                 break
             idle_ticks += 1
@@ -1073,13 +1173,15 @@ async def get_events(
         ]
     }
 
-
+# messages：这次聊天说了什么、助手怎么回
+# memories：用户希望助手长期记住的东西
 @app.get("/api/v1/assistant/memories", response_model=list[MemoryView])
 async def list_memories(
     principal: PrincipalDep, rt: RuntimeDep
 ) -> list[MemoryView]:
     async with rt.database.sessions() as session:
         rows = (
+            # 查询数据表assistant_user_memories
             await session.scalars(
                 select(UserMemory)
                 .where(UserMemory.user_id == principal.user_id)
@@ -1161,6 +1263,7 @@ async def save_memory(
     body: MemoryCreate, principal: PrincipalDep, rt: RuntimeDep
 ) -> MemoryView:
     async with rt.database.sessions() as session, session.begin():
+        # 写入数据表assistant_user_memories，key是用户希望助手长期记住的东西，value是用户希望助手记住的内容。
         memory = await session.scalar(
             select(UserMemory)
             .where(
@@ -1360,36 +1463,39 @@ async def list_scheduled_action_attempts(
 async def cancel_scheduled_action(
     action_id: str, principal: PrincipalDep, rt: RuntimeDep
 ) -> ScheduledActionView:
-    async with rt.database.sessions() as session, session.begin():
-        action = await session.scalar(
-            select(ScheduledAction)
-            .where(
-                ScheduledAction.id == action_id,
-                ScheduledAction.user_id == principal.user_id,
-            )
-            .with_for_update()
+    """Cancel via shared ScheduleCommandService (local authority + best-effort revoke)."""
+
+    from app.schedule_commands import cancel_schedule_command, revoke_after_cancel
+
+    try:
+        result = await cancel_schedule_command(
+            rt.worker.schedule_repository,
+            action_id=action_id,
+            user_id=principal.user_id,
         )
-        if action is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "定时任务不存在")
-        if action.status not in {"SCHEDULED", "RETRYING"}:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT, "当前状态不能取消该定时任务"
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    if not result.noop:
+        cleanup = await revoke_after_cancel(
+            rt.community,
+            access_token=principal.token,
+            capability_id=result.old_capability_id,
+        )
+        if cleanup.get("capability_cleanup_pending"):
+            # Local cancel already committed; surface cleanup debt without 502.
+            logger.warning(
+                "HTTP cancel left capability_cleanup_pending action_id=%s capability_id=%s",
+                action_id,
+                result.old_capability_id,
             )
-        if action.capability_id:
-            try:
-                await rt.community.revoke_capability(
-                    access_token=principal.token,
-                    capability_id=action.capability_id,
-                )
-            except Exception as exc:
-                raise HTTPException(
-                    status.HTTP_502_BAD_GATEWAY,
-                    "Java 能力撤销失败，定时任务尚未取消，请重试",
-                ) from exc
-        action.status = "CANCELLED"
-        action.capability_token = None
-        action.lease_owner = None
-        action.lease_expires_at = None
+
+    async with rt.database.sessions() as session:
+        action = await session.get(ScheduledAction, action_id)
+    if action is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "定时任务不存在")
     return _scheduled_view(action)
 
 
@@ -1397,6 +1503,7 @@ async def _owned_conversation(
     rt: Runtime, conversation_id: str, user_id: str
 ) -> Conversation:
     async with rt.database.sessions() as session:
+        # 从表 assistant_conversations 查询，条件是 会话id 和 user_id 相等
         conversation = await session.scalar(
             select(Conversation).where(
                 Conversation.id == conversation_id,
@@ -1431,6 +1538,17 @@ def _conversation_view(item: Conversation) -> ConversationView:
     )
 
 
+def _display_run_summary(run: Run) -> str | None:
+    """Terminal state wins over a stale transient phase description."""
+    if run.status == "COMPLETED":
+        return "任务已完成"
+    if run.status == "FAILED":
+        return "执行失败"
+    if run.status == "RETRYING":
+        return "等待自动重试"
+    return run.summary
+
+
 def _run_view(run: Run) -> RunView:
     steps = sorted(run.steps, key=lambda item: item.ordinal)
     approval = next(
@@ -1449,7 +1567,7 @@ def _run_view(run: Run) -> RunView:
         execution_path=run.execution_path,
         workload_lane=run.workload_lane,
         intent=run.intent,
-        summary=run.summary,
+        summary=_display_run_summary(run),
         final_response=run.final_response,
         error=run.error,
         trace_id=run.trace_id,
@@ -1469,6 +1587,12 @@ def _run_view(run: Run) -> RunView:
             "total_ms": _elapsed_ms(run.created_at, run.completed_at),
         },
         intent_detail=dict(run.intent_detail) if run.intent_detail else None,
+        pending_clarification=(
+            dict(run.checkpoint.get("pending_clarification") or {})
+            if isinstance(run.checkpoint, dict)
+            and run.checkpoint.get("pending_clarification")
+            else None
+        ),
         task_ledger=dict(run.task_ledger or {}),
         progress_ledger=dict(run.progress_ledger or {}),
         approval=(
@@ -1532,7 +1656,7 @@ def _run_list_item_view(run: Run) -> RunListItemView:
         goal=run.prompt,
         status=run.status,
         intent=run.intent,
-        summary=run.summary,
+        summary=_display_run_summary(run),
         error=run.error,
         trace_id=run.trace_id,
         approval=(
@@ -1560,6 +1684,28 @@ def _run_list_item_view(run: Run) -> RunListItemView:
         created_at=run.created_at,
         updated_at=run.updated_at,
     )
+
+def _clear_invalid_plan_for_reroute(run: Run) -> bool:
+    """Discard a rejected planner proposal before retry/resume.
+
+    A compiler-rejected plan is not a durable execution checkpoint. Keeping it
+    forces the worker to replay the same malformed proposal and prevents a new
+    deterministic route (for example, a schedule-time update) from running.
+    Valid compiled plans remain untouched so ordinary tool retries still resume
+    from their completed artifacts.
+    """
+    if run.plan is not None:
+        return False
+    checkpoint = dict(run.checkpoint or {})
+    if not isinstance(checkpoint.get("invalid_plan"), dict):
+        return False
+    checkpoint.pop("invalid_plan", None)
+    checkpoint.pop("conversation_workspace_frozen", None)
+    checkpoint.pop("conversation_workspace", None)
+    run.checkpoint = checkpoint
+    run.intent_detail = None
+    run.execution_path = None
+    return True
 
 
 async def _reload_run(rt: Runtime, run_id: str) -> RunView:

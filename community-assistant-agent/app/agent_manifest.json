@@ -10,27 +10,34 @@
     "name": "AnalyticsAgent",
     "description": "Analyze community trends, engagement and time-window metrics.",
     "capabilities": ["analysis", "trend_analysis"],
-    "tools": ["community.analyze_engagement"],
+    "tools": [
+      "community.analyze_engagement",
+      "community.aggregate_post_topics"
+    ],
     "max_parallel_tasks": 2
   },
   {
     "name": "UserInsightAgent",
     "description": "Analyze user interaction, contributors and audience activity.",
     "capabilities": ["analysis", "user_insight"],
-    "tools": ["community.analyze_engagement"],
+    "tools": [
+      "community.analyze_engagement",
+      "community.list_active_users",
+      "community.list_posts_by_users"
+    ],
     "max_parallel_tasks": 2
   },
   {
     "name": "ContentCreationAgent",
     "description": "Delegate community draft generation and rewriting to Creator Agent.",
     "capabilities": ["generation", "rewrite_content"],
-    "tools": ["creator.create_draft"]
+    "tools": ["creator.create_draft", "creator.revise_draft"]
   },
   {
     "name": "PublishAgent",
     "description": "Publish or schedule approved drafts within authorization boundaries.",
     "capabilities": ["publishing", "schedule_publish"],
-    "tools": ["publication.publish_now", "publication.schedule", "publication.schedule_batch"]
+    "tools": ["community.get_own_draft", "publication.publish_now", "publication.schedule", "publication.get_schedule", "publication.update_schedule", "publication.cancel_schedule", "publication.schedule_batch"]
   },
   {
     "name": "InteractionAgent",

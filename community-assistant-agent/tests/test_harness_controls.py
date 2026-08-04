@@ -27,6 +27,26 @@ def test_publish_requires_creator_content_fingerprint() -> None:
         )
 
 
+def test_owned_draft_lookup_returns_a_publishable_typed_artifact() -> None:
+    output = tool_registry.validate_output(
+        "community.get_own_draft",
+        {
+            "draft_id": "342506609282519040",
+            "title": "MySQL 学习路线",
+            "status": "READY",
+            "content_sha256": "a" * 64,
+        },
+        {"draft_id": "342506609282519040"},
+        run_id="run-1",
+    )
+
+    assert output["draft_id"] == "342506609282519040"
+    assert (
+        tool_registry.get("community.get_own_draft").artifact_type
+        == "CONTENT_DRAFT"
+    )
+
+
 def test_model_cannot_replace_creator_content_fingerprint() -> None:
     worker = object.__new__(AgentWorker)
     run = SimpleNamespace(
@@ -397,6 +417,39 @@ async def test_creator_cancel_uses_latest_task_version() -> None:
     assert requests[1].url.path == "/api/v1/creator/tasks/task-1/cancel"
     assert requests[1].headers["Authorization"] == "Bearer user-jwt"
     assert requests[1].read().decode("utf-8") == '{"expected_version":7}'
+
+
+@pytest.mark.asyncio
+async def test_creator_balanced_profile_supports_instruction_without_references() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={"task_id": "task-1", "status": "QUEUED", "version": 1},
+        )
+
+    client = CreatorClient(SimpleNamespace(creator_base_url="http://creator"))
+    await client.http.aclose()
+    client.http = httpx.AsyncClient(
+        base_url="http://creator",
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        await client.submit_draft(
+            instruction="Create a post about learning MySQL",
+            references=[],
+            access_token="user-jwt",
+            idempotency_key="creator-run-no-references",
+        )
+    finally:
+        await client.close()
+
+    payload = requests[0].read().decode("utf-8")
+    assert '"goal":"Create a post about learning MySQL"' in payload
+    assert '"execution_profile":"ASSISTANT_BALANCED"' in payload
+    assert '"reference_evidence":[]' in payload
 
 
 @pytest.mark.asyncio

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Iterable
 
+from app.capability_graph import CapabilityGraph, capability_graph
 from app.domain import AgentPlan, AgentPlanStep
 
 
@@ -17,25 +18,37 @@ class AgentDescriptor:
     tools: frozenset[str]
     max_parallel_tasks: int = 1
 
-    def supports(self, step: AgentPlanStep) -> bool:
-        tool_supported = (
-            step.tool in self.tools
-            or any(
-                pattern.endswith(".*") and step.tool.startswith(pattern[:-1])
-                for pattern in self.tools
-            )
+    def supports_tool(self, tool: str) -> bool:
+        return tool in self.tools or any(
+            pattern.endswith(".*") and tool.startswith(pattern[:-1])
+            for pattern in self.tools
         )
-        return tool_supported and set(step.capabilities).issubset(self.capabilities)
+
+    def supports(
+        self,
+        step: AgentPlanStep,
+        graph: CapabilityGraph = capability_graph,
+    ) -> bool:
+        return self.supports_tool(step.tool) and (
+            step.primary_capability is None
+            or graph.covers(self.capabilities, step.primary_capability)
+        )
 
 
 class AgentRegistry:
     """Capability-based routing over a versioned, loadable Agent manifest."""
 
-    def __init__(self, agents: Iterable[AgentDescriptor]) -> None:
+    def __init__(
+        self,
+        agents: Iterable[AgentDescriptor],
+        *,
+        capabilities: CapabilityGraph = capability_graph,
+    ) -> None:
         materialized = list(agents)
         self._agents = {agent.name: agent for agent in materialized}
         if len(self._agents) != len(materialized):
             raise ValueError("Agent Registry contains duplicate names")
+        self.capability_graph = capabilities
 
     @classmethod
     def from_manifest(cls, path: str | Path) -> "AgentRegistry":
@@ -77,23 +90,44 @@ class AgentRegistry:
         except KeyError as exc:
             raise ValueError(f"Unknown agent: {name}") from exc
 
-    def route(self, step: AgentPlanStep) -> AgentDescriptor:
-        requested = self._agents.get(step.agent)
-        if requested and requested.supports(step):
-            return requested
-        candidates = [agent for agent in self._agents.values() if agent.supports(step)]
-        if not candidates:
-            raise ValueError(
-                f"No registered agent can execute {step.tool} "
-                f"with capabilities {step.capabilities}"
+    def candidates(self, step: AgentPlanStep) -> list[AgentDescriptor]:
+        candidates = [
+            agent
+            for agent in self._agents.values()
+            if agent.supports_tool(step.tool)
+            and self.capability_graph.covers(
+                agent.capabilities,
+                step.primary_capability,
             )
+        ]
         candidates.sort(
             key=lambda agent: (
+                0 if agent.name == step.agent else 1,
+                -len(set(step.capabilities) & agent.capabilities),
                 len(agent.capabilities - set(step.capabilities)),
                 len(agent.tools),
                 agent.name,
             )
         )
+        return candidates
+
+    def route(self, step: AgentPlanStep) -> AgentDescriptor:
+        requested = self._agents.get(step.agent)
+        if (
+            requested
+            and requested.supports_tool(step.tool)
+            and self.capability_graph.covers(
+                requested.capabilities,
+                step.primary_capability,
+            )
+        ):
+            return requested
+        candidates = self.candidates(step)
+        if not candidates:
+            raise ValueError(
+                f"No registered agent can execute {step.tool} "
+                f"with primary capability {step.primary_capability}"
+            )
         return candidates[0]
 
     def route_plan(self, plan: AgentPlan) -> AgentPlan:
@@ -129,7 +163,10 @@ class AgentRegistry:
 
     def signature(self) -> str:
         encoded = json.dumps(
-            self.public_catalog(),
+            {
+                "agents": self.public_catalog(),
+                "capability_graph": self.capability_graph.signature(),
+            },
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
