@@ -142,6 +142,12 @@ from app.schedule_commands import (
     ScheduleCommandServices,
     register_schedule_command_handlers,
 )
+from app.publication_commands import (
+    PublishNowRequest,
+    PublishNowServices,
+    execute_publish_now,
+    register_publish_now_handler,
+)
 from app.creator_tools import CreatorToolServices, register_creator_tool_handlers
 from app.tool_dependency import DependencyPending
 from app.untrusted_content import guard_post_payload
@@ -264,6 +270,16 @@ class AgentWorker:
                 publication_max_schedule_days=self.settings.publication_max_schedule_days,
                 consume_budget=self._consume_budget,
                 run_prompt_loader=self._load_run_prompt,
+            ),
+        )
+        register_publish_now_handler(
+            self.execution_runtime,
+            services=PublishNowServices(
+                community=self.community,
+                ledger=self.side_effect_ledger,
+                issue_capability=self._runtime_issue_capability,
+                registry=self.registry,
+                consume_budget=self._consume_budget,
             ),
         )
         register_creator_tool_handlers(
@@ -6320,21 +6336,9 @@ class AgentWorker:
                 )
             return {"status": "SCHEDULED", "actions": actions}
         if tool == "publication.publish_now":
-            capability = await self._issue_capability(
-                run,
-                action="publication.publish_now",
-                resources=[f"post:{args['draft_id']}"],
-            )
-            return await asyncio.wait_for(
-                self.community.publish_ai_draft(
-                    post_id=args["draft_id"],
-                    creator_id=run.user_id,
-                    idempotency_key=operation_key,
-                    capability_token=capability.token,
-                    expected_content_sha256=args["expected_content_sha256"],
-                    trace_id=run.trace_id,
-                ),
-                timeout=timeout_seconds,
+            raise RuntimeError(
+                f"{tool} was migrated to ToolRuntime and must not use "
+                "_dispatch_builtin_tool"
             )
         if tool == "community.reply_comment":
             capability = await self._issue_capability(
@@ -7589,10 +7593,14 @@ class AgentWorker:
     async def _claim_scheduled_action(self) -> str | None:
         now = utc_now()
         async with self.database.sessions() as session, session.begin():
+            # Include lease-expired RUNNING so Java-success / local-incomplete
+            # rows can be reclaimed and reconciled (same idempotency key).
             action = await session.scalar(
                 select(ScheduledAction)
                 .where(
-                    ScheduledAction.status.in_(["SCHEDULED", "RETRYING"]),
+                    ScheduledAction.status.in_(
+                        ["SCHEDULED", "RETRYING", "RUNNING"]
+                    ),
                     ScheduledAction.run_at <= now,
                     (ScheduledAction.lease_expires_at.is_(None))
                     | (ScheduledAction.lease_expires_at < now),
@@ -7603,6 +7611,7 @@ class AgentWorker:
             )
             if action is None:
                 return None
+            # Fresh SCHEDULED/RETRYING: normal claim. Expired RUNNING: reclaim.
             action.status = "RUNNING"
             action.attempts += 1
             action.lease_owner = self.worker_id
@@ -7652,20 +7661,25 @@ class AgentWorker:
         try:
             if not action.capability_token:
                 raise RuntimeError("定时发布缺少委托能力令牌")
-            result = await self.community.publish_ai_draft(
-                post_id=action.draft_id,
-                creator_id=action.user_id,
-                idempotency_key=action.idempotency_key,
-                capability_token=self.token_vault.decrypt(action.capability_token),
-                expected_content_sha256=action.expected_content_sha256,
-                trace_id=action.run_id,
+            published = await execute_publish_now(
+                community=self.community,
+                registry=self.registry,
+                request=PublishNowRequest(
+                    draft_id=action.draft_id,
+                    expected_content_sha256=str(
+                        action.expected_content_sha256 or ""
+                    ).lower(),
+                    creator_id=action.user_id,
+                    idempotency_key=action.idempotency_key,
+                    capability_token=self.token_vault.decrypt(
+                        action.capability_token
+                    ),
+                    trace_id=action.run_id,
+                    source="SCHEDULER",
+                    run_id=action.run_id,
+                ),
             )
-            result = self.registry.validate_output(
-                "publication.publish_now",
-                result,
-                {"draft_id": action.draft_id},
-                run_id=action.run_id,
-            )
+            result = published.output
             async with self.database.sessions() as session, session.begin():
                 current = await session.get(
                     ScheduledAction, action_id, with_for_update=True
@@ -7673,7 +7687,11 @@ class AgentWorker:
                 if current is None or current.lease_owner != self.worker_id:
                     return
                 current.status = "COMPLETED"
-                current.result = result
+                current.result = {
+                    **result,
+                    "source": "SCHEDULER",
+                    "idempotency_key_hash": published.idempotency_key_hash,
+                }
                 current.error = None
                 current.capability_token = None
                 current.lease_owner = None
@@ -7691,7 +7709,11 @@ class AgentWorker:
                 )
                 if current is None or current.lease_owner != self.worker_id:
                     return
-                retryable = _is_transient_exception(exc)
+                # Unknown / transient: RETRYING with same idempotency key.
+                # Do not mint a new key. Permanent business failures → FAILED.
+                retryable = _is_transient_exception(exc) or isinstance(
+                    exc, UnknownSideEffectError
+                )
                 current.status = (
                     "RETRYING"
                     if retryable and current.attempts < 5

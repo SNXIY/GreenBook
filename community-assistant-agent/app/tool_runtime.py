@@ -218,7 +218,6 @@ LEGACY_BUILTIN_MIGRATION_BACKLOG: frozenset[str] = frozenset(
         "community.summarize_post",
         "community.get_own_draft",
         "publication.schedule_batch",
-        "publication.publish_now",
         "community.reply_comment",
         "community.delete_post",
         "community.delete_own_posts_batch",
@@ -238,6 +237,7 @@ MIGRATED_WRITE_TOOLS: frozenset[str] = frozenset(
         "publication.update_schedule",
         "publication.schedule",
         "publication.cancel_schedule",
+        "publication.publish_now",
         "creator.create_draft",
         "creator.revise_draft",
     }

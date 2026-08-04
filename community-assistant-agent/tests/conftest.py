@@ -21,6 +21,7 @@ REGRESSION_MODULES: frozenset[str] = frozenset(
         "test_tool_runtime_step4",
         "test_tool_runtime_step4_1",
         "test_tool_runtime_step5",
+        "test_tool_runtime_step6",
         "test_moderation_removed",
         "test_orchestration",
         "test_adaptive_execution",

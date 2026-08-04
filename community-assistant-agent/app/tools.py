@@ -1021,6 +1021,16 @@ class ToolRegistry:
                 ),
                 required_target_roles=frozenset({"CONTENT"}),
                 optional_target_roles=frozenset({"SCHEDULE"}),
+                transport=TransportType.BUILTIN,
+                idempotency_mode=IdempotencyMode.SIDE_EFFECT_REQUIRED,
+                capability_budget=CapabilityBudget(base_uses=1, max_internal_calls=3),
+                retry_policy=RetryPolicy(
+                    max_attempts=1,
+                    initial_backoff_ms=200,
+                    max_backoff_ms=2_000,
+                    retryable_http_statuses=(),
+                    retryable_error_codes=(),
+                ),
             ),
             ToolDefinition(
                 "community.reply_comment",
