@@ -282,6 +282,25 @@ def _progress_signature(payload: dict[str, Any]) -> tuple[Any, ...]:
             payload.get("current_node"), payload.get("execution_key"))
 
 
+def _record_business_ids(manifest: Manifest, value: Any) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = str(key).lower()
+            if normalized in {"goal_id", "creator_task_id", "creator_run_id", "scheduled_action_id"}:
+                target = {
+                    "goal_id": "goal_ids",
+                    "creator_task_id": "creator_task_ids",
+                    "creator_run_id": "creator_run_ids",
+                    "scheduled_action_id": "scheduled_action_ids",
+                }[normalized]
+                if item and item not in manifest.data["business"][target]:
+                    manifest.data["business"][target].append(item)
+            _record_business_ids(manifest, item)
+    elif isinstance(value, list):
+        for item in value:
+            _record_business_ids(manifest, item)
+
+
 def task_snapshot(base_url: str, token: str, task_id: str, *, deadline: Deadline,
                   manifest: Manifest, creator_run_id: str | None = None) -> dict[str, Any]:
     task_started = time.monotonic()
@@ -333,6 +352,7 @@ def submit_creator(base_url: str, token: str, payload: dict[str, Any], *, deadli
     )
     response.raise_for_status()
     accepted = response.json()
+    _record_business_ids(manifest, accepted)
     manifest.data["business"]["creator_task_ids"].append(accepted["task_id"])
     manifest.data["business"]["creator_run_ids"].append(accepted["run_id"])
     manifest.update("CREATOR_TASK_CREATED")
@@ -343,6 +363,9 @@ def submit_creator(base_url: str, token: str, payload: dict[str, Any], *, deadli
 
 def assistant_run(base_url: str, token: str, prompt: str, *, conversation: dict[str, Any] | None,
                   deadline: Deadline, manifest: Manifest, label: str) -> dict[str, Any]:
+    if label == "E2E2" and os.environ.get("P0_E2E_SKIP_E2E2") == "true":
+        manifest.update("E2E2_SKIPPED")
+        return {"skipped": True}
     headers = {"Authorization": f"Bearer {token}"}
     if conversation is None:
         deadline.check("Conversation create")
@@ -387,6 +410,21 @@ def assistant_run(base_url: str, token: str, prompt: str, *, conversation: dict[
                          "status": view.get("status"), "updated_at": view.get("updated_at"),
                          "step_count": len(steps), "artifact_count": len(artifacts)}, ensure_ascii=False))
         if view.get("status") in TERMINAL:
+            if view.get("status") != "COMPLETED":
+                raise HarnessTimeout(
+                    "ASSISTANT_RUN_FAILED",
+                    f"{label} ended in {view.get('status')}",
+                    evidence={"run_id": run_id, "run": view, "artifacts": artifacts},
+                )
+            artifacts_response = requests.get(
+                f"{base_url}/api/v1/assistant/runs/{run_id}/artifacts",
+                headers=headers,
+                timeout=15,
+            )
+            if artifacts_response.ok:
+                artifacts = artifacts_response.json()
+            _record_business_ids(manifest, view)
+            _record_business_ids(manifest, artifacts)
             return {"conversation": conversation, "accepted": accepted_view, "run": view, "artifacts": artifacts}
         if time.monotonic() - last_progress >= DEFAULT_STALL_TIMEOUT:
             raise HarnessTimeout("NODE_STALL_TIMEOUT", f"{label} made no observable progress",
@@ -438,7 +476,10 @@ def main() -> int:
     parser.add_argument("--keep-output", action="store_true")
     parser.add_argument("--experiment", choices=("A", "B", "C", "D"), default="C")
     parser.add_argument("--global-timeout", type=int, default=None)
+    parser.add_argument("--e2e1-only", action="store_true")
     args = parser.parse_args()
+    if args.e2e1_only:
+        os.environ["P0_E2E_SKIP_E2E2"] = "true"
     creator_hard = DEFAULT_CREATOR_HARD_TIMEOUT
     assistant_hard = DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT
     global_hard = args.global_timeout or (120 + 30 + 30 + assistant_hard * 2 + 120 + 120)

@@ -69,3 +69,28 @@ def test_manifest_sanitizes_nested_evidence(tmp_path) -> None:
     text = (tmp_path / "manifest.json").read_text(encoding="utf-8")
     assert "Bearer secret" not in text
     assert "<REDACTED>" in text
+
+
+def test_terminal_failed_run_is_not_success() -> None:
+    assert harness.TERMINAL >= {"COMPLETED", "FAILED", "CANCELLED"}
+    # The assistant polling path must treat only COMPLETED as a successful result.
+    source = open(harness.__file__, encoding="utf-8").read()
+    assert 'if view.get("status") != "COMPLETED"' in source
+
+
+def test_business_ids_are_collected_from_nested_evidence(tmp_path) -> None:
+    manifest = harness.Manifest(tmp_path, run_id="run-4", timeouts={})
+    harness._record_business_ids(manifest, {
+        "goal": {"goal_id": "goal-1"},
+        "steps": [{"creator_task_id": "task-1", "creator_run_id": "run-1"}],
+        "side_effect": {"scheduled_action_id": "schedule-1"},
+    })
+    assert manifest.data["business"] == {
+        "user_id": None,
+        "conversation_id": None,
+        "goal_ids": ["goal-1"],
+        "assistant_run_ids": [],
+        "creator_task_ids": ["task-1"],
+        "creator_run_ids": ["run-1"],
+        "scheduled_action_ids": ["schedule-1"],
+    }
