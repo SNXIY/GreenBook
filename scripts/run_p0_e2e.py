@@ -86,6 +86,11 @@ def redact(text: str) -> str:
     return text
 
 
+def console_safe(text: str) -> str:
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    return text.encode(encoding, errors="replace").decode(encoding, errors="replace")
+
+
 def sanitize(value: Any) -> Any:
     if isinstance(value, str):
         return redact(value)
@@ -153,7 +158,7 @@ class Manifest:
         with self.log_path.open("a", encoding="utf-8") as stream:
             stream.write(line)
             stream.flush()
-        print(line, end="", flush=True)
+        print(console_safe(line), end="", flush=True)
 
     def _write(self) -> None:
         temporary = self.path.with_suffix(".tmp")

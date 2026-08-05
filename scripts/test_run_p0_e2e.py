@@ -62,6 +62,14 @@ def test_redaction_does_not_emit_credentials() -> None:
     assert "xyz" not in value
 
 
+def test_console_safe_handles_windows_legacy_encoding(monkeypatch) -> None:
+    class Output:
+        encoding = "gbk"
+
+    monkeypatch.setattr(harness.sys, "stdout", Output())
+    result = harness.console_safe("draft 📝"); assert "draft" in result
+
+
 def test_manifest_sanitizes_nested_evidence(tmp_path) -> None:
     manifest = harness.Manifest(tmp_path, run_id="run-3", timeouts={})
     manifest.update("EVIDENCE_COLLECTED", evidence={"headers": {"Authorization": "Bearer secret"}})
