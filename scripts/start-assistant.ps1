@@ -1,5 +1,7 @@
 param(
-  [switch]$NoReload
+  [switch]$NoReload,
+  [string]$PostgresDatabase = "",
+  [int]$ApiPort = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,11 +18,19 @@ Assert-GreenBookSecret -Name "ASSISTANT_SERVICE_SHARED_SECRET" -Value $sharedSec
 
 $postgresUser = Get-GreenBookEnvValue -Name "GREENBOOK_POSTGRES_USER" -DefaultValue "mindflow"
 $postgresPassword = Get-GreenBookEnvValue -Name "GREENBOOK_POSTGRES_PASSWORD" -DefaultValue "mindflow"
-$postgresDatabase = Get-GreenBookEnvValue -Name "CREATOR_POSTGRES_DB" -DefaultValue "mindflow_creator"
+$postgresDatabase = if ([string]::IsNullOrWhiteSpace($PostgresDatabase)) {
+  Get-GreenBookEnvValue -Name "CREATOR_POSTGRES_DB" -DefaultValue "mindflow_creator"
+} else {
+  $PostgresDatabase
+}
 $postgresPort = Get-GreenBookEnvValue -Name "GREENBOOK_POSTGRES_HOST_PORT" -DefaultValue "25432"
 $redisPassword = Get-GreenBookEnvValue -Name "GREENBOOK_REDIS_PASSWORD" -DefaultValue "mindflow"
 $redisPort = Get-GreenBookEnvValue -Name "GREENBOOK_REDIS_HOST_PORT" -DefaultValue "26379"
-$assistantPort = Get-GreenBookEnvValue -Name "ASSISTANT_API_PORT" -DefaultValue "8094"
+$assistantPort = if ($ApiPort -gt 0) {
+  [string]$ApiPort
+} else {
+  Get-GreenBookEnvValue -Name "ASSISTANT_API_PORT" -DefaultValue "8094"
+}
 
 $encodedUser = [Uri]::EscapeDataString($postgresUser)
 $encodedPassword = [Uri]::EscapeDataString($postgresPassword)
