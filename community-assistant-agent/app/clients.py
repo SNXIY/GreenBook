@@ -1,12 +1,45 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from app.config import Settings
+
+logger = logging.getLogger(__name__)
+
+
+class CreatorHttpError(RuntimeError):
+    """A completed Creator HTTP response that is not successful."""
+
+    def __init__(
+        self,
+        *,
+        method: str,
+        url: str,
+        status_code: int,
+        response_body: str,
+        request_id: str | None,
+        payload_schema_version: str,
+        idempotency_key: str | None,
+        build_commit: str | None = None,
+        instance_id: str | None = None,
+    ) -> None:
+        self.method = method
+        self.url = url
+        self.status_code = status_code
+        self.response_body = response_body
+        self.request_id = request_id
+        self.payload_schema_version = payload_schema_version
+        self.idempotency_key = idempotency_key
+        self.build_commit = build_commit
+        self.instance_id = instance_id
+        super().__init__(
+            f"Creator HTTP {status_code} for {method} {url}: {response_body}"
+        )
 
 
 @dataclass(frozen=True)
@@ -342,6 +375,8 @@ class CommunityClient:
 class CreatorClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self.build_commit = getattr(settings, "creator_build_commit", None)
+        self.instance_id = getattr(settings, "creator_instance_id", None)
         self.http = httpx.AsyncClient(
             base_url=settings.creator_base_url.rstrip("/"),
             timeout=httpx.Timeout(30.0),
@@ -604,7 +639,42 @@ class CreatorClient:
             },
             json=json,
         )
-        response.raise_for_status()
+        if not 200 <= response.status_code < 300:
+            request_id = next(
+                (
+                    response.headers.get(name)
+                    for name in ("X-Request-ID", "X-Request-Id", "X-Trace-ID", "X-Trace-Id")
+                    if response.headers.get(name)
+                ),
+                None,
+            )
+            payload_schema_version = "creator-task.v1"
+            idempotency_key = (headers or {}).get("Idempotency-Key")
+            logger.error(
+                "Creator HTTP failure method=%s url=%s status_code=%s "
+                "request_id=%s payload_schema_version=%s idempotency_key=%s "
+                "build_commit=%s instance_id=%s response_body=%s",
+                method,
+                str(response.request.url),
+                response.status_code,
+                request_id,
+                payload_schema_version,
+                idempotency_key,
+                self.build_commit,
+                self.instance_id,
+                response.text,
+            )
+            raise CreatorHttpError(
+                method=method,
+                url=str(response.request.url),
+                status_code=response.status_code,
+                response_body=response.text,
+                request_id=request_id,
+                payload_schema_version=payload_schema_version,
+                idempotency_key=idempotency_key,
+                build_commit=self.build_commit,
+                instance_id=self.instance_id,
+            )
         return dict(response.json())
 
 

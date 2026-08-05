@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from app.clients import CapabilityGrant, CommunityClient, CreatorClient
+from app.clients import (
+    CapabilityGrant,
+    CommunityClient,
+    CreatorClient,
+    CreatorHttpError,
+)
 from app.revision_claim import RevisionClaimConflict
 from app.side_effect_ledger import (
     SideEffectLedger,
@@ -360,6 +365,15 @@ async def handle_creator_tool(
             idempotency_key=record.operation_key,
             trace_id=credentials.trace_id,
         )
+    except CreatorHttpError as exc:
+        await services.ledger.finish(
+            run_id=context.run_id,
+            operation_key=record.operation_key,
+            status="FAILED",
+            ledger_state=ledger_state,
+            error=f"creator contract failure: {exc}",
+        )
+        raise RuntimeError(f"Creator contract failure: {exc}") from exc
     except Exception as exc:
         await services.ledger.finish(
             run_id=context.run_id,
@@ -447,6 +461,15 @@ async def _resume_or_recover_creator(
                 idempotency_key=operation_key,
                 trace_id=credentials.trace_id,
             )
+        except CreatorHttpError as exc:
+            await services.ledger.finish(
+                run_id=context.run_id,
+                operation_key=operation_key,
+                status="FAILED",
+                ledger_state=state,
+                error=f"idempotency recovery contract failure: {exc}",
+            )
+            raise RuntimeError(f"Creator contract failure: {exc}") from exc
         except Exception as exc:
             await services.ledger.finish(
                 run_id=context.run_id,
@@ -526,6 +549,16 @@ async def _resume_or_recover_creator(
             access_token=credentials.access_token,
             trace_id=credentials.trace_id,
         )
+    except CreatorHttpError as exc:
+        await services.ledger.finish(
+            run_id=context.run_id,
+            operation_key=operation_key,
+            status="FAILED",
+            ledger_state=state,
+            error=f"creator status contract failure: {exc}",
+            remote_operation_id=task_id,
+        )
+        raise RuntimeError(f"Creator contract failure: {exc}") from exc
     except Exception as exc:
         await services.ledger.finish(
             run_id=context.run_id,
@@ -620,6 +653,16 @@ async def _resume_or_recover_creator(
             idempotency_key=operation_key,
             trace_id=credentials.trace_id,
         )
+    except CreatorHttpError as exc:
+        await services.ledger.finish(
+            run_id=context.run_id,
+            operation_key=operation_key,
+            status="FAILED",
+            ledger_state={**state, "status": "COMPLETED"},
+            error=f"creator handoff contract failure: {exc}",
+            remote_operation_id=task_id,
+        )
+        raise RuntimeError(f"Creator contract failure: {exc}") from exc
     except Exception as exc:
         await services.ledger.finish(
             run_id=context.run_id,

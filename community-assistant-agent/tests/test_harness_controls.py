@@ -3,7 +3,7 @@ import httpx
 from pydantic import ValidationError
 from types import SimpleNamespace
 
-from app.clients import CommunityClient, CreatorClient
+from app.clients import CommunityClient, CreatorClient, CreatorHttpError
 from app.tools import RiskLevel, tool_registry
 from app.worker import AgentWorker, _is_transient_exception, _stable_hash
 from app.untrusted_content import guard_post_payload
@@ -489,6 +489,40 @@ async def test_creator_receives_bounded_current_post_body_as_reference() -> None
     assert "先学习查询，再学习事务" in payload
     assert len(payload) < 6_000
     assert requests[0].headers["Authorization"] == "Bearer user-jwt"
+
+
+@pytest.mark.asyncio
+async def test_creator_http_4xx_preserves_contract_error_without_jwt() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            422,
+            headers={"X-Request-ID": "creator-request-1"},
+            text='{"detail":"invalid constraints"}',
+        )
+
+    client = CreatorClient(SimpleNamespace(creator_base_url="http://creator"))
+    await client.http.aclose()
+    client.http = httpx.AsyncClient(
+        base_url="http://creator",
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        with pytest.raises(CreatorHttpError) as caught:
+            await client.submit_draft(
+                instruction="Create a post",
+                references=[],
+                access_token="secret-jwt",
+                idempotency_key="creator-contract-1",
+            )
+    finally:
+        await client.close()
+
+    error = caught.value
+    assert error.status_code == 422
+    assert error.response_body == '{"detail":"invalid constraints"}'
+    assert error.request_id == "creator-request-1"
+    assert error.idempotency_key == "creator-contract-1"
+    assert "secret-jwt" not in str(error)
 
 
 def test_search_limit_from_model_is_deterministically_bounded() -> None:
