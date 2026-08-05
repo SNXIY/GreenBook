@@ -419,6 +419,10 @@ class CreatorClient:
                 for item in references[:8]
                 if item.get("id") or item.get("post_id")
             ]
+        reference_notes = "\n\n".join(
+            "[{id}] {title}\n{summary}\n{body_excerpt}".format(**item)
+            for item in compact
+        )[:12_000]
         return await self._request(
             "POST",
             "/api/v1/creator/tasks",
@@ -432,11 +436,10 @@ class CreatorClient:
                 "goal": instruction,
                 "constraints": {
                     "interaction_mode": "AUTO",
-                    "execution_profile": "ASSISTANT_BALANCED",
                     "format": "POST",
                     "target_length": 1200,
                     "tone": "PRACTICAL",
-                    "reference_evidence": compact,
+                    "reference_notes": reference_notes,
                     "audience": "知光知识社区用户",
                     "reader_takeaway": "读完后能获得清晰、可执行的方法",
                 },

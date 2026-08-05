@@ -448,8 +448,7 @@ async def test_creator_balanced_profile_supports_instruction_without_references(
 
     payload = requests[0].read().decode("utf-8")
     assert '"goal":"Create a post about learning MySQL"' in payload
-    assert '"execution_profile":"ASSISTANT_BALANCED"' in payload
-    assert '"reference_evidence":[]' in payload
+    assert '"reference_notes":""' in payload
 
 
 @pytest.mark.asyncio
