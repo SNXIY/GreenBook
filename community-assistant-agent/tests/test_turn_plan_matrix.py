@@ -20,6 +20,7 @@ from app.goal_resolver import GoalResolver
 from app.intent_delta import IntentDeltaParser, TurnIntentParser
 from app.turn_plan import (
     TurnPlanBuilder,
+    _has_time_expression,
     changes_from_operation,
     primary_operation_from_changes,
 )
@@ -474,3 +475,15 @@ def test_live_java_title_compound_not_open_plan_or_schedule_only() -> None:
     assert "publication.update_schedule" in tools
     assert "schedule_publish" in (compiled.intent_detail.required_capabilities or [])
     assert "schedule_update" not in (compiled.intent_detail.required_capabilities or [])
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Create a draft and schedule it in five minutes.",
+        "Create a draft and publish it five minutes from now.",
+        "Create a draft for tomorrow.",
+    ],
+)
+def test_create_schedule_recognizes_english_relative_time(message: str) -> None:
+    assert _has_time_expression(message)

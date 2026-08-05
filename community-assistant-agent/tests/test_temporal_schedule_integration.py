@@ -624,3 +624,23 @@ async def test_incomplete_schedule_leaves_db_unchanged(temporal_db: Database) ->
             ).all()
         )
         assert effects == []
+
+
+@pytest.mark.parametrize(
+    ("message", "seconds"),
+    [
+        ("schedule it in five minutes", 300),
+        ("publish it five minutes from now", 300),
+        ("schedule it after two hours", 7_200),
+    ],
+)
+def test_temporal_resolver_accepts_english_relative_time(
+    message: str, seconds: int
+) -> None:
+    resolved = resolve_schedule_time(
+        message=message,
+        current_time=NOW,
+        timezone="Asia/Shanghai",
+    )
+    assert resolved.mode == "RELATIVE_TO_NOW"
+    assert resolved.offset_seconds == seconds

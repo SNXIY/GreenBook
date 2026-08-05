@@ -233,6 +233,10 @@ def test_compiler_strips_runtime_draft_fields_and_validates_relative_schedule() 
         "instruction": "Create from real analysis"
     }
     assert result.compiled_plan.steps[1].arguments == {"delay_seconds": 300}
+    assert result.compiled_plan.steps[1].artifact_sources == {
+        "draft_id": ["create"],
+        "expected_content_sha256": ["create"],
+    }
 
 
 def test_compiler_normalizes_model_capability_aliases_for_create_and_schedule() -> None:

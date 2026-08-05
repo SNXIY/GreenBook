@@ -110,9 +110,9 @@ def changes_from_operation(
             payload["schedule_request"] = schedule_request
         changes.append(Change(role=role, op=op, payload=payload))
 
-    # Compound: content edit that also asks to change publish time.
+    # Compound: content edit or create that also asks to schedule publish time.
     if (
-        operation in {"APPEND_CONTENT", "REPLACE_CONTENT", "UPDATE_TITLE"}
+        operation in {"CREATE_POST", "APPEND_CONTENT", "REPLACE_CONTENT", "UPDATE_TITLE"}
         and schedule_request
         and not any(item.role == "SCHEDULE" for item in changes)
     ):
@@ -506,11 +506,32 @@ class TurnPlanBuilder:
         elif operation in {"APPEND_CONTENT", "REPLACE_CONTENT", "UPDATE_TITLE"}:
             if IntentDeltaParser._has_schedule_request(message):
                 schedule_request = message
+        elif operation == "CREATE_POST":
+            # "写一篇关于X的帖子，五分钟之后发布" must carry the schedule
+            # alongside the content creation so ChangeCompiler can produce a
+            # deterministic create+draft→schedule DAG.
+            if _has_time_expression(message):
+                schedule_request = message
         changes = changes_from_operation(
             operation,
             message=message,
             schedule_request=schedule_request,
         )
+        # Prepend ANALYSIS change when the user asks to search/research before
+        # creating content. "先去检索...然后创作" → [ANALYSIS, CONTENT, SCHEDULE]
+        if operation == "CREATE_POST" and _has_upstream_research(message):
+            search_query = _extract_search_query(message) or message
+            changes.insert(
+                0,
+                Change(
+                    role="ANALYSIS",
+                    op="QUERY",
+                    payload={
+                        "message": message,
+                        "instruction": search_query,
+                    },
+                ),
+            )
         # Map analysis / comment follow-ups.
         if operation == "CONTINUE_ANALYSIS":
             changes = [
@@ -564,6 +585,71 @@ def _looks_like_content_goal(message: str, intent_domain: str | None) -> bool:
         token in lowered
         for token in ("帖子", "草稿", "创作", "写一篇", "发布一篇", "draft", "post")
     )
+
+
+_TIME_EXPRESSION_RE = re.compile(
+    r"(?:"
+    r"\d+[点:：]\d*|"                         # 8点, 8:30
+    r"今天|明天|后天|大后天|"
+    r"上午|中午|下午|晚上|傍晚|凌晨|早上|深夜|"
+    r"(?:\d+|[一二三四五六七八九十百千]+)\s*(?:分钟|小时|天|周|星期|月)"
+    r"\s*(?:之后|后|以后|以内|内|前)|"
+    r"下周[一二三四五六日天]|下下周|"
+    r"周[一二三四五六日天]|"
+    r"\d+号|\d+日|"
+    r"一会儿|马上|立刻|立即"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _has_time_expression(text: str) -> bool:
+    """Detect any temporal expression — absolute or relative — in user text."""
+    return bool(
+        _TIME_EXPRESSION_RE.search(text)
+        or re.search(
+            r"\b(?:in|after)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+            r"(?:minutes?|hours?|days?|weeks?)\b|"
+            r"\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+            r"(?:minutes?|hours?|days?|weeks?)\s+from\s+now\b|"
+            r"\b(?:today|tomorrow|tonight|next\s+week)\b",
+            text,
+            re.IGNORECASE,
+        )
+    )
+
+
+_UPSTREAM_RESEARCH_RE = re.compile(
+    r"(?:先|首先|帮我|请|麻烦)"
+    r".{0,20}(?:检索|搜索|查找|查一下|搜一下|找一下|看看)"
+    r".{0,60}(?:再|然后|之后|根据|参考|基于)"
+    r".{0,20}(?:创作|撰写|写|生成|发|发布)",
+    re.IGNORECASE,
+)
+
+
+def _has_upstream_research(text: str) -> bool:
+    """Detect 'search first, then create' compound intent."""
+    return bool(_UPSTREAM_RESEARCH_RE.search(text))
+
+
+_SEARCH_QUERY_RE = re.compile(
+    r"(?:检索|搜索|查找|查一下|搜一下|找一下|看看)"
+    r"(?:出|一下|关于|有没有|有什么)?"
+    r"(.+?)"
+    r"(?:的帖子|的内容|的社区|再|然后|之后|根据|参考|基于|来|，|。|$)",
+    re.IGNORECASE,
+)
+
+
+def _extract_search_query(text: str) -> str | None:
+    """Extract the search topic from a 'search then create' request."""
+    match = _SEARCH_QUERY_RE.search(text)
+    if match:
+        query = match.group(1).strip()
+        if query and len(query) >= 2:
+            return query
+    return None
 
 
 def extract_schedule_run_at(
@@ -629,4 +715,7 @@ __all__ = [
     "extract_schedule_run_at",
     "goal_id_from_ref",
     "split_task_bag_messages",
+    "_has_time_expression",
+    "_has_upstream_research",
+    "_extract_search_query",
 ]

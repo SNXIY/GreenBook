@@ -111,7 +111,38 @@ class ChangeCompiler:
             )
 
         if content is not None and content.op == "CREATE":
-            return None  # new posts go through Planner / Creator path
+            if schedule is not None and schedule.op in {"UPDATE", "CREATE"}:
+                return self._compile_create_and_schedule(
+                    content=content,
+                    schedule=schedule,
+                    intent=intent,
+                    client_timezone=client_timezone,
+                    message=turn_plan.raw_message,
+                    current_time=current_time,
+                )
+            # Pure content creation without a schedule — single-step creator path.
+            return self._compile_create_only(
+                content=content,
+                intent=intent,
+                message=turn_plan.raw_message,
+                target_context=target_context,
+            )
+
+        # ANALYSIS (search/research) combined with content creation.
+        analysis = next(
+            (c for c in turn_plan.changes if c.role == "ANALYSIS"),
+            None,
+        )
+        if analysis is not None and content is not None and content.op == "CREATE":
+            return self._compile_research_and_create(
+                analysis=analysis,
+                content=content,
+                schedule=schedule,
+                intent=intent,
+                client_timezone=client_timezone,
+                message=turn_plan.raw_message,
+                current_time=current_time,
+            )
 
         return None
 
@@ -136,6 +167,229 @@ class ChangeCompiler:
             client_timezone=client_timezone,
             current_time=current_time,
             existing_run_at=existing_run_at,
+        )
+
+    def _compile_create_only(
+        self,
+        *,
+        content: Any,
+        intent: CommunityIntent,
+        message: str,
+        target_context: TargetContext | None = None,
+    ) -> AgentPlan | None:
+        # If the goal already has a draft, a bare CREATE_POST likely means
+        # the user wants to revise or repurpose — let the Planner sort it out.
+        if target_context is not None and target_context.content_target is not None:
+            return None
+        instruction = str(
+            content.payload.get("instruction")
+            or content.payload.get("message")
+            or message
+            or intent.goal
+        ).strip()
+        if not instruction:
+            return None
+        normalized = intent.model_copy(
+            update={"required_capabilities": ["generation"]}
+        )
+        return AgentPlan(
+            intent="CREATE_POST",
+            summary="创作一篇新的帖子草稿",
+            response_guidance=(
+                "根据 Creator 返回的草稿内容告知用户帖子已生成，"
+                "列出草稿号并提示可以继续修改或安排发布。"
+            ),
+            intent_detail=normalized,
+            steps=[
+                AgentPlanStep(
+                    task_id="create-draft",
+                    agent="ContentCreationAgent",
+                    primary_capability="generation",
+                    capabilities=["generation"],
+                    tool="creator.create_draft",
+                    label="创作帖子草稿",
+                    arguments={"instruction": instruction},
+                    expected_artifact_type="content_draft",
+                    max_attempts=2,
+                )
+            ],
+        )
+
+    def _compile_create_and_schedule(
+        self,
+        *,
+        content: Any,
+        schedule: Any,
+        intent: CommunityIntent,
+        client_timezone: str,
+        message: str,
+        current_time: datetime | None,
+    ) -> AgentPlan | None:
+        instruction = str(
+            content.payload.get("instruction")
+            or content.payload.get("message")
+            or message
+            or intent.goal
+        ).strip()
+        if not instruction:
+            return None
+        schedule_request = str(
+            schedule.payload.get("schedule_request")
+            or content.payload.get("schedule_request")
+            or message
+        )
+        run_at, _resolution = self._solidify_run_at(
+            schedule_request=schedule_request,
+            schedule_payload=dict(schedule.payload or {}),
+            client_timezone=client_timezone,
+            current_time=current_time,
+            existing_run_at=None,
+        )
+        if run_at is None:
+            # Time resolution failed — fall back to create-only with
+            # the time expression preserved so Planner can handle it.
+            # Pass target_context=None to skip the "already has draft" guard;
+            # the user explicitly asked for a new post with a schedule.
+            return self._compile_create_only(
+                content=content,
+                intent=intent,
+                message=message,
+                target_context=None,
+            )
+        normalized = intent.model_copy(
+            update={"required_capabilities": ["generation", "schedule_publish"]}
+        )
+        return AgentPlan(
+            intent="CREATE_AND_SCHEDULE",
+            summary="创作帖子草稿并按指定时间安排定时发布",
+            response_guidance=(
+                "告知用户帖子草稿已生成并已安排定时发布。"
+                "明确说出草稿号和北京时间发布时刻。"
+            ),
+            intent_detail=normalized,
+            steps=[
+                AgentPlanStep(
+                    task_id="create-draft",
+                    agent="ContentCreationAgent",
+                    primary_capability="generation",
+                    capabilities=["generation"],
+                    tool="creator.create_draft",
+                    label="创作帖子草稿",
+                    arguments={"instruction": instruction},
+                    expected_artifact_type="content_draft",
+                    max_attempts=2,
+                ),
+                AgentPlanStep(
+                    task_id="schedule-draft",
+                    agent="PublishAgent",
+                    primary_capability="schedule_publish",
+                    capabilities=["schedule_publish"],
+                    tool="publication.schedule",
+                    label="安排定时发布",
+                    arguments={"run_at": run_at},
+                    depends_on=["create-draft"],
+                    expected_artifact_type="schedule_receipt",
+                    max_attempts=2,
+                ),
+            ],
+        )
+
+    def _compile_research_and_create(
+        self,
+        *,
+        analysis: Any,
+        content: Any,
+        schedule: Any | None,
+        intent: CommunityIntent,
+        client_timezone: str,
+        message: str,
+        current_time: datetime | None,
+    ) -> AgentPlan | None:
+        search_query = str(
+            analysis.payload.get("instruction")
+            or analysis.payload.get("message")
+            or message
+        ).strip()
+        instruction = str(
+            content.payload.get("instruction")
+            or content.payload.get("message")
+            or message
+            or intent.goal
+        ).strip()
+        if not search_query or not instruction:
+            return None
+        steps: list[AgentPlanStep] = [
+            AgentPlanStep(
+                task_id="search-posts",
+                agent="SearchAgent",
+                primary_capability="search",
+                capabilities=["search"],
+                tool="community.search_posts",
+                label="检索社区热门帖子作为参考",
+                arguments={"query": search_query, "limit": 5},
+                expected_artifact_type="post_search_results",
+                max_attempts=2,
+            ),
+            AgentPlanStep(
+                task_id="create-draft",
+                agent="ContentCreationAgent",
+                primary_capability="generation",
+                capabilities=["generation"],
+                tool="creator.create_draft",
+                label="参考检索结果创作帖子草稿",
+                arguments={"instruction": instruction},
+                depends_on=["search-posts"],
+                expected_artifact_type="content_draft",
+                max_attempts=2,
+            ),
+        ]
+        capabilities = ["search", "generation"]
+        if schedule is not None and schedule.op in {"UPDATE", "CREATE"}:
+            schedule_request = str(
+                schedule.payload.get("schedule_request")
+                or content.payload.get("schedule_request")
+                or message
+            )
+            run_at, _resolution = self._solidify_run_at(
+                schedule_request=schedule_request,
+                schedule_payload=dict(schedule.payload or {}),
+                client_timezone=client_timezone,
+                current_time=current_time,
+                existing_run_at=None,
+            )
+            if run_at is not None:
+                capabilities.append("schedule_publish")
+                steps.append(
+                    AgentPlanStep(
+                        task_id="schedule-draft",
+                        agent="PublishAgent",
+                        primary_capability="schedule_publish",
+                        capabilities=["schedule_publish"],
+                        tool="publication.schedule",
+                        label="安排定时发布",
+                        arguments={"run_at": run_at},
+                        depends_on=["create-draft"],
+                        expected_artifact_type="schedule_receipt",
+                        max_attempts=2,
+                    )
+                )
+        normalized = intent.model_copy(
+            update={"required_capabilities": capabilities}
+        )
+        summary = (
+            "检索社区帖子 → 参考创作草稿 → 安排定时发布"
+            if schedule is not None
+            else "检索社区帖子 → 参考创作草稿"
+        )
+        return AgentPlan(
+            intent="RESEARCH_AND_CREATE",
+            summary=summary,
+            response_guidance=(
+                "告知用户已完成社区检索和草稿创作。"
+                "列出检索到的关键参考帖子和生成的草稿号。"
+            ),
+            intent_detail=normalized,
+            steps=steps,
         )
 
     def _compile_query(

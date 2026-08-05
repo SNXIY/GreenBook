@@ -93,6 +93,13 @@ _RELATIVE_TO_NOW_HALF = re.compile(
     r"半\s*(?:个|個)?\s*(?:小时|小時|钟头)\s*(?:之后|之後|以后|以後|后|後)?",
     re.IGNORECASE,
 )
+_ENGLISH_RELATIVE_TO_NOW = re.compile(
+    r"\b(?:(?:in|after)\s+)?"
+    r"(?P<num>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+    r"(?P<unit>minutes?|hours?|days?|weeks?)"
+    r"(?:\s+from\s+now)?\b",
+    re.IGNORECASE,
+)
 
 # Incomplete schedule-change asks (no concrete new time).
 _INCOMPLETE_SCHEDULE = re.compile(
@@ -268,6 +275,34 @@ class TemporalResolver:
         return verb, seconds, match.group(0)
 
     def _match_relative_to_now(self, text: str) -> tuple[int, str] | None:
+        english = _ENGLISH_RELATIVE_TO_NOW.search(text)
+        if english is not None:
+            numbers = {
+                "one": 1,
+                "two": 2,
+                "three": 3,
+                "four": 4,
+                "five": 5,
+                "six": 6,
+                "seven": 7,
+                "eight": 8,
+                "nine": 9,
+                "ten": 10,
+            }
+            raw_num = english.group("num").lower()
+            amount = numbers.get(raw_num, int(raw_num) if raw_num.isdigit() else 0)
+            unit = english.group("unit").lower()
+            multiplier = (
+                60
+                if unit.startswith("minute")
+                else 3_600
+                if unit.startswith("hour")
+                else 86_400
+                if unit.startswith("day")
+                else 604_800
+            )
+            if amount > 0:
+                return amount * multiplier, english.group(0)
         half = _RELATIVE_TO_NOW_HALF.search(text)
         if half is not None:
             return 1800, half.group(0)
