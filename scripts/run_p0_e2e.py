@@ -1,34 +1,50 @@
-"""One-shot P0 E2E harness.
+"""Observable, bounded, one-shot P0 E2E harness.
 
-Starts Creator and Assistant with programmatic uvicorn servers on OS-assigned
-ports, runs health/OpenAPI/probes, and always tears down child processes.
-This is test infrastructure only; it does not change either control plane.
+This module is test infrastructure only.  It does not alter either control
+plane.  Failed runs retain their manifest, logs, SQLite and Redis namespace
+by default so that evidence can be collected after a timeout.
 """
 
 from __future__ import annotations
 
 import argparse
-import asyncio
 import json
 import os
+import re
 import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import requests
+
+
+TERMINAL = {"COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED", "WAITING_APPROVAL"}
+CREATOR_TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
+DEFAULT_MODEL_TIMEOUT = 60
+DEFAULT_SPECIALIST_TIMEOUT = 90
+DEFAULT_MAX_MODEL_CALLS = 24
+DEFAULT_REVISION_BUDGET = 4
+DEFAULT_STALL_TIMEOUT = max(2 * DEFAULT_SPECIALIST_TIMEOUT, 180)
+DEFAULT_CREATOR_HARD_TIMEOUT = (
+    DEFAULT_MAX_MODEL_CALLS * max(DEFAULT_MODEL_TIMEOUT, DEFAULT_SPECIALIST_TIMEOUT) + 300
+)
+DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT = DEFAULT_CREATOR_HARD_TIMEOUT + 600
 
 
 SERVER_CODE = r'''
 import asyncio, json, os
 from pathlib import Path
 import uvicorn
-
 from app.main import app
 
 async def main():
@@ -52,454 +68,435 @@ asyncio.run(main())
 '''
 
 
-def wait_ready(path: Path, process: subprocess.Popen[str]) -> int:
-    deadline = time.time() + 30
-    while time.time() < deadline:
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def redact(text: str) -> str:
+    """Remove credentials/tokens from child output and evidence logs."""
+    patterns = (
+        (r"(?i)(authorization\s*[\"']?\s*[:=]\s*[\"']?\s*bearer\s+)[^\"'\s,}]+", r"\1<REDACTED>"),
+        (r"(?i)(password\s*[:=]\s*)[^,\s}]+", r"\1<REDACTED>"),
+        (r"(?i)(refresh[_ -]?token\s*[:=]\s*)[^,\s}]+", r"\1<REDACTED>"),
+        (r"(?i)(access[_ -]?token\s*[:=]\s*)[^,\s}]+", r"\1<REDACTED>"),
+        (r"(?i)(p0_e2e_(?:email|password)\s*[:=]\s*)[^,\s}]+", r"\1<REDACTED>"),
+    )
+    for pattern, replacement in patterns:
+        text = re.sub(pattern, replacement, text)
+    return text
+
+
+def sanitize(value: Any) -> Any:
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            key_name = str(key).lower().replace("-", "_")
+            if key_name in {"authorization", "password", "access_token", "refresh_token", "delegated_token"}:
+                result[key] = "<REDACTED>"
+            else:
+                result[key] = sanitize(item)
+        return result
+    if isinstance(value, list):
+        return [sanitize(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize(item) for item in value]
+    return value
+
+
+class HarnessTimeout(RuntimeError):
+    def __init__(self, code: str, message: str, *, evidence: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.evidence = evidence or {}
+
+
+class Manifest:
+    def __init__(self, root: Path, *, run_id: str, timeouts: dict[str, Any]):
+        self.root = root
+        self.path = root / "manifest.json"
+        self.log_path = root / "harness.log"
+        self.data: dict[str, Any] = {
+            "harness_run_id": run_id,
+            "started_at": utc_now(),
+            "status": "STARTING",
+            "creator": {"pid": None, "port": None, "instance_id": None,
+                         "build_commit": None, "database_path": None,
+                         "redis_namespace": None, "log_path": str(root / "creator.log")},
+            "assistant": {"api_pid": None, "worker_pid": None, "api_port": None,
+                          "log_paths": [str(root / "assistant-api.log"), str(root / "assistant-worker.log")]},
+            "business": {"user_id": None, "conversation_id": None, "goal_ids": [],
+                         "assistant_run_ids": [], "creator_task_ids": [],
+                         "creator_run_ids": [], "scheduled_action_ids": []},
+            "timeouts": timeouts,
+            "last_progress_at": None,
+            "last_stage": None,
+            "error": None,
+        }
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.update("HARNESS_STARTED")
+
+    def update(self, stage: str, **fields: Any) -> None:
+        self.data["last_stage"] = stage
+        self.data.update(fields)
+        self._write()
+        self.log(f"MANIFEST stage={stage} fields={json.dumps(fields, ensure_ascii=False, default=str)}")
+
+    def progress(self, **fields: Any) -> None:
+        self.data["last_progress_at"] = utc_now()
+        self.data.update(fields)
+        self._write()
+
+    def log(self, message: str) -> None:
+        line = f"{utc_now()} {redact(message)}\n"
+        with self.log_path.open("a", encoding="utf-8") as stream:
+            stream.write(line)
+            stream.flush()
+        print(line, end="", flush=True)
+
+    def _write(self) -> None:
+        temporary = self.path.with_suffix(".tmp")
+        payload = json.dumps(sanitize(self.data), ensure_ascii=False, indent=2, default=str)
+        with temporary.open("w", encoding="utf-8") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, self.path)
+
+
+class LogPump:
+    def __init__(self, process: subprocess.Popen[str], paths: list[Path], log: Callable[[str], None]):
+        self.process = process
+        self.paths = paths
+        self.log = log
+        self.thread = threading.Thread(target=self._pump, name=f"p0-log-{process.pid}", daemon=True)
+        self.thread.start()
+
+    def _pump(self) -> None:
+        if self.process.stdout is None:
+            return
+        streams = [path.open("a", encoding="utf-8") for path in self.paths]
+        try:
+            for raw in iter(self.process.stdout.readline, ""):
+                line = redact(raw.rstrip("\r\n"))
+                for stream in streams:
+                    stream.write(line + "\n")
+                    stream.flush()
+                self.log(f"CHILD pid={self.process.pid} {line}")
+        finally:
+            for stream in streams:
+                stream.close()
+
+    def join(self, timeout: float = 2.0) -> None:
+        self.thread.join(timeout)
+
+
+@dataclass
+class Deadline:
+    hard_timeout: float
+    started: float = field(default_factory=time.monotonic)
+
+    def check(self, label: str) -> None:
+        elapsed = time.monotonic() - self.started
+        if elapsed >= self.hard_timeout:
+            raise HarnessTimeout("GLOBAL_HARD_TIMEOUT", f"{label} exceeded global hard timeout ({elapsed:.1f}s)")
+
+    @property
+    def elapsed(self) -> float:
+        return time.monotonic() - self.started
+
+
+def wait_ready(path: Path, process: subprocess.Popen[str], deadline: Deadline, log: Manifest) -> int:
+    started = time.monotonic()
+    while time.monotonic() - started < 30:
+        deadline.check("service startup")
         if path.exists():
             return int(json.loads(path.read_text(encoding="utf-8"))["port"])
         if process.poll() is not None:
-            output = process.stdout.read() if process.stdout is not None else ""
-            raise RuntimeError(
-                f"server exited with {process.returncode}:\n{output}"
-            )
+            raise RuntimeError(f"server exited with {process.returncode} before ready")
         time.sleep(0.2)
-    raise TimeoutError(f"server did not publish port: {path}")
+    raise HarnessTimeout("SERVICE_START_TIMEOUT", f"server did not publish port: {path}")
 
 
-def start_server(
-    *, root: Path, python: Path, env: dict[str, str], ready: Path
-) -> tuple[subprocess.Popen[str], int]:
+def start_server(*, root: Path, python: Path, env: dict[str, str], ready: Path,
+                 log_paths: list[Path], deadline: Deadline, manifest: Manifest,
+                 role: str) -> tuple[subprocess.Popen[str], int, LogPump]:
     child_env = os.environ.copy()
     child_env.update(env)
     child_env["P0_READY_FILE"] = str(ready)
+    child_env["PYTHONUNBUFFERED"] = "1"
+    manifest.update(f"{role.upper()}_STARTING")
     process = subprocess.Popen(
-        [str(python), "-c", SERVER_CODE],
-        cwd=root,
-        env=child_env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
+        [str(python), "-u", "-c", SERVER_CODE], cwd=root, env=child_env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
-    return process, wait_ready(ready, process)
+    pump = LogPump(process, log_paths, manifest.log)
+    port = wait_ready(ready, process, deadline, manifest)
+    manifest.update(f"{role.upper()}_HEALTHY", **({"creator": {**manifest.data["creator"], "pid": process.pid, "port": port}}
+                                                   if role == "creator" else
+                                                   {"assistant": {**manifest.data["assistant"], "api_pid": process.pid, "worker_pid": process.pid, "api_port": port}}))
+    return process, port, pump
 
 
-def wait_health(base_url: str) -> dict[str, Any]:
-    deadline = time.time() + 30
-    last = ""
-    while time.time() < deadline:
+def wait_health(base_url: str, deadline: Deadline) -> dict[str, Any]:
+    started = time.monotonic()
+    while time.monotonic() - started < 30:
+        deadline.check("health check")
         try:
             response = requests.get(f"{base_url}/actuator/health", timeout=3)
-            if response.status_code == 200:
-                payload = response.json()
-                if payload.get("status") == "UP":
-                    return payload
-            last = f"{response.status_code}: {response.text}"
-        except requests.RequestException as exc:
-            last = str(exc)
+            if response.status_code == 200 and response.json().get("status") == "UP":
+                return response.json()
+        except requests.RequestException:
+            pass
         time.sleep(0.3)
-    raise RuntimeError(f"health failed for {base_url}: {last}")
+    raise HarnessTimeout("SERVICE_HEALTH_TIMEOUT", f"health failed for {base_url}")
 
 
 def assert_port_free(port: int) -> None:
-    import socket
-
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind(("127.0.0.1", port))
 
 
-def login() -> str:
-    email = os.environ["P0_E2E_EMAIL"]
+def login(deadline: Deadline) -> str:
+    deadline.check("Java login")
+    identifier = os.environ["P0_E2E_EMAIL"]
     password = os.environ["P0_E2E_PASSWORD"]
+    identifier_type = os.environ.get("P0_E2E_IDENTIFIER_TYPE", "PHONE")
     response = requests.post(
         "http://127.0.0.1:8080/api/v1/auth/login",
-        json={
-            "identifierType": "EMAIL",
-            "identifier": email,
-            "password": password,
-            "code": None,
-        },
-        timeout=10,
+        json={"identifierType": identifier_type, "identifier": identifier, "password": password, "code": None},
+        timeout=15,
     )
-    response.raise_for_status()
-    return str(response.json()["token"]["accessToken"])
+    if not response.ok:
+        raise RuntimeError(f"Java login failed: status={response.status_code} body={redact(response.text)}")
+    payload = response.json()
+    token = str(payload["token"]["accessToken"])
+    return token
 
 
-def task_snapshot(base_url: str, token: str, task_id: str) -> dict[str, Any]:
-    deadline = time.time() + float(os.environ.get("P0_E2E_TASK_TIMEOUT", "300"))
-    last_status = None
-    while time.time() < deadline:
+def _progress_signature(payload: dict[str, Any]) -> tuple[Any, ...]:
+    run = payload.get("run") or {}
+    return (payload.get("status"), run.get("status"), payload.get("updated_at"),
+            len(payload.get("artifacts") or []), run.get("checkpoint_id"),
+            payload.get("current_node"), payload.get("execution_key"))
+
+
+def task_snapshot(base_url: str, token: str, task_id: str, *, deadline: Deadline,
+                  manifest: Manifest, creator_run_id: str | None = None) -> dict[str, Any]:
+    task_started = time.monotonic()
+    last_progress = time.monotonic()
+    last_signature: tuple[Any, ...] | None = None
+    while True:
+        deadline.check("Creator task")
+        if time.monotonic() - task_started >= DEFAULT_CREATOR_HARD_TIMEOUT:
+            raise HarnessTimeout("TASK_BUDGET_EXHAUSTED", f"Creator task {task_id} exceeded {DEFAULT_CREATOR_HARD_TIMEOUT}s")
         try:
-            response = requests.get(
-                f"{base_url}/api/v1/creator/tasks/{task_id}",
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=10,
-            )
+            response = requests.get(f"{base_url}/api/v1/creator/tasks/{task_id}",
+                                    headers={"Authorization": f"Bearer {token}"}, timeout=15)
             response.raise_for_status()
             payload = response.json()
-            if payload.get("status") != last_status:
-                last_status = payload.get("status")
-                try:
-                    dispatcher_response = requests.get(
-                        f"{base_url}/api/v1/creator/status",
-                        headers={"Authorization": f"Bearer {token}"},
-                        timeout=10,
-                    )
-                    dispatcher_diagnostic = {
-                        "http_status": dispatcher_response.status_code,
-                        "body": dispatcher_response.json(),
-                    }
-                except requests.RequestException as exc:
-                    dispatcher_diagnostic = {"error": repr(exc)}
-                print(json.dumps({
-                    "task_diagnostic": {
-                        "task_id": task_id,
-                        "status": payload.get("status"),
-                        "updated_at": payload.get("updated_at"),
-                        "attempt": (payload.get("run") or {}).get("execution_attempts"),
-                        "artifact_count": len(payload.get("artifacts") or []),
-                        "last_error": payload.get("error_message"),
-                    },
-                    "dispatcher_diagnostic": dispatcher_diagnostic,
-                }, ensure_ascii=False), flush=True)
-            if payload.get("status") in {"COMPLETED", "FAILED", "CANCELLED"}:
+            signature = _progress_signature(payload)
+            if signature != last_signature:
+                last_signature = signature
+                last_progress = time.monotonic()
+                run = payload.get("run") or {}
+                manifest.progress(last_progress_monotonic=last_progress,
+                                  creator_task_status=payload.get("status"),
+                                  creator_run_status=run.get("status"),
+                                  creator_artifact_count=len(payload.get("artifacts") or []),
+                                  creator_last_progress_at=payload.get("updated_at"))
+                manifest.log("CREATOR_PROGRESS " + json.dumps({
+                    "task_id": task_id, "status": payload.get("status"),
+                    "run_status": run.get("status"), "updated_at": payload.get("updated_at"),
+                    "current_node": payload.get("current_node") or run.get("current_node"),
+                    "execution_key": payload.get("execution_key") or run.get("execution_key"),
+                    "artifact_count": len(payload.get("artifacts") or []),
+                }, ensure_ascii=False))
+            if payload.get("status") in CREATOR_TERMINAL:
                 return payload
         except requests.ReadTimeout:
-            pass
-        time.sleep(1)
-    raise TimeoutError(f"Creator task did not finish: {task_id}")
+            manifest.log(f"CREATOR_POLL_READ_TIMEOUT task_id={task_id}")
+        if time.monotonic() - last_progress >= DEFAULT_STALL_TIMEOUT:
+            raise HarnessTimeout("NODE_STALL_TIMEOUT", f"Creator task {task_id} made no observable progress",
+                                  evidence={"task_id": task_id, "last_progress_at": payload.get("updated_at") if 'payload' in locals() else None})
+        time.sleep(5)
 
 
-def submit_creator(
-    base_url: str, token: str, payload: dict[str, Any]
-) -> dict[str, Any]:
+def submit_creator(base_url: str, token: str, payload: dict[str, Any], *, deadline: Deadline,
+                   manifest: Manifest) -> dict[str, Any]:
+    deadline.check("Creator submit")
     response = requests.post(
         f"{base_url}/api/v1/creator/tasks",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Idempotency-Key": f"p0-harness-{uuid.uuid4()}",
-        },
-        json=payload,
-        timeout=15,
+        headers={"Authorization": f"Bearer {token}", "Idempotency-Key": f"p0-harness-{uuid.uuid4()}"},
+        json=payload, timeout=15,
     )
     response.raise_for_status()
     accepted = response.json()
-    snapshot = task_snapshot(base_url, token, accepted["task_id"])
-    print(json.dumps({"creator_task_snapshot": snapshot}, ensure_ascii=False, indent=2), flush=True)
+    manifest.data["business"]["creator_task_ids"].append(accepted["task_id"])
+    manifest.data["business"]["creator_run_ids"].append(accepted["run_id"])
+    manifest.update("CREATOR_TASK_CREATED")
+    snapshot = task_snapshot(base_url, token, accepted["task_id"], deadline=deadline,
+                             manifest=manifest, creator_run_id=accepted["run_id"])
     return {"accepted": accepted, "snapshot": snapshot}
 
 
-def artifact_from_isolated_db(db_path: Path, task_id: str, artifact_id: str) -> dict[str, Any]:
-    with sqlite3.connect(db_path) as connection:
-        row = connection.execute(
-            "SELECT id, kind, producer, revision, content_json, parent_ids_json, metadata_json "
-            "FROM creator_artifacts WHERE task_id = ? AND id = ?",
-            (task_id, artifact_id),
-        ).fetchone()
-    if row is None:
-        raise RuntimeError(f"isolated Creator artifact not found: {task_id}/{artifact_id}")
-    return {
-        "artifact_id": row[0],
-        "kind": row[1],
-        "producer": row[2],
-        "revision": row[3],
-        "content": json.loads(row[4]),
-        "parent_ids": json.loads(row[5] or "[]"),
-        "metadata": json.loads(row[6] or "{}"),
-    }
-
-
-def creator_probe(base_url: str, token: str, db_path: Path) -> dict[str, Any]:
-    create_results: list[dict[str, Any]] = []
-    draft_details: list[dict[str, Any]] = []
-    count = 1 if os.environ.get("P0_E2E_SINGLE") == "1" else 3
-    for index in range(count):
-        create = submit_creator(
-            base_url,
-            token,
-            {
-                "kind": "CREATE_CONTENT",
-                "goal": f"Create a concise practical post about neighborhood resilience, case {index + 1}.",
-                "constraints": {
-                    "interaction_mode": "AUTO",
-                    "format": "POST",
-                    "target_length": 1200,
-                    "tone": "PRACTICAL",
-                },
-                "source_scope": {
-                    "include_creator_profile": False,
-                    "include_creator_history": False,
-                    "include_community_posts": False,
-                },
-            },
-        )
-        create_results.append(create)
-        if create["snapshot"].get("status") != "COMPLETED":
-            raise RuntimeError(json.dumps(create, ensure_ascii=False))
-        draft = next(item for item in create["snapshot"].get("artifacts", []) if item["kind"] == "DRAFT")
-        draft_details.append(artifact_from_isolated_db(
-            db_path, create["accepted"]["task_id"], draft["artifact_id"]
-        ))
-
-    if os.environ.get("P0_E2E_SINGLE") == "1":
-        return {
-            "create_x1": create_results,
-            "create_draft_details": draft_details,
-            "improve_x0": [],
-        }
-
-    improve_results: list[dict[str, Any]] = []
-    for index, (create, detail) in enumerate(zip(create_results, draft_details, strict=True)):
-        content = detail.get("content") or {}
-        document = content.get("document") or content
-        improve = submit_creator(
-            base_url,
-            token,
-            {
-                "kind": "IMPROVE_DRAFT",
-                "goal": f"Improve the draft with one additional concrete action, case {index + 1}.",
-                "constraints": {
-                    "interaction_mode": "AUTO",
-                    "format": "POST",
-                    "target_length": 1200,
-                    "tone": "PRACTICAL",
-                    "draft": {
-                        "title": str(document.get("title") or "Neighborhood resilience"),
-                        "body_markdown": str(
-                            document.get("body_markdown")
-                            or document.get("content_markdown")
-                            or document.get("body")
-                            or ""
-                        ),
-                    },
-                },
-                "source_scope": {
-                    "include_creator_profile": False,
-                    "include_creator_history": False,
-                    "include_community_posts": False,
-                },
-            },
-        )
-        improve_results.append(improve)
-        if improve["snapshot"].get("status") != "COMPLETED":
-            raise RuntimeError(json.dumps(improve, ensure_ascii=False))
-    return {
-        "create_x3": create_results,
-        "create_draft_details": draft_details,
-        "improve_x3": improve_results,
-    }
-
-
-def assistant_run(base_url: str, token: str, prompt: str) -> dict[str, Any]:
+def assistant_run(base_url: str, token: str, prompt: str, *, conversation: dict[str, Any] | None,
+                  deadline: Deadline, manifest: Manifest, label: str) -> dict[str, Any]:
     headers = {"Authorization": f"Bearer {token}"}
-    conversation = requests.post(
-        f"{base_url}/api/v1/assistant/conversations",
-        headers=headers,
-        json={"title": "P0 harness", "surface": "HOME"},
-        timeout=15,
-    )
-    conversation.raise_for_status()
-    conversation_view = conversation.json()
-    key = f"p0-harness-{uuid.uuid4()}"
+    if conversation is None:
+        deadline.check("Conversation create")
+        response = requests.post(f"{base_url}/api/v1/assistant/conversations", headers=headers,
+                                 json={"title": "P0 final E2E", "surface": "HOME"}, timeout=15)
+        response.raise_for_status()
+        conversation = response.json()
+        manifest.data["business"]["conversation_id"] = conversation["conversation_id"]
+        manifest.update("CONVERSATION_CREATED")
+    deadline.check(f"{label} message submit")
     accepted = requests.post(
-        f"{base_url}/api/v1/assistant/conversations/{conversation_view['conversation_id']}/messages",
-        headers={**headers, "Idempotency-Key": key},
-        json={"content": prompt, "client_timezone": "Asia/Shanghai"},
-        timeout=15,
+        f"{base_url}/api/v1/assistant/conversations/{conversation['conversation_id']}/messages",
+        headers={**headers, "Idempotency-Key": f"p0-final-{uuid.uuid4()}"},
+        json={"content": prompt, "client_timezone": "Asia/Shanghai"}, timeout=15,
     )
     accepted.raise_for_status()
     accepted_view = accepted.json()
-    deadline = time.time() + 900
-    last: dict[str, Any] = {}
-    while time.time() < deadline:
-        response = requests.get(
-            f"{base_url}/api/v1/assistant/runs/{accepted_view['run_id']}",
-            headers=headers,
-            timeout=15,
-        )
+    run_id = accepted_view["run_id"]
+    manifest.data["business"]["assistant_run_ids"].append(run_id)
+    manifest.update(f"{label}_RUN_CREATED")
+    run_started = time.monotonic()
+    last_progress = time.monotonic()
+    last_sig: tuple[Any, ...] | None = None
+    while True:
+        deadline.check(f"{label} Assistant Run")
+        if time.monotonic() - run_started >= DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT:
+            raise HarnessTimeout("ASSISTANT_RUN_HARD_TIMEOUT", f"{label} exceeded {DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT}s")
+        response = requests.get(f"{base_url}/api/v1/assistant/runs/{run_id}", headers=headers, timeout=15)
         response.raise_for_status()
-        last = response.json()
-        if last.get("status") in {"COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"}:
-            return {
-                "conversation": conversation_view,
-                "accepted": accepted_view,
-                "run": last,
-                "artifacts": requests.get(
-                    f"{base_url}/api/v1/assistant/runs/{accepted_view['run_id']}/artifacts",
-                    headers=headers,
-                    timeout=15,
-                ).json(),
-            }
-        time.sleep(2)
-    raise TimeoutError(f"GreenBook run did not finish: {accepted_view['run_id']} last={last}")
+        view = response.json()
+        steps = view.get("steps") or []
+        artifacts = view.get("artifacts") or []
+        sig = (view.get("status"), view.get("updated_at"), len(steps), len(artifacts),
+               next((s.get("status") for s in reversed(steps) if s.get("status") not in TERMINAL), None))
+        if sig != last_sig:
+            last_sig = sig
+            last_progress = time.monotonic()
+            manifest.progress(last_progress_monotonic=last_progress,
+                              assistant_run_status=view.get("status"), assistant_run_updated_at=view.get("updated_at"),
+                              assistant_step_count=len(steps), assistant_artifact_count=len(artifacts))
+            manifest.log("ASSISTANT_PROGRESS " + json.dumps({"label": label, "run_id": run_id,
+                         "status": view.get("status"), "updated_at": view.get("updated_at"),
+                         "step_count": len(steps), "artifact_count": len(artifacts)}, ensure_ascii=False))
+        if view.get("status") in TERMINAL:
+            return {"conversation": conversation, "accepted": accepted_view, "run": view, "artifacts": artifacts}
+        if time.monotonic() - last_progress >= DEFAULT_STALL_TIMEOUT:
+            raise HarnessTimeout("NODE_STALL_TIMEOUT", f"{label} made no observable progress",
+                                  evidence={"run_id": run_id, "last_progress_at": view.get("updated_at")})
+        time.sleep(5)
+
+
+def cleanup_redis_namespace(redis_url: str, namespace: str, manifest: Manifest) -> dict[str, int]:
+    try:
+        import redis
+        client = redis.Redis.from_url(redis_url, decode_responses=True)
+        keys = list(client.scan_iter(match=f"{namespace}:*", count=1000))
+        deleted = int(client.delete(*keys)) if keys else 0
+        remaining = sum(1 for _ in client.scan_iter(match=f"{namespace}:*", count=1000))
+        result = {"keys_before": len(keys), "keys_deleted": deleted, "keys_after": remaining}
+    except Exception as exc:
+        result = {"keys_before": -1, "keys_deleted": 0, "keys_after": -1, "error": type(exc).__name__}
+    manifest.update("REDIS_CLEANUP", redis_cleanup=result)
+    return result
+
+
+def collect_evidence(*, manifest: Manifest, evidence: dict[str, Any]) -> None:
+    manifest.update("EVIDENCE_COLLECTED", evidence=evidence)
+    path = manifest.root / "evidence.json"
+    temporary = path.with_suffix(".tmp")
+    with temporary.open("w", encoding="utf-8") as stream:
+        json.dump(sanitize(evidence), stream, ensure_ascii=False, indent=2, default=str)
+        stream.flush(); os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    summary = manifest.root / "evidence-summary.txt"
+    summary.write_text(json.dumps(sanitize(evidence), ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+
+
+def stop_process(process: subprocess.Popen[str] | None, pump: LogPump | None) -> None:
+    if process is not None and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill(); process.wait(timeout=5)
+    if pump is not None:
+        pump.join()
 
 
 def main() -> int:
+    started_monotonic = time.monotonic()
+    started_at = utc_now()
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-output", action="store_true")
     parser.add_argument("--experiment", choices=("A", "B", "C", "D"), default="C")
-    parser.add_argument("--single", action="store_true")
-    parser.add_argument("--task-timeout", type=int, default=300)
+    parser.add_argument("--global-timeout", type=int, default=None)
     args = parser.parse_args()
-    repo = Path(__file__).resolve().parents[1]
-    creator_root = repo / "creator-agent"
-    assistant_root = repo / "community-assistant-agent"
-    creator_python = creator_root / ".venv/Scripts/python.exe"
-    assistant_python = assistant_root / ".venv/Scripts/python.exe"
-    creator_build = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=creator_root, text=True
-    ).strip()
-    os.environ["NO_PROXY"] = "127.0.0.1,localhost"
-    os.environ["no_proxy"] = "127.0.0.1,localhost"
-    os.environ["P0_E2E_TASK_TIMEOUT"] = str(args.task_timeout)
-    os.environ["P0_E2E_SINGLE"] = "1" if args.single else "0"
-    temp_path = Path(tempfile.mkdtemp(prefix="greenbook-p0-"))
-    creator_db = temp_path / "creator.sqlite"
-    checkpoint_db = temp_path / "checkpoints.sqlite"
-    if args.experiment == "A":
-        checkpoint_db = creator_db
-    creator_env = {
-        "DEEPSEEK_API_KEY": os.environ["DEEPSEEK_API_KEY"],
-        "AI_PROVIDER": "deepseek",
-        "CREATOR_DATABASE_URL": f"sqlite+aiosqlite:///{creator_db}",
-        "CREATOR_CHECKPOINT_BACKEND": "sqlite",
-        "CREATOR_CHECKPOINT_SQLITE_PATH": str(checkpoint_db),
-        "CREATOR_CHECKPOINT_AUTO_SETUP": "true",
-        "CREATOR_CHECKPOINT_DIAGNOSTICS": "true",
-        "CREATOR_API_EXECUTION_MODE": "local",
-        "CREATOR_API_CREATE_SCHEMA": "true",
-        "CREATOR_IDENTITY_MODE": "oidc",
-        "CREATOR_IDENTITY_ISSUER": "http://127.0.0.1:8080",
-        "CREATOR_IDENTITY_AUDIENCE": "creator-agent",
-        "CREATOR_IDENTITY_JWKS_URL": "http://127.0.0.1:8080/.well-known/jwks.json",
-        "CREATOR_IDENTITY_ALLOW_INSECURE_HTTP": "true",
-        "REDIS_URL": "redis://:mindflow@127.0.0.1:26379/15",
-        "CREATOR_MAX_WRITER_REVISIONS": "4",
-        "CREATOR_MAX_MODEL_CALLS": "24",
-        "CREATOR_MAX_SUPERVISOR_TURNS": "24",
-        "CREATOR_MAX_AGENT_DISPATCHES": "24",
-        "CREATOR_MAX_OUTPUT_TOKENS": "40000",
-        "CREATOR_RUN_LEASE_SECONDS": "120",
-        "CREATOR_MODEL_TIMEOUT_SECONDS": "60",
-        "CREATOR_SPECIALIST_TIMEOUT_SECONDS": "90",
-        "CREATOR_BUILD_COMMIT": creator_build,
-        "CREATOR_INSTANCE_ID": f"p0-e2e-{uuid.uuid4().hex[:8]}",
-        "CREATOR_QUEUE_NAMESPACE": f"creator:p0:{uuid.uuid4().hex[:8]}",
-        "CREATOR_DATABASE_IDENTIFIER": "temporary-sqlite",
-        "CREATOR_API_WORKER_ID": "p0-e2e-dispatcher",
-    }
-    if args.experiment == "B":
-        creator_env["CREATOR_CHECKPOINT_BACKEND"] = "memory"
-    if args.experiment == "D":
-        creator_env["CREATOR_DIAGNOSTICS_DISABLE_EVENT_PERSISTENCE"] = "true"
-    creator_ready = temp_path / "creator-ready.json"
-    assistant_ready = temp_path / "assistant-ready.json"
-    creator_process: subprocess.Popen[str] | None = None
-    assistant_process: subprocess.Popen[str] | None = None
+    creator_hard = DEFAULT_CREATOR_HARD_TIMEOUT
+    assistant_hard = DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT
+    global_hard = args.global_timeout or (120 + 30 + 30 + assistant_hard * 2 + 120 + 120)
+    run_id = uuid.uuid4().hex
+    run_root = Path(__file__).resolve().parents[1] / ".p0-e2e-runs" / run_id
+    manifest = Manifest(run_root, run_id=run_id, timeouts={
+        "stall_timeout": DEFAULT_STALL_TIMEOUT, "creator_task_hard_timeout": creator_hard,
+        "assistant_run_hard_timeout": assistant_hard, "global_hard_timeout": global_hard,
+    })
+    manifest.data["started_at"] = started_at; manifest.data["harness_started_monotonic"] = started_monotonic; manifest._write()
+    deadline = Deadline(global_hard, started=started_monotonic)
+    repo = run_root.parents[1]
+    creator_root = repo / "creator-agent"; assistant_root = repo / "community-assistant-agent"
+    creator_python = creator_root / ".venv/Scripts/python.exe"; assistant_python = assistant_root / ".venv/Scripts/python.exe"
+    temp_path = Path(tempfile.mkdtemp(prefix="greenbook-p0-")); creator_db = temp_path / "creator.sqlite"; checkpoint_db = temp_path / "checkpoints.sqlite"
+    creator_process = assistant_process = None; creator_pump = assistant_pump = None; ports: list[int] = []
+    creator_namespace = f"creator:p0:{run_id}"
+    creator_env = {"DEEPSEEK_API_KEY": os.environ["DEEPSEEK_API_KEY"], "AI_PROVIDER":"deepseek",
+        "CREATOR_DATABASE_URL":f"sqlite+aiosqlite:///{creator_db}", "CREATOR_CHECKPOINT_BACKEND":"sqlite",
+        "CREATOR_CHECKPOINT_SQLITE_PATH":str(checkpoint_db), "CREATOR_CHECKPOINT_AUTO_SETUP":"true",
+        "CREATOR_CHECKPOINT_DIAGNOSTICS":"true", "CREATOR_API_EXECUTION_MODE":"local",
+        "CREATOR_API_CREATE_SCHEMA":"true", "CREATOR_IDENTITY_MODE":"oidc",
+        "CREATOR_IDENTITY_ISSUER":"http://127.0.0.1:8080", "CREATOR_IDENTITY_AUDIENCE":"creator-agent",
+        "CREATOR_IDENTITY_JWKS_URL":"http://127.0.0.1:8080/.well-known/jwks.json",
+        "CREATOR_IDENTITY_ALLOW_INSECURE_HTTP":"true", "REDIS_URL":"redis://:mindflow@127.0.0.1:26379/15",
+        "CREATOR_MAX_WRITER_REVISIONS":"4", "CREATOR_MAX_MODEL_CALLS":"24", "CREATOR_MAX_SUPERVISOR_TURNS":"24",
+        "CREATOR_MAX_AGENT_DISPATCHES":"24", "CREATOR_MAX_OUTPUT_TOKENS":"40000", "CREATOR_RUN_LEASE_SECONDS":"120",
+        "CREATOR_MODEL_TIMEOUT_SECONDS":"60", "CREATOR_SPECIALIST_TIMEOUT_SECONDS":"90",
+        "CREATOR_BUILD_COMMIT":subprocess.check_output(["git","rev-parse","HEAD"],cwd=creator_root,text=True).strip(),
+        "CREATOR_INSTANCE_ID":f"p0-e2e-{run_id[:8]}", "CREATOR_QUEUE_NAMESPACE":creator_namespace,
+        "CREATOR_DATABASE_IDENTIFIER":"temporary-sqlite", "CREATOR_API_WORKER_ID":f"p0-e2e-dispatcher:{run_id[:8]}"}
+    manifest.data["creator"].update({"instance_id":creator_env["CREATOR_INSTANCE_ID"],"build_commit":creator_env["CREATOR_BUILD_COMMIT"],"database_path":str(creator_db),"redis_namespace":creator_namespace}); manifest._write()
     try:
-        creator_process, creator_port = start_server(
-                root=creator_root,
-                python=creator_python,
-                env=creator_env,
-                ready=creator_ready,
-        )
-        creator_url = f"http://127.0.0.1:{creator_port}"
-        health = wait_health(creator_url)
-        openapi = requests.get(f"{creator_url}/openapi.json", timeout=10).json()
-        token = login()
-        print(json.dumps({
-                "creator": {
-                    "url": creator_url,
-                    "instance_id": creator_env["CREATOR_INSTANCE_ID"],
-            "build_commit": creator_env["CREATOR_BUILD_COMMIT"],
-                    "dispatcher": "local-durable-dispatcher",
-                    "experiment": args.experiment,
-                    "checkpoint_backend": creator_env["CREATOR_CHECKPOINT_BACKEND"],
-                    "database_path": str(creator_db),
-                    "checkpoint_path": str(checkpoint_db),
-                    "revision_budget": 4,
-                    "health": health,
-                    "task_paths": [p for p in openapi["paths"] if "/creator/tasks" in p],
-                }
-            }, ensure_ascii=False, indent=2))
-        print(json.dumps(creator_probe(creator_url, token, creator_db), ensure_ascii=False, indent=2))
-        if args.single:
-            print(json.dumps({"experiment": args.experiment, "creator_only": True}, indent=2), flush=True)
-            return 0
-        assistant_env = {
-            "DEEPSEEK_API_KEY": os.environ["DEEPSEEK_API_KEY"],
-            "ASSISTANT_DATABASE_URL": os.environ.get(
-                "P0_E2E_ASSISTANT_DATABASE_URL",
-                "postgresql+asyncpg://mindflow:mindflow@127.0.0.1:25432/mindflow_creator",
-            ),
-            "ASSISTANT_REDIS_URL": "redis://:mindflow@127.0.0.1:26379/14",
-            "ASSISTANT_CREATOR_BASE_URL": creator_url,
-            "ASSISTANT_JAVA_BASE_URL": "http://127.0.0.1:8080",
-            "ASSISTANT_IDENTITY_ISSUER": "http://127.0.0.1:8080",
-            "ASSISTANT_IDENTITY_AUDIENCE": "community-assistant-agent",
-            "ASSISTANT_IDENTITY_JWKS_URL": "http://127.0.0.1:8080/.well-known/jwks.json",
-            "ASSISTANT_ALLOW_INSECURE_HTTP": "true",
-            "ASSISTANT_SERVICE_SHARED_SECRET": os.environ["ASSISTANT_SERVICE_SHARED_SECRET"],
-            "ASSISTANT_PROCESS_ROLE": "all",
-            "ASSISTANT_DEV_RELOAD": "false",
-        }
-        assistant_process, assistant_port = start_server(
-            root=assistant_root,
-            python=assistant_python,
-            env=assistant_env,
-            ready=assistant_ready,
-        )
-        assistant_url = f"http://127.0.0.1:{assistant_port}"
-        assistant_health = wait_health(assistant_url)
-        print(json.dumps({
-            "assistant": {
-                "url": assistant_url,
-                "creator_base_url": creator_url,
-                "health": assistant_health,
-            }
-        }, ensure_ascii=False, indent=2), flush=True)
-        e2e_one = assistant_run(
-            assistant_url,
-            token,
-            "Search public community posts about neighborhood resilience, use the results to write a concise practical post, and schedule it two hours from now. Do not publish immediately.",
-        )
-        print(json.dumps({"e2e_public_search_create_schedule": e2e_one}, ensure_ascii=False, indent=2), flush=True)
-        e2e_two = assistant_run(
-            assistant_url,
-            token,
-            "Find the existing draft created in this conversation and revise it by adding one concrete practical action for readers.",
-        )
-        print(json.dumps({"e2e_resolve_existing_modify": e2e_two}, ensure_ascii=False, indent=2), flush=True)
-        return 0
+        creator_process, creator_port, creator_pump = start_server(root=creator_root, python=creator_python, env=creator_env, ready=temp_path/"creator-ready.json", log_paths=[run_root/"creator.log"], deadline=deadline, manifest=manifest, role="creator"); ports.append(creator_port)
+        creator_url=f"http://127.0.0.1:{creator_port}"; health=wait_health(creator_url,deadline); openapi=requests.get(f"{creator_url}/openapi.json",timeout=15).json(); manifest.update("CREATOR_HEALTHY",creator_url=creator_url,health=health,checkpoint_ns="",revision_budget=4)
+        token=login(deadline); manifest.update("JAVA_LOGIN_COMPLETED",email_configured=True,password_configured=True)
+        assistant_env={"DEEPSEEK_API_KEY":os.environ["DEEPSEEK_API_KEY"],"ASSISTANT_DATABASE_URL":os.environ.get("P0_E2E_ASSISTANT_DATABASE_URL","postgresql+asyncpg://mindflow:mindflow@127.0.0.1:25432/mindflow_creator"),"ASSISTANT_REDIS_URL":"redis://:mindflow@127.0.0.1:26379/14","ASSISTANT_CREATOR_BASE_URL":creator_url,"ASSISTANT_JAVA_BASE_URL":"http://127.0.0.1:8080","ASSISTANT_IDENTITY_ISSUER":"http://127.0.0.1:8080","ASSISTANT_IDENTITY_AUDIENCE":"community-assistant-agent","ASSISTANT_IDENTITY_JWKS_URL":"http://127.0.0.1:8080/.well-known/jwks.json","ASSISTANT_ALLOW_INSECURE_HTTP":"true","ASSISTANT_SERVICE_SHARED_SECRET":os.environ["ASSISTANT_SERVICE_SHARED_SECRET"],"ASSISTANT_PROCESS_ROLE":"all","ASSISTANT_DEV_RELOAD":"false"}
+        assistant_process, assistant_port, assistant_pump=start_server(root=assistant_root,python=assistant_python,env=assistant_env,ready=temp_path/"assistant-ready.json",log_paths=[run_root/"assistant-api.log",run_root/"assistant-worker.log"],deadline=deadline,manifest=manifest,role="assistant"); ports.append(assistant_port); assistant_url=f"http://127.0.0.1:{assistant_port}"; wait_health(assistant_url,deadline); manifest.update("ASSISTANT_API_HEALTHY",assistant_url=assistant_url,creator_base_url=creator_url)
+        conversation=None
+        e2e1=assistant_run(assistant_url,token,"搜索一些社区里关于 Agent 稳定性的公开帖子，参考搜索结果写一篇实用内容，十分钟后发布。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E1"); conversation=e2e1["conversation"]; manifest.update("E2E1_COMPLETED")
+        e2e2=assistant_run(assistant_url,token,"把刚才那篇 Agent 稳定性的草稿改得更适合初学者，并增加三个具体排查步骤。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E2"); manifest.update("E2E2_COMPLETED")
+        collect_evidence(manifest=manifest,evidence={"e2e1":e2e1,"e2e2":e2e2}); manifest.update("COMPLETED",status="COMPLETED"); return 0
+    except Exception as exc:
+        evidence={"error_type":type(exc).__name__,"error":redact(str(exc)),"elapsed_seconds":deadline.elapsed,"hard_timeout":global_hard,"manifest":manifest.data.copy()}
+        manifest.update("COLLECTING_EVIDENCE",status="COLLECTING_EVIDENCE",error=evidence); collect_evidence(manifest=manifest,evidence=evidence); manifest.update("FAILED",status="FAILED"); return 1
     finally:
-        for process in (assistant_process, creator_process):
-            if process is not None and process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
-            if process is not None and process.stdout is not None:
-                output = process.stdout.read()
-                if output:
-                    print(f"[child {process.pid} output]\n{output}", flush=True)
-        for port in locals().get("creator_port"), locals().get("assistant_port"):
-            if port is not None:
-                try:
-                    assert_port_free(port)
-                    print(f"port_released={port}", flush=True)
-                except OSError as exc:
-                    print(f"port_release_check_failed={port}: {exc}", flush=True)
-        if not args.keep_output:
-            for _ in range(20):
-                try:
-                    shutil.rmtree(temp_path)
-                    break
-                except PermissionError:
-                    time.sleep(0.5)
-            else:
-                raise RuntimeError(f"harness cleanup failed: {temp_path}")
+        manifest.update("CLEANUP_STARTED")
+        stop_process(assistant_process,assistant_pump); stop_process(creator_process,creator_pump)
+        for port in ports:
+            try: assert_port_free(port); manifest.log(f"PORT_RELEASED port={port}")
+            except OSError as exc: manifest.log(f"PORT_RELEASE_CHECK_FAILED port={port} error={type(exc).__name__}")
+        failed=manifest.data.get("status") not in {"COMPLETED"}; keep_failed=os.environ.get("P0_E2E_KEEP_FAILED_ARTIFACTS","true").lower() == "true"
+        redis_url=creator_env.get("REDIS_URL"); redis_result=cleanup_redis_namespace(redis_url,creator_namespace,manifest) if not failed or not keep_failed else {"preserved":True}
+        manifest.data["redis_cleanup"]=redis_result
+        if not failed or not keep_failed:
+            shutil.rmtree(temp_path,ignore_errors=True)
+        else: manifest.data["preserved_temp_path"]=str(temp_path)
+        manifest.update("CLEANUP_COMPLETED",status=manifest.data.get("status"),preserved_failed_artifacts=failed and keep_failed)
 
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ Thumbs.db
 **/*.db
 **/*.sqlite
 **/*.sqlite3
+.p0-e2e-runs/
 data/
 var/
 backups/
