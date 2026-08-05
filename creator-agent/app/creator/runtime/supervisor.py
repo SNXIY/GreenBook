@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.creator.domain.models import (
     CreatorDecisionAction,
@@ -34,6 +34,14 @@ class SupervisorPolicy(BaseModel):
 
     max_plan_steps: int = Field(default=12, ge=1, le=64)
     critic_acceptance_score: float = Field(default=0.70, ge=0.0, le=1.0)
+    target_quality_threshold: float = Field(default=0.70, ge=0.0, le=1.0)
+    minimum_publishable_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def validate_quality_thresholds(self) -> "SupervisorPolicy":
+        if self.minimum_publishable_threshold >= self.target_quality_threshold:
+            raise ValueError("minimum_publishable_threshold must be below target_quality_threshold")
+        return self
 
 
 @dataclass(frozen=True)
@@ -58,6 +66,10 @@ class CreatorSupervisorAgent:
     ):
         self._registry = registry
         self._policy = policy or SupervisorPolicy()
+
+    @property
+    def policy(self) -> SupervisorPolicy:
+        return self._policy
 
     def decide(self, state: CreatorGraphState) -> SupervisorTurn:
         budget_failure = self._budget_failure(state)
@@ -524,9 +536,45 @@ class CreatorSupervisorAgent:
                     "草稿已通过质量评审和运行评估门禁。",
                     "Draft passed critic and evaluation gates.",
                 ),
+                finalization_metadata={
+                    "quality_gate": "PASSED",
+                    "quality_score": score,
+                    "target_threshold": self._policy.target_quality_threshold,
+                    "minimum_publishable_threshold": self._policy.minimum_publishable_threshold,
+                    "revision_budget_exhausted": False,
+                },
             )
 
         if state["usage"].writer_revisions >= state["limits"].max_writer_revisions:
+            best_draft, best_score = self._best_draft(state)
+            if best_draft is not None and best_score >= self._policy.minimum_publishable_threshold:
+                assessment = self._assess_publishability(best_draft)
+                if not assessment["hard_failure"]:
+                    quality_gate = (
+                        "PASSED"
+                        if best_score >= self._policy.target_quality_threshold
+                        else "DEGRADED"
+                    )
+                    return self._finish_turn(
+                        best_draft,
+                        _text(
+                            state,
+                            "鏈鏈揪鍒拌川閲忕洰鏍囷紝浣嗗凡閫夋嫨璇勫垎鏈€楂樼殑鍙彂甯冭崏绋裤€?",
+                            "The target quality was not reached; the highest-scoring usable draft was selected.",
+                        ),
+                        finalization_metadata={
+                            "quality_gate": quality_gate,
+                            "quality_score": best_score,
+                            "target_threshold": self._policy.target_quality_threshold,
+                            "minimum_publishable_threshold": self._policy.minimum_publishable_threshold,
+                            "revision_budget_exhausted": True,
+                            "source_draft_artifact_id": best_draft.id,
+                            "warning": (
+                                "Target quality was not reached; best usable draft selected."
+                                if quality_gate == "DEGRADED" else None
+                            ),
+                        },
+                    )
             return self._failure_turn(
                 RuntimeFailure(
                     code="QUALITY_GATE_FAILED",
@@ -1007,13 +1055,54 @@ class CreatorSupervisorAgent:
                 return True
         return False
 
+    def _best_draft(
+        self,
+        state: CreatorGraphState,
+    ) -> tuple[ArtifactRef | None, float]:
+        drafts = {
+            ref.id: ref for ref in state["artifacts"].values()
+            if ref.kind == ArtifactKind.DRAFT
+        }
+        candidates: list[tuple[float, ArtifactRef]] = []
+        for critique in state["artifacts"].values():
+            if critique.kind != ArtifactKind.CRITIQUE:
+                continue
+            draft_id = critique.metadata.get("reviewed_artifact_id")
+            draft = drafts.get(str(draft_id)) if draft_id else None
+            if draft is None:
+                continue
+            candidates.append((float(critique.metadata.get("overall_score") or 0.0), draft))
+        if not candidates:
+            return None, 0.0
+        score, draft = max(candidates, key=lambda item: (item[0], item[1].revision))
+        return draft, score
+
     @staticmethod
-    def _finish_turn(source: ArtifactRef, reason: str) -> SupervisorTurn:
+    def _assess_publishability(draft: ArtifactRef) -> dict[str, bool]:
+        metadata = draft.metadata
+        hard_failure = bool(
+            metadata.get("safety_failure")
+            or metadata.get("format_failure")
+            or metadata.get("empty_content")
+            or metadata.get("unparseable_content")
+            or int(metadata.get("unsupported_claim_count") or 0) > 0
+            or int(metadata.get("word_count") or 0) < 80
+        )
+        return {"hard_failure": hard_failure}
+
+    @staticmethod
+    def _finish_turn(
+        source: ArtifactRef,
+        reason: str,
+        *,
+        finalization_metadata: dict[str, object] | None = None,
+    ) -> SupervisorTurn:
         return SupervisorTurn(
             decision=SupervisorDecision(
                 action=SupervisorAction.FINISH,
                 reason=reason,
                 final_source_artifact_id=source.id,
+                finalization_metadata=finalization_metadata or {},
             ),
             progress=(
                 ProgressEntry(

@@ -620,6 +620,7 @@ class CreatorRuntimeGraph:
                         ref.kind == ArtifactKind.CRITIQUE
                         for ref in state["artifacts"].values()
                     ),
+                    **decision.finalization_metadata,
                 },
                 confidence=source.confidence,
             ),

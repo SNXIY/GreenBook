@@ -291,6 +291,7 @@ class SupervisorDecision(RuntimeModel):
     final_source_artifact_id: str | None = None
     human_request: HumanDecisionRequest | None = None
     failure: RuntimeFailure | None = None
+    finalization_metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_action_payload(self) -> "SupervisorDecision":
