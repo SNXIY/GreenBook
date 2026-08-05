@@ -158,3 +158,10 @@ async def test_schedule_status_answers_without_tools_or_goals() -> None:
     assert result.created_goal is False
     assert result.touched_task is False
     assert "sched-1" in result.answer
+
+
+def test_own_post_query_has_own_scope_even_when_it_uses_search_language() -> None:
+    spec = QueryCatalog().resolve("search my published posts")
+    assert spec.kind == "OWN_POST_LIST"
+    assert spec.tool == "community.list_own_posts"
+    assert spec.scope == "OWN"

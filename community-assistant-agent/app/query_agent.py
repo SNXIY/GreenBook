@@ -24,6 +24,7 @@ QueryKind = Literal[
     "ENGAGEMENT",
     "UNSUPPORTED",
 ]
+QueryScope = Literal["OWN", "PUBLIC"]
 
 ReadToolExecutor = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 
@@ -32,6 +33,7 @@ ReadToolExecutor = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 class QuerySpec:
     kind: QueryKind
     tool: str | None
+    scope: QueryScope | None = None
     arguments: dict[str, Any] = field(default_factory=dict)
     summary: str = ""
 
@@ -86,8 +88,14 @@ _ENGAGEMENT = re.compile(
     re.IGNORECASE,
 )
 _SEARCH = re.compile(
-    r"^(?:(?:帮我|请|麻烦)\s*)?(?:检索|搜索|查找|找出|找几篇|找一些|寻找)"
-    r"\s*(?:出\s*)?(?:几篇|一些)?\s*",
+    r"(?:先|先去|帮我|请|麻烦)?\s*"
+    r"(?:检索|搜索|查找|找出|找几篇|找一些|寻找|搜一下|查一下)"
+    r"\s*(?:出\s*)?(?:几篇|一些|一下)?\s*",
+    re.IGNORECASE,
+)
+_OWN_SCOPE = re.compile(
+    r"\b(?:my|mine|own|personal)\s+(?:published\s+)?posts?\b|"
+    r"\bposts?\s+(?:i|we)\s+(?:published|posted)\b",
     re.IGNORECASE,
 )
 
@@ -118,13 +126,23 @@ class QueryCatalog:
             return QuerySpec(
                 kind="ENGAGEMENT",
                 tool="community.analyze_engagement",
+                scope=None,
                 arguments={"days": 7, "limit": 20},
                 summary="查询互动数据",
+            )
+        if _OWN_SCOPE.search(text):
+            return QuerySpec(
+                kind="OWN_POST_LIST",
+                tool="community.list_own_posts",
+                scope="OWN",
+                arguments={"max_items": 20},
+                summary="查询当前用户发布的帖子列表",
             )
         if _SEARCH.search(text):
             return QuerySpec(
                 kind="PUBLIC_POST_SEARCH",
                 tool="community.search_posts",
+                scope="PUBLIC",
                 arguments={"query": _search_query(text), "limit": 10},
                 summary="检索公开帖子",
             )
@@ -134,6 +152,7 @@ class QueryCatalog:
             return QuerySpec(
                 kind="OWN_POST_COUNT",
                 tool="community.list_own_posts",
+                scope="OWN",
                 arguments={"max_items": 1_000},
                 summary="查询已发布帖子数量",
             )
@@ -141,6 +160,7 @@ class QueryCatalog:
             return QuerySpec(
                 kind="OWN_POST_LIST",
                 tool="community.list_own_posts",
+                scope="OWN",
                 arguments={"max_items": 20},
                 summary="查询最近发布的帖子列表",
             )
@@ -148,12 +168,14 @@ class QueryCatalog:
             return QuerySpec(
                 kind="OWN_POST_LIST",
                 tool="community.list_own_posts",
+                scope="OWN",
                 arguments={"max_items": 20},
                 summary="查询帖子列表",
             )
         return QuerySpec(
             kind="UNSUPPORTED",
             tool=None,
+            scope=None,
             arguments={},
             summary="暂不支持的查询",
         )
