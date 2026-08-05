@@ -37,9 +37,9 @@ from app.tools import CapabilityBudget, IdempotencyMode, TransportType, tool_reg
 from app.worker import AgentWorker
 from app.write_tools import UpdateScheduleServices, register_update_schedule_handler
 
-NOW = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
-JAVA_RUN_AT = datetime(2026, 8, 5, 0, 0, tzinfo=timezone.utc)
-FIT_RUN_AT = datetime(2026, 8, 5, 2, 0, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc)
+JAVA_RUN_AT = NOW + timedelta(days=1)
+FIT_RUN_AT = NOW + timedelta(days=1, hours=2)
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 PLAIN_TOKEN = "plain-capability-token-do-not-persist"

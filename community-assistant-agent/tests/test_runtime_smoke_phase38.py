@@ -91,11 +91,22 @@ from app.worker import AgentWorker
 
 SH = ZoneInfo("Asia/Shanghai")
 UTC = ZoneInfo("UTC")
-MSG_CREATED = datetime(2026, 8, 4, 15, 30, tzinfo=SH)
-JAVA_RUN_AT = datetime(2026, 8, 5, 8, 0, tzinfo=SH)
-FIT_RUN_AT = datetime(2026, 8, 5, 10, 0, tzinfo=SH)
-EXPECTED_TOOL_RUN_AT = "2026-08-05T00:10:00Z"
-EXPECTED_USER_TIME = "2026年8月5日上午8:10（北京时间）"
+_TEST_NOW_UTC = datetime.now(UTC).replace(microsecond=0)
+MSG_CREATED = _TEST_NOW_UTC.astimezone(SH)
+JAVA_RUN_AT = (_TEST_NOW_UTC + timedelta(days=1)).astimezone(SH)
+FIT_RUN_AT = JAVA_RUN_AT + timedelta(hours=2)
+EXPECTED_TOOL_RUN_AT = (
+    (JAVA_RUN_AT + timedelta(minutes=10))
+    .astimezone(UTC)
+    .strftime("%Y-%m-%dT%H:%M:%SZ")
+)
+_expected_local = (JAVA_RUN_AT + timedelta(minutes=10)).astimezone(SH)
+_expected_period = "上午" if _expected_local.hour < 12 else "下午"
+_expected_hour = _expected_local.hour % 12 or 12
+EXPECTED_USER_TIME = (
+    f"{_expected_local.year}年{_expected_local.month}月{_expected_local.day}日"
+    f"{_expected_period}{_expected_hour}:{_expected_local.minute:02d}（北京时间）"
+)
 JAVA_TITLE = "如何高效学好 Java：一份实用的学习路线图"
 FIT_TITLE = "科学减肥：从饮食、运动到生活习惯的完整指南"
 CONTENT_SHA = "a" * 64

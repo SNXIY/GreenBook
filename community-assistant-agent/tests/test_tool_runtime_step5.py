@@ -40,8 +40,8 @@ from app.tool_runtime import (
 )
 from app.tools import IdempotencyMode, TransportType, tool_registry
 
-NOW = datetime(2026, 8, 4, 12, 0, tzinfo=timezone.utc)
-RUN_AT = datetime(2026, 8, 5, 0, 10, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc)
+RUN_AT = NOW + timedelta(days=1)
 SHA = "a" * 64
 PLAIN = "plain-cap-token"
 
