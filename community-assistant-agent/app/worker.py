@@ -2825,9 +2825,16 @@ class AgentWorker:
             current.status = "WAITING_CLARIFICATION"
             current.summary = "等待用户选择会话目标"
             current.final_response = response
+            clarification_payload = {
+                **resolution.model_dump(mode="json"),
+                "kind": "GOAL",
+                "question": response,
+                "original_message": run.prompt,
+            }
             current.checkpoint = {
                 **dict(current.checkpoint or {}),
                 "goal_resolution": resolution.model_dump(mode="json"),
+                "pending_clarification": clarification_payload,
             }
             current.lease_owner = None
             current.lease_expires_at = None
@@ -2873,11 +2880,16 @@ class AgentWorker:
         if recent is None:
             return None
         checkpoint = dict(recent.checkpoint or {})
-        payload = checkpoint.get("goal_resolution")
+        payload = checkpoint.get("pending_clarification") or checkpoint.get(
+            "goal_resolution"
+        )
         if not isinstance(payload, dict):
             return None
         try:
-            return GoalResolution.model_validate(payload)
+            resolution_payload = dict(payload)
+            for display_key in ("kind", "question", "original_message"):
+                resolution_payload.pop(display_key, None)
+            return GoalResolution.model_validate(resolution_payload)
         except Exception:
             return None
 
@@ -2899,6 +2911,7 @@ class AgentWorker:
             for pending in pending_runs:
                 checkpoint = dict(pending.checkpoint or {})
                 checkpoint.pop("goal_resolution", None)
+                checkpoint.pop("pending_clarification", None)
                 pending.checkpoint = checkpoint
                 pending.status = "COMPLETED"
                 pending.summary = "目标消歧已完成"
