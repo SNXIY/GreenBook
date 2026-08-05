@@ -19,6 +19,7 @@ from app.router import RouteDecision
 QueryKind = Literal[
     "OWN_POST_COUNT",
     "OWN_POST_LIST",
+    "PUBLIC_POST_SEARCH",
     "SCHEDULE_STATUS",
     "ENGAGEMENT",
     "UNSUPPORTED",
@@ -84,6 +85,18 @@ _ENGAGEMENT = re.compile(
     r"(分析|统计).{0,12}(互动|活跃|用户|数据|趋势)",
     re.IGNORECASE,
 )
+_SEARCH = re.compile(
+    r"^(?:(?:帮我|请|麻烦)\s*)?(?:检索|搜索|查找|找出|找几篇|找一些|寻找)"
+    r"\s*(?:出\s*)?(?:几篇|一些)?\s*",
+    re.IGNORECASE,
+)
+
+
+def _search_query(message: str) -> str:
+    query = _SEARCH.sub("", str(message or ""), count=1).strip(" ，,：:")
+    query = re.sub(r"^(?:关于|有关|与)\s*", "", query, count=1)
+    query = re.sub(r"(?:的)?(?:帖子|文章|内容)\s*[。！？!?]?$", "", query)
+    return query.strip(" ，,：:")
 
 
 class QueryCatalog:
@@ -107,6 +120,13 @@ class QueryCatalog:
                 tool="community.analyze_engagement",
                 arguments={"days": 7, "limit": 20},
                 summary="查询互动数据",
+            )
+        if _SEARCH.search(text):
+            return QuerySpec(
+                kind="PUBLIC_POST_SEARCH",
+                tool="community.search_posts",
+                arguments={"query": _search_query(text), "limit": 10},
+                summary="检索公开帖子",
             )
         if _COUNT.search(lowered) and any(
             token in lowered for token in ("帖", "文章", "草稿", "post", "发布")
@@ -158,6 +178,8 @@ class QueryAgent:
             return await self._own_post_count(spec, execute_tool)
         if spec.kind == "OWN_POST_LIST":
             return await self._own_post_list(spec, execute_tool)
+        if spec.kind == "PUBLIC_POST_SEARCH":
+            return await self._public_post_search(spec, execute_tool)
         if spec.kind == "SCHEDULE_STATUS":
             return self._schedule_status(spec, schedules or [])
         if spec.kind == "ENGAGEMENT":
@@ -221,6 +243,40 @@ class QueryAgent:
         return QueryResult(
             kind="OWN_POST_LIST",
             data=data,
+            answer=answer,
+            tool_name=spec.tool,
+        )
+
+    async def _public_post_search(
+        self,
+        spec: QuerySpec,
+        execute_tool: ReadToolExecutor | None,
+    ) -> QueryResult:
+        if execute_tool is None:
+            raise RuntimeError("QueryAgent 缺少只读工具执行器")
+        assert spec.tool == "community.search_posts"
+        output = await execute_tool(spec.tool, dict(spec.arguments))
+        results = list(output.get("results") or [])
+        lines: list[str] = []
+        for index, item in enumerate(results[:10], start=1):
+            title = str(item.get("title") or "未命名帖子").strip() or "未命名帖子"
+            post_id = str(item.get("id") or item.get("postId") or "").strip()
+            identity = f" #{post_id}" if post_id else ""
+            lines.append(f"{index}. {title}{identity}")
+        if not lines:
+            answer = f"暂时没有检索到与“{spec.arguments['query']}”相关的公开帖子。"
+        else:
+            answer = f"找到 {len(results)} 篇与“{spec.arguments['query']}”相关的公开帖子：\n"
+            answer += "\n".join(lines)
+            if output.get("truncated"):
+                answer += "\n（结果已按检索限制截断）"
+        return QueryResult(
+            kind="PUBLIC_POST_SEARCH",
+            data={
+                "query": output.get("query", spec.arguments["query"]),
+                "results": results,
+                "truncated": bool(output.get("truncated")),
+            },
             answer=answer,
             tool_name=spec.tool,
         )

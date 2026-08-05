@@ -112,6 +112,32 @@ def test_schedule_status_stays_on_query_path_not_action() -> None:
     assert spec.tool is None
 
 
+def test_public_search_does_not_fall_back_to_own_posts() -> None:
+    catalog = QueryCatalog()
+    spec = catalog.resolve("帮我检索出几篇关于如何学习agent的帖子")
+    assert spec.kind == "PUBLIC_POST_SEARCH"
+    assert spec.tool == "community.search_posts"
+    assert spec.arguments == {"query": "如何学习agent", "limit": 10}
+
+
+@pytest.mark.asyncio
+async def test_public_search_renders_search_results() -> None:
+    agent = QueryAgent()
+
+    async def execute_tool(name: str, args: dict) -> dict:
+        assert name == "community.search_posts"
+        assert args == {"query": "如何学习agent", "limit": 10}
+        return {"query": "如何学习agent", "results": [{"id": "p-1", "title": "Agent 学习路线"}]}
+
+    result = await agent.handle(
+        message="帮我检索出几篇关于如何学习agent的帖子",
+        execute_tool=execute_tool,
+    )
+    assert result.kind == "PUBLIC_POST_SEARCH"
+    assert result.tool_name == "community.search_posts"
+    assert "Agent 学习路线" in result.answer
+
+
 @pytest.mark.asyncio
 async def test_schedule_status_answers_without_tools_or_goals() -> None:
     agent = QueryAgent()
