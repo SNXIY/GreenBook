@@ -241,8 +241,7 @@ class LangGraphCreatorRuntime:
     def _config(self, thread_id: str) -> dict[str, Any]:
         return {
             "configurable": {
-                "thread_id": thread_id,
-                "checkpoint_ns": f"creator:{thread_id}",
+                "thread_id": f"creator:{thread_id}",
             },
             "recursion_limit": (
                 self._limits.max_supervisor_turns
