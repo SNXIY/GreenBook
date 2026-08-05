@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import faulthandler
 import logging
+import threading
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import Any, cast
@@ -238,7 +240,10 @@ class LangGraphCreatorRuntime:
 
     def _config(self, thread_id: str) -> dict[str, Any]:
         return {
-            "configurable": {"thread_id": thread_id},
+            "configurable": {
+                "thread_id": thread_id,
+                "checkpoint_ns": f"creator:{thread_id}",
+            },
             "recursion_limit": (
                 self._limits.max_supervisor_turns
                 + self._limits.max_agent_dispatches
@@ -257,6 +262,9 @@ class LangGraphCreatorRuntime:
     ) -> RuntimeOutcome:
         cursor = previous
         last_raw: dict[str, Any] = {}
+        stack_timer = threading.Timer(10.0, faulthandler.dump_traceback)
+        stack_timer.daemon = True
+        stack_timer.start()
         async for chunk in self._graph.compiled.astream(
             graph_input,
             config=config,
@@ -292,6 +300,7 @@ class LangGraphCreatorRuntime:
                 len(state.get("artifacts", {})),
                 len(state.get("progress", ())),
             )
+        stack_timer.cancel()
         logger.info(
             "Creator graph stream finished run_id=%s has_state=%s",
             config.get("configurable", {}).get("thread_id"),

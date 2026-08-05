@@ -129,6 +129,18 @@ class CreatorLocalRunDispatcher:
     def diagnostics(self) -> dict[str, object]:
         self.dispatcher_loop_iteration += 1
         self.dispatcher_last_heartbeat = datetime.now(timezone.utc)
+        active_stacks: dict[str, str] = {}
+        for run_id, task in self._tasks.items():
+            if task.done():
+                continue
+            try:
+                active_stacks[run_id] = "".join(
+                    line
+                    for frame in task.get_stack(limit=8)
+                    for line in traceback.format_stack(frame)
+                )
+            except Exception as exc:
+                active_stacks[run_id] = f"<stack unavailable: {type(exc).__name__}: {exc}>"
         return {
             "dispatcher_instance_id": self.dispatcher_instance_id,
             "dispatcher_started_at": self.dispatcher_started_at.isoformat(),
@@ -142,14 +154,7 @@ class CreatorLocalRunDispatcher:
             "dispatcher_last_error": self.dispatcher_last_error,
             "active_task_count": len(self._tasks),
             "active_task_ids": tuple(self._tasks),
-            "active_task_stacks": {
-                run_id: "".join(
-                    traceback.format_stack(frame)
-                    for frame in task.get_stack(limit=8)
-                )
-                for run_id, task in self._tasks.items()
-                if not task.done()
-            },
+            "active_task_stacks": active_stacks,
         }
 
     async def recover(self, run_ids: tuple[str, ...]) -> int:

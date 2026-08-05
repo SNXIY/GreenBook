@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     creator_checkpoint_sqlite_path: str = "data/mindflow-checkpoints.db"
     creator_checkpoint_postgres_url: str = ""
     creator_checkpoint_auto_setup: bool = True
+    creator_checkpoint_diagnostics: bool = False
     creator_runtime_max_attempts: int = 3
     creator_run_lease_seconds: int = 120
     creator_retry_delay_seconds: int = 15

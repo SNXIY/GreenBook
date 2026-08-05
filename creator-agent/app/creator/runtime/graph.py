@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import faulthandler
 import hashlib
 import logging
+import threading
+import time
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Literal
@@ -60,7 +63,7 @@ from app.creator.runtime.registry import AgentRegistryError, CreatorAgentRegistr
 from app.creator.runtime.supervisor import CreatorSupervisorAgent, execution_id
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 TerminalNode = Literal["await_human", "finalize", "fail"]
@@ -103,7 +106,17 @@ class CreatorRuntimeGraph:
         return builder.compile(checkpointer=self._checkpointer)
 
     async def _supervise(self, state: CreatorGraphState) -> dict[str, Any]:
-        turn = self._supervisor.decide(state)
+        identity = state["identity"]
+        started = time.monotonic()
+        logger.info(
+            "graph_node_started node_name=supervise task_id=%s graph_thread_id=%s event_loop_id=%s thread_id=%s",
+            identity.task_id, identity.thread_id, id(asyncio.get_running_loop()), threading.get_ident(),
+        )
+        faulthandler.dump_traceback_later(10, repeat=False)
+        try:
+            turn = self._supervisor.decide(state)
+        finally:
+            faulthandler.cancel_dump_traceback_later()
         update: dict[str, Any] = {
             "decision": turn.decision,
             "usage": turn.usage_delta,
@@ -113,6 +126,10 @@ class CreatorRuntimeGraph:
             assert turn.plan is not None
             update["plan"] = turn.plan
             update["plan_history"] = (turn.plan,)
+        logger.info(
+            "graph_node_returned node_name=supervise task_id=%s graph_thread_id=%s returned_keys=%s duration_ms=%.1f",
+            identity.task_id, identity.thread_id, tuple(update), (time.monotonic() - started) * 1000,
+        )
         return update
 
     def _route_supervisor(
@@ -166,6 +183,10 @@ class CreatorRuntimeGraph:
         run_identity = envelope["identity"]
         execution_key = execution_id(plan_revision, step)
         agent_name = "unresolved"
+        logger.info(
+            "graph_node_started node_name=execute_agent task_id=%s graph_thread_id=%s node_name=%s event_loop_id=%s thread_id=%s",
+            run_identity.task_id, run_identity.thread_id, step.id, id(asyncio.get_running_loop()), threading.get_ident(),
+        )
         try:
             agent = self._registry.resolve(step.capability)
             agent_name = agent.descriptor.name
@@ -231,7 +252,16 @@ class CreatorRuntimeGraph:
                     payload=payload,
                     created_at=self._clock(),
                 )
+                persist_started = time.monotonic()
+                logger.info(
+                    "artifact_persist_started task_id=%s graph_thread_id=%s artifact_id=%s node_name=%s",
+                    run_identity.task_id, run_identity.thread_id, artifact.id, step.id,
+                )
                 await self._artifacts.put(artifact)
+                logger.info(
+                    "artifact_persist_finished task_id=%s graph_thread_id=%s artifact_id=%s duration_ms=%.1f",
+                    run_identity.task_id, run_identity.thread_id, artifact.id, (time.monotonic() - persist_started) * 1000,
+                )
                 produced.append(artifact)
                 existing_refs.append(artifact.as_ref())
 
@@ -269,7 +299,7 @@ class CreatorRuntimeGraph:
                 started_at=started_at,
                 finished_at=finished_at,
             )
-            return {
+            update = {
                 "executions": {execution_key: execution},
                 "artifacts": {artifact.id: artifact.as_ref() for artifact in produced},
                 "facts": facts,
@@ -291,6 +321,11 @@ class CreatorRuntimeGraph:
                     ),
                 ),
             }
+            logger.info(
+                "graph_node_returned node_name=execute_agent task_id=%s graph_thread_id=%s node_name=%s returned_keys=%s",
+                run_identity.task_id, run_identity.thread_id, step.id, tuple(update),
+            )
+            return update
         except SpecialistAgentError as exc:
             return self._failed_execution_update(
                 step=step,

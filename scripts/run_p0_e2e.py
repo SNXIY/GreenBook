@@ -126,7 +126,7 @@ def login() -> str:
 
 
 def task_snapshot(base_url: str, token: str, task_id: str) -> dict[str, Any]:
-    deadline = time.time() + 300
+    deadline = time.time() + float(os.environ.get("P0_E2E_TASK_TIMEOUT", "300"))
     last_status = None
     while time.time() < deadline:
         try:
@@ -139,11 +139,18 @@ def task_snapshot(base_url: str, token: str, task_id: str) -> dict[str, Any]:
             payload = response.json()
             if payload.get("status") != last_status:
                 last_status = payload.get("status")
-                dispatcher_response = requests.get(
-                    f"{base_url}/api/v1/creator/status",
-                    headers={"Authorization": f"Bearer {token}"},
-                    timeout=10,
-                )
+                try:
+                    dispatcher_response = requests.get(
+                        f"{base_url}/api/v1/creator/status",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=10,
+                    )
+                    dispatcher_diagnostic = {
+                        "http_status": dispatcher_response.status_code,
+                        "body": dispatcher_response.json(),
+                    }
+                except requests.RequestException as exc:
+                    dispatcher_diagnostic = {"error": repr(exc)}
                 print(json.dumps({
                     "task_diagnostic": {
                         "task_id": task_id,
@@ -153,7 +160,7 @@ def task_snapshot(base_url: str, token: str, task_id: str) -> dict[str, Any]:
                         "artifact_count": len(payload.get("artifacts") or []),
                         "last_error": payload.get("error_message"),
                     },
-                    "dispatcher_diagnostic": dispatcher_response.json(),
+                    "dispatcher_diagnostic": dispatcher_diagnostic,
                 }, ensure_ascii=False), flush=True)
             if payload.get("status") in {"COMPLETED", "FAILED", "CANCELLED"}:
                 return payload
@@ -205,7 +212,8 @@ def artifact_from_isolated_db(db_path: Path, task_id: str, artifact_id: str) -> 
 def creator_probe(base_url: str, token: str, db_path: Path) -> dict[str, Any]:
     create_results: list[dict[str, Any]] = []
     draft_details: list[dict[str, Any]] = []
-    for index in range(3):
+    count = 1 if os.environ.get("P0_E2E_SINGLE") == "1" else 3
+    for index in range(count):
         create = submit_creator(
             base_url,
             token,
@@ -232,6 +240,13 @@ def creator_probe(base_url: str, token: str, db_path: Path) -> dict[str, Any]:
         draft_details.append(artifact_from_isolated_db(
             db_path, create["accepted"]["task_id"], draft["artifact_id"]
         ))
+
+    if os.environ.get("P0_E2E_SINGLE") == "1":
+        return {
+            "create_x1": create_results,
+            "create_draft_details": draft_details,
+            "improve_x0": [],
+        }
 
     improve_results: list[dict[str, Any]] = []
     for index, (create, detail) in enumerate(zip(create_results, draft_details, strict=True)):
@@ -322,6 +337,9 @@ def assistant_run(base_url: str, token: str, prompt: str) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--keep-output", action="store_true")
+    parser.add_argument("--experiment", choices=("A", "B", "C", "D"), default="C")
+    parser.add_argument("--single", action="store_true")
+    parser.add_argument("--task-timeout", type=int, default=300)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     creator_root = repo / "creator-agent"
@@ -333,9 +351,13 @@ def main() -> int:
     ).strip()
     os.environ["NO_PROXY"] = "127.0.0.1,localhost"
     os.environ["no_proxy"] = "127.0.0.1,localhost"
+    os.environ["P0_E2E_TASK_TIMEOUT"] = str(args.task_timeout)
+    os.environ["P0_E2E_SINGLE"] = "1" if args.single else "0"
     temp_path = Path(tempfile.mkdtemp(prefix="greenbook-p0-"))
     creator_db = temp_path / "creator.sqlite"
     checkpoint_db = temp_path / "checkpoints.sqlite"
+    if args.experiment == "A":
+        checkpoint_db = creator_db
     creator_env = {
         "DEEPSEEK_API_KEY": os.environ["DEEPSEEK_API_KEY"],
         "AI_PROVIDER": "deepseek",
@@ -343,6 +365,7 @@ def main() -> int:
         "CREATOR_CHECKPOINT_BACKEND": "sqlite",
         "CREATOR_CHECKPOINT_SQLITE_PATH": str(checkpoint_db),
         "CREATOR_CHECKPOINT_AUTO_SETUP": "true",
+        "CREATOR_CHECKPOINT_DIAGNOSTICS": "true",
         "CREATOR_API_EXECUTION_MODE": "local",
         "CREATOR_API_CREATE_SCHEMA": "true",
         "CREATOR_IDENTITY_MODE": "oidc",
@@ -363,8 +386,12 @@ def main() -> int:
         "CREATOR_INSTANCE_ID": f"p0-e2e-{uuid.uuid4().hex[:8]}",
         "CREATOR_QUEUE_NAMESPACE": f"creator:p0:{uuid.uuid4().hex[:8]}",
         "CREATOR_DATABASE_IDENTIFIER": "temporary-sqlite",
-            "CREATOR_API_WORKER_ID": "p0-e2e-dispatcher",
+        "CREATOR_API_WORKER_ID": "p0-e2e-dispatcher",
     }
+    if args.experiment == "B":
+        creator_env["CREATOR_CHECKPOINT_BACKEND"] = "memory"
+    if args.experiment == "D":
+        creator_env["CREATOR_DIAGNOSTICS_DISABLE_EVENT_PERSISTENCE"] = "true"
     creator_ready = temp_path / "creator-ready.json"
     assistant_ready = temp_path / "assistant-ready.json"
     creator_process: subprocess.Popen[str] | None = None
@@ -386,12 +413,19 @@ def main() -> int:
                     "instance_id": creator_env["CREATOR_INSTANCE_ID"],
             "build_commit": creator_env["CREATOR_BUILD_COMMIT"],
                     "dispatcher": "local-durable-dispatcher",
+                    "experiment": args.experiment,
+                    "checkpoint_backend": creator_env["CREATOR_CHECKPOINT_BACKEND"],
+                    "database_path": str(creator_db),
+                    "checkpoint_path": str(checkpoint_db),
                     "revision_budget": 4,
                     "health": health,
                     "task_paths": [p for p in openapi["paths"] if "/creator/tasks" in p],
                 }
             }, ensure_ascii=False, indent=2))
         print(json.dumps(creator_probe(creator_url, token, creator_db), ensure_ascii=False, indent=2))
+        if args.single:
+            print(json.dumps({"experiment": args.experiment, "creator_only": True}, indent=2), flush=True)
+            return 0
         assistant_env = {
             "DEEPSEEK_API_KEY": os.environ["DEEPSEEK_API_KEY"],
             "ASSISTANT_DATABASE_URL": os.environ.get(

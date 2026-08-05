@@ -4,6 +4,8 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
+import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -1635,8 +1637,21 @@ class CreatorAgentHarness:
     ) -> None:
         if not events:
             return
+        if os.getenv("CREATOR_DIAGNOSTICS_DISABLE_EVENT_PERSISTENCE", "").lower() in {
+            "1", "true", "yes"
+        }:
+            logger.info(
+                "Creator event persistence disabled by diagnostic harness run_id=%s event_count=%s",
+                run_id,
+                len(events),
+            )
+            return
         now = self._clock()
         try:
+            logger.info(
+                "event_persist_started run_id=%s event_count=%s event_loop_id=%s thread_id=%s",
+                run_id, len(events), id(asyncio.get_running_loop()), threading.get_ident(),
+            )
             async with self._uow_factory() as uow:
                 run = await self._require_run(uow, run_id, for_update=True)
                 task = await self._require_task(uow, run.task_id, for_update=True)
@@ -1662,6 +1677,10 @@ class CreatorAgentHarness:
                         now=now,
                     )
                 await uow.commit()
+                logger.info(
+                    "event_persist_finished run_id=%s duration_marker=commit session_identity=%s",
+                    run_id, id(uow),
+                )
         except Exception:
             logger.exception(
                 "Failed to publish mid-run creator events run_id=%s worker_id=%s",
