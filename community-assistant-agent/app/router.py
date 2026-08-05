@@ -119,7 +119,12 @@ class ControlPlaneRouter:
                 confidence=0.9,
                 summary="识别为状态查询",
             )
-        if any(pattern.search(text) for pattern in _SEARCH_QUERY_PATTERNS):
+        # A search phrase can be the first step of a mutating composite task
+        # (for example, search first and then create/schedule).  Preserve the
+        # read fast path only when no action signal is present; otherwise the
+        # ACTION pipeline must retain the complete request.
+        action_hit = any(pattern.search(text) for pattern in _ACTION_PATTERNS)
+        if any(pattern.search(text) for pattern in _SEARCH_QUERY_PATTERNS) and not action_hit:
             return RouteDecision(
                 mode="QUERY",
                 domain=_domain_for("QUERY", text),
@@ -127,7 +132,6 @@ class ControlPlaneRouter:
                 summary="识别为检索/分析查询",
             )
 
-        action_hit = any(pattern.search(text) for pattern in _ACTION_PATTERNS)
         chat_hit = any(pattern.search(text) for pattern in _CHAT_PATTERNS)
 
         if action_hit and not chat_hit:

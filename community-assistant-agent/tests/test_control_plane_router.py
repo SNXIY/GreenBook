@@ -39,3 +39,9 @@ def test_help_introduce_agent_is_chat() -> None:
     router = ControlPlaneRouter()
     decision = router.classify("帮我介绍Agent")
     assert decision.mode == "CHAT"
+
+
+def test_search_then_create_stays_on_action_path() -> None:
+    router = ControlPlaneRouter()
+    decision = router.classify("search posts and create a draft")
+    assert decision.mode == "ACTION"
