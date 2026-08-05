@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import time
 
 from pydantic import ValidationError
 
@@ -12,6 +14,9 @@ from app.creator.runtime.ports import (
     CreatorModelRequest,
     OutputModelT,
 )
+
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class CreatorModelGatewayError(RuntimeError):
@@ -45,7 +50,15 @@ class AiClientCreatorModelGateway:
             ),
             CreatorMessage(role="user", content=request.user_prompt),
         ]
+        started = time.monotonic()
         try:
+            logger.info(
+                "Creator model request started operation=%s model=%s max_tokens=%s timeout=%s",
+                request.operation,
+                request.model or "provider-default",
+                request.max_output_tokens,
+                getattr(self._client._settings, "creator_model_timeout_seconds", None),
+            )
             with creator_span(
                 f"gen_ai.{request.operation}",
                 attributes={
@@ -64,6 +77,11 @@ class AiClientCreatorModelGateway:
                 )
                 parsed = _parse_json_object(raw)
                 result = output_type.model_validate(parsed)
+                logger.info(
+                    "Creator model request finished operation=%s elapsed_seconds=%.2f",
+                    request.operation,
+                    time.monotonic() - started,
+                )
                 input_tokens = _estimate_tokens(request.user_prompt)
                 output_tokens = _estimate_tokens(raw)
                 set_span_attributes(
@@ -77,6 +95,13 @@ class AiClientCreatorModelGateway:
             raise CreatorModelGatewayError(
                 f"Model returned invalid structured output for {request.operation}"
             ) from exc
+        except Exception:
+            logger.exception(
+                "Creator model request failed operation=%s elapsed_seconds=%.2f",
+                request.operation,
+                time.monotonic() - started,
+            )
+            raise
         return result, input_tokens, output_tokens
 
 

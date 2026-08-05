@@ -172,6 +172,7 @@ async def creator_status(
     principal: _Principal,
     runtime: _Runtime,
 ) -> CreatorApiStatusResponse:
+    diagnostics = getattr(runtime.dispatcher, "diagnostics", lambda: {})()
     return CreatorApiStatusResponse(
         status="READY",
         tenant_id=principal.tenant_id,
@@ -181,6 +182,13 @@ async def creator_status(
         execution_mode=runtime.execution_mode,
         model_provider=runtime.model_provider,
         model_name=runtime.model_name,
+        dispatcher_alive=diagnostics.get("dispatcher_alive"),
+        dispatcher_instance_id=diagnostics.get("dispatcher_instance_id"),
+        dispatcher_last_heartbeat=diagnostics.get("dispatcher_last_heartbeat"),
+        dispatcher_last_claim_at=diagnostics.get("dispatcher_last_claim_at"),
+        dispatcher_last_error=diagnostics.get("dispatcher_last_error"),
+        active_task_count=diagnostics.get("active_task_count"),
+        active_task_stacks=diagnostics.get("active_task_stacks"),
     )
 
 

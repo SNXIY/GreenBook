@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
+import logging
 
 from app.core.config import Settings
 from app.creator.api.dispatcher import (
@@ -34,6 +35,9 @@ from app.creator.domain.models import (
     RuntimeResumeRequest,
     RuntimeStartRequest,
 )
+
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass(frozen=True)
@@ -129,6 +133,14 @@ async def open_creator_api_runtime(
                 )
             else:
                 dispatcher = CreatorOutboxRunDispatcher()
+            logger.info(
+                "Creator API/dispatcher store identity api_store=%s dispatcher_store=%s database=%s pool=%s queue_namespace=%s",
+                database.diagnostics()["store_instance_id"],
+                database.diagnostics()["store_instance_id"],
+                database.diagnostics()["database_absolute_path"] or database.diagnostics()["database_url"],
+                database.diagnostics()["connection_pool_identity"],
+                settings.creator_queue_namespace,
+            )
             query = SqlAlchemyCreatorWorkspaceQuery(
                 database.sessions,
                 default_page_size=settings.creator_api_default_page_size,

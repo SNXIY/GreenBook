@@ -127,6 +127,7 @@ def login() -> str:
 
 def task_snapshot(base_url: str, token: str, task_id: str) -> dict[str, Any]:
     deadline = time.time() + 300
+    last_status = None
     while time.time() < deadline:
         try:
             response = requests.get(
@@ -136,6 +137,24 @@ def task_snapshot(base_url: str, token: str, task_id: str) -> dict[str, Any]:
             )
             response.raise_for_status()
             payload = response.json()
+            if payload.get("status") != last_status:
+                last_status = payload.get("status")
+                dispatcher_response = requests.get(
+                    f"{base_url}/api/v1/creator/status",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=10,
+                )
+                print(json.dumps({
+                    "task_diagnostic": {
+                        "task_id": task_id,
+                        "status": payload.get("status"),
+                        "updated_at": payload.get("updated_at"),
+                        "attempt": (payload.get("run") or {}).get("execution_attempts"),
+                        "artifact_count": len(payload.get("artifacts") or []),
+                        "last_error": payload.get("error_message"),
+                    },
+                    "dispatcher_diagnostic": dispatcher_response.json(),
+                }, ensure_ascii=False), flush=True)
             if payload.get("status") in {"COMPLETED", "FAILED", "CANCELLED"}:
                 return payload
         except requests.ReadTimeout:
@@ -184,68 +203,76 @@ def artifact_from_isolated_db(db_path: Path, task_id: str, artifact_id: str) -> 
 
 
 def creator_probe(base_url: str, token: str, db_path: Path) -> dict[str, Any]:
-    create = submit_creator(
-        base_url,
-        token,
-        {
-            "kind": "CREATE_CONTENT",
-            "goal": "Create a concise practical post about neighborhood resilience.",
-            "constraints": {
-                "interaction_mode": "AUTO",
-                "format": "POST",
-                "target_length": 1200,
-                "tone": "PRACTICAL",
-            },
-            "source_scope": {
-                "include_creator_profile": False,
-                "include_creator_history": False,
-                "include_community_posts": False,
-            },
-        },
-    )
-    if create["snapshot"].get("status") != "COMPLETED":
-        raise RuntimeError(json.dumps(create, ensure_ascii=False))
-    artifacts = create["snapshot"].get("artifacts") or []
-    draft = next(item for item in artifacts if item["kind"] == "DRAFT")
-    # The isolated SQLite is the task store for this harness. Reading the
-    # already-completed artifact locally avoids holding the API event loop on
-    # the large JSON response while the in-process dispatcher is idle.
-    detail = artifact_from_isolated_db(
-        db_path, create["accepted"]["task_id"], draft["artifact_id"]
-    )
-    content = detail.get("content") or {}
-    document = content.get("document") or content
-    improve = submit_creator(
-        base_url,
-        token,
-        {
-            "kind": "IMPROVE_DRAFT",
-            "goal": "Improve the draft with one additional concrete action.",
-            "constraints": {
-                "interaction_mode": "AUTO",
-                "format": "POST",
-                "target_length": 1200,
-                "tone": "PRACTICAL",
-                "draft": {
-                    "title": str(document.get("title") or "Neighborhood resilience"),
-                    "body_markdown": str(
-                        document.get("body_markdown")
-                        or document.get("content_markdown")
-                        or document.get("body")
-                        or ""
-                    ),
+    create_results: list[dict[str, Any]] = []
+    draft_details: list[dict[str, Any]] = []
+    for index in range(3):
+        create = submit_creator(
+            base_url,
+            token,
+            {
+                "kind": "CREATE_CONTENT",
+                "goal": f"Create a concise practical post about neighborhood resilience, case {index + 1}.",
+                "constraints": {
+                    "interaction_mode": "AUTO",
+                    "format": "POST",
+                    "target_length": 1200,
+                    "tone": "PRACTICAL",
+                },
+                "source_scope": {
+                    "include_creator_profile": False,
+                    "include_creator_history": False,
+                    "include_community_posts": False,
                 },
             },
-            "source_scope": {
-                "include_creator_profile": False,
-                "include_creator_history": False,
-                "include_community_posts": False,
+        )
+        create_results.append(create)
+        if create["snapshot"].get("status") != "COMPLETED":
+            raise RuntimeError(json.dumps(create, ensure_ascii=False))
+        draft = next(item for item in create["snapshot"].get("artifacts", []) if item["kind"] == "DRAFT")
+        draft_details.append(artifact_from_isolated_db(
+            db_path, create["accepted"]["task_id"], draft["artifact_id"]
+        ))
+
+    improve_results: list[dict[str, Any]] = []
+    for index, (create, detail) in enumerate(zip(create_results, draft_details, strict=True)):
+        content = detail.get("content") or {}
+        document = content.get("document") or content
+        improve = submit_creator(
+            base_url,
+            token,
+            {
+                "kind": "IMPROVE_DRAFT",
+                "goal": f"Improve the draft with one additional concrete action, case {index + 1}.",
+                "constraints": {
+                    "interaction_mode": "AUTO",
+                    "format": "POST",
+                    "target_length": 1200,
+                    "tone": "PRACTICAL",
+                    "draft": {
+                        "title": str(document.get("title") or "Neighborhood resilience"),
+                        "body_markdown": str(
+                            document.get("body_markdown")
+                            or document.get("content_markdown")
+                            or document.get("body")
+                            or ""
+                        ),
+                    },
+                },
+                "source_scope": {
+                    "include_creator_profile": False,
+                    "include_creator_history": False,
+                    "include_community_posts": False,
+                },
             },
-        },
-    )
-    if improve["snapshot"].get("status") != "COMPLETED":
-        raise RuntimeError(json.dumps(improve, ensure_ascii=False))
-    return {"create": create, "create_draft_detail": detail, "improve": improve}
+        )
+        improve_results.append(improve)
+        if improve["snapshot"].get("status") != "COMPLETED":
+            raise RuntimeError(json.dumps(improve, ensure_ascii=False))
+    return {
+        "create_x3": create_results,
+        "create_draft_details": draft_details,
+        "improve_x3": improve_results,
+    }
 
 
 def assistant_run(base_url: str, token: str, prompt: str) -> dict[str, Any]:
@@ -325,6 +352,13 @@ def main() -> int:
         "CREATOR_IDENTITY_ALLOW_INSECURE_HTTP": "true",
         "REDIS_URL": "redis://:mindflow@127.0.0.1:26379/15",
         "CREATOR_MAX_WRITER_REVISIONS": "4",
+        "CREATOR_MAX_MODEL_CALLS": "24",
+        "CREATOR_MAX_SUPERVISOR_TURNS": "24",
+        "CREATOR_MAX_AGENT_DISPATCHES": "24",
+        "CREATOR_MAX_OUTPUT_TOKENS": "40000",
+        "CREATOR_RUN_LEASE_SECONDS": "120",
+        "CREATOR_MODEL_TIMEOUT_SECONDS": "60",
+        "CREATOR_SPECIALIST_TIMEOUT_SECONDS": "90",
         "CREATOR_BUILD_COMMIT": creator_build,
         "CREATOR_INSTANCE_ID": f"p0-e2e-{uuid.uuid4().hex[:8]}",
         "CREATOR_QUEUE_NAMESPACE": f"creator:p0:{uuid.uuid4().hex[:8]}",

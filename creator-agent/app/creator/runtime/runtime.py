@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -39,7 +40,7 @@ from app.creator.runtime.models import (
 from app.creator.runtime.ports import CreatorArtifactStore
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 @dataclass(frozen=True)
@@ -261,6 +262,11 @@ class LangGraphCreatorRuntime:
             config=config,
             stream_mode="values",
         ):
+            logger.info(
+                "Creator graph chunk received run_id=%s keys=%s",
+                config.get("configurable", {}).get("thread_id"),
+                tuple(chunk) if isinstance(chunk, dict) else type(chunk).__name__,
+            )
             if not isinstance(chunk, dict):
                 continue
             last_raw = dict(chunk)
@@ -271,8 +277,26 @@ class LangGraphCreatorRuntime:
             if on_events is not None:
                 events = _runtime_events(state, previous=cursor)
                 if events:
-                    await on_events(events)
+                    try:
+                        await asyncio.wait_for(on_events(events), timeout=30.0)
+                    except asyncio.TimeoutError:
+                        logger.exception(
+                            "Creator runtime event publication timed out; continuing graph run_id=%s event_count=%s",
+                            config.get("configurable", {}).get("thread_id"),
+                            len(events),
+                        )
                     cursor = _advance_event_cursor(cursor, state)
+            logger.info(
+                "Creator graph chunk processed run_id=%s artifact_count=%s progress_count=%s",
+                config.get("configurable", {}).get("thread_id"),
+                len(state.get("artifacts", {})),
+                len(state.get("progress", ())),
+            )
+        logger.info(
+            "Creator graph stream finished run_id=%s has_state=%s",
+            config.get("configurable", {}).get("thread_id"),
+            bool(last_raw),
+        )
         if not last_raw:
             snapshot = await self._graph.compiled.aget_state(config)
             last_raw = dict(snapshot.values or {})

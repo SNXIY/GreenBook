@@ -412,6 +412,13 @@ class CreatorApiStatusResponse(CreatorApiModel):
     execution_mode: str
     model_provider: str = Field(min_length=1, max_length=64)
     model_name: str = Field(min_length=1, max_length=128)
+    dispatcher_alive: bool | None = None
+    dispatcher_instance_id: str | None = None
+    dispatcher_last_heartbeat: str | None = None
+    dispatcher_last_claim_at: str | None = None
+    dispatcher_last_error: str | None = None
+    active_task_count: int | None = None
+    active_task_stacks: dict[str, str] | None = None
     sse_replay: bool = True
     human_decisions: tuple[CreatorDecisionKind, ...] = (
         CreatorDecisionKind.TOPIC_SELECTION,

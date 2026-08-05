@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -1102,13 +1103,16 @@ class CreatorAgentHarness:
         worker_id: str,
     ) -> RuntimeOutcome:
         try:
-            raw_outcome = await self._runtime.start(
-                request,
-                on_events=lambda events: self._publish_runtime_events(
-                    run_id=run_id,
-                    worker_id=worker_id,
-                    events=events,
+            raw_outcome = await asyncio.wait_for(
+                self._runtime.start(
+                    request,
+                    on_events=lambda events: self._publish_runtime_events(
+                        run_id=run_id,
+                        worker_id=worker_id,
+                        events=events,
+                    ),
                 ),
+                timeout=max(1.0, float(self._policy.run_lease_seconds)),
             )
             try:
                 outcome = RuntimeOutcome.model_validate(raw_outcome)
@@ -1118,6 +1122,24 @@ class CreatorAgentHarness:
                 ) from exc
             self._validate_runtime_outcome(outcome)
             return outcome
+        except asyncio.TimeoutError as exc:
+            logger.error(
+                "Creator runtime timeout task_id=%s run_id=%s timeout_seconds=%s",
+                request.task_id,
+                request.run_id,
+                self._policy.run_lease_seconds,
+            )
+            return RuntimeOutcome(
+                status=RuntimeOutcomeStatus.RETRYABLE_ERROR,
+                error=RuntimeErrorInfo(
+                    code="RUNTIME_TIMEOUT",
+                    message=(
+                        f"Creator runtime exceeded {self._policy.run_lease_seconds}s"
+                    ),
+                    retryable=True,
+                    details={"timeout_seconds": self._policy.run_lease_seconds},
+                ),
+            )
         except CreatorRuntimeRetryableError as exc:
             return RuntimeOutcome(
                 status=RuntimeOutcomeStatus.RETRYABLE_ERROR,
@@ -1162,13 +1184,16 @@ class CreatorAgentHarness:
         worker_id: str,
     ) -> RuntimeOutcome:
         try:
-            raw_outcome = await self._runtime.resume(
-                request,
-                on_events=lambda events: self._publish_runtime_events(
-                    run_id=run_id,
-                    worker_id=worker_id,
-                    events=events,
+            raw_outcome = await asyncio.wait_for(
+                self._runtime.resume(
+                    request,
+                    on_events=lambda events: self._publish_runtime_events(
+                        run_id=run_id,
+                        worker_id=worker_id,
+                        events=events,
+                    ),
                 ),
+                timeout=max(1.0, float(self._policy.run_lease_seconds)),
             )
             try:
                 outcome = RuntimeOutcome.model_validate(raw_outcome)
@@ -1188,6 +1213,24 @@ class CreatorAgentHarness:
                     "Runtime did not confirm the submitted decision"
                 )
             return outcome
+        except asyncio.TimeoutError:
+            logger.error(
+                "Creator runtime resume timeout task_id=%s run_id=%s timeout_seconds=%s",
+                request.task_id,
+                request.run_id,
+                self._policy.run_lease_seconds,
+            )
+            return RuntimeOutcome(
+                status=RuntimeOutcomeStatus.RETRYABLE_ERROR,
+                error=RuntimeErrorInfo(
+                    code="RUNTIME_RESUME_TIMEOUT",
+                    message=(
+                        f"Creator runtime resume exceeded {self._policy.run_lease_seconds}s"
+                    ),
+                    retryable=True,
+                    details={"timeout_seconds": self._policy.run_lease_seconds},
+                ),
+            )
         except CreatorRuntimeRetryableError as exc:
             return RuntimeOutcome(
                 status=RuntimeOutcomeStatus.RETRYABLE_ERROR,

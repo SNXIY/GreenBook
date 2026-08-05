@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from sqlalchemy import event, text
@@ -118,6 +119,18 @@ class CreatorDatabase:
     async def ping(self) -> None:
         async with self.engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
+
+    def diagnostics(self) -> dict[str, str]:
+        url = self.engine.url.render_as_string(hide_password=True)
+        database_path = ""
+        if url.startswith("sqlite"):
+            database_path = str(Path(self.engine.url.database or "").resolve())
+        return {
+            "store_instance_id": f"database:{id(self)}",
+            "database_url": url,
+            "database_absolute_path": database_path,
+            "connection_pool_identity": f"pool:{id(self.engine.pool)}",
+        }
 
     async def dispose(self) -> None:
         await self.engine.dispose()
