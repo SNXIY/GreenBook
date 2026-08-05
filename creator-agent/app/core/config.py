@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     creator_max_output_tokens: int = 40000
     creator_max_replans: int = 4
     creator_max_writer_revisions: int = 4
+    creator_build_commit: str = "8efb91c"
+    creator_instance_id: str = "creator-api"
+    creator_queue_namespace: str = "creator-p0"
     creator_model_analysis_model: str = ""
     creator_model_writer_model: str = ""
     creator_model_critic_model: str = ""

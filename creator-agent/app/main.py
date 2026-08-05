@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -21,11 +22,25 @@ from app.creator.observability import (
 
 
 _TRACE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    logger.info(
+        "Creator API/Worker runtime build_commit=%s instance_id=%s "
+        "worker_instance_id=%s revision_budget=%s provider=%s model=%s "
+        "queue_namespace=%s database_identifier=%s",
+        settings.creator_build_commit,
+        settings.creator_instance_id,
+        settings.creator_api_worker_id,
+        settings.creator_max_writer_revisions,
+        settings.ai_provider,
+        settings.deepseek_model,
+        settings.creator_queue_namespace,
+        settings.creator_database_url.split("@")[-1],
+    )
     configure_creator_telemetry(settings)
     async with open_creator_api_runtime(settings) as creator_api:
         app.state.creator_api = creator_api
