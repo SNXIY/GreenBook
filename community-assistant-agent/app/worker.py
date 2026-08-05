@@ -1151,7 +1151,6 @@ class AgentWorker:
                 turn_intent = None
                 turn_plan = None
                 if intent_delta is None:
-                    conversation_goals = await self._load_goals_for_resolution(run)
                     focus_goal_refs = list(
                         conversation_workspace.focus_goal_refs
                         or (
@@ -1163,12 +1162,29 @@ class AgentWorker:
                     # Phase 3 continuity:
                     # Router(ACTION) → TaskManager(lifecycle) → TargetResolver(Layer A)
                     # → Goal bind → TargetResolver.resolve(Layer B) → Planner
-                    decision, task_turn = self.task_manager.prepare_action(
-                        message=planning_prompt,
-                        decision=decision,
-                        goals=conversation_goals,
-                        focus_goal_refs=focus_goal_refs,
+                    preflight_decision, preflight_task_turn = (
+                        self.task_manager.prepare_action(
+                            message=planning_prompt,
+                            decision=decision,
+                            goals=[],
+                            focus_goal_refs=[],
+                        )
                     )
+                    if preflight_task_turn.action == "CREATE":
+                        # CREATE must not resolve against historical goals.
+                        conversation_goals = []
+                        decision, task_turn = (
+                            preflight_decision,
+                            preflight_task_turn,
+                        )
+                    else:
+                        conversation_goals = await self._load_goals_for_resolution(run)
+                        decision, task_turn = self.task_manager.prepare_action(
+                            message=planning_prompt,
+                            decision=decision,
+                            goals=conversation_goals,
+                            focus_goal_refs=focus_goal_refs,
+                        )
                     if task_turn.action in {"UPDATE", "CANCEL"}:
                         entity_resolution = self.task_manager.resolve_target(
                             message=planning_prompt,
