@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     creator_max_model_calls: int = 24
     creator_max_output_tokens: int = 40000
     creator_max_replans: int = 4
-    creator_max_writer_revisions: int = 2
+    creator_max_writer_revisions: int = 4
     creator_model_analysis_model: str = ""
     creator_model_writer_model: str = ""
     creator_model_critic_model: str = ""
