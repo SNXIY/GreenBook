@@ -1,8 +1,11 @@
-"""Unit tests for shared contracts."""
+"""Unit tests for shared contracts — AuthContext, ToolResult, ErrorCode."""
+
 from __future__ import annotations
 
 import pytest
-from greenbook_contracts import AuthContext, ErrorCode, GreenBookError, ToolResult
+from greenbook_contracts.identity import AuthContext
+from greenbook_contracts.errors import ErrorCode, GreenBookError
+from greenbook_contracts.tool_result import ToolResult
 from greenbook_contracts.events import BusinessEvent
 
 
@@ -72,6 +75,7 @@ class TestErrorCode:
         assert ErrorCode.REQUEST_NOT_SENT in codes
         assert ErrorCode.RESULT_UNKNOWN in codes
         assert ErrorCode.BUSINESS_REJECTED in codes
+        assert ErrorCode.DRAFT_VERSION_CONFLICT in codes
 
 
 class TestGreenBookError:
@@ -84,17 +88,17 @@ class TestGreenBookError:
 
 class TestAuthContext:
     def test_construction(self) -> None:
-        ctx = AuthContext(user_id="u1", tenant_id="t1", role="user", display_name="Alice")
+        ctx = AuthContext(user_id="u1", tenant_id="t1", raw_access_token="tok")
         assert ctx.user_id == "u1"
         assert ctx.tenant_id == "t1"
 
-    def test_default_role(self) -> None:
-        ctx = AuthContext(user_id="u1", tenant_id="t1")
-        assert ctx.role == "user"
+    def test_default_roles(self) -> None:
+        ctx = AuthContext(user_id="u1", tenant_id="t1", raw_access_token="tok")
+        assert ctx.roles == []
 
-    def test_scopes_default(self) -> None:
-        ctx = AuthContext(user_id="u1", tenant_id="t1")
-        assert ctx.scopes == []
+    def test_timezone_default(self) -> None:
+        ctx = AuthContext(user_id="u1", tenant_id="t1", raw_access_token="tok")
+        assert ctx.timezone == "Asia/Shanghai"
 
 
 class TestBusinessEvent:
@@ -108,8 +112,7 @@ class TestNoUserIdInjection:
     """Model must never pass user_id — it always comes from AuthContext."""
 
     def test_auth_context_immutable_from_model(self) -> None:
-        ctx = AuthContext(user_id="secure-user", tenant_id="t1")
-        # Model can't create AuthContext — only auth middleware can
+        ctx = AuthContext(user_id="secure-user", tenant_id="t1", raw_access_token="tok")
         assert ctx.user_id == "secure-user"
 
     def test_tool_result_has_no_user_id_field(self) -> None:

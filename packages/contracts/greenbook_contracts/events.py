@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -11,7 +11,7 @@ class BusinessEvent(BaseModel):
 
     event_type: str
     event_id: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     trace_id: str | None = None
     conversation_id: str | None = None
     user_id: str | None = None

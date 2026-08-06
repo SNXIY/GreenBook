@@ -141,23 +141,61 @@ class JavaClient:
         req_headers = dict(headers or {})
         trace_id = self._trace_id(req_headers)
 
+        is_write = method in ("POST", "PUT", "DELETE", "PATCH")
+
         try:
             resp = await self.http.request(
                 method, path, json=body, params=params, headers=req_headers
             )
-        except httpx.ConnectError as exc:
-            logger.warning("Java connect failed path=%s error=%s", path, _sanitize(str(exc)))
+        except httpx.ConnectError:
+            logger.warning("Java connect failed path=%s", path)
             return ToolResult.dependency_unavailable(
-                f"Java backend unreachable: {exc}", trace_id=trace_id
+                "Java backend unreachable — connection failed. No request was sent.",
+                trace_id=trace_id,
             )
-        except httpx.TimeoutException as exc:
-            logger.warning("Java timeout path=%s method=%s", path, method)
+        except httpx.ConnectTimeout:
+            logger.warning("Java connect timeout path=%s", path)
+            return ToolResult.dependency_unavailable(
+                "Java backend connection timed out. No request was sent.",
+                trace_id=trace_id,
+            )
+        except httpx.ReadTimeout:
+            logger.warning("Java read timeout path=%s method=%s", path, method)
+            if is_write:
+                return ToolResult.result_unknown(
+                    "Write request was sent but Java response timed out. "
+                    "Use the same Idempotency-Key to query or replay.",
+                    trace_id=trace_id,
+                )
             return ToolResult.timeout(
-                f"Java backend request timed out: {exc}"
+                "Java backend read timed out. You may safely retry."
             )
-        except (httpx.RemoteProtocolError, httpx.NetworkError) as exc:
+        except httpx.WriteTimeout:
+            logger.warning("Java write timeout path=%s method=%s", path, method)
+            return ToolResult.request_not_sent(
+                "Request body could not be fully sent. You may safely retry."
+            )
+        except httpx.PoolTimeout:
+            logger.warning("Java pool timeout path=%s", path)
             return ToolResult.dependency_unavailable(
-                f"Java backend network error: {exc}", trace_id=trace_id
+                "Java backend connection pool exhausted. You may safely retry.",
+                trace_id=trace_id,
+            )
+        except httpx.TimeoutException:
+            logger.warning("Java timeout path=%s method=%s", path, method)
+            if is_write:
+                return ToolResult.result_unknown(
+                    "Write request timed out — result is unknown. "
+                    "Use the same Idempotency-Key to query or replay.",
+                    trace_id=trace_id,
+                )
+            return ToolResult.timeout(
+                "Java backend request timed out. You may safely retry."
+            )
+        except (httpx.RemoteProtocolError, httpx.NetworkError):
+            return ToolResult.dependency_unavailable(
+                "Java backend network error. No request was processed.",
+                trace_id=trace_id,
             )
 
         resp_trace_id = resp.headers.get("X-Trace-ID") or trace_id

@@ -1,40 +1,46 @@
-"""Contract tests: JavaClient error mapping.
+"""Contract tests: JavaClient error mapping uses type-specific API methods."""
 
-Verify that all HTTP error codes are properly classified
-and that connection failures return DEPENDENCY_UNAVAILABLE.
-"""
 from __future__ import annotations
 
-import httpx
 import pytest
+import httpx
+from unittest.mock import patch
+
 from greenbook_java_client.client import JavaClient
 
 
 @pytest.fixture
-async def client() -> JavaClient:
-    return JavaClient("http://127.0.0.1:1")  # Non-existent port
+def client():
+    return JavaClient(base_url="http://127.0.0.1:9999")
 
 
-class TestJavaClientErrorMapping:
-    async def test_connection_refused_is_dependency_unavailable(self, client: JavaClient) -> None:
-        result = await client.get("/api/v1/posts/search")
+@pytest.mark.asyncio
+async def test_connection_refused_is_dependency_unavailable(client):
+    """ConnectError → DEPENDENCY_UNAVAILABLE, not RESULT_UNKNOWN."""
+    with patch.object(client.http, "request", side_effect=httpx.ConnectError("refused")):
+        result = await client.search_posts(query="test")
         assert result.ok is False
         assert result.code == "DEPENDENCY_UNAVAILABLE"
         assert result.retryable is True
         assert result.request_sent is False
 
-    async def test_result_never_blindly_says_unknown(self, client: JavaClient) -> None:
-        """All connection failures must be DEPENDENCY_UNAVAILABLE, not RESULT_UNKNOWN."""
-        result = await client.get("/api/v1/health")
+
+@pytest.mark.asyncio
+async def test_result_never_blindly_says_unknown(client):
+    """All connection failures must be DEPENDENCY_UNAVAILABLE, not RESULT_UNKNOWN."""
+    with patch.object(client.http, "request", side_effect=httpx.ConnectError("refused")):
+        result = await client.get_post("123")
         assert result.code != "RESULT_UNKNOWN"
         assert result.code == "DEPENDENCY_UNAVAILABLE"
 
-    async def test_error_messages_are_user_safe(self, client: JavaClient) -> None:
-        """Error messages must not expose raw HTTP errors to users."""
-        result = await client.get("/api/v1/test")
-        assert "All connection attempts failed" not in result.user_message
-        assert "提交结果未知" not in result.user_message
-        assert "禁止盲目重试" not in result.user_message
+
+@pytest.mark.asyncio
+async def test_error_messages_are_user_safe(client):
+    """Error messages must not expose raw HTTP errors to users."""
+    with patch.object(client.http, "request", side_effect=httpx.ConnectError("Connection refused by target machine")):
+        result = await client.search_posts(query="test")
+        assert "Connection refused" not in result.user_message
+        assert result.user_message != ""
 
 
 class TestToolResultUserMessages:
