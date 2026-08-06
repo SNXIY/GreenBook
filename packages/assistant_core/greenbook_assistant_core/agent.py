@@ -48,10 +48,39 @@ def _has_future_time_expression(text: str) -> bool:
     )
 
 
+def _is_schedule_only_retry(text: str) -> bool:
+    """Recognize an explicit recovery request for the failed schedule step.
+
+    A sentence such as “只把刚才帖子的发布时间改为五分钟之后，不要再次修改内容”
+    contains the word “修改”, but explicitly excludes draft revision.  This
+    check runs before the generic revision markers so a partial-success retry
+    cannot repeat the already completed draft side effect.
+    """
+
+    normalized = text.strip().lower()
+    return (
+        (
+            "\u53ea\u628a" in normalized
+            and "\u53d1\u5e03\u65f6\u95f4" in normalized
+        )
+        or "\u53ea\u8c03\u6574\u53d1\u5e03\u65f6\u95f4" in normalized
+    ) and any(
+        marker in normalized
+        for marker in (
+            "\u4e0d\u8981\u518d\u6b21\u4fee\u6539",
+            "\u4e0d\u518d\u4fee\u6539",
+            "\u4e0d\u8981\u4fee\u6539\u5185\u5bb9",
+        )
+    )
+
+
 def _turn_intents(user_message: str) -> tuple[bool, bool, bool, bool, bool]:
     text = user_message.strip().lower()
     asks_create = any(word in text for word in _CREATE_MARKERS)
-    asks_revise = any(word in text for word in ("修改", "改成", "改得", "润色", "重写"))
+    asks_revise = (
+        any(word in text for word in ("修改", "改成", "改得", "润色", "重写"))
+        and not _is_schedule_only_retry(text)
+    )
     asks_schedule = any(word in text for word in _SCHEDULE_MARKERS) or (
         "发布" in text and _has_future_time_expression(text)
     )
@@ -89,6 +118,12 @@ def _turn_routing_hint(
     """
     asks_create, asks_revise, asks_schedule, asks_cancel, asks_search = _turn_intents(user_message)
 
+    if _is_schedule_only_retry(user_message):
+        return (
+            "INTERNAL TURN ROUTING: This is a recovery request for the previously "
+            "failed schedule update. Call publication_update_schedule only. Do not "
+            "revise the draft, call Creator, or create a new schedule."
+        )
     if asks_create and asks_schedule:
         return (
             "INTERNAL TURN ROUTING: This is a create-and-schedule request. "
@@ -130,6 +165,8 @@ def _turn_tool_filter(
     """
     asks_create, asks_revise, asks_schedule, asks_cancel, asks_search = _turn_intents(user_message)
 
+    if _is_schedule_only_retry(user_message):
+        return {"publication_update_schedule"}
     if asks_cancel:
         return {"publication_cancel_schedule"}
     if asks_schedule and asks_revise:
@@ -239,6 +276,7 @@ class CommunityOperationsAssistant:
         tool_rounds = 0
         final_content = ""
         failed_tool_calls: set[str] = set()
+        failed_tool_results: dict[str, dict[str, Any]] = {}
 
         while tool_rounds < self.max_tool_rounds:
             resp = await self.llm.chat.completions.create(
@@ -300,6 +338,13 @@ class CommunityOperationsAssistant:
                     call_key = json.dumps(
                         [tool_name, tool_args], ensure_ascii=False, sort_keys=True, default=str
                     )
+                    previous_failure = failed_tool_results.get(call_key)
+                    repeat_pre_execution_failure = (
+                        isinstance(previous_failure, dict)
+                        and isinstance(previous_failure.get("state"), dict)
+                        and previous_failure["state"].get("phase")
+                        == "PRE_EXECUTION_VALIDATION_FAILED"
+                    )
                     if call_key in failed_tool_calls:
                         result = {
                             "ok": False,
@@ -324,8 +369,18 @@ class CommunityOperationsAssistant:
                                 "request_sent": False,
                                 "trace_id": tid,
                             }
+                    if repeat_pre_execution_failure:
+                        result = {
+                            **(previous_failure or {}),
+                            "user_message": (
+                                "工具参数校验失败，本次尚未执行任何修改，可以安全重试。"
+                            ),
+                            "retryable": True,
+                            "request_sent": False,
+                        }
                     if not result.get("ok"):
                         failed_tool_calls.add(call_key)
+                        failed_tool_results[call_key] = result
                         # A failed first action must not allow the model to
                         # continue into the next side-effect action.
                         turn_tools = []

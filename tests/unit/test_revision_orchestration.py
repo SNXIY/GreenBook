@@ -150,6 +150,29 @@ def test_update_time_uses_message_received_at_and_utc_java_value() -> None:
     assert "timezone_name" not in normalized
 
 
+def test_legacy_publish_at_is_normalized_before_relative_time_is_applied() -> None:
+    received_at = datetime(
+        2026,
+        8,
+        6,
+        23,
+        23,
+        tzinfo=timezone(timedelta(hours=8)),
+    )
+    normalized = _normalize_update_schedule_tool_args(
+        {"schedule_id": "schedule-1", "publish_at": "stale"},
+        user_message=(
+            "\u53ea\u628a\u521a\u624d\u5e16\u5b50\u7684\u53d1\u5e03\u65f6\u95f4"
+            "\u6539\u4e3a\u4e94\u5206\u949f\u4e4b\u540e\uff0c\u4e0d\u8981\u518d\u6b21\u4fee\u6539\u5185\u5bb9"
+        ),
+        timezone_name="Asia/Shanghai",
+        now=received_at,
+    )
+
+    assert normalized["run_at"] == "2026-08-06T15:28:00Z"
+    assert "publish_at" not in normalized
+
+
 def test_revision_success_then_schedule_failure_is_partial_failure() -> None:
     revise_call = SimpleNamespace(
         id="revise-call",
@@ -250,3 +273,79 @@ def test_revision_success_then_schedule_failure_is_partial_failure() -> None:
     assert mcp.calls == ["content.revise_draft", "publication.update_schedule"]
     run = client.get(f"/api/v1/assistant/runs/{detail['run_id']}", headers=headers)
     assert run.json()["status"] == "PARTIAL_FAILURE"
+
+
+@pytest.mark.asyncio
+async def test_partial_success_recovery_exposes_only_schedule_update() -> None:
+    update_call = SimpleNamespace(
+        id="recovery-update-call",
+        function=SimpleNamespace(
+            name="publication_update_schedule",
+            arguments=(
+                '{"schedule_id":"schedule-1",'
+                '"publish_at":"2026-08-06T15:28:00Z"}'
+            ),
+        ),
+    )
+    responses = [
+        SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(
+                content=None,
+                reasoning_content="schedule recovery",
+                tool_calls=[update_call],
+            ))],
+        ),
+        SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(
+                content="宸插彧鏇存柊瀹氭椂浠诲姟",
+                reasoning_content=None,
+                tool_calls=None,
+            ))],
+        ),
+    ]
+    create = AsyncMock(side_effect=responses)
+    llm = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    agent = CommunityOperationsAssistant(
+        llm=llm,
+        model="thinking-test-model",
+        tools_schema=[
+            {"type": "function", "function": {"name": "content_revise_draft"}},
+            {"type": "function", "function": {"name": "publication_update_schedule"}},
+        ],
+    )
+    calls: list[str] = []
+
+    async def tool_handler(
+        name: str,
+        args: dict[str, object],
+        session: SessionContext,
+        run_id: str,
+        tool_call_id: str,
+    ) -> dict[str, object]:
+        calls.append(name)
+        assert name == "publication_update_schedule"
+        assert args["schedule_id"] == "schedule-1"
+        return ToolResult.success(
+            {
+                "draft_id": "draft-1",
+                "schedule_id": "schedule-1",
+                "run_at": "2026-08-06T15:28:00Z",
+                "timezone": "Asia/Shanghai",
+                "status": "SCHEDULED",
+                "version": 5,
+            }
+        ).model_dump(mode="json")
+
+    result = await agent.run(
+        user_message="只把刚才帖子的发布时间改为五分钟之后，不要再次修改内容",
+        session=_session(),
+        tool_handler=tool_handler,
+        run_id="recovery-run",
+    )
+
+    assert calls == ["publication_update_schedule"]
+    assert [
+        item["function"]["name"]
+        for item in create.call_args_list[0].kwargs["tools"]
+    ] == ["publication_update_schedule"]
+    assert result["content"] == "宸插彧鏇存柊瀹氭椂浠诲姟"

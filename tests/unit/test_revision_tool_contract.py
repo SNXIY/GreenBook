@@ -15,6 +15,7 @@ from greenbook_mcp_server.server import GreenBookMCPServer
 from greenbook_mcp_server.tool_registry import validate_registered_tool_contracts
 from greenbook_mcp_server.tool_schemas import (
     ReviseDraftArguments,
+    UpdateScheduleArguments,
     openai_parameters,
 )
 from greenbook_mcp_server.tools.content import revise_draft
@@ -92,6 +93,113 @@ async def test_missing_revision_target_is_rejected_before_handler() -> None:
     assert result["code"] == "TOOL_ARGUMENT_VALIDATION_FAILED"
     assert result["request_sent"] is False
     assert result["state"]["safe_to_retry"] is True
+
+
+def test_update_schedule_schema_has_one_public_time_field() -> None:
+    validate_registered_tool_contracts()
+    schema = openai_parameters(UpdateScheduleArguments)
+
+    assert set(schema["properties"]) == {"schedule_id", "run_at"}
+    assert schema["required"] == ["schedule_id", "run_at"]
+    assert schema["additionalProperties"] is False
+    assert "publish_at" not in schema["properties"]
+    assert "scheduled_at" not in schema["properties"]
+
+
+def test_update_schedule_accepts_legacy_publish_at_as_canonical_run_at() -> None:
+    arguments = UpdateScheduleArguments.model_validate(
+        {"schedule_id": "schedule-1", "publish_at": "2026-08-06T15:28:00Z"}
+    )
+
+    assert arguments.model_dump() == {
+        "schedule_id": "schedule-1",
+        "run_at": "2026-08-06T15:28:00Z",
+    }
+
+
+def test_update_schedule_rejects_conflicting_time_aliases() -> None:
+    with pytest.raises(ValueError, match="run_at and publish_at conflict"):
+        UpdateScheduleArguments.model_validate(
+            {
+                "schedule_id": "schedule-1",
+                "run_at": "2026-08-06T15:28:00Z",
+                "publish_at": "2026-08-06T15:29:00Z",
+            }
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_schedule_legacy_alias_reaches_handler_as_run_at_only() -> None:
+    current = ScheduledPublicationResponse.model_validate(
+        {
+            "scheduleId": "schedule-1",
+            "draftId": "draft-1",
+            "runAt": "2026-08-06T14:48:00Z",
+            "timezone": "Asia/Shanghai",
+            "status": "SCHEDULED",
+            "version": 4,
+        }
+    )
+    updated = ScheduledPublicationResponse.model_validate(
+        {
+            "scheduleId": "schedule-1",
+            "draftId": "draft-1",
+            "runAt": "2026-08-06T15:28:00Z",
+            "timezone": "Asia/Shanghai",
+            "status": "SCHEDULED",
+            "version": 5,
+        }
+    )
+    java = SimpleNamespace(
+        get_schedule=AsyncMock(
+            side_effect=[ToolResult.success(current), ToolResult.success(updated)]
+        ),
+        update_schedule=AsyncMock(return_value=ToolResult.success(updated)),
+    )
+    server = GreenBookMCPServer(java=java, creator=object())
+
+    result = await server.execute_tool(
+        "publication.update_schedule",
+        auth=_auth(),
+        session=_session(),
+        schedule_id="schedule-1",
+        publish_at="2026-08-06T15:28:00Z",
+    )
+
+    assert result["ok"] is True
+    request = java.update_schedule.await_args.args[1]
+    assert request.run_at == "2026-08-06T15:28:00Z"
+    assert "publish_at" not in request.model_dump()
+
+
+@pytest.mark.asyncio
+async def test_update_schedule_conflict_is_pre_execution_and_java_is_not_called() -> None:
+    java = SimpleNamespace(
+        get_schedule=AsyncMock(),
+        update_schedule=AsyncMock(),
+    )
+    server = GreenBookMCPServer(java=java, creator=object())
+
+    result = await server.execute_tool(
+        "publication.update_schedule",
+        auth=_auth(),
+        session=_session(),
+        schedule_id="schedule-1",
+        run_at="2026-08-06T15:28:00Z",
+        publish_at="2026-08-06T15:29:00Z",
+    )
+
+    assert result["ok"] is False
+    assert result["code"] == "INVALID_TOOL_ARGUMENT"
+    assert result["request_sent"] is False
+    assert result["state"] == {
+        "phase": "PRE_EXECUTION_VALIDATION_FAILED",
+        "downstream_called": False,
+        "side_effect_started": False,
+        "safe_to_retry": True,
+    }
+    java.get_schedule.assert_not_called()
+    java.update_schedule.assert_not_called()
 
 
 @pytest.mark.asyncio

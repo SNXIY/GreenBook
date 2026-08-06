@@ -69,9 +69,16 @@ class GreenBookMCPServer:
                 arguments = definition_model.model_validate(kwargs)
             except ValidationError as exc:
                 error_types = {str(item.get("type", "")) for item in exc.errors()}
+                error_messages = {
+                    str(item.get("msg", "")) for item in exc.errors()
+                }
+                time_alias_conflict = any(
+                    "run_at and publish_at conflict" in message
+                    for message in error_messages
+                )
                 code = (
                     "INVALID_TOOL_ARGUMENT"
-                    if "extra_forbidden" in error_types
+                    if "extra_forbidden" in error_types or time_alias_conflict
                     else "TOOL_ARGUMENT_VALIDATION_FAILED"
                 )
                 logger.warning(
@@ -83,13 +90,16 @@ class GreenBookMCPServer:
                         for item in exc.errors()
                     ),
                 )
+                user_message = (
+                    "时间参数冲突：run_at 与 publish_at 的值不一致，本次尚未修改定时任务，可以安全重试。"
+                    if time_alias_conflict
+                    else "工具参数校验失败，本次尚未执行任何修改，请重试。"
+                )
                 return {
                     "ok": False,
                     "code": code,
                     "message": "Tool arguments failed schema validation",
-                    "user_message": (
-                        "工具参数不匹配，本次尚未执行任何修改，请重试。"
-                    ),
+                    "user_message": user_message,
                     "retryable": True,
                     "request_sent": False,
                     "state": {

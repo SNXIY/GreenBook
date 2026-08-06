@@ -174,6 +174,12 @@ def _normalize_update_schedule_tool_args(
 ) -> dict[str, Any]:
     """Own relative update times deterministically at message receipt time."""
     normalized = dict(tool_args)
+    # ``publish_at`` was emitted by an older planner.  Convert that one
+    # compatibility alias before applying the deterministic relative-time
+    # value.  If both names are present, retain both so the MCP Pydantic
+    # boundary can reject a conflicting pair instead of guessing.
+    if "publish_at" in normalized and "run_at" not in normalized:
+        normalized["run_at"] = normalized.pop("publish_at")
     parsed_run_at = parse_natural_schedule_time(
         user_message,
         timezone_name,
@@ -853,9 +859,18 @@ async def send_message(
         )
         failure_message = str(tool_failure["message"])
         if partial_failure:
-            failure_message = (
-                "\u8349\u7a3f\u5185\u5bb9\u5df2\u4fee\u6539\uff0c\u4f46\u53d1\u5e03\u65f6\u95f4\u8c03\u6574\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u5b9a\u65f6\u4efb\u52a1\u72b6\u6001\u3002"
-            )
+            if tool_failure["code"] in {
+                "INVALID_TOOL_ARGUMENT",
+                "TOOL_ARGUMENT_VALIDATION_FAILED",
+                "PRE_EXECUTION_VALIDATION_FAILED",
+            }:
+                failure_message = (
+                    "\u8349\u7a3f\u5185\u5bb9\u5df2\u4fee\u6539\uff0c\u4f46\u53d1\u5e03\u65f6\u95f4\u53c2\u6570\u6821\u9a8c\u5931\u8d25\uff1b\u5b9a\u65f6\u4efb\u52a1\u5c1a\u672a\u4fee\u6539\uff0c\u53ef\u4ee5\u5b89\u5168\u91cd\u8bd5\u3002"
+                )
+            else:
+                failure_message = (
+                    "\u8349\u7a3f\u5185\u5bb9\u5df2\u4fee\u6539\uff0c\u4f46\u53d1\u5e03\u65f6\u95f4\u8c03\u6574\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u5b9a\u65f6\u4efb\u52a1\u72b6\u6001\u3002"
+                )
         raw_state = tool_failure.get("state")
         original_state: dict[str, Any] = (
             raw_state if isinstance(raw_state, dict) else {}
