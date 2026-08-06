@@ -1,0 +1,17 @@
+[project]
+name = "greenbook-java-client"
+version = "0.1.0"
+description = "GreenBook async HTTPX client for Java backend with retry, idempotency, and error mapping"
+requires-python = ">=3.12"
+dependencies = [
+    "greenbook-contracts",
+    "httpx>=0.28",
+    "tenacity>=9.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["greenbook_java_client"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

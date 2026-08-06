@@ -1,0 +1,823 @@
+openapi: 3.1.0
+info:
+  title: GreenBook Community API - Agent Facade
+  version: 1.0.0
+  description: |
+    GreenBook 社区后端 Agent Facade 稳定 API。
+    所有接口使用 RS256 JWT Bearer Token 鉴权。
+
+    ## 鉴权
+    - JWKS 公钥端点: `/.well-known/jwks.json` (无需认证)
+    - Token 必须包含 audience: `community-assistant-agent`
+    - token_type 必须为 `access`
+    - Python 配置: `GREENBOOK_JAVA_BASE_URL=http://127.0.0.1:8080`
+  contact:
+    name: GreenBook Team
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Agent Facade
+    description: Python Agent 稳定业务语义 API
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 JWT Access Token
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: 幂等键，用于写操作的幂等保证
+      required: false
+      schema:
+        type: string
+        example: "uuid-or-unique-key"
+    TraceId:
+      name: X-Trace-ID
+      in: header
+      description: 分布式追踪ID
+      required: false
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._:\-/]{1,128}$'
+    ConversationId:
+      name: X-Conversation-Id
+      in: header
+      description: 对话ID
+      required: false
+      schema:
+        type: string
+    AgentRunId:
+      name: X-Agent-Run-Id
+      in: header
+      description: Agent运行ID
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    # ── Search ────────────────────────────────────────────
+    SearchPostItem:
+      type: object
+      description: 搜索帖子项
+      properties:
+        postId:
+          type: string
+          example: "340415383330754560"
+        authorId:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        likeCount:
+          type: integer
+          format: int64
+        commentCount:
+          type: integer
+          format: int64
+        favoriteCount:
+          type: integer
+          format: int64
+        publishedAt:
+          type: string
+          format: date-time
+        hotScore:
+          type: number
+          format: double
+
+    SearchPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchPostItem'
+        page:
+          type: integer
+        size:
+          type: integer
+        total:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+        hasMore:
+          type: boolean
+        sort:
+          type: string
+          enum: [hot, latest, relevant]
+
+    # ── Post Context ──────────────────────────────────────
+    AgentPostContext:
+      type: object
+      properties:
+        postId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        body:
+          type: string
+          description: 正文内容 (Markdown)
+        tags:
+          type: array
+          items:
+            type: string
+        authorId:
+          type: string
+        authorNickname:
+          type: string
+        publishTime:
+          type: string
+          format: date-time
+        contentOrigin:
+          type: string
+          enum: [MANUAL, AI_ASSISTED]
+
+    # ── My Posts ──────────────────────────────────────────
+    AgentOwnPostSummary:
+      type: object
+      properties:
+        postId:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        status:
+          type: string
+        visible:
+          type: string
+        contentOrigin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+
+    # ── Draft ─────────────────────────────────────────────
+    AgentDraftCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 256
+        content:
+          type: string
+          description: 正文 Markdown
+        summary:
+          type: string
+          maxLength: 200
+        visibility:
+          type: string
+          enum: [public, followers, school, private, unlisted]
+
+    AgentDraftUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+        expectedVersion:
+          type: string
+          format: date-time
+          description: 期望的草稿更新时间（ISO-8601），用于乐观锁冲突检测。不传则跳过版本检查
+
+    DraftResponse:
+      type: object
+      properties:
+        draftId:
+          type: string
+        ownerId:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        summary:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+        contentOrigin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── Scheduled Publication ─────────────────────────────
+    ScheduleCreateRequest:
+      type: object
+      required: [draftId, runAt]
+      properties:
+        draftId:
+          type: string
+        runAt:
+          type: string
+          format: date-time
+          description: ISO-8601
+        timezone:
+          type: string
+          default: Asia/Shanghai
+
+    ScheduleUpdateRequest:
+      type: object
+      required: [runAt, version]
+      properties:
+        runAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          description: 当前版本号（乐观锁）
+
+    ScheduledPublicationResponse:
+      type: object
+      properties:
+        scheduleId:
+          type: string
+        draftId:
+          type: string
+        runAt:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+        status:
+          type: string
+          enum: [SCHEDULED, PROCESSING, PUBLISHED, CANCELLED, FAILED]
+        version:
+          type: integer
+        publishedPostId:
+          type: string
+        failureCode:
+          type: string
+        failureMessage:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── Publish ───────────────────────────────────────────
+    PublishNowRequest:
+      type: object
+      required: [draftId]
+      properties:
+        draftId:
+          type: string
+
+    PublishResponse:
+      type: object
+      properties:
+        postId:
+          type: string
+        status:
+          type: string
+        alreadyPublished:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+
+    # ── Comment ───────────────────────────────────────────
+    AgentCommentPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentCommentResponse'
+        nextCursor:
+          type: string
+          nullable: true
+        hasMore:
+          type: boolean
+
+    AgentCommentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        postId:
+          type: string
+        parentId:
+          type: string
+          nullable: true
+        rootId:
+          type: string
+          nullable: true
+        userId:
+          type: string
+        authorNickname:
+          type: string
+        authorAvatar:
+          type: string
+        content:
+          type: string
+        isTop:
+          type: boolean
+        replyCount:
+          type: integer
+        likeCount:
+          type: integer
+          format: int64
+        assistant:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    AgentCommentReplyRequest:
+      type: object
+      required: [postId, parentCommentId, content]
+      properties:
+        postId:
+          type: string
+        parentCommentId:
+          type: string
+        content:
+          type: string
+
+    # ── Analytics ─────────────────────────────────────────
+    PostAnalyticsResponse:
+      type: object
+      properties:
+        postId:
+          type: string
+        likeCount:
+          type: integer
+          format: int64
+        commentCount:
+          type: integer
+          format: int64
+        favoriteCount:
+          type: integer
+          format: int64
+        shareCount:
+          type: integer
+          format: int64
+        viewCount:
+          type: integer
+          format: int64
+
+    UserAnalyticsSummaryResponse:
+      type: object
+      properties:
+        totalPublished:
+          type: integer
+          format: int64
+        totalLikesReceived:
+          type: integer
+          format: int64
+        totalComments:
+          type: integer
+          format: int64
+        totalFavorites:
+          type: integer
+          format: int64
+        followerCount:
+          type: integer
+          format: int64
+        followingCount:
+          type: integer
+          format: int64
+
+    # ── Error ─────────────────────────────────────────────
+    AgentErrorResponse:
+      type: object
+      description: 结构化错误响应
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - AUTHENTICATION_REQUIRED
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - CONFLICT
+            - DRAFT_VERSION_CONFLICT
+            - IDEMPOTENCY_CONFLICT
+            - BUSINESS_REJECTED
+            - DEPENDENCY_UNAVAILABLE
+            - RESULT_UNKNOWN
+            - INTERNAL_ERROR
+        message:
+          type: string
+        userMessage:
+          type: string
+        retryable:
+          type: boolean
+        requestCommitted:
+          type: boolean
+        traceId:
+          type: string
+
+paths:
+  # ── Public Search ─────────────────────────────────────
+  /api/v1/agent/posts/search:
+    get:
+      tags: [Agent Facade]
+      summary: 公共搜索帖子
+      operationId: searchPosts
+      parameters:
+        - name: query
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [hot, latest, relevant]
+            default: latest
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 搜索成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchPageResponse'
+
+  # ── Get Post ──────────────────────────────────────────
+  /api/v1/agent/posts/{postId}:
+    get:
+      tags: [Agent Facade]
+      summary: 获取帖子详情
+      operationId: getPost
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 帖子详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPostContext'
+
+  # ── My Posts ──────────────────────────────────────────
+  /api/v1/agent/me/posts:
+    get:
+      tags: [Agent Facade]
+      summary: 查询自己的帖子
+      operationId: getMyPosts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 自己的帖子列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentOwnPostSummary'
+
+  # ── Drafts ──────────────────────────────────────────────────
+  /api/v1/agent/drafts:
+    post:
+      tags: [Agent Facade]
+      summary: 创建草稿
+      operationId: createDraft
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentDraftCreateRequest'
+      responses:
+        '201':
+          description: 草稿创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftResponse'
+
+  /api/v1/agent/drafts/{draftId}:
+    get:
+      tags: [Agent Facade]
+      summary: 获取草稿
+      operationId: getDraft
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 草稿详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftResponse'
+
+  /api/v1/agent/me/drafts:
+    get:
+      tags: [Agent Facade]
+      summary: 查询自己的草稿列表
+      operationId: getMyDrafts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 草稿列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DraftResponse'
+
+  /api/v1/agent/drafts/{draftId}/update:
+    put:
+      tags: [Agent Facade]
+      summary: 修改草稿
+      operationId: updateDraft
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentDraftUpdateRequest'
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftResponse'
+
+  # ── Publications ────────────────────────────────────────────
+  /api/v1/agent/publications/schedules:
+    post:
+      tags: [Agent Facade]
+      summary: 创建定时发布任务
+      operationId: createSchedule
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCreateRequest'
+      responses:
+        '201':
+          description: 定时任务创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledPublicationResponse'
+
+  /api/v1/agent/publications/schedules/{scheduleId}:
+    get:
+      tags: [Agent Facade]
+      summary: 获取定时任务
+      operationId: getSchedule
+      parameters:
+        - name: scheduleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 定时任务详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledPublicationResponse'
+    put:
+      tags: [Agent Facade]
+      summary: 修改定时发布时间
+      operationId: updateSchedule
+      parameters:
+        - name: scheduleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleUpdateRequest'
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduledPublicationResponse'
+    delete:
+      tags: [Agent Facade]
+      summary: 取消定时任务
+      operationId: cancelSchedule
+      parameters:
+        - name: scheduleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: 取消成功
+
+  /api/v1/agent/publications/publish-now:
+    post:
+      tags: [Agent Facade]
+      summary: 立即发布
+      operationId: publishNow
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishNowRequest'
+      responses:
+        '200':
+          description: 发布完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishResponse'
+
+  # ── Comments ────────────────────────────────────────────────
+  /api/v1/agent/posts/{postId}/comments:
+    get:
+      tags: [Agent Facade]
+      summary: 查询帖子评论
+      operationId: getPostComments
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 评论列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCommentPageResponse'
+
+  /api/v1/agent/comments/{commentId}/replies:
+    post:
+      tags: [Agent Facade]
+      summary: 回复评论
+      operationId: replyToComment
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCommentReplyRequest'
+      responses:
+        '201':
+          description: 回复成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCommentResponse'
+
+  # ── Analytics ───────────────────────────────────────────────
+  /api/v1/agent/posts/{postId}/analytics:
+    get:
+      tags: [Agent Facade]
+      summary: 获取帖子分析数据
+      operationId: getPostAnalytics
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 分析数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostAnalyticsResponse'
+
+  /api/v1/agent/me/analytics/summary:
+    get:
+      tags: [Agent Facade]
+      summary: 获取个人分析摘要
+      operationId: getMyAnalyticsSummary
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 个人分析摘要
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAnalyticsSummaryResponse'

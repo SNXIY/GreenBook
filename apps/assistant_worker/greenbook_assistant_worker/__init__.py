@@ -1,0 +1,1 @@
+"""GreenBook Assistant async worker."""

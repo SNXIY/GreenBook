@@ -1,0 +1,15 @@
+[project]
+name = "greenbook-contracts"
+version = "0.1.0"
+description = "GreenBook shared contracts, errors, events, and identity models"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.10",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["greenbook_contracts"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

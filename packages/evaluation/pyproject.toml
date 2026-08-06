@@ -1,0 +1,21 @@
+[project]
+name = "greenbook-evaluation"
+version = "0.1.0"
+description = "GreenBook E2E and contract test harness"
+requires-python = ">=3.12"
+dependencies = [
+    "greenbook-contracts",
+    "greenbook-assistant-core",
+    "greenbook-mcp-server",
+    "greenbook-java-client",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "httpx>=0.28",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["greenbook_evaluation"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,16 @@
+[project]
+name = "greenbook-creator-client"
+version = "0.1.0"
+description = "GreenBook async client for Creator Agent Task API"
+requires-python = ">=3.12"
+dependencies = [
+    "greenbook-contracts",
+    "httpx>=0.28",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["greenbook_creator_client"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

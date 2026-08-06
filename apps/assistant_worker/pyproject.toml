@@ -1,0 +1,17 @@
+[project]
+name = "greenbook-assistant-worker"
+version = "0.1.0"
+description = "GreenBook Assistant async worker — Kafka consumers and scheduled jobs"
+requires-python = ">=3.12"
+dependencies = [
+    "greenbook-contracts",
+    "greenbook-java-client",
+    "aiokafka>=0.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["greenbook_assistant_worker"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

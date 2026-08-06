@@ -1,0 +1,58 @@
+name: greenbook-agent-platform
+
+# Development infrastructure for Python agent monorepo.
+# Java backend (zhiguang-be), frontend (zhiguang-fe), and moderation-agent
+# are in separate repos. Run them independently.
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  postgres:
+    <<: *restart
+    container_name: greenbook-postgres
+    image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:${GREENBOOK_POSTGRES_HOST_PORT:-25432}:5432"
+    environment:
+      POSTGRES_DB: ${CREATOR_POSTGRES_DB:-mindflow_creator}
+      POSTGRES_USER: ${GREENBOOK_POSTGRES_USER:-mindflow}
+      POSTGRES_PASSWORD: ${GREENBOOK_POSTGRES_PASSWORD:-mindflow}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/01-create-databases.sql:/docker-entrypoint-initdb.d/01-create-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    <<: *restart
+    container_name: greenbook-redis
+    image: redis:8.0-alpine
+    ports:
+      - "127.0.0.1:${GREENBOOK_REDIS_HOST_PORT:-26379}:6379"
+    command: ["redis-server", "--requirepass", "${GREENBOOK_REDIS_PASSWORD:-mindflow}", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${GREENBOOK_REDIS_PASSWORD:-mindflow}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  qdrant:
+    <<: *restart
+    container_name: greenbook-qdrant
+    image: qdrant/qdrant:v1.18.2
+    ports:
+      - "127.0.0.1:${QDRANT_HTTP_HOST_PORT:-26333}:6333"
+      - "127.0.0.1:${QDRANT_GRPC_HOST_PORT:-26334}:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+volumes:
+  postgres-data:
+  redis-data:
+  qdrant-data:

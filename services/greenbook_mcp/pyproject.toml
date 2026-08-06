@@ -1,0 +1,20 @@
+[project]
+name = "greenbook-mcp-server"
+version = "0.1.0"
+description = "GreenBook MCP Server — business capability tools via Streamable HTTP"
+requires-python = ">=3.12"
+dependencies = [
+    "greenbook-contracts",
+    "greenbook-security",
+    "greenbook-java-client",
+    "mcp>=1.10",
+    "pydantic>=2.10",
+    "httpx>=0.28",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["greenbook_mcp_server"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

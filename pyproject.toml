@@ -1,0 +1,70 @@
+[project]
+name = "greenbook-agent-platform"
+version = "2.0.0"
+description = "GreenBook Python Agent Monorepo — Community Operations Assistant V2"
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.uv.workspace]
+members = [
+    "packages/assistant_core",
+    "packages/contracts",
+    "packages/java_client",
+    "packages/creator_client",
+    "packages/security",
+    "packages/observability",
+    "packages/persistence",
+    "packages/evaluation",
+    "services/greenbook_mcp",
+    "services/creator_agent",
+    "apps/assistant_api",
+    "apps/assistant_worker",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "httpx>=0.28",
+    "ruff>=0.11",
+    "mypy>=1.13",
+    "pyjwt>=2.9",
+    "cryptography>=43",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "fastapi>=0.115",
+    "openai>=1.58",
+    "sse-starlette>=2.1",
+    "tenacity>=9.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = [
+    ".",
+    "packages/assistant_core",
+    "packages/contracts",
+    "packages/java_client",
+    "packages/creator_client",
+    "packages/security",
+    "packages/observability",
+    "packages/persistence",
+    "packages/evaluation",
+    "services/greenbook_mcp",
+    "services/creator_agent",
+    "apps/assistant_api",
+    "apps/assistant_worker",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
