@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from greenbook_assistant_core.agent import CommunityOperationsAssistant
-from greenbook_assistant_core.context import SessionContext, PendingApproval
+from greenbook_assistant_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
-from greenbook_security.approval import Approval
 from greenbook_security.policy import requires_approval
 from pydantic import BaseModel, Field
 
@@ -22,18 +20,49 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/assistant")
 
+# ── How session data is stored ───────────────────────────────────────
+#
+# request.app.state.conversation_store[conv_id] = {
+#     "conversation_id": str,
+#     "user_id": str,          # frozen — from AuthContext at create time
+#     "tenant_id": str,        # frozen — from AuthContext at create time
+#     "title": str | None,
+#     "created_at": str,       # ISO-8601 UTC
+#     "updated_at": str,       # ISO-8601 UTC — bumped on every message
+#     "active_draft_id": str | None,
+#     "active_schedule_id": str | None,
+#     "active_post_id": str | None,
+#     "recent_entities": [...],
+#     "recent_tool_calls": [...],
+#     "pending_approval": ... | None,
+#     "last_successful_run_id": str | None,
+# }
+#
+# run_store maps run_id → { run_id, conversation_id, user_id, tenant_id, ... }
+# approval_store maps approval_id → { approval_id, user_id, conversation_id, ... }
+
 
 # ── Request / Response models ────────────────────────────────────
 
 class ConversationCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
-    context_post_id: str | None = Field(default=None, max_length=64)
 
 
-class ConversationResponse(BaseModel):
+class ConversationSummary(BaseModel):
+    """Public-safe conversation list item.  Never exposes tokens, secrets, or internals."""
     conversation_id: str
     title: str | None = None
+    active_draft_id: str | None = None
+    active_schedule_id: str | None = None
     created_at: str
+    updated_at: str
+
+
+class ConversationListResponse(BaseModel):
+    items: list[ConversationSummary]
+    page: int = 1
+    size: int = 20
+    total: int = 0
 
 
 class MessageCreateRequest(BaseModel):
@@ -63,25 +92,88 @@ def _get_auth(request: Request) -> AuthContext:
     return auth
 
 
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _conversation_belongs_to(auth: AuthContext, conversation_data: dict[str, Any]) -> bool:
+    return (
+        str(conversation_data.get("user_id", "")) == auth.user_id
+        and str(conversation_data.get("tenant_id", "")) == auth.tenant_id
+    )
+
+
 def _get_session(request: Request, conversation_id: str) -> SessionContext:
+    """Get or create a SessionContext, verifying ownership on existing sessions."""
+    auth = _get_auth(request)
     store = request.app.state.conversation_store
+
     if conversation_id in store:
         data = store[conversation_id]
+        if not _conversation_belongs_to(auth, data):
+            raise HTTPException(status_code=404, detail="Conversation not found")
         return SessionContext(**data)
-    auth = _get_auth(request)
+
+    # New conversation
+    now = _now_iso()
     session = SessionContext(
         conversation_id=conversation_id,
         user_id=auth.user_id,
         tenant_id=auth.tenant_id,
         timezone=auth.timezone,
     )
-    store[conversation_id] = session.model_dump(mode="json")
+    store[conversation_id] = {
+        **session.model_dump(mode="json"),
+        "title": None,
+        "created_at": now,
+        "updated_at": now,
+    }
     return session
 
 
 def _save_session(request: Request, session: SessionContext) -> None:
     store = request.app.state.conversation_store
-    store[session.conversation_id] = session.model_dump(mode="json")
+    existing = store.get(session.conversation_id, {})
+    store[session.conversation_id] = {
+        **session.model_dump(mode="json"),
+        "title": existing.get("title"),
+        "created_at": existing.get("created_at", _now_iso()),
+        "updated_at": _now_iso(),
+    }
+
+
+def _conversation_summary(data: dict[str, Any]) -> ConversationSummary:
+    return ConversationSummary(
+        conversation_id=str(data.get("conversation_id", "")),
+        title=data.get("title"),
+        active_draft_id=data.get("active_draft_id"),
+        active_schedule_id=data.get("active_schedule_id"),
+        created_at=str(data.get("created_at", "")),
+        updated_at=str(data.get("updated_at", "")),
+    )
+
+
+def _auth_store_put(store_key: str, request: Request, record_id: str, record: dict[str, Any]) -> None:
+    """Store a record with ownership fields from AuthContext."""
+    auth = _get_auth(request)
+    store = getattr(request.app.state, store_key)
+    store[record_id] = {
+        **record,
+        "user_id": auth.user_id,
+        "tenant_id": auth.tenant_id,
+    }
+
+
+def _auth_store_get(store_key: str, request: Request, record_id: str) -> dict[str, Any]:
+    """Get a stored record, verifying it belongs to the authenticated user."""
+    auth = _get_auth(request)
+    store = getattr(request.app.state, store_key)
+    if record_id not in store:
+        raise HTTPException(status_code=404, detail="Record not found")
+    record = store[record_id]
+    if not _conversation_belongs_to(auth, record):
+        raise HTTPException(status_code=404, detail="Record not found")
+    return record
 
 
 # ── Tool schema for LLM ─────────────────────────────────────────
@@ -300,25 +392,60 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
 
 # ── Routes ───────────────────────────────────────────────────────
 
-@router.post("/conversations", response_model=ConversationResponse)
+@router.get("/conversations", response_model=ConversationListResponse)
+async def list_conversations(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+) -> ConversationListResponse:
+    """List conversations for the authenticated user, newest first."""
+    auth = _get_auth(request)
+    store = request.app.state.conversation_store
+
+    # Filter and sort
+    owned: list[dict[str, Any]] = [
+        data for data in store.values()
+        if _conversation_belongs_to(auth, data)
+    ]
+    owned.sort(
+        key=lambda d: d.get("updated_at") or d.get("created_at") or "",
+        reverse=True,
+    )
+
+    total = len(owned)
+    start = (page - 1) * size
+    page_items = owned[start : start + size]
+
+    return ConversationListResponse(
+        items=[_conversation_summary(item) for item in page_items],
+        page=page,
+        size=size,
+        total=total,
+    )
+
+
+@router.post("/conversations", response_model=ConversationSummary)
 async def create_conversation(
     body: ConversationCreateRequest,
     request: Request,
-) -> ConversationResponse:
-    conversation_id = str(uuid.uuid4())
+) -> ConversationSummary:
     auth = _get_auth(request)
+    conversation_id = str(uuid.uuid4())
+    now = _now_iso()
     session = SessionContext(
         conversation_id=conversation_id,
         user_id=auth.user_id,
         tenant_id=auth.tenant_id,
         timezone=auth.timezone,
     )
-    _save_session(request, session)
-    return ConversationResponse(
-        conversation_id=conversation_id,
-        title=body.title,
-        created_at=datetime.now(timezone.utc).isoformat(),
-    )
+    store = request.app.state.conversation_store
+    store[conversation_id] = {
+        **session.model_dump(mode="json"),
+        "title": body.title,
+        "created_at": now,
+        "updated_at": now,
+    }
+    return _conversation_summary(store[conversation_id])
 
 
 @router.post("/conversations/{conversation_id}/messages")
@@ -329,6 +456,9 @@ async def send_message(
 ) -> StreamingResponse:
     auth = _get_auth(request)
     session = _get_session(request, conversation_id)
+    # Enforce timezone from the request on this turn
+    if body.timezone:
+        session.timezone = body.timezone
     mcp = request.app.state.mcp
     llm = request.app.state.llm
     model = request.app.state.model
@@ -343,11 +473,10 @@ async def send_message(
 
     async def tool_handler(
         tool_name: str, tool_args: dict[str, Any],
-        session_ctx: SessionContext, agent_run_id: str, tool_call_id: str,
+        _session: SessionContext, agent_run_id: str, tool_call_id: str,
     ) -> dict[str, Any]:
-        # Check if approval is needed
         if requires_approval(tool_name):
-            pending = session_ctx.pending_approval
+            pending = _session.pending_approval
             if not pending or pending.operation != tool_name:
                 return {
                     "ok": False,
@@ -358,11 +487,10 @@ async def send_message(
                     "request_sent": False,
                     "trace_id": trace_id,
                 }
-
         result = await mcp.execute_tool(
             tool_name,
             auth=auth,
-            session=session_ctx,
+            session=_session,
             trace_id=trace_id,
             agent_run_id=agent_run_id,
             tool_call_id=tool_call_id,
@@ -372,37 +500,26 @@ async def send_message(
 
     async def on_tool_start(tool_name: str, tool_call_id: str, args: dict[str, Any]) -> None:
         await emit_event("TOOL_CALL_STARTED", {
-            "run_id": run_id,
-            "tool_name": tool_name,
-            "tool_call_id": tool_call_id,
+            "run_id": run_id, "tool_name": tool_name, "tool_call_id": tool_call_id,
         })
 
     async def on_tool_complete(tool_name: str, tool_call_id: str, result: dict[str, Any]) -> None:
         event_type = "TOOL_CALL_COMPLETED" if result.get("ok") else "TOOL_CALL_FAILED"
         await emit_event(event_type, {
-            "run_id": run_id,
-            "tool_name": tool_name,
-            "tool_call_id": tool_call_id,
-            "ok": result.get("ok"),
-            "code": result.get("code"),
+            "run_id": run_id, "tool_name": tool_name, "tool_call_id": tool_call_id,
+            "ok": result.get("ok"), "code": result.get("code"),
             "user_message": result.get("user_message"),
         })
 
     async def on_assistant_delta(content: str) -> None:
-        await emit_event("ASSISTANT_MESSAGE_DELTA", {
-            "run_id": run_id,
-            "content": content,
-        })
+        await emit_event("ASSISTANT_MESSAGE_DELTA", {"run_id": run_id, "content": content})
 
     await emit_event("RUN_STARTED", {
-        "run_id": run_id,
-        "conversation_id": conversation_id,
-        "status": "IN_PROGRESS",
+        "run_id": run_id, "conversation_id": conversation_id, "status": "IN_PROGRESS",
     })
 
     assistant = CommunityOperationsAssistant(
-        llm=llm,
-        model=model,
+        llm=llm, model=model,
         tools_schema=_build_tool_schemas(),
         system_prompt=_SYSTEM_PROMPT,
     )
@@ -420,18 +537,12 @@ async def send_message(
         )
     except Exception as exc:
         logger.exception("Run failed run_id=%s", run_id)
-        await emit_event("RUN_FAILED", {
-            "run_id": run_id,
-            "error": str(exc),
-        })
+        await emit_event("RUN_FAILED", {"run_id": run_id, "error": str(exc)})
         run_record = {
-            "run_id": run_id,
-            "conversation_id": conversation_id,
-            "status": "FAILED",
-            "error": str(exc),
-            "trace_id": trace_id,
-            "tool_rounds": 0,
-            "events": events,
+            "run_id": run_id, "conversation_id": conversation_id,
+            "user_id": auth.user_id, "tenant_id": auth.tenant_id,
+            "status": "FAILED", "error": str(exc),
+            "trace_id": trace_id, "tool_rounds": 0, "events": events,
         }
         request.app.state.run_store[run_id] = run_record
         return StreamingResponse(
@@ -443,20 +554,16 @@ async def send_message(
     _save_session(request, session)
 
     await emit_event("RUN_COMPLETED", {
-        "run_id": run_id,
-        "content": result["content"],
+        "run_id": run_id, "content": result["content"],
         "tool_rounds": result["tool_rounds"],
     })
 
     run_record = {
-        "run_id": run_id,
-        "conversation_id": conversation_id,
-        "status": "COMPLETED",
-        "content": result["content"],
-        "trace_id": trace_id,
-        "tool_rounds": result["tool_rounds"],
-        "events": events,
-        "session_snapshot": result.get("session_snapshot"),
+        "run_id": run_id, "conversation_id": conversation_id,
+        "user_id": auth.user_id, "tenant_id": auth.tenant_id,
+        "status": "COMPLETED", "content": result["content"],
+        "trace_id": trace_id, "tool_rounds": result["tool_rounds"],
+        "events": events, "session_snapshot": result.get("session_snapshot"),
     }
     request.app.state.run_store[run_id] = run_record
 
@@ -469,10 +576,7 @@ async def send_message(
 
 @router.get("/runs/{run_id}")
 async def get_run(run_id: str, request: Request) -> RunResponse:
-    run_store = request.app.state.run_store
-    if run_id not in run_store:
-        raise HTTPException(status_code=404, detail="Run not found")
-    record = run_store[run_id]
+    record = _auth_store_get("run_store", request, run_id)
     return RunResponse(
         run_id=record["run_id"],
         conversation_id=record["conversation_id"],
@@ -485,10 +589,8 @@ async def get_run(run_id: str, request: Request) -> RunResponse:
 
 @router.get("/runs/{run_id}/events")
 async def get_run_events(run_id: str, request: Request) -> StreamingResponse:
-    run_store = request.app.state.run_store
-    if run_id not in run_store:
-        raise HTTPException(status_code=404, detail="Run not found")
-    events = run_store[run_id].get("events", [])
+    record = _auth_store_get("run_store", request, run_id)
+    events = record.get("events", [])
     return StreamingResponse(
         _sse_stream(events),
         media_type="text/event-stream",
@@ -502,23 +604,24 @@ async def approve_operation(
     body: ApprovalDecisionRequest,
     request: Request,
 ) -> dict[str, Any]:
-    approval_store = request.app.state.approval_store
-    if approval_id not in approval_store:
-        raise HTTPException(status_code=404, detail="Approval not found")
+    record = _auth_store_get("approval_store", request, approval_id)
 
     if body.decision != "APPROVE":
-        approval_store[approval_id]["status"] = "REJECTED"
+        record["status"] = "REJECTED"
         return {"approval_id": approval_id, "status": "REJECTED"}
 
-    approval_store[approval_id]["status"] = "APPROVED"
-
-    approval_data = approval_store[approval_id]
-    conv_id = approval_data.get("conversation_id", "")
+    record["status"] = "APPROVED"
+    conv_id = record.get("conversation_id", "")
     if conv_id in request.app.state.conversation_store:
         session_data = request.app.state.conversation_store[conv_id]
         session = SessionContext(**session_data)
-        session.pending_approval = None  # Clear after approval
-        request.app.state.conversation_store[conv_id] = session.model_dump(mode="json")
+        session.pending_approval = None
+        request.app.state.conversation_store[conv_id] = {
+            **session.model_dump(mode="json"),
+            "title": session_data.get("title"),
+            "created_at": session_data.get("created_at", _now_iso()),
+            "updated_at": _now_iso(),
+        }
 
     return {"approval_id": approval_id, "status": "APPROVED"}
 
@@ -528,16 +631,14 @@ async def reject_operation(
     approval_id: str,
     request: Request,
 ) -> dict[str, Any]:
-    approval_store = request.app.state.approval_store
-    if approval_id not in approval_store:
-        raise HTTPException(status_code=404, detail="Approval not found")
-    approval_store[approval_id]["status"] = "REJECTED"
+    record = _auth_store_get("approval_store", request, approval_id)
+    record["status"] = "REJECTED"
     return {"approval_id": approval_id, "status": "REJECTED"}
 
 
 # ── Helpers ──────────────────────────────────────────────────────
 
-async def _sse_stream(events: list[dict[str, Any]]):
+async def _sse_stream(events: Any):
     for event in events:
         event_type = event.get("event", "message")
         data = json.dumps(event.get("data", {}), ensure_ascii=False, default=str)

@@ -1,0 +1,316 @@
+openapi: 3.1.0
+info:
+  title: GreenBook Community Operations Assistant API
+  version: 2.0.0
+paths:
+  /api/v1/assistant/conversations:
+    post:
+      summary: Create Conversation
+      operationId: create_conversation_api_v1_assistant_conversations_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationCreateRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/assistant/conversations/{conversation_id}/messages:
+    post:
+      summary: Send Message
+      operationId: send_message_api_v1_assistant_conversations__conversation_id__messages_post
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Conversation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      description: 'Send a message and receive Server-Sent Events (SSE). Events: RUN_STARTED,
+        ASSISTANT_MESSAGE_DELTA, TOOL_CALL_STARTED, TOOL_CALL_COMPLETED, TOOL_CALL_FAILED,
+        APPROVAL_REQUIRED, RUN_COMPLETED, RUN_FAILED'
+  /api/v1/assistant/runs/{run_id}:
+    get:
+      summary: Get Run
+      operationId: get_run_api_v1_assistant_runs__run_id__get
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/assistant/runs/{run_id}/events:
+    get:
+      summary: Get Run Events
+      operationId: get_run_events_api_v1_assistant_runs__run_id__events_get
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Run Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/assistant/approvals/{approval_id}/approve:
+    post:
+      summary: Approve Operation
+      operationId: approve_operation_api_v1_assistant_approvals__approval_id__approve_post
+      parameters:
+      - name: approval_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Approval Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Approve Operation Api V1 Assistant Approvals  Approval
+                  Id  Approve Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/assistant/approvals/{approval_id}/reject:
+    post:
+      summary: Reject Operation
+      operationId: reject_operation_api_v1_assistant_approvals__approval_id__reject_post
+      parameters:
+      - name: approval_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Approval Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response Reject Operation Api V1 Assistant Approvals  Approval
+                  Id  Reject Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Health Health Get
+components:
+  schemas:
+    ApprovalDecisionRequest:
+      properties:
+        decision:
+          type: string
+          pattern: ^(APPROVE|REJECT)$
+          title: Decision
+      type: object
+      required:
+      - decision
+      title: ApprovalDecisionRequest
+    ConversationCreateRequest:
+      properties:
+        title:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Title
+        context_post_id:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Context Post Id
+      type: object
+      title: ConversationCreateRequest
+    ConversationResponse:
+      properties:
+        conversation_id:
+          type: string
+          title: Conversation Id
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - conversation_id
+      - created_at
+      title: ConversationResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    MessageCreateRequest:
+      properties:
+        content:
+          type: string
+          maxLength: 10000
+          minLength: 1
+          title: Content
+        timezone:
+          type: string
+          maxLength: 64
+          title: Timezone
+          default: Asia/Shanghai
+      type: object
+      required:
+      - content
+      title: MessageCreateRequest
+    RunResponse:
+      properties:
+        run_id:
+          type: string
+          title: Run Id
+        conversation_id:
+          type: string
+          title: Conversation Id
+        status:
+          type: string
+          title: Status
+        content:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Content
+        trace_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Trace Id
+        tool_rounds:
+          type: integer
+          title: Tool Rounds
+          default: 0
+      type: object
+      required:
+      - run_id
+      - conversation_id
+      - status
+      title: RunResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 JWT Access Token
+security:
+- bearerAuth: []
