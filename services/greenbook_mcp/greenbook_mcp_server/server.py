@@ -7,14 +7,17 @@ Phase 2: Streamable HTTP MCP Server.
 from __future__ import annotations
 
 import logging
+from inspect import Signature, signature
 
 from greenbook_assistant_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_creator_client.client import CreatorClient
 from greenbook_java_client.client import JavaClient
+from pydantic import ValidationError
 
 from . import tool_registry
 from .context import ToolContext
+from .tool_schemas import openai_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,7 @@ class GreenBookMCPServer:
     ) -> None:
         self.java = java
         self.creator = creator
+        tool_registry.validate_registered_tool_contracts()
 
     async def execute_tool(
         self,
@@ -56,6 +60,85 @@ class GreenBookMCPServer:
                 "user_message": f"Tool '{tool_name}' is not available.",
             }
 
+        definition_model = definition.argument_model
+        normalized_kwargs: dict[str, object]
+        if definition_model is None:
+            normalized_kwargs = dict(kwargs)
+        else:
+            try:
+                arguments = definition_model.model_validate(kwargs)
+            except ValidationError as exc:
+                error_types = {str(item.get("type", "")) for item in exc.errors()}
+                code = (
+                    "INVALID_TOOL_ARGUMENT"
+                    if "extra_forbidden" in error_types
+                    else "TOOL_ARGUMENT_VALIDATION_FAILED"
+                )
+                logger.warning(
+                    "tool_argument_validation_failed tool=%s code=%s fields=%s",
+                    tool_name,
+                    code,
+                    sorted(
+                        str(item.get("loc", ()))
+                        for item in exc.errors()
+                    ),
+                )
+                return {
+                    "ok": False,
+                    "code": code,
+                    "message": "Tool arguments failed schema validation",
+                    "user_message": (
+                        "工具参数不匹配，本次尚未执行任何修改，请重试。"
+                    ),
+                    "retryable": True,
+                    "request_sent": False,
+                    "state": {
+                        "phase": "PRE_EXECUTION_VALIDATION_FAILED",
+                        "downstream_called": False,
+                        "side_effect_started": False,
+                        "safe_to_retry": True,
+                    },
+                    "trace_id": trace_id,
+                }
+            normalized_kwargs = arguments.model_dump(
+                mode="python",
+                by_alias=False,
+                exclude_none=True,
+            )
+
+        handler_signature: Signature = signature(definition.handler)
+        try:
+            handler_signature.bind(
+                ToolContext(
+                    auth=auth,
+                    session=session,
+                    java=self.java,
+                    creator=self.creator,
+                    trace_id=trace_id,
+                    conversation_id=session.conversation_id,
+                    agent_run_id=agent_run_id,
+                    tool_call_id=tool_call_id,
+                ),
+                **normalized_kwargs,
+            )
+        except TypeError:
+            logger.exception("tool_handler_signature_mismatch tool=%s", tool_name)
+            return {
+                "ok": False,
+                "code": "PRE_EXECUTION_VALIDATION_FAILED",
+                "message": "Tool handler signature does not match its schema",
+                "user_message": "工具参数不匹配，本次尚未执行任何修改，请重试。",
+                "retryable": True,
+                "request_sent": False,
+                "state": {
+                    "phase": "PRE_EXECUTION_VALIDATION_FAILED",
+                    "downstream_called": False,
+                    "side_effect_started": False,
+                    "safe_to_retry": True,
+                },
+                "trace_id": trace_id,
+            }
+
         ctx = ToolContext(
             auth=auth,
             session=session,
@@ -68,7 +151,7 @@ class GreenBookMCPServer:
         )
 
         try:
-            result = await definition.handler(ctx, **kwargs)
+            result = await definition.handler(ctx, **normalized_kwargs)
             if hasattr(result, "model_dump"):
                 return result.model_dump(mode="json")
             return result
@@ -88,10 +171,13 @@ class GreenBookMCPServer:
         """Export tool definitions for LLM function-calling."""
         tools = []
         for td in tool_registry.list_tools():
-            tools.append({
+            item: dict[str, object] = {
                 "name": td.name,
                 "description": td.description,
                 "category": td.category,
                 "risk": td.risk,
-            })
+            }
+            if td.argument_model is not None:
+                item["parameters"] = openai_parameters(td.argument_model)
+            tools.append(item)
         return tools

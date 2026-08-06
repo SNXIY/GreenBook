@@ -31,6 +31,13 @@ _NUMBER_RE_FOR_TIME = r"[零〇一二两三四五六七八九十百\d]+"
 
 
 def _has_future_time_expression(text: str) -> bool:
+    if re.search(
+        rf"{_NUMBER_RE_FOR_TIME}\s*"
+        rf"(?:\u5206\u949f|\u5c0f\u65f6|\u5929)\s*"
+        rf"(?:\u4e4b\u540e|\u540e)",
+        text,
+    ):
+        return True
     return bool(
         re.search(
             rf"明天|后天|今天(?:上午|早上|下午|晚上|今晚)|下周|"
@@ -90,9 +97,12 @@ def _turn_routing_hint(
     if asks_cancel:
         return "INTERNAL TURN ROUTING: Call publication_cancel_schedule for this cancellation request."
     if asks_schedule and asks_revise:
-        if session is not None and session.active_schedule_id:
-            return "INTERNAL TURN ROUTING: Call publication_update_schedule for this schedule-change request."
-        return "INTERNAL TURN ROUTING: Call publication_schedule for this new scheduling request."
+        return (
+            "INTERNAL TURN ROUTING: This is a two-action request. "
+            "Call content_revise_draft first for the bound draft, then "
+            "publication_update_schedule for the same bound schedule. "
+            "Do not create a new draft or schedule."
+        )
     if asks_create and asks_revise:
         return "INTERNAL TURN ROUTING: Call content_revise_draft for this draft operation."
     if asks_create:
@@ -123,11 +133,7 @@ def _turn_tool_filter(
     if asks_cancel:
         return {"publication_cancel_schedule"}
     if asks_schedule and asks_revise:
-        return {
-            "publication_update_schedule"
-            if session is not None and session.active_schedule_id
-            else "publication_schedule"
-        }
+        return {"content_revise_draft"}
     if asks_create:
         return {"content_create_draft"}
     if asks_revise:
@@ -212,10 +218,16 @@ class CommunityOperationsAssistant:
         messages.append({"role": "user", "content": user_message})
 
         allowed_tool_names = _turn_tool_filter(user_message, session)
+        asks_create, asks_revise, asks_schedule, _, _ = _turn_intents(user_message)
         create_then_schedule = (
             allowed_tool_names == {"content_create_draft"}
-            and _turn_intents(user_message)[0]
-            and _turn_intents(user_message)[2]
+            and asks_create
+            and asks_schedule
+        )
+        revise_then_schedule = (
+            allowed_tool_names == {"content_revise_draft"}
+            and asks_revise
+            and asks_schedule
         )
         turn_tools = self.tools_schema
         if allowed_tool_names is not None:
@@ -314,6 +326,9 @@ class CommunityOperationsAssistant:
                             }
                     if not result.get("ok"):
                         failed_tool_calls.add(call_key)
+                        # A failed first action must not allow the model to
+                        # continue into the next side-effect action.
+                        turn_tools = []
 
                     if on_tool_complete:
                         await on_tool_complete(tool_name, tc.id, result)
@@ -381,7 +396,19 @@ class CommunityOperationsAssistant:
                                 ]
                             else:
                                 turn_tools = []
-                        elif tool_name == "publication_schedule":
+                        elif tool_name == "content_revise_draft":
+                            if revise_then_schedule:
+                                turn_tools = [
+                                    schema for schema in self.tools_schema
+                                    if schema.get("function", {}).get("name")
+                                    == "publication_update_schedule"
+                                ]
+                            else:
+                                turn_tools = []
+                        elif tool_name in {
+                            "publication_schedule",
+                            "publication_update_schedule",
+                        }:
                             turn_tools = []
                 continue
 

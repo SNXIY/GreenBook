@@ -17,6 +17,11 @@ from greenbook_assistant_core.time_parser import (
     parse_natural_schedule_time,
 )
 from greenbook_contracts.identity import AuthContext
+from greenbook_mcp_server.tool_schemas import (
+    ReviseDraftArguments,
+    UpdateScheduleArguments,
+    openai_parameters,
+)
 from greenbook_security.policy import requires_approval
 from pydantic import BaseModel, Field
 
@@ -120,12 +125,20 @@ def _http_status_for_tool_error(code: str) -> int:
         "CONFLICT", "IDEMPOTENCY_CONFLICT", "DRAFT_VERSION_CONFLICT",
     }:
         return status.HTTP_409_CONFLICT
-    if code in {"VALIDATION_ERROR", "INVALID_REQUEST"}:
+    if code in {
+        "VALIDATION_ERROR",
+        "INVALID_REQUEST",
+        "INVALID_TOOL_ARGUMENT",
+        "TOOL_ARGUMENT_VALIDATION_FAILED",
+        "PRE_EXECUTION_VALIDATION_FAILED",
+    }:
         return status.HTTP_400_BAD_REQUEST
     if code == "DOWNSTREAM_VALIDATION_FAILED":
         return status.HTTP_422_UNPROCESSABLE_ENTITY
     if code in {"JAVA_BACKEND_UNAVAILABLE", "CREATOR_UNAVAILABLE", "DEPENDENCY_UNAVAILABLE"}:
         return status.HTTP_503_SERVICE_UNAVAILABLE
+    if code in {"BUSINESS_REJECTED", "SCHEDULE_NOT_MODIFIABLE"}:
+        return status.HTTP_409_CONFLICT
     if code == "TIMEOUT":
         return status.HTTP_504_GATEWAY_TIMEOUT
     return status.HTTP_502_BAD_GATEWAY
@@ -149,6 +162,47 @@ def _normalize_schedule_tool_args(
     if parsed_run_at:
         normalized["run_at"] = parsed_run_at
     normalized["timezone"] = timezone_name
+    return normalized
+
+
+def _normalize_update_schedule_tool_args(
+    tool_args: dict[str, Any],
+    *,
+    user_message: str,
+    timezone_name: str,
+    now: datetime,
+) -> dict[str, Any]:
+    """Own relative update times deterministically at message receipt time."""
+    normalized = dict(tool_args)
+    parsed_run_at = parse_natural_schedule_time(
+        user_message,
+        timezone_name,
+        now=now,
+    )
+    if parsed_run_at:
+        normalized["run_at"] = parsed_run_at
+    return normalized
+
+
+def _bind_target_tool_args(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    session: SessionContext,
+) -> dict[str, Any]:
+    """Bind omitted targets to the conversation's explicit active resources."""
+    normalized = dict(tool_args)
+    if (
+        tool_name == "content.revise_draft"
+        and not normalized.get("draft_id")
+        and session.active_draft_id
+    ):
+        normalized["draft_id"] = session.active_draft_id
+    if (
+        tool_name == "publication.update_schedule"
+        and not normalized.get("schedule_id")
+        and session.active_schedule_id
+    ):
+        normalized["schedule_id"] = session.active_schedule_id
     return normalized
 
 
@@ -354,14 +408,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
             "function": {
                 "name": "content_revise_draft",
                 "description": "Revise an existing draft. The system will regenerate content based on your revision instructions. If no draft_id specified, revises the most recent draft from this conversation.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "instruction": {"type": "string", "description": "Revision instruction: what to change, add, remove, adjust tone, etc."},
-                        "draft_id": {"type": "string", "description": "Draft ID (optional)"},
-                    },
-                    "required": ["instruction"],
-                },
+                "parameters": openai_parameters(ReviseDraftArguments),
             },
         },
         {
@@ -396,14 +443,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
             "function": {
                 "name": "publication_update_schedule",
                 "description": "Change the scheduled publication time. Only works for schedules in SCHEDULED status.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "schedule_id": {"type": "string", "description": "Schedule ID (optional)"},
-                        "run_at": {"type": "string", "description": "New ISO-8601 datetime with timezone"},
-                    },
-                    "required": ["run_at"],
-                },
+                "parameters": openai_parameters(UpdateScheduleArguments),
             },
         },
         {
@@ -569,6 +609,7 @@ async def send_message(
 
     trace_id = str(uuid.uuid4())
     run_id = str(uuid.uuid4())
+    received_at = datetime.now(UTC)
 
     # Replay only public conversation messages.  Tool observations and model
     # reasoning are intentionally never sent to the frontend or stored here.
@@ -584,9 +625,11 @@ async def send_message(
     })
 
     events: list[dict[str, Any]] = []
-    tool_failure: dict[str, str] | None = None
+    tool_failure: dict[str, Any] | None = None
     successful_draft: dict[str, Any] | None = None
     successful_schedule: dict[str, Any] | None = None
+    successful_revision: dict[str, Any] | None = None
+    successful_schedule_update: dict[str, Any] | None = None
 
     async def emit_event(event_type: str, data: dict[str, Any]) -> None:
         events.append({"event": event_type, "data": data})
@@ -597,6 +640,7 @@ async def send_message(
     ) -> dict[str, Any]:
         # DeepSeek rejects dots in function names — convert _ to . for MCP lookup
         mcp_name = tool_name.replace("_", ".", 1) if "_" in tool_name else tool_name
+        tool_args = _bind_target_tool_args(mcp_name, tool_args, _session)
         if mcp_name == "publication.schedule":
             # The model chooses the tool, but deterministic code owns the
             # user's relative time.
@@ -604,6 +648,14 @@ async def send_message(
                 tool_args,
                 user_message=body.content,
                 timezone_name=_session.timezone or "Asia/Shanghai",
+                now=received_at,
+            )
+        elif mcp_name == "publication.update_schedule":
+            tool_args = _normalize_update_schedule_tool_args(
+                tool_args,
+                user_message=body.content,
+                timezone_name=_session.timezone or "Asia/Shanghai",
+                now=received_at,
             )
         if requires_approval(mcp_name):
             pending = _session.pending_approval
@@ -660,11 +712,15 @@ async def send_message(
         })
 
     async def on_tool_complete(tool_name: str, tool_call_id: str, result: dict[str, Any]) -> None:
-        nonlocal tool_failure, successful_draft, successful_schedule
+        nonlocal tool_failure, successful_draft, successful_schedule, successful_revision, successful_schedule_update
         event_type = "TOOL_CALL_COMPLETED" if result.get("ok") else "TOOL_CALL_FAILED"
         if not result.get("ok") and result.get("code") != "APPROVAL_REQUIRED":
             tool_failure = {
                 "code": str(result.get("code") or "TOOL_EXECUTION_FAILED"),
+                "tool_name": tool_name,
+                "request_sent": bool(result.get("request_sent", False)),
+                "retryable": bool(result.get("retryable", False)),
+                "state": result.get("state"),
                 "message": str(result.get("user_message") or "工具执行失败，请稍后重试。"),
             }
         if result.get("ok") and isinstance(result.get("data"), dict):
@@ -681,6 +737,32 @@ async def send_message(
                     for key in ("schedule_id", "draft_id", "run_at", "timezone", "status")
                     if data.get(key) is not None
                 }
+            elif tool_name == "content_revise_draft":
+                successful_revision = {
+                    key: data.get(key)
+                    for key in (
+                        "draft_id",
+                        "title",
+                        "version",
+                        "updated_at",
+                        "creator_task_id",
+                        "creator_artifact_id",
+                    )
+                    if data.get(key) is not None
+                }
+            elif tool_name == "publication_update_schedule":
+                successful_schedule_update = {
+                    key: data.get(key)
+                    for key in (
+                        "schedule_id",
+                        "draft_id",
+                        "run_at",
+                        "timezone",
+                        "status",
+                        "version",
+                    )
+                    if data.get(key) is not None
+                }
         event_data: dict[str, Any] = {
             "run_id": run_id, "tool_name": tool_name, "tool_call_id": tool_call_id,
             "ok": result.get("ok"), "code": result.get("code"),
@@ -690,8 +772,17 @@ async def send_message(
             public_keys = (
                 ("draft_id", "title", "creator_task_id", "creator_artifact_id")
                 if tool_name == "content_create_draft"
+                else (
+                    "draft_id",
+                    "title",
+                    "version",
+                    "updated_at",
+                    "creator_task_id",
+                    "creator_artifact_id",
+                )
+                if tool_name == "content_revise_draft"
                 else ("draft_id", "schedule_id", "run_at", "timezone", "status")
-                if tool_name == "publication_schedule"
+                if tool_name in {"publication_schedule", "publication_update_schedule"}
                 else ()
             )
             public_result = {
@@ -756,13 +847,40 @@ async def send_message(
         ) from None
 
     if tool_failure is not None:
+        partial_failure = (
+            successful_revision is not None
+            and tool_failure.get("tool_name") == "publication_update_schedule"
+        )
+        failure_message = str(tool_failure["message"])
+        if partial_failure:
+            failure_message = (
+                "\u8349\u7a3f\u5185\u5bb9\u5df2\u4fee\u6539\uff0c\u4f46\u53d1\u5e03\u65f6\u95f4\u8c03\u6574\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u5b9a\u65f6\u4efb\u52a1\u72b6\u6001\u3002"
+            )
+        raw_state = tool_failure.get("state")
+        original_state: dict[str, Any] = (
+            raw_state if isinstance(raw_state, dict) else {}
+        )
+        failure_state = {
+            **original_state,
+            "phase": "PARTIAL_FAILURE"
+            if partial_failure
+            else original_state.get("phase", "RUN_FAILED"),
+            "draft_revision": "COMPLETED" if successful_revision else "NOT_STARTED",
+            "schedule_update": "FAILED"
+            if partial_failure
+            else "NOT_STARTED",
+            "downstream_called": bool(tool_failure.get("request_sent", False)),
+            "side_effect_started": bool(tool_failure.get("request_sent", False)),
+            "safe_to_retry": bool(tool_failure.get("retryable", False)),
+        }
         _save_session(request, session)
         await emit_event(
-            "RUN_FAILED",
+            "RUN_PARTIAL_FAILURE" if partial_failure else "RUN_FAILED",
             {
                 "run_id": run_id,
                 "code": tool_failure["code"],
-                "message": tool_failure["message"],
+                "message": failure_message,
+                "state": failure_state,
             },
         )
         request.app.state.run_store[run_id] = {
@@ -770,20 +888,25 @@ async def send_message(
             "conversation_id": conversation_id,
             "user_id": auth.user_id,
             "tenant_id": auth.tenant_id,
-            "status": "FAILED",
+            "status": "PARTIAL_FAILURE" if partial_failure else "FAILED",
             "error_code": tool_failure["code"],
-            "error": tool_failure["message"],
+            "error": failure_message,
             "trace_id": trace_id,
             "tool_rounds": result.get("tool_rounds", 0),
             "events": events,
+            "partial_results": {
+                "draft_revision": successful_revision,
+                "schedule_update": successful_schedule_update,
+            },
         }
         raise HTTPException(
             status_code=_http_status_for_tool_error(tool_failure["code"]),
             detail={
                 "code": tool_failure["code"],
-                "message": tool_failure["message"],
+                "message": failure_message,
                 "run_id": run_id,
                 "events_url": f"/api/v1/assistant/runs/{run_id}/events",
+                "state": failure_state,
             },
         )
 
@@ -794,8 +917,8 @@ async def send_message(
     # success from HTTP 202 alone.
     assistant_content = _append_schedule_confirmation(
         result.get("content", ""),
-        draft=successful_draft,
-        schedule=successful_schedule,
+        draft=successful_revision or successful_draft,
+        schedule=successful_schedule_update or successful_schedule,
     )
     result["content"] = assistant_content
     if assistant_content:

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from inspect import Signature, signature
 
 from pydantic import BaseModel
 
-from .context import ToolContext
+from .tool_schemas import ReviseDraftArguments, UpdateScheduleArguments
 from .tools import analytics, community, content, interaction, publication
 
 
@@ -17,6 +17,7 @@ class ToolDefinition(BaseModel):
     handler: Callable
     category: str
     risk: str  # low, medium, high
+    argument_model: type[BaseModel] | None = None
 
 
 _TOOLS: dict[str, ToolDefinition] = {}
@@ -29,6 +30,7 @@ def _register(
     description: str,
     category: str,
     risk: str,
+    argument_model: type[BaseModel] | None = None,
 ) -> None:
     _TOOLS[name] = ToolDefinition(
         name=name,
@@ -36,6 +38,7 @@ def _register(
         handler=handler,
         category=category,
         risk=risk,
+        argument_model=argument_model,
     )
 
 
@@ -92,6 +95,7 @@ _register(
     description="Revise an existing draft via Creator Agent",
     category="content",
     risk="medium",
+    argument_model=ReviseDraftArguments,
 )
 
 # ── Publication ──────────────────────────────────────────────────
@@ -116,6 +120,7 @@ _register(
     description="Update a scheduled publication's run_at time",
     category="publication",
     risk="medium",
+    argument_model=UpdateScheduleArguments,
 )
 _register(
     "publication.cancel_schedule",
@@ -183,3 +188,24 @@ def tool_catalog_prompt() -> str:
     for tool in _TOOLS.values():
         lines.append(f"- {tool.name}: {tool.description} (risk: {tool.risk})")
     return "\n".join(lines)
+
+
+def validate_registered_tool_contracts() -> None:
+    """Fail fast if a registered handler drifts from its argument model."""
+
+    for definition in _TOOLS.values():
+        model = definition.argument_model
+        if model is None:
+            continue
+        handler_signature: Signature = signature(definition.handler)
+        handler_fields = {
+            name
+            for name in handler_signature.parameters
+            if name != "ctx"
+        }
+        model_fields = set(model.model_fields)
+        if handler_fields != model_fields:
+            raise RuntimeError(
+                f"Tool contract drift for {definition.name}: "
+                f"model={sorted(model_fields)} handler={sorted(handler_fields)}"
+            )

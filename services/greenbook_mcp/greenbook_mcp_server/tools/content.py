@@ -286,8 +286,10 @@ async def list_drafts(
 
 async def revise_draft(
     ctx: ToolContext,
-    instruction: str,
-    draft_id: str | None = None,
+    draft_id: str,
+    revision_instruction: str,
+    title: str | None = None,
+    expected_version: str | None = None,
 ) -> ToolResult[Any]:
     """Revise an existing draft via Creator Agent → Java Facade.
 
@@ -328,12 +330,12 @@ async def revise_draft(
     # Step 3: Submit Creator revise task
     idempotency_key = ctx.idempotency_key(
         "revise_draft",
-        scope=f"{resolved_id}|{instruction}",
+        scope=f"{resolved_id}|{revision_instruction}",
     )
 
     creator_result = await ctx.creator.create_task(
         kind="IMPROVE_DRAFT",
-        goal=f"Revise the following draft: {instruction}",
+        goal=f"Revise the following draft: {revision_instruction}",
         constraints={
             "interaction_mode": "AUTO",
             "format": "POST",
@@ -343,6 +345,7 @@ async def revise_draft(
                 "title": current_title,
                 "body_markdown": current_content,
             },
+            **({"requested_title": title} if title else {}),
         },
         bearer_token=ctx.auth.raw_access_token,
         idempotency_key=idempotency_key,
@@ -368,22 +371,33 @@ async def revise_draft(
     snapshot = wait_result.data or {}
     final_artifact_id = str(snapshot.get("final_artifact_id") or "")
 
-    # Step 5: Get revised content
-    revised_content = instruction  # fallback
-    revised_title = current_title
-    revised_summary = None
-
-    if final_artifact_id:
-        artifact_result = await ctx.creator.get_artifact(
-            task_id, final_artifact_id,
-            bearer_token=ctx.auth.raw_access_token,
+    # Step 5: Get revised content.  A completed Creator task without a final
+    # artifact is a dependency failure; never use the user's instruction as
+    # the new post body.
+    if not final_artifact_id:
+        return ToolResult.creator_unavailable(
+            "Creator completed without a final revision artifact",
             trace_id=trace_id,
         )
-        if artifact_result.ok:
-            doc = extract_creator_document(artifact_result.data or {})
-            revised_title = doc["title"] or current_title
-            revised_content = doc["body_markdown"] or instruction
-            revised_summary = doc["description"]
+
+    artifact_result = await ctx.creator.get_artifact(
+        task_id,
+        final_artifact_id,
+        bearer_token=ctx.auth.raw_access_token,
+        trace_id=trace_id,
+    )
+    if not artifact_result.ok:
+        return artifact_result
+
+    doc = extract_creator_document(artifact_result.data or {})
+    revised_title = doc["title"] or title or current_title
+    revised_content = doc["body_markdown"]
+    revised_summary = doc["description"]
+    if not revised_content:
+        return ToolResult.validation_error(
+            "Creator returned an empty revised document",
+            user_message="创作服务没有返回有效的修改后正文，本次尚未保存修改。",
+        )
 
     # Step 6: Java PUT with expectedVersion=updatedAt (ISO-8601)
     expected_version_str = current_updated_at.isoformat() if current_updated_at else None
@@ -392,7 +406,7 @@ async def revise_draft(
         title=revised_title,
         content=revised_content,
         summary=revised_summary,
-        expectedVersion=expected_version_str,
+        expectedVersion=expected_version or expected_version_str,
     )
 
     update_result = await ctx.java.update_draft(
@@ -462,6 +476,8 @@ async def revise_draft(
                 "status": updated.status,
                 "version": updated.version,
                 "updated_at": updated.updated_at.isoformat() if updated.updated_at else None,
+                "creator_task_id": task_id,
+                "creator_artifact_id": final_artifact_id,
             },
             trace_id=trace_id,
         )

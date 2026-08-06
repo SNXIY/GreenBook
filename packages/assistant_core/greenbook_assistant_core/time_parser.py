@@ -107,6 +107,25 @@ def parse_natural_schedule_time(
         base.replace(tzinfo=zone) if base.tzinfo is None else base.astimezone(zone)
     )
 
+    delay_after = re.search(
+        rf"(?P<amount>{_NUMBER_RE})\s*"
+        rf"(?P<unit>\u5206\u949f|\u5c0f\u65f6|\u5929)\s*"
+        rf"(?:\u4e4b\u540e|\u540e)",
+        text,
+    )
+    if delay_after:
+        amount = _parse_number(delay_after.group("amount"))
+        if amount is None:
+            return None
+        unit = delay_after.group("unit")
+        if unit == "\u5206\u949f":
+            target = base_local + timedelta(minutes=amount)
+        elif unit == "\u5c0f\u65f6":
+            target = base_local + timedelta(hours=amount)
+        else:
+            target = base_local + timedelta(days=amount)
+        return _as_utc_iso(target)
+
     delay = re.search(
         rf"(?P<amount>{_NUMBER_RE})\s*(?P<unit>分钟|分|小时|个小时|天)\s*后",
         text,

@@ -28,6 +28,7 @@ publication.publish_now:
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from greenbook_contracts.tool_result import ResourceRef, ToolResult
@@ -200,6 +201,14 @@ async def update_schedule(
     if isinstance(current_data, ScheduledPublicationResponse):
         current_status = current_data.status or ""
         current_version = current_data.version if current_data.version is not None else 0
+        if (
+            ctx.session.active_draft_id
+            and current_data.draft_id
+            and current_data.draft_id != ctx.session.active_draft_id
+        ):
+            return ToolResult.not_found(
+                f"Schedule {resolved_id} is not bound to the active draft"
+            )
     else:
         return ToolResult.internal_error("Unexpected schedule response", trace_id=ctx.trace_id)
 
@@ -235,22 +244,75 @@ async def update_schedule(
     if not result.ok:
         return result
 
-    # Verify
+    # Verify the same schedule resource after the PUT.  A successful PUT with
+    # an unavailable or inconsistent verification is not reported as success.
     verify = await ctx.java.get_schedule(
         resolved_id,
         bearer_token=ctx.auth.raw_access_token,
         trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
     )
-    if verify.ok:
-        ctx.session.active_schedule_id = resolved_id
-
-    if result.ok and result.data:
-        return ToolResult.success(
-            result.data.model_dump(mode="json") if hasattr(result.data, "model_dump") else result.data,
+    if not verify.ok:
+        return ToolResult.result_unknown(
+            f"Schedule {resolved_id} was updated but could not be verified",
             trace_id=ctx.trace_id,
         )
-    return result
+    verified = verify.data
+    if not isinstance(verified, ScheduledPublicationResponse):
+        return ToolResult.result_unknown(
+            f"Schedule {resolved_id} returned an invalid verification response",
+            trace_id=ctx.trace_id,
+        )
+    if verified.schedule_id != resolved_id:
+        return ToolResult.result_unknown(
+            f"Schedule verification ID mismatch for {resolved_id}",
+            trace_id=ctx.trace_id,
+        )
+    if verified.status != ScheduleStatus.SCHEDULED.value:
+        return ToolResult.business_rejected(
+            f"Schedule {resolved_id} changed to unexpected status {verified.status}",
+            user_message="定时任务更新时间后状态异常，请检查任务状态。",
+        )
+    try:
+        expected_run_at = datetime.fromisoformat(run_at.replace("Z", "+00:00"))
+        actual_run_at = verified.run_at
+        if actual_run_at is None:
+            raise ValueError("verified schedule has no runAt")
+        if expected_run_at.tzinfo is None:
+            expected_run_at = expected_run_at.replace(tzinfo=UTC)
+        if actual_run_at.tzinfo is None:
+            actual_run_at = actual_run_at.replace(tzinfo=UTC)
+        if actual_run_at.astimezone(UTC) != expected_run_at.astimezone(UTC):
+            return ToolResult.result_unknown(
+                f"Schedule {resolved_id} runAt verification mismatch",
+                trace_id=ctx.trace_id,
+            )
+    except ValueError:
+        return ToolResult.result_unknown(
+            f"Schedule {resolved_id} returned an invalid runAt",
+            trace_id=ctx.trace_id,
+        )
+
+    ctx.session.active_schedule_id = resolved_id
+    ctx.session.record_entity(
+        ref=f"schedule:{resolved_id}",
+        kind="SCHEDULE",
+        entity_id=resolved_id,
+        label=f"Schedule for draft {verified.draft_id or ctx.session.active_draft_id}",
+        status=verified.status,
+        run_id=ctx.agent_run_id,
+    )
+    return ToolResult.success(
+        {
+            "schedule_id": verified.schedule_id,
+            "draft_id": verified.draft_id,
+            "run_at": verified.run_at.isoformat() if verified.run_at else run_at,
+            "timezone": verified.timezone or "Asia/Shanghai",
+            "status": verified.status,
+            "version": verified.version,
+        },
+        trace_id=ctx.trace_id,
+    )
 
 
 async def cancel_schedule(
