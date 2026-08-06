@@ -482,6 +482,7 @@ def main() -> int:
     parser.add_argument("--experiment", choices=("A", "B", "C", "D"), default="C")
     parser.add_argument("--global-timeout", type=int, default=None)
     parser.add_argument("--e2e1-only", action="store_true")
+    parser.add_argument("--e2e2-only", action="store_true")
     args = parser.parse_args()
     if args.e2e1_only:
         os.environ["P0_E2E_SKIP_E2E2"] = "true"
@@ -523,6 +524,21 @@ def main() -> int:
         token=login(deadline); manifest.update("JAVA_LOGIN_COMPLETED",email_configured=True,password_configured=True)
         assistant_env={"DEEPSEEK_API_KEY":os.environ["DEEPSEEK_API_KEY"],"ASSISTANT_DATABASE_URL":os.environ.get("P0_E2E_ASSISTANT_DATABASE_URL","postgresql+asyncpg://mindflow:mindflow@127.0.0.1:25432/mindflow_creator"),"ASSISTANT_REDIS_URL":"redis://:mindflow@127.0.0.1:26379/14","ASSISTANT_CREATOR_BASE_URL":creator_url,"ASSISTANT_JAVA_BASE_URL":"http://127.0.0.1:8080","ASSISTANT_IDENTITY_ISSUER":"http://127.0.0.1:8080","ASSISTANT_IDENTITY_AUDIENCE":"community-assistant-agent","ASSISTANT_IDENTITY_JWKS_URL":"http://127.0.0.1:8080/.well-known/jwks.json","ASSISTANT_ALLOW_INSECURE_HTTP":"true","ASSISTANT_SERVICE_SHARED_SECRET":os.environ["ASSISTANT_SERVICE_SHARED_SECRET"],"ASSISTANT_PROCESS_ROLE":"all","ASSISTANT_DEV_RELOAD":"false"}
         assistant_process, assistant_port, assistant_pump=start_server(root=assistant_root,python=assistant_python,env=assistant_env,ready=temp_path/"assistant-ready.json",log_paths=[run_root/"assistant-api.log",run_root/"assistant-worker.log"],deadline=deadline,manifest=manifest,role="assistant"); ports.append(assistant_port); assistant_url=f"http://127.0.0.1:{assistant_port}"; wait_health(assistant_url,deadline); manifest.update("ASSISTANT_API_HEALTHY",assistant_url=assistant_url,creator_base_url=creator_url)
+        if args.e2e2_only:
+            existing_conversation_id = os.environ["P0_E2E_EXISTING_CONVERSATION_ID"]
+            conversation = {"conversation_id": existing_conversation_id}
+            e2e2 = assistant_run(
+                assistant_url,
+                token,
+                "Revise the just-created draft for beginners and add three concrete troubleshooting steps.",
+                conversation=conversation,
+                deadline=deadline,
+                manifest=manifest,
+                label="E2E2",
+            )
+            collect_evidence(manifest=manifest, evidence={"e2e2": e2e2})
+            manifest.update("COMPLETED", status="COMPLETED")
+            return 0
         conversation=None
         e2e1=assistant_run(assistant_url,token,"搜索一些社区里关于 Agent 稳定性的公开帖子，参考搜索结果写一篇实用内容，十分钟后发布。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E1"); conversation=e2e1["conversation"]; manifest.update("E2E1_COMPLETED")
         e2e2=assistant_run(assistant_url,token,"把刚才那篇 Agent 稳定性的草稿改得更适合初学者，并增加三个具体排查步骤。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E2"); manifest.update("E2E2_COMPLETED")
