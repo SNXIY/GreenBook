@@ -191,6 +191,93 @@ async def test_thinking_tool_call_preserves_reasoning_for_the_second_request() -
 
 
 @pytest.mark.asyncio
+async def test_create_and_schedule_uses_ordered_write_tool_turns() -> None:
+    create_call = SimpleNamespace(
+        id="create-call",
+        function=SimpleNamespace(
+            name="content_create_draft",
+            arguments='{"title":"如何学好 Java","instruction":"写一篇 Java 学习指南"}',
+        ),
+    )
+    schedule_call = SimpleNamespace(
+        id="schedule-call",
+        function=SimpleNamespace(
+            name="publication_schedule",
+            arguments='{"run_at":"2026-08-07T00:00:00Z","timezone":"Asia/Shanghai"}',
+        ),
+    )
+    responses = [
+        SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(
+                content=None,
+                reasoning_content="create first",
+                tool_calls=[create_call],
+            ))],
+        ),
+        SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(
+                content=None,
+                reasoning_content="schedule second",
+                tool_calls=[schedule_call],
+            ))],
+        ),
+        SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(
+                content="已创建草稿并完成定时发布。",
+                reasoning_content=None,
+                tool_calls=None,
+            ))],
+        ),
+    ]
+    create = AsyncMock(side_effect=responses)
+    llm = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    agent = CommunityOperationsAssistant(
+        llm=llm,
+        model="thinking-test-model",
+        tools_schema=[
+            {"type": "function", "function": {"name": "content_create_draft"}},
+            {"type": "function", "function": {"name": "publication_schedule"}},
+        ],
+    )
+    calls: list[str] = []
+
+    async def tool_handler(
+        name: str,
+        args: dict[str, object],
+        session: SessionContext,
+        run_id: str,
+        tool_call_id: str,
+    ) -> dict[str, object]:
+        calls.append(name)
+        if name == "content_create_draft":
+            return ToolResult.success({"draft_id": "draft-1", "title": "如何学好 Java"}).model_dump(mode="json")
+        return ToolResult.success({
+            "draft_id": "draft-1",
+            "schedule_id": "schedule-1",
+            "run_at": "2026-08-07T00:00:00Z",
+            "timezone": "Asia/Shanghai",
+            "status": "SCHEDULED",
+        }).model_dump(mode="json")
+
+    result = await agent.run(
+        user_message="明天上午八点发布一篇关于如何学好 Java 的帖子",
+        session=_session(),
+        tool_handler=tool_handler,
+        run_id="run-schedule",
+    )
+
+    assert calls == ["content_create_draft", "publication_schedule"]
+    second_tools = create.call_args_list[1].kwargs["tools"]
+    assert [item["function"]["name"] for item in second_tools] == ["publication_schedule"]
+    first_assistant = next(
+        message for message in create.call_args_list[1].kwargs["messages"]
+        if message.get("role") == "assistant"
+    )
+    assert first_assistant["reasoning_content"] == "create first"
+    assert result["content"] == "已创建草稿并完成定时发布。"
+
+
+@pytest.mark.asyncio
 async def test_cancelled_schedule_is_removed_from_active_session_binding() -> None:
     tool_call = SimpleNamespace(
         id="cancel-call",
@@ -306,7 +393,7 @@ def test_failed_tool_returns_http_error_and_failed_run_event() -> None:
         json={"content": "search community posts"},
         headers=headers,
     )
-    assert response.status_code == 502
+    assert response.status_code == 503
     detail = response.json()["detail"]
     assert detail["code"] == "DEPENDENCY_UNAVAILABLE"
     run_id = detail["run_id"]
@@ -322,3 +409,64 @@ def test_failed_tool_returns_http_error_and_failed_run_event() -> None:
     assert events.status_code == 200
     assert "RUN_FAILED" in events.text
     assert "reasoning_content" not in events.text
+
+
+def test_validation_tool_failure_returns_http_400() -> None:
+    tool_call = SimpleNamespace(
+        id="validation-call",
+        function=SimpleNamespace(
+            name="content_create_draft",
+            arguments='{"title":"x","instruction":"y"}',
+        ),
+    )
+    llm = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(
+                create=AsyncMock(side_effect=[
+                    SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
+                        content=None, reasoning_content="private", tool_calls=[tool_call]
+                    ))]),
+                    SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(
+                        content="创建失败。", reasoning_content=None, tool_calls=None
+                    ))]),
+                ])
+            )
+        )
+    )
+
+    class ValidationMCP:
+        async def execute_tool(self, *args: object, **kwargs: object) -> dict[str, object]:
+            return ToolResult.validation_error(
+                "downstream rejected request",
+                user_message="下游请求参数无效。",
+            ).model_dump(mode="json")
+
+    app = create_app(
+        auth_validator=lambda token: AuthContext(
+            user_id="u1", tenant_id="t1", raw_access_token=token
+        )
+    )
+    app.state.conversation_store = {}
+    app.state.run_store = {}
+    app.state.approval_store = {}
+    app.state.message_store = {}
+    app.state.llm = llm
+    app.state.mcp = ValidationMCP()
+    app.state.model = "thinking-test-model"
+
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer test-access"}
+    conversation = client.post(
+        "/api/v1/assistant/conversations",
+        json={"title": "validation"},
+        headers=headers,
+    )
+    conversation_id = conversation.json()["conversation_id"]
+    response = client.post(
+        f"/api/v1/assistant/conversations/{conversation_id}/messages",
+        json={"content": "保存草稿"},
+        headers=headers,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "VALIDATION_ERROR"

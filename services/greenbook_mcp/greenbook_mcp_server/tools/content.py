@@ -37,6 +37,28 @@ from ..context import ToolContext
 logger = logging.getLogger(__name__)
 
 
+def normalize_text_artifact(
+    document: dict[str, str | None],
+    *,
+    fallback_title: str,
+    fallback_content: str,
+    fallback_summary: str | None = None,
+) -> AgentDraftCreateRequest | None:
+    """Map a Creator document to the Java text-only draft contract.
+
+    Creator artifacts may contain provider-specific media metadata.  The Java
+    Agent Facade draft request intentionally receives only text fields here;
+    no local path, artifact id, cover, or upload flag can cross this boundary.
+    """
+    title = str(document.get("title") or fallback_title).strip()[:256]
+    content = str(document.get("body_markdown") or fallback_content).strip()
+    summary_value = document.get("description") or fallback_summary
+    summary = str(summary_value).strip()[:200] if summary_value else None
+    if not title or not content:
+        return None
+    return AgentDraftCreateRequest(title=title, content=content, summary=summary)
+
+
 async def create_draft(
     ctx: ToolContext,
     title: str,
@@ -139,11 +161,17 @@ async def create_draft(
     # second Java draft, which would make one Assistant operation produce
     # duplicate drafts.  The Assistant owns this single handoff to the
     # Java Agent Facade; Creator remains the content-generation service.
-    java_create = AgentDraftCreateRequest(
-        title=str(document["title"] or title)[:256],
-        content=str(document["body_markdown"] or instruction),
-        summary=str(document["description"] or "")[:200] if document.get("description") else None,
+    java_create = normalize_text_artifact(
+        document,
+        fallback_title=title,
+        fallback_content=instruction,
+        fallback_summary=summary,
     )
+    if java_create is None:
+        return ToolResult.validation_error(
+            "Creator returned an empty text document.",
+            user_message="创作结果缺少标题或正文，未创建草稿。",
+        )
 
     draft_result = await ctx.java.create_draft(
         java_create,

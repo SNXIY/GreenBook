@@ -12,6 +12,10 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from greenbook_assistant_core.agent import CommunityOperationsAssistant
 from greenbook_assistant_core.context import PendingApproval, SessionContext
+from greenbook_assistant_core.time_parser import (
+    format_local_schedule_time,
+    parse_natural_schedule_time,
+)
 from greenbook_contracts.identity import AuthContext
 from greenbook_security.policy import requires_approval
 from pydantic import BaseModel, Field
@@ -103,6 +107,81 @@ class RunResponse(BaseModel):
 
 class ApprovalDecisionRequest(BaseModel):
     decision: str = Field(pattern="^(APPROVE|REJECT)$")
+
+
+def _http_status_for_tool_error(code: str) -> int:
+    if code in {"AUTHENTICATION_FAILED", "AUTHENTICATION_REQUIRED"}:
+        return status.HTTP_401_UNAUTHORIZED
+    if code in {"AUTHORIZATION_DENIED", "PERMISSION_DENIED"}:
+        return status.HTTP_403_FORBIDDEN
+    if code in {"NOT_FOUND", "RESOURCE_NOT_FOUND"}:
+        return status.HTTP_404_NOT_FOUND
+    if code in {
+        "CONFLICT", "IDEMPOTENCY_CONFLICT", "DRAFT_VERSION_CONFLICT",
+    }:
+        return status.HTTP_409_CONFLICT
+    if code in {"VALIDATION_ERROR", "INVALID_REQUEST"}:
+        return status.HTTP_400_BAD_REQUEST
+    if code == "DOWNSTREAM_VALIDATION_FAILED":
+        return status.HTTP_422_UNPROCESSABLE_ENTITY
+    if code in {"JAVA_BACKEND_UNAVAILABLE", "CREATOR_UNAVAILABLE", "DEPENDENCY_UNAVAILABLE"}:
+        return status.HTTP_503_SERVICE_UNAVAILABLE
+    if code == "TIMEOUT":
+        return status.HTTP_504_GATEWAY_TIMEOUT
+    return status.HTTP_502_BAD_GATEWAY
+
+
+def _normalize_schedule_tool_args(
+    tool_args: dict[str, Any],
+    *,
+    user_message: str,
+    timezone_name: str,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Normalize a model schedule call to the Assistant→Java contract."""
+    normalized = dict(tool_args)
+    normalized.pop("timezone_name", None)
+    parsed_run_at = parse_natural_schedule_time(
+        user_message,
+        timezone_name,
+        now=now,
+    )
+    if parsed_run_at:
+        normalized["run_at"] = parsed_run_at
+    normalized["timezone"] = timezone_name
+    return normalized
+
+
+def _append_schedule_confirmation(
+    content: str,
+    *,
+    draft: dict[str, Any] | None,
+    schedule: dict[str, Any] | None,
+) -> str:
+    """Ensure the frontend receives a stable, user-readable write summary."""
+    if not schedule:
+        return content
+
+    draft_id = str((draft or {}).get("draft_id") or schedule.get("draft_id") or "")
+    schedule_id = str(schedule.get("schedule_id") or "")
+    title = str((draft or {}).get("title") or "未命名草稿")
+    run_at = str(schedule.get("run_at") or "")
+    timezone_name = str(schedule.get("timezone") or "Asia/Shanghai")
+    local_time = format_local_schedule_time(run_at, timezone_name)
+    required = (draft_id, schedule_id, local_time, timezone_name, "SCHEDULED")
+    if all(value and value in content for value in required):
+        return content
+
+    confirmation = "\n".join([
+        "执行结果：",
+        f"标题：{title}",
+        f"draftId：{draft_id}",
+        f"scheduleId：{schedule_id}",
+        f"发布时间：{local_time}",
+        f"时区：{timezone_name}",
+        "当前状态：SCHEDULED",
+    ])
+    return f"{content.rstrip()}\n\n{confirmation}".strip()
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -506,6 +585,8 @@ async def send_message(
 
     events: list[dict[str, Any]] = []
     tool_failure: dict[str, str] | None = None
+    successful_draft: dict[str, Any] | None = None
+    successful_schedule: dict[str, Any] | None = None
 
     async def emit_event(event_type: str, data: dict[str, Any]) -> None:
         events.append({"event": event_type, "data": data})
@@ -516,6 +597,14 @@ async def send_message(
     ) -> dict[str, Any]:
         # DeepSeek rejects dots in function names — convert _ to . for MCP lookup
         mcp_name = tool_name.replace("_", ".", 1) if "_" in tool_name else tool_name
+        if mcp_name == "publication.schedule":
+            # The model chooses the tool, but deterministic code owns the
+            # user's relative time.
+            tool_args = _normalize_schedule_tool_args(
+                tool_args,
+                user_message=body.content,
+                timezone_name=_session.timezone or "Asia/Shanghai",
+            )
         if requires_approval(mcp_name):
             pending = _session.pending_approval
             if not pending or pending.operation != mcp_name:
@@ -571,18 +660,48 @@ async def send_message(
         })
 
     async def on_tool_complete(tool_name: str, tool_call_id: str, result: dict[str, Any]) -> None:
-        nonlocal tool_failure
+        nonlocal tool_failure, successful_draft, successful_schedule
         event_type = "TOOL_CALL_COMPLETED" if result.get("ok") else "TOOL_CALL_FAILED"
         if not result.get("ok") and result.get("code") != "APPROVAL_REQUIRED":
             tool_failure = {
                 "code": str(result.get("code") or "TOOL_EXECUTION_FAILED"),
                 "message": str(result.get("user_message") or "工具执行失败，请稍后重试。"),
             }
-        await emit_event(event_type, {
+        if result.get("ok") and isinstance(result.get("data"), dict):
+            data = result["data"]
+            if tool_name == "content_create_draft":
+                successful_draft = {
+                    key: data.get(key)
+                    for key in ("draft_id", "title")
+                    if data.get(key) is not None
+                }
+            elif tool_name == "publication_schedule":
+                successful_schedule = {
+                    key: data.get(key)
+                    for key in ("schedule_id", "draft_id", "run_at", "timezone", "status")
+                    if data.get(key) is not None
+                }
+        event_data: dict[str, Any] = {
             "run_id": run_id, "tool_name": tool_name, "tool_call_id": tool_call_id,
             "ok": result.get("ok"), "code": result.get("code"),
             "user_message": result.get("user_message"),
-        })
+        }
+        if result.get("ok") and isinstance(result.get("data"), dict):
+            public_keys = (
+                ("draft_id", "title", "creator_task_id", "creator_artifact_id")
+                if tool_name == "content_create_draft"
+                else ("draft_id", "schedule_id", "run_at", "timezone", "status")
+                if tool_name == "publication_schedule"
+                else ()
+            )
+            public_result = {
+                key: result["data"].get(key)
+                for key in public_keys
+                if result["data"].get(key) is not None
+            }
+            if public_result:
+                event_data["result"] = public_result
+        await emit_event(event_type, event_data)
 
     async def on_assistant_delta(content: str) -> None:
         await emit_event("ASSISTANT_MESSAGE_DELTA", {"run_id": run_id, "content": content})
@@ -659,7 +778,7 @@ async def send_message(
             "events": events,
         }
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
+            status_code=_http_status_for_tool_error(tool_failure["code"]),
             detail={
                 "code": tool_failure["code"],
                 "message": tool_failure["message"],
@@ -670,8 +789,15 @@ async def send_message(
 
     _save_session(request, session)
 
-    # Save assistant response to message history
-    assistant_content = result.get("content", "")
+    # Save assistant response to message history.  The model's response is
+    # supplemented with verified IDs/time so the frontend never has to infer
+    # success from HTTP 202 alone.
+    assistant_content = _append_schedule_confirmation(
+        result.get("content", ""),
+        draft=successful_draft,
+        schedule=successful_schedule,
+    )
+    result["content"] = assistant_content
     if assistant_content:
         msg_store.setdefault(conversation_id, []).append({
             "role": "assistant", "content": assistant_content,

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -20,6 +21,38 @@ from typing import Any
 from greenbook_assistant_core.context import SessionContext
 
 logger = logging.getLogger(__name__)
+
+_CREATE_MARKERS = (
+    "草稿", "保存", "存为", "写一篇", "写个", "创作一篇", "创建一篇",
+    "发一篇", "发布一篇",
+)
+_SCHEDULE_MARKERS = ("定时", "安排", "后发布", "发布任务")
+_NUMBER_RE_FOR_TIME = r"[零〇一二两三四五六七八九十百\d]+"
+
+
+def _has_future_time_expression(text: str) -> bool:
+    return bool(
+        re.search(
+            rf"明天|后天|今天(?:上午|早上|下午|晚上|今晚)|下周|"
+            rf"{_NUMBER_RE_FOR_TIME}\s*(?:分钟|分|小时|个小时|天)\s*后|"
+            rf"20\d{{2}}[-年/]\d{{1,2}}[-月/]\d{{1,2}}日?",
+            text,
+        )
+    )
+
+
+def _turn_intents(user_message: str) -> tuple[bool, bool, bool, bool, bool]:
+    text = user_message.strip().lower()
+    asks_create = any(word in text for word in _CREATE_MARKERS)
+    asks_revise = any(word in text for word in ("修改", "改成", "改得", "润色", "重写"))
+    asks_schedule = any(word in text for word in _SCHEDULE_MARKERS) or (
+        "发布" in text and _has_future_time_expression(text)
+    )
+    asks_cancel = any(word in text for word in ("取消", "撤销"))
+    asks_search = any(word in text for word in ("搜索", "查找", "检索")) and any(
+        word in text for word in ("社区", "帖子", "文章")
+    )
+    return asks_create, asks_revise, asks_schedule, asks_cancel, asks_search
 
 # Product default context injected into every system prompt
 PRODUCT_DEFAULTS = """## GreenBook产品默认语义
@@ -47,14 +80,7 @@ def _turn_routing_hint(
     commands, this keeps auto tool selection deterministic without exposing a
     routing implementation detail to the user or disabling thinking mode.
     """
-    text = user_message.strip().lower()
-    asks_create = any(word in text for word in ("草稿", "保存", "存为", "写一篇", "创作一篇"))
-    asks_revise = any(word in text for word in ("修改", "改成", "改得", "润色", "重写"))
-    asks_schedule = any(word in text for word in ("定时", "安排", "后发布", "发布任务"))
-    asks_cancel = any(word in text for word in ("取消", "撤销"))
-    asks_search = any(word in text for word in ("搜索", "查找", "检索")) and any(
-        word in text for word in ("社区", "帖子", "文章")
-    )
+    asks_create, asks_revise, asks_schedule, asks_cancel, asks_search = _turn_intents(user_message)
 
     if asks_create and asks_schedule:
         return (
@@ -92,14 +118,7 @@ def _turn_tool_filter(
     The next turn receives a fresh filter, so a create-and-schedule request
     can create first and schedule from the session's active draft afterward.
     """
-    text = user_message.strip().lower()
-    asks_create = any(word in text for word in ("草稿", "保存", "存为", "写一篇", "创作一篇"))
-    asks_revise = any(word in text for word in ("修改", "改成", "改得", "润色", "重写"))
-    asks_schedule = any(word in text for word in ("定时", "安排", "后发布", "发布任务"))
-    asks_cancel = any(word in text for word in ("取消", "撤销"))
-    asks_search = any(word in text for word in ("搜索", "查找", "检索")) and any(
-        word in text for word in ("社区", "帖子", "文章")
-    )
+    asks_create, asks_revise, asks_schedule, asks_cancel, asks_search = _turn_intents(user_message)
 
     if asks_cancel:
         return {"publication_cancel_schedule"}
@@ -193,6 +212,11 @@ class CommunityOperationsAssistant:
         messages.append({"role": "user", "content": user_message})
 
         allowed_tool_names = _turn_tool_filter(user_message, session)
+        create_then_schedule = (
+            allowed_tool_names == {"content_create_draft"}
+            and _turn_intents(user_message)[0]
+            and _turn_intents(user_message)[2]
+        )
         turn_tools = self.tools_schema
         if allowed_tool_names is not None:
             turn_tools = [
@@ -343,6 +367,22 @@ class CommunityOperationsAssistant:
                                     entity_id=str(data["post_id"]),
                                     label=data.get("title"), status="PUBLISHED", run_id=rid,
                                 )
+
+                        # A create-and-schedule request is two ordered model
+                        # turns. The schedule tool is exposed only after the
+                        # draft side effect succeeds; after a successful
+                        # write, no duplicate write tool is exposed.
+                        if tool_name == "content_create_draft":
+                            if create_then_schedule and session.active_draft_id:
+                                turn_tools = [
+                                    schema for schema in self.tools_schema
+                                    if schema.get("function", {}).get("name")
+                                    == "publication_schedule"
+                                ]
+                            else:
+                                turn_tools = []
+                        elif tool_name == "publication_schedule":
+                            turn_tools = []
                 continue
 
             # A final assistant message is stored exactly once.  Reasoning is

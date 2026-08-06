@@ -206,7 +206,16 @@ class JavaClient:
             return ToolResult.success({}, trace_id=resp_trace_id)
 
         if 200 <= resp.status_code < 300:
-            data = resp.json() if resp.content else {}
+            try:
+                data = resp.json() if resp.content else {}
+            except ValueError:
+                return ToolResult.failure(
+                    "BAD_GATEWAY",
+                    "Java returned a non-JSON success response",
+                    "社区服务返回了无法识别的结果，请稍后重试。",
+                    request_sent=is_write,
+                    trace_id=resp_trace_id,
+                )
             return ToolResult.success(data, trace_id=resp_trace_id, receipt_id=receipt_id)
 
         if resp.status_code == 201:
@@ -234,6 +243,15 @@ class JavaClient:
 
         code = str(structured.code) if structured else ""
         user_msg = structured.user_message if structured else None
+        if resp.status_code == 422:
+            return ToolResult.failure(
+                "DOWNSTREAM_VALIDATION_FAILED",
+                body_text,
+                user_msg or "下游服务拒绝了请求参数。",
+                request_sent=True,
+                trace_id=trace_id,
+            )
+
         if resp.status_code == 400 or code == "VALIDATION_ERROR":
             return ToolResult.validation_error(message=body_text, user_message=user_msg or "")
 
