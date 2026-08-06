@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,7 @@ class ResourceRef(BaseModel):
     version: int | None = None
 
 
-class ToolResult(BaseModel, Generic[T]):
+class ToolResult[T](BaseModel):
     """Unified result envelope for every MCP tool and Java API call."""
 
     ok: bool
@@ -29,6 +29,63 @@ class ToolResult(BaseModel, Generic[T]):
     receipt_id: str | None = Field(default=None)
     resource_refs: list[ResourceRef] = Field(default_factory=list)
 
+    @classmethod
+    def failure(
+        cls,
+        code: str,
+        message: str,
+        user_message: str,
+        *,
+        retryable: bool = False,
+        request_sent: bool = False,
+        trace_id: str | None = None,
+    ) -> ToolResult[T]:
+        return cls(
+            ok=False,
+            code=code,
+            message=message,
+            user_message=user_message,
+            retryable=retryable,
+            request_sent=request_sent,
+            trace_id=trace_id,
+        )
+
+    @classmethod
+    def creator_unavailable(
+        cls, message: str = "", *, trace_id: str | None = None
+    ) -> ToolResult[T]:
+        return cls.failure(
+            "CREATOR_UNAVAILABLE",
+            message or "Creator Agent is unavailable",
+            "创作服务暂时不可用，尚未保存草稿，可以安全重试。",
+            retryable=True,
+            trace_id=trace_id,
+        )
+
+    @classmethod
+    def java_backend_unavailable(
+        cls, message: str = "", *, trace_id: str | None = None
+    ) -> ToolResult[T]:
+        return cls.failure(
+            "JAVA_BACKEND_UNAVAILABLE",
+            message or "Java backend is unavailable",
+            "社区服务暂时不可用，尚未确认本次操作结果。",
+            retryable=True,
+            trace_id=trace_id,
+        )
+
+    @classmethod
+    def tool_execution_failed(
+        cls, message: str = "", *, trace_id: str | None = None
+    ) -> ToolResult[T]:
+        return cls.failure(
+            "TOOL_EXECUTION_FAILED",
+            message or "Tool execution failed",
+            "工具执行失败，请稍后重试。",
+            retryable=False,
+            trace_id=trace_id,
+        )
+
     # ── Success ──────────────────────────────────────────
 
     @classmethod
@@ -39,7 +96,7 @@ class ToolResult(BaseModel, Generic[T]):
         trace_id: str | None = None,
         receipt_id: str | None = None,
         resource_refs: list[ResourceRef] | None = None,
-    ) -> "ToolResult[T]":
+    ) -> ToolResult[T]:
         return cls(
             ok=True,
             code="OK",
@@ -55,7 +112,7 @@ class ToolResult(BaseModel, Generic[T]):
     @classmethod
     def dependency_unavailable(
         cls, message: str = "", *, trace_id: str | None = None
-    ) -> "ToolResult[T]":
+    ) -> ToolResult[T]:
         return cls(
             ok=False,
             code="DEPENDENCY_UNAVAILABLE",
@@ -70,7 +127,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def validation_error(cls, message: str = "", *, user_message: str = "") -> "ToolResult[T]":
+    def validation_error(cls, message: str = "", *, user_message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="VALIDATION_ERROR",
@@ -81,7 +138,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def authentication_required(cls, message: str = "") -> "ToolResult[T]":
+    def authentication_required(cls, message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="AUTHENTICATION_REQUIRED",
@@ -92,7 +149,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def permission_denied(cls, message: str = "") -> "ToolResult[T]":
+    def permission_denied(cls, message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="PERMISSION_DENIED",
@@ -103,7 +160,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def business_rejected(cls, message: str = "", *, user_message: str = "") -> "ToolResult[T]":
+    def business_rejected(cls, message: str = "", *, user_message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="BUSINESS_REJECTED",
@@ -116,7 +173,7 @@ class ToolResult(BaseModel, Generic[T]):
     # ── Server-side / ambiguous failures ─────────────────
 
     @classmethod
-    def not_found(cls, message: str = "") -> "ToolResult[T]":
+    def not_found(cls, message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="NOT_FOUND",
@@ -127,7 +184,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def conflict(cls, message: str = "", *, user_message: str = "") -> "ToolResult[T]":
+    def conflict(cls, message: str = "", *, user_message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="CONFLICT",
@@ -138,7 +195,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def draft_version_conflict(cls, message: str = "") -> "ToolResult[T]":
+    def draft_version_conflict(cls, message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="DRAFT_VERSION_CONFLICT",
@@ -152,7 +209,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def idempotency_conflict(cls, message: str = "") -> "ToolResult[T]":
+    def idempotency_conflict(cls, message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="IDEMPOTENCY_CONFLICT",
@@ -166,7 +223,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def timeout(cls, message: str = "") -> "ToolResult[T]":
+    def timeout(cls, message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="TIMEOUT",
@@ -179,7 +236,7 @@ class ToolResult(BaseModel, Generic[T]):
     @classmethod
     def result_unknown(
         cls, message: str = "", *, trace_id: str | None = None
-    ) -> "ToolResult[T]":
+    ) -> ToolResult[T]:
         return cls(
             ok=False,
             code="RESULT_UNKNOWN",
@@ -194,7 +251,7 @@ class ToolResult(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def request_not_sent(cls, message: str = "") -> "ToolResult[T]":
+    def request_not_sent(cls, message: str = "") -> ToolResult[T]:
         return cls(
             ok=False,
             code="REQUEST_NOT_SENT",
@@ -207,7 +264,7 @@ class ToolResult(BaseModel, Generic[T]):
     @classmethod
     def internal_error(
         cls, message: str = "", *, trace_id: str | None = None
-    ) -> "ToolResult[T]":
+    ) -> ToolResult[T]:
         return cls(
             ok=False,
             code="INTERNAL_ERROR",

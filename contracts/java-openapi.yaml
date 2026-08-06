@@ -582,24 +582,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/DraftResponse'
 
-  /api/v1/agent/me/drafts:
-    get:
-      tags: [Agent Facade]
-      summary: 查询自己的草稿列表
-      operationId: getMyDrafts
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: 草稿列表
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DraftResponse'
-
-  /api/v1/agent/drafts/{draftId}/update:
     put:
       tags: [Agent Facade]
       summary: 修改草稿
@@ -625,6 +607,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DraftResponse'
+
+  /api/v1/agent/me/drafts:
+    get:
+      tags: [Agent Facade]
+      summary: 查询自己的草稿列表
+      operationId: getMyDrafts
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 草稿列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DraftResponse'
 
   # ── Publications ────────────────────────────────────────────
   /api/v1/agent/publications/schedules:

@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 import httpx
-from greenbook_contracts.tool_result import ResourceRef, ToolResult
+from greenbook_contracts.tool_result import ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class CreatorClient:
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:8093",
+        base_url: str = "http://127.0.0.1:8092",
         *,
         timeout: float = 240.0,
         poll_interval: float = 1.5,
@@ -87,8 +87,8 @@ class CreatorClient:
                 json=body,
                 headers=headers,
             )
-        except httpx.ConnectError as exc:
-            return ToolResult.dependency_unavailable(
+        except httpx.ConnectError:
+            return ToolResult.creator_unavailable(
                 "Creator Agent is unreachable. No draft was created. You may safely retry.",
                 trace_id=trace_id,
             )
@@ -98,7 +98,7 @@ class CreatorClient:
         if 200 <= resp.status_code < 300:
             return ToolResult.success(resp.json(), trace_id=trace_id)
 
-        return ToolResult.dependency_unavailable(
+        return ToolResult.creator_unavailable(
             f"Creator returned HTTP {resp.status_code}", trace_id=trace_id
         )
 
@@ -177,7 +177,7 @@ class CreatorClient:
                 headers=headers,
             )
         except httpx.ConnectError:
-            return ToolResult.dependency_unavailable(
+            return ToolResult.creator_unavailable(
                 "Creator Agent is unreachable", trace_id=trace_id
             )
         except httpx.TimeoutException:
@@ -218,7 +218,7 @@ class CreatorClient:
                 headers=headers,
             )
         except httpx.ConnectError:
-            return ToolResult.dependency_unavailable(
+            return ToolResult.creator_unavailable(
                 "Creator Agent is unreachable", trace_id=trace_id
             )
         except httpx.TimeoutException:
@@ -227,7 +227,7 @@ class CreatorClient:
         if 200 <= resp.status_code < 300:
             return ToolResult.success(resp.json(), trace_id=trace_id)
 
-        return ToolResult.dependency_unavailable(
+        return ToolResult.creator_unavailable(
             f"Creator handoff returned {resp.status_code}", trace_id=trace_id
         )
 

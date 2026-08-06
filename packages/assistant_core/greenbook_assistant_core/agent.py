@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from greenbook_assistant_core.context import SessionContext
@@ -35,6 +35,89 @@ PRODUCT_DEFAULTS = """## GreenBook产品默认语义
 - 未明确提及外部平台时，不询问发布平台
 - 搜索结果是创作输入，不是搜索完成后直接结束
 - 只有缺少真正必要的业务参数时才澄清"""
+
+
+def _turn_routing_hint(
+    user_message: str,
+    session: SessionContext | None = None,
+) -> str | None:
+    """Give obvious business intents a short, internal tool-routing hint.
+
+    Thinking models only support ``tool_choice=auto``.  For explicit product
+    commands, this keeps auto tool selection deterministic without exposing a
+    routing implementation detail to the user or disabling thinking mode.
+    """
+    text = user_message.strip().lower()
+    asks_create = any(word in text for word in ("草稿", "保存", "存为", "写一篇", "创作一篇"))
+    asks_revise = any(word in text for word in ("修改", "改成", "改得", "润色", "重写"))
+    asks_schedule = any(word in text for word in ("定时", "安排", "后发布", "发布任务"))
+    asks_cancel = any(word in text for word in ("取消", "撤销"))
+    asks_search = any(word in text for word in ("搜索", "查找", "检索")) and any(
+        word in text for word in ("社区", "帖子", "文章")
+    )
+
+    if asks_create and asks_schedule:
+        return (
+            "INTERNAL TURN ROUTING: This is a create-and-schedule request. "
+            "Call content_create_draft first, then publication_schedule using its active draft."
+        )
+    if asks_cancel:
+        return "INTERNAL TURN ROUTING: Call publication_cancel_schedule for this cancellation request."
+    if asks_schedule and asks_revise:
+        if session is not None and session.active_schedule_id:
+            return "INTERNAL TURN ROUTING: Call publication_update_schedule for this schedule-change request."
+        return "INTERNAL TURN ROUTING: Call publication_schedule for this new scheduling request."
+    if asks_create and asks_revise:
+        return "INTERNAL TURN ROUTING: Call content_revise_draft for this draft operation."
+    if asks_create:
+        return "INTERNAL TURN ROUTING: Call content_create_draft directly for this draft operation. Do not search first unless the user explicitly asks for search references."
+    if asks_revise:
+        return "INTERNAL TURN ROUTING: Call content_revise_draft directly for this draft operation."
+    if asks_schedule:
+        return "INTERNAL TURN ROUTING: Call publication_schedule for this scheduling request."
+    if asks_search:
+        return "INTERNAL TURN ROUTING: Call community_search_public_posts before answering this community search request."
+    return None
+
+
+def _turn_tool_filter(
+    user_message: str,
+    session: SessionContext | None = None,
+) -> set[str] | None:
+    """Limit auto tool selection for explicit business commands.
+
+    Thinking models support ``tool_choice=auto`` but can still choose a
+    semantically adjacent tool when every tool is offered.  For an explicit
+    command, expose only the operation that can satisfy the current turn.
+    The next turn receives a fresh filter, so a create-and-schedule request
+    can create first and schedule from the session's active draft afterward.
+    """
+    text = user_message.strip().lower()
+    asks_create = any(word in text for word in ("草稿", "保存", "存为", "写一篇", "创作一篇"))
+    asks_revise = any(word in text for word in ("修改", "改成", "改得", "润色", "重写"))
+    asks_schedule = any(word in text for word in ("定时", "安排", "后发布", "发布任务"))
+    asks_cancel = any(word in text for word in ("取消", "撤销"))
+    asks_search = any(word in text for word in ("搜索", "查找", "检索")) and any(
+        word in text for word in ("社区", "帖子", "文章")
+    )
+
+    if asks_cancel:
+        return {"publication_cancel_schedule"}
+    if asks_schedule and asks_revise:
+        return {
+            "publication_update_schedule"
+            if session is not None and session.active_schedule_id
+            else "publication_schedule"
+        }
+    if asks_create:
+        return {"content_create_draft"}
+    if asks_revise:
+        return {"content_revise_draft"}
+    if asks_schedule:
+        return {"publication_schedule"}
+    if asks_search:
+        return {"community_search_public_posts"}
+    return None
 
 
 class CommunityOperationsAssistant:
@@ -65,12 +148,11 @@ class CommunityOperationsAssistant:
 
     def _build_system_prompt(self, session: SessionContext) -> str:
         tz = session.timezone or "Asia/Shanghai"
-        now_str = datetime.now(timezone.utc).isoformat()
+        now_str = datetime.now(UTC).isoformat()
         context_lines = [
             self.system_prompt,
-            PRODUCT_DEFAULTS,
             "",
-            f"## 当前会话上下文",
+            "## 当前会话上下文",
             f"- 会话ID: {session.conversation_id}",
             f"- 当前时间: {now_str}",
             f"- 用户时区: {tz}",
@@ -103,32 +185,69 @@ class CommunityOperationsAssistant:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self._build_system_prompt(session)},
         ]
+        routing_hint = _turn_routing_hint(user_message, session)
+        if routing_hint:
+            messages.append({"role": "system", "content": routing_hint})
         if conversation_history:
             messages.extend(conversation_history)
         messages.append({"role": "user", "content": user_message})
 
+        allowed_tool_names = _turn_tool_filter(user_message, session)
+        turn_tools = self.tools_schema
+        if allowed_tool_names is not None:
+            turn_tools = [
+                schema for schema in self.tools_schema
+                if schema.get("function", {}).get("name") in allowed_tool_names
+            ]
+
         tool_rounds = 0
         final_content = ""
+        failed_tool_calls: set[str] = set()
 
         while tool_rounds < self.max_tool_rounds:
             resp = await self.llm.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                tools=self.tools_schema if self.tools_schema else None,
-                temperature=0.3,
+                tools=turn_tools if turn_tools else None,
+                tool_choice="auto" if turn_tools else None,
+                temperature=0.0,
             )
 
             choice = resp.choices[0]
             msg = choice.message
-
-            # Accumulate content delta
-            if msg.content:
-                final_content = msg.content
-                messages.append({"role": "assistant", "content": msg.content})
-                if on_assistant_delta:
-                    await on_assistant_delta(msg.content)
+            logger.info(
+                "llm_response trace_id=%s run_id=%s finish_reason=%s tool_call_count=%s reasoning_present=%s",
+                tid,
+                rid,
+                getattr(choice, "finish_reason", None),
+                len(msg.tool_calls or []),
+                bool(getattr(msg, "reasoning_content", None)),
+            )
 
             if msg.tool_calls:
+                # DeepSeek thinking models require this complete assistant
+                # message, including reasoning_content, on the next request.
+                assistant_msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": msg.content or "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ],
+                }
+                if hasattr(msg, "reasoning_content"):
+                    reasoning_content = msg.reasoning_content
+                    if reasoning_content is not None:
+                        assistant_msg["reasoning_content"] = reasoning_content
+                messages.append(assistant_msg)
+
                 for tc in msg.tool_calls:
                     tool_rounds += 1
                     tool_name = tc.function.name
@@ -142,19 +261,35 @@ class CommunityOperationsAssistant:
                     if on_tool_start:
                         await on_tool_start(tool_name, tc.id, tool_args)
 
-                    try:
-                        result = await tool_handler(tool_name, tool_args, session, rid, tc.id)
-                    except Exception as exc:
-                        logger.exception("Tool handler error: %s", tool_name)
+                    call_key = json.dumps(
+                        [tool_name, tool_args], ensure_ascii=False, sort_keys=True, default=str
+                    )
+                    if call_key in failed_tool_calls:
                         result = {
                             "ok": False,
-                            "code": "INTERNAL_ERROR",
-                            "message": str(exc),
-                            "user_message": "An error occurred processing your request.",
-                            "retryable": True,
+                            "code": "TOOL_EXECUTION_FAILED",
+                            "message": "The same tool call already failed",
+                            "user_message": "该工具调用已失败，不能重复执行。",
+                            "retryable": False,
                             "request_sent": False,
                             "trace_id": tid,
                         }
+                    else:
+                        try:
+                            result = await tool_handler(tool_name, tool_args, session, rid, tc.id)
+                        except Exception:
+                            logger.exception("Tool handler error tool=%s", tool_name)
+                            result = {
+                                "ok": False,
+                                "code": "TOOL_EXECUTION_FAILED",
+                                "message": "Tool handler raised an exception",
+                                "user_message": "工具执行失败，请稍后重试。",
+                                "retryable": False,
+                                "request_sent": False,
+                                "trace_id": tid,
+                            }
+                    if not result.get("ok"):
+                        failed_tool_calls.add(call_key)
 
                     if on_tool_complete:
                         await on_tool_complete(tool_name, tc.id, result)
@@ -169,11 +304,6 @@ class CommunityOperationsAssistant:
                         "receipt_id": result.get("receipt_id"),
                     }
 
-                    messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [tc],
-                    })
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc.id,
@@ -195,11 +325,15 @@ class CommunityOperationsAssistant:
                                     label=data.get("title"), status="READY", run_id=rid,
                                 )
                             if data.get("schedule_id"):
-                                session.active_schedule_id = str(data["schedule_id"])
+                                schedule_status = str(data.get("status", "SCHEDULED"))
+                                if schedule_status == "CANCELLED":
+                                    session.active_schedule_id = None
+                                else:
+                                    session.active_schedule_id = str(data["schedule_id"])
                                 session.record_entity(
                                     ref=f"schedule:{data['schedule_id']}", kind="SCHEDULE",
                                     entity_id=str(data["schedule_id"]),
-                                    label=f"Schedule", status=data.get("status", "SCHEDULED"),
+                                    label="Schedule", status=schedule_status,
                                     run_id=rid,
                                 )
                             if data.get("post_id"):
@@ -211,6 +345,11 @@ class CommunityOperationsAssistant:
                                 )
                 continue
 
+            # A final assistant message is stored exactly once.  Reasoning is
+            # intentionally not copied into the user-visible result/history.
+            final_content = msg.content or ""
+            if final_content and on_assistant_delta:
+                await on_assistant_delta(final_content)
             break
 
         return {

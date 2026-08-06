@@ -1,12 +1,16 @@
 # Local configuration and secrets
 .env
 **/.env
+**/.env.*
+!**/.env.example
 privatecredentials/
 **/privatecredentials/
 zhiguang-be/src/main/resources/keys/*.pem
 
 # Python
 **/.venv/
+**/.venv-v2/
+**/venv/
 **/__pycache__/
 **/*.py[cod]
 **/.pytest_cache/
@@ -32,6 +36,13 @@ Thumbs.db
 **/*.db
 **/*.sqlite
 **/*.sqlite3
+**/.coverage
+**/coverage.xml
+**/htmlcov/
+**/build/
+**/tmp/
+**/temp/
+**/generated/
 .p0-e2e-runs/
 data/
 var/

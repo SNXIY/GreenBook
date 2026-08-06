@@ -10,12 +10,8 @@ without requiring live infrastructure.
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-
 import pytest
-from greenbook_assistant_core.agent import AssistantAgent
 from greenbook_assistant_core.context import SessionContext
-from greenbook_assistant_core.memory import ConversationMemory
 from greenbook_contracts.identity import AuthContext
 from greenbook_contracts.tool_result import ToolResult
 
@@ -25,11 +21,11 @@ class TestGoldenFlowCreateSchedule:
 
     @pytest.fixture
     def auth(self) -> AuthContext:
-        return AuthContext(user_id="u1", tenant_id="t1")
+        return AuthContext(user_id="u1", tenant_id="t1", raw_access_token="test-token")
 
     @pytest.fixture
     def session(self, auth: AuthContext) -> SessionContext:
-        return SessionContext("conv-1", auth)
+        return SessionContext(conversation_id="conv-1", user_id=auth.user_id, tenant_id=auth.tenant_id)
 
     async def test_create_draft_then_schedule(self, auth: AuthContext, session: SessionContext) -> None:
         """User creates a draft, then schedules it."""
@@ -60,11 +56,11 @@ class TestGoldenFlowSearchCreateSchedule:
 
     @pytest.fixture
     def auth(self) -> AuthContext:
-        return AuthContext(user_id="u1", tenant_id="t1")
+        return AuthContext(user_id="u1", tenant_id="t1", raw_access_token="test-token")
 
     @pytest.fixture
     def session(self, auth: AuthContext) -> SessionContext:
-        return SessionContext("conv-1", auth)
+        return SessionContext(conversation_id="conv-1", user_id=auth.user_id, tenant_id=auth.tenant_id)
 
     async def test_search_then_create_then_schedule(self, auth: AuthContext, session: SessionContext) -> None:
         results = {
@@ -101,11 +97,11 @@ class TestGoldenFlowReviseKeepSchedule:
 
     @pytest.fixture
     def auth(self) -> AuthContext:
-        return AuthContext(user_id="u1", tenant_id="t1")
+        return AuthContext(user_id="u1", tenant_id="t1", raw_access_token="test-token")
 
     @pytest.fixture
     def session(self, auth: AuthContext) -> SessionContext:
-        return SessionContext("conv-1", auth)
+        return SessionContext(conversation_id="conv-1", user_id=auth.user_id, tenant_id=auth.tenant_id)
 
     async def test_resolve_recent_then_revise_then_verify_schedule(self, auth: AuthContext, session: SessionContext) -> None:
         """After revising a draft, the schedule must still point to the correct draft."""
@@ -162,11 +158,11 @@ class TestErrorHandling:
 
     @pytest.fixture
     def auth(self) -> AuthContext:
-        return AuthContext(user_id="u1", tenant_id="t1")
+        return AuthContext(user_id="u1", tenant_id="t1", raw_access_token="test-token")
 
     @pytest.fixture
     def session(self, auth: AuthContext) -> SessionContext:
-        return SessionContext("conv-1", auth)
+        return SessionContext(conversation_id="conv-1", user_id=auth.user_id, tenant_id=auth.tenant_id)
 
     async def test_creator_unavailable_is_readable_and_retryable(self, session: SessionContext) -> None:
         """Creator不可用时错误可读且可安全重试."""
@@ -191,7 +187,7 @@ class TestErrorHandling:
         from greenbook_contracts.identity import AuthContext
 
         # AuthContext is created by auth middleware, not model
-        ctx = AuthContext(user_id="verified-user", tenant_id="t1")
+        ctx = AuthContext(user_id="verified-user", tenant_id="t1", raw_access_token="test-token")
         assert ctx.user_id == "verified-user"
         # Model cannot create AuthContext — it's always from validated JWT
 

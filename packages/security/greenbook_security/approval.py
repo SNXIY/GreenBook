@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -36,7 +36,7 @@ class Approval(BaseModel):
         description: str = "",
         preview: dict[str, Any] | None = None,
         ttl_minutes: int = 30,
-    ) -> "Approval":
+    ) -> Approval:
         request_data = {
             "user_id": user_id,
             "conversation_id": conversation_id,
@@ -58,11 +58,11 @@ class Approval(BaseModel):
             request_hash=request_hash,
             description=description,
             preview=preview or {},
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes),
+            expires_at=datetime.now(UTC) + timedelta(minutes=ttl_minutes),
         )
 
     def is_expired(self) -> bool:
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def is_valid_for(
         self,
@@ -85,7 +85,8 @@ class Approval(BaseModel):
             return False
         if self.operation != operation:
             return False
-        if self.resource_id is not None and resource_id is not None:
-            if self.resource_id != resource_id:
-                return False
-        return True
+        return not (
+            self.resource_id is not None
+            and resource_id is not None
+            and self.resource_id != resource_id
+        )

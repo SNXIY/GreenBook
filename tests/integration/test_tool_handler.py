@@ -5,7 +5,7 @@ with proper auth context, trace headers, and idempotency keys.
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from greenbook_assistant_core.context import SessionContext
@@ -25,11 +25,11 @@ class MockJavaClient:
 class TestToolHandlerRouting:
     @pytest.fixture
     def auth(self) -> AuthContext:
-        return AuthContext(user_id="u1", tenant_id="t1", display_name="Test User")
+        return AuthContext(user_id="u1", tenant_id="t1", raw_access_token="test-token")
 
     @pytest.fixture
     def session(self, auth: AuthContext) -> SessionContext:
-        return SessionContext("conv-1", auth)
+        return SessionContext(conversation_id="conv-1", user_id=auth.user_id, tenant_id=auth.tenant_id)
 
     @pytest.fixture
     def java(self) -> MockJavaClient:

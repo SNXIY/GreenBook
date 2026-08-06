@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-import httpx
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
+import httpx
+import pytest
 from greenbook_java_client.client import JavaClient
-from greenbook_contracts.tool_result import ToolResult
 
 
 @pytest.fixture
@@ -17,11 +16,11 @@ def client():
 
 @pytest.mark.asyncio
 async def test_connect_error_is_dependency_unavailable(client):
-    """ConnectError → DEPENDENCY_UNAVAILABLE, request_sent=false, retryable=true."""
+    """ConnectError → JAVA_BACKEND_UNAVAILABLE, request_sent=false, retryable=true."""
     with patch.object(client.http, "request", side_effect=httpx.ConnectError("refused")):
         result = await client.search_posts(query="test")
         assert result.ok is False
-        assert result.code == "DEPENDENCY_UNAVAILABLE"
+        assert result.code == "JAVA_BACKEND_UNAVAILABLE"
         assert result.retryable is True
         assert result.request_sent is False
 
@@ -61,19 +60,19 @@ async def test_write_timeout_is_not_sent(client):
 
 @pytest.mark.asyncio
 async def test_connect_timeout_is_dependency_unavailable(client):
-    """ConnectTimeout → DEPENDENCY_UNAVAILABLE, request_sent=false."""
+    """ConnectTimeout → JAVA_BACKEND_UNAVAILABLE, request_sent=false."""
     with patch.object(client.http, "request", side_effect=httpx.ConnectTimeout("connect timeout")):
         result = await client.get_post("123")
-        assert result.code == "DEPENDENCY_UNAVAILABLE"
+        assert result.code == "JAVA_BACKEND_UNAVAILABLE"
         assert result.request_sent is False
 
 
 @pytest.mark.asyncio
 async def test_pool_timeout_is_dependency_unavailable(client):
-    """PoolTimeout → DEPENDENCY_UNAVAILABLE."""
+    """PoolTimeout → JAVA_BACKEND_UNAVAILABLE."""
     with patch.object(client.http, "request", side_effect=httpx.PoolTimeout("pool exhausted")):
         result = await client.search_posts(query="test")
-        assert result.code == "DEPENDENCY_UNAVAILABLE"
+        assert result.code == "JAVA_BACKEND_UNAVAILABLE"
         assert result.retryable is True
 
 
@@ -89,11 +88,11 @@ async def test_success_responses_have_request_sent_true(client):
 
 @pytest.mark.asyncio
 async def test_http_500_is_dependency_unavailable(client):
-    """50x responses without structured error → DEPENDENCY_UNAVAILABLE."""
+    """50x responses without structured error → JAVA_BACKEND_UNAVAILABLE."""
     mock_resp = httpx.Response(503, text="Service Unavailable")
     with patch.object(client.http, "request", return_value=mock_resp):
         result = await client.search_posts(query="test")
-        assert result.code == "DEPENDENCY_UNAVAILABLE"
+        assert result.code == "JAVA_BACKEND_UNAVAILABLE"
 
 
 @pytest.mark.asyncio
@@ -110,8 +109,20 @@ async def test_draft_version_conflict_code_mapped(client):
 
 @pytest.mark.asyncio
 async def test_network_error_is_dependency_unavailable(client):
-    """NetworkError before request → DEPENDENCY_UNAVAILABLE."""
+    """NetworkError before request → JAVA_BACKEND_UNAVAILABLE."""
     with patch.object(client.http, "request", side_effect=httpx.NetworkError("network gone")):
         result = await client.search_posts(query="test")
-        assert result.code == "DEPENDENCY_UNAVAILABLE"
+        assert result.code == "JAVA_BACKEND_UNAVAILABLE"
         assert result.request_sent is False
+
+
+@pytest.mark.asyncio
+async def test_no_content_delete_is_a_success(client):
+    """204 DELETE responses must not be parsed as JSON."""
+    mock_resp = httpx.Response(204)
+    with patch.object(client.http, "request", return_value=mock_resp):
+        result = await client.cancel_schedule(
+            "schedule-1", bearer_token="t", idempotency_key="cancel-1"
+        )
+    assert result.ok is True
+    assert result.code == "OK"

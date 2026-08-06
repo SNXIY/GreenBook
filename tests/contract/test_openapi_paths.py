@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-import yaml
+
 import pytest
+import yaml
 
 
 def _normalize_path(path: str) -> str:
@@ -93,7 +94,6 @@ def test_client_path_exists_in_openapi(func_name, method, raw_path):
 
 
 def test_all_openapi_paths_covered():
-    covered = {_normalize_path(p) for _, (_, p) in CLIENT_PATHS.items()}
     for path, methods in sorted(OPENAPI_OPS.items()):
         for method in methods:
             found = any(
@@ -105,7 +105,9 @@ def test_all_openapi_paths_covered():
 
 def test_update_draft_path():
     _, raw = CLIENT_PATHS["update_draft"]
-    assert "/update" in raw, f"update_draft missing /update: {raw}"
+    assert raw == "/api/v1/agent/drafts/{draft_id}", (
+        f"update_draft must use the Java Agent Facade resource path: {raw}"
+    )
 
 
 def test_schedule_status_enum():

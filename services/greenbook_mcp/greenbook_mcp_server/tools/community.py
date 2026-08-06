@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 from greenbook_contracts.tool_result import ToolResult
-from greenbook_java_client.models import SortMode
 
 from ..context import ToolContext
 
@@ -19,13 +18,14 @@ async def search_public_posts(
     sort: str = "latest",
     page: int = 1,
     size: int = 20,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Search public posts in the GreenBook community."""
     return await ctx.java.search_posts(
         query=query,
         sort=sort,
         page=page,
         size=size,
+        bearer_token=ctx.auth.raw_access_token,
         trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
     )
@@ -34,10 +34,11 @@ async def search_public_posts(
 async def get_post(
     ctx: ToolContext,
     post_id: str,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Get a single post by ID."""
     result = await ctx.java.get_post(
         post_id,
+        bearer_token=ctx.auth.raw_access_token,
         trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
     )
@@ -53,7 +54,7 @@ async def list_own_posts(
     ctx: ToolContext,
     page: int = 1,
     size: int = 20,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """List current user's own posts."""
     result = await ctx.java.list_own_posts(
         page=page,

@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import logging
 import re
-import uuid
+from contextlib import suppress
 from typing import Any
 
 import httpx
-from greenbook_contracts.tool_result import ResourceRef, ToolResult
+from greenbook_contracts.tool_result import ToolResult
+
 from greenbook_java_client.models import (
     AgentCommentPageResponse,
     AgentCommentReplyRequest,
@@ -21,8 +22,8 @@ from greenbook_java_client.models import (
     AgentDraftCreateRequest,
     AgentDraftUpdateRequest,
     AgentErrorResponse,
-    AgentPostContext,
     AgentOwnPostSummary,
+    AgentPostContext,
     DraftResponse,
     PostAnalyticsResponse,
     PublishNowRequest,
@@ -137,7 +138,7 @@ class JavaClient:
         body: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
-    ) -> ToolResult[dict[str, Any]]:
+    ) -> ToolResult[Any]:
         req_headers = dict(headers or {})
         trace_id = self._trace_id(req_headers)
 
@@ -149,13 +150,13 @@ class JavaClient:
             )
         except httpx.ConnectError:
             logger.warning("Java connect failed path=%s", path)
-            return ToolResult.dependency_unavailable(
+            return ToolResult.java_backend_unavailable(
                 "Java backend unreachable — connection failed. No request was sent.",
                 trace_id=trace_id,
             )
         except httpx.ConnectTimeout:
             logger.warning("Java connect timeout path=%s", path)
-            return ToolResult.dependency_unavailable(
+            return ToolResult.java_backend_unavailable(
                 "Java backend connection timed out. No request was sent.",
                 trace_id=trace_id,
             )
@@ -177,7 +178,7 @@ class JavaClient:
             )
         except httpx.PoolTimeout:
             logger.warning("Java pool timeout path=%s", path)
-            return ToolResult.dependency_unavailable(
+            return ToolResult.java_backend_unavailable(
                 "Java backend connection pool exhausted. You may safely retry.",
                 trace_id=trace_id,
             )
@@ -193,7 +194,7 @@ class JavaClient:
                 "Java backend request timed out. You may safely retry."
             )
         except (httpx.RemoteProtocolError, httpx.NetworkError):
-            return ToolResult.dependency_unavailable(
+            return ToolResult.java_backend_unavailable(
                 "Java backend network error. No request was processed.",
                 trace_id=trace_id,
             )
@@ -201,12 +202,12 @@ class JavaClient:
         resp_trace_id = resp.headers.get("X-Trace-ID") or trace_id
         receipt_id = resp.headers.get("X-Receipt-ID")
 
+        if resp.status_code == 204:
+            return ToolResult.success({}, trace_id=resp_trace_id)
+
         if 200 <= resp.status_code < 300:
             data = resp.json() if resp.content else {}
             return ToolResult.success(data, trace_id=resp_trace_id, receipt_id=receipt_id)
-
-        if resp.status_code == 204:
-            return ToolResult.success({}, trace_id=resp_trace_id)
 
         if resp.status_code == 201:
             data = resp.json() if resp.content else {}
@@ -219,12 +220,10 @@ class JavaClient:
         resp: httpx.Response,
         trace_id: str | None,
         receipt_id: str | None,
-    ) -> ToolResult[dict[str, Any]]:
+    ) -> ToolResult[Any]:
         body_text = ""
-        try:
+        with suppress(Exception):
             body_text = (resp.text or "")[:2000]
-        except Exception:
-            pass
 
         structured: AgentErrorResponse | None = None
         try:
@@ -235,14 +234,22 @@ class JavaClient:
 
         code = str(structured.code) if structured else ""
         user_msg = structured.user_message if structured else None
-        retryable = structured.retryable if structured else False
-        request_committed = structured.request_committed if structured else False
-
         if resp.status_code == 400 or code == "VALIDATION_ERROR":
             return ToolResult.validation_error(message=body_text, user_message=user_msg or "")
 
-        if resp.status_code in (401, 403) or code in ("AUTHENTICATION_REQUIRED", "UNAUTHORIZED", "FORBIDDEN"):
-            return ToolResult.permission_denied(message=body_text)
+        if resp.status_code == 401 or code in ("AUTHENTICATION_REQUIRED", "UNAUTHORIZED"):
+            return ToolResult.failure(
+                "AUTHENTICATION_FAILED",
+                "Java rejected the access token",
+                "登录状态已失效，请重新登录。",
+            )
+
+        if resp.status_code == 403 or code in ("FORBIDDEN", "PERMISSION_DENIED"):
+            return ToolResult.failure(
+                "AUTHORIZATION_DENIED",
+                "Java denied this operation",
+                "你没有权限执行此操作。",
+            )
 
         if resp.status_code == 404 or code == "NOT_FOUND":
             return ToolResult.not_found(message=body_text)
@@ -263,7 +270,9 @@ class JavaClient:
             return ToolResult.conflict(message=body_text, user_message=user_msg or "")
 
         if resp.status_code >= 500 or code == "DEPENDENCY_UNAVAILABLE":
-            return ToolResult.dependency_unavailable(f"Java backend error: {body_text}", trace_id=trace_id)
+            return ToolResult.java_backend_unavailable(
+                f"Java backend error: {body_text}", trace_id=trace_id
+            )
 
         return ToolResult.internal_error(f"Unexpected {resp.status_code}: {body_text}", trace_id=trace_id)
 
@@ -437,7 +446,7 @@ class JavaClient:
         )
         result = await self._request(
             "PUT",
-            f"/api/v1/agent/drafts/{draft_id}/update",
+            f"/api/v1/agent/drafts/{draft_id}",
             headers=headers,
             body=request.model_dump(mode="json", by_alias=True, exclude_none=True),
         )
@@ -532,7 +541,7 @@ class JavaClient:
         idempotency_key: str,
         trace_id: str | None = None,
         conversation_id: str | None = None,
-    ) -> ToolResult[dict[str, Any]]:
+    ) -> ToolResult[Any]:
         headers = self._headers(
             bearer_token=bearer_token,
             trace_id=trace_id,

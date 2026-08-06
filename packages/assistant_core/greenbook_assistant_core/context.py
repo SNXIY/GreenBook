@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -47,6 +46,15 @@ class SessionContext(BaseModel):
     conversation_summary: str | None = None
     last_successful_run_id: str | None = None
 
+    def set_active_draft(self, draft_id: str | None) -> None:
+        self.active_draft_id = draft_id
+
+    def set_active_post(self, post_id: str | None) -> None:
+        self.active_post_id = post_id
+
+    def set_active_schedule(self, schedule_id: str | None) -> None:
+        self.active_schedule_id = schedule_id
+
     def resolve_active_draft_id(self) -> tuple[str | None, list[str]]:
         """Resolve "the draft I just mentioned" in priority order.
 
@@ -59,7 +67,7 @@ class SessionContext(BaseModel):
         # 2. Most recent successful Draft entity
         drafts = sorted(
             [e for e in self.recent_entities if e.kind == "DRAFT"],
-            key=lambda e: e.timestamp or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda e: e.timestamp or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         if len(drafts) == 1:
@@ -78,7 +86,7 @@ class SessionContext(BaseModel):
         # 2. Most recent successful publication.schedule
         schedules = sorted(
             [e for e in self.recent_entities if e.kind == "SCHEDULE"],
-            key=lambda e: e.timestamp or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda e: e.timestamp or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         if len(schedules) == 1:
@@ -94,7 +102,7 @@ class SessionContext(BaseModel):
     ) -> None:
         entity = RecentEntity(
             ref=ref, kind=kind, entity_id=entity_id, label=label,
-            status=status, run_id=run_id, timestamp=datetime.now(timezone.utc),
+            status=status, run_id=run_id, timestamp=datetime.now(UTC),
         )
         self.recent_entities = [
             e for e in self.recent_entities
@@ -110,7 +118,7 @@ class SessionContext(BaseModel):
         call = RecentToolCall(
             tool_name=tool_name, tool_call_id=tool_call_id,
             run_id=run_id, status=status,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         self.recent_tool_calls.append(call)
         if len(self.recent_tool_calls) > 20:

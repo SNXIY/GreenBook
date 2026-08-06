@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import logging
 
-from greenbook_contracts.identity import AuthContext
 from greenbook_assistant_core.context import SessionContext
-from greenbook_java_client.client import JavaClient
+from greenbook_contracts.identity import AuthContext
 from greenbook_creator_client.client import CreatorClient
+from greenbook_java_client.client import JavaClient
 
-from .context import ToolContext
 from . import tool_registry
+from .context import ToolContext
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +72,13 @@ class GreenBookMCPServer:
             if hasattr(result, "model_dump"):
                 return result.model_dump(mode="json")
             return result
-        except Exception as exc:
+        except Exception:
             logger.exception("Tool '%s' execution failed", tool_name)
             return {
                 "ok": False,
-                "code": "INTERNAL_ERROR",
-                "message": str(exc),
-                "user_message": "An unexpected error occurred while processing your request.",
+                "code": "TOOL_EXECUTION_FAILED",
+                "message": "Tool execution failed",
+                "user_message": "工具执行失败，请稍后重试。",
                 "retryable": False,
                 "request_sent": False,
                 "trace_id": trace_id,

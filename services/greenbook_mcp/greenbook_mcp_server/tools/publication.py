@@ -28,18 +28,16 @@ publication.publish_now:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from greenbook_contracts.tool_result import ResourceRef, ToolResult
 from greenbook_java_client.models import (
     PublishNowRequest,
     ScheduleCreateRequest,
-    ScheduleStatus,
     ScheduledPublicationResponse,
+    ScheduleStatus,
     ScheduleUpdateRequest,
 )
-from greenbook_security.policy import requires_approval
 
 from ..context import ToolContext
 
@@ -52,8 +50,8 @@ async def schedule(
     ctx: ToolContext,
     draft_id: str | None,
     run_at: str,
-    timezone_name: str = "Asia/Shanghai",
-) -> ToolResult[dict[str, Any]]:
+    timezone: str = "Asia/Shanghai",
+) -> ToolResult[Any]:
     """Schedule a draft for publication."""
     resolved_draft = draft_id or ctx.session.active_draft_id
     if not resolved_draft:
@@ -64,12 +62,15 @@ async def schedule(
                 user_message="请指定要定时发布的草稿。",
             )
 
-    idempotency_key = ctx.idempotency_key("schedule")
+    idempotency_key = ctx.idempotency_key(
+        "schedule",
+        scope=f"{resolved_draft}|{run_at}|{timezone}",
+    )
 
     create_req = ScheduleCreateRequest(
         draftId=resolved_draft,
         runAt=run_at,
-        timezone=timezone_name,
+        timezone=timezone,
     )
     result = await ctx.java.create_schedule(
         create_req,
@@ -129,7 +130,7 @@ async def schedule(
             "schedule_id": schedule_id,
             "draft_id": verified.draft_id if isinstance(verified, ScheduledPublicationResponse) else resolved_draft,
             "run_at": verified.run_at.isoformat() if isinstance(verified, ScheduledPublicationResponse) and verified.run_at else run_at,
-            "timezone": verified.timezone if isinstance(verified, ScheduledPublicationResponse) else timezone_name,
+            "timezone": verified.timezone if isinstance(verified, ScheduledPublicationResponse) else timezone,
             "status": ScheduleStatus.SCHEDULED.value,
             "version": verified.version if isinstance(verified, ScheduledPublicationResponse) else None,
         },
@@ -145,7 +146,7 @@ async def schedule(
 async def get_status(
     ctx: ToolContext,
     schedule_id: str | None = None,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Get the current status of a scheduled publication."""
     resolved_id = schedule_id or ctx.session.active_schedule_id
     if not resolved_id:
@@ -171,7 +172,7 @@ async def update_schedule(
     ctx: ToolContext,
     schedule_id: str | None,
     run_at: str,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Update a scheduled publication's run_at time."""
     # Resolve schedule_id
     resolved_id = schedule_id or ctx.session.active_schedule_id
@@ -198,7 +199,7 @@ async def update_schedule(
     current_data = current.data
     if isinstance(current_data, ScheduledPublicationResponse):
         current_status = current_data.status or ""
-        current_version = current_data.version or 1
+        current_version = current_data.version if current_data.version is not None else 0
     else:
         return ToolResult.internal_error("Unexpected schedule response", trace_id=ctx.trace_id)
 
@@ -215,7 +216,10 @@ async def update_schedule(
         )
 
     # PUT update
-    idempotency_key = ctx.idempotency_key("update_schedule")
+    idempotency_key = ctx.idempotency_key(
+        "update_schedule",
+        scope=f"{resolved_id}|{run_at}",
+    )
     update_req = ScheduleUpdateRequest(runAt=run_at, version=current_version)
 
     result = await ctx.java.update_schedule(
@@ -252,7 +256,7 @@ async def update_schedule(
 async def cancel_schedule(
     ctx: ToolContext,
     schedule_id: str | None = None,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Cancel a scheduled publication.
 
     SCHEDULED → cancel
@@ -322,7 +326,7 @@ async def cancel_schedule(
         )
 
     # SCHEDULED → cancel
-    idempotency_key = ctx.idempotency_key("cancel_schedule")
+    idempotency_key = ctx.idempotency_key("cancel_schedule", scope=resolved_id)
     result = await ctx.java.cancel_schedule(
         resolved_id,
         bearer_token=ctx.auth.raw_access_token,
@@ -355,7 +359,7 @@ async def cancel_schedule(
 async def publish_now(
     ctx: ToolContext,
     draft_id: str | None = None,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Immediately publish a draft.
 
     REQUIRES APPROVAL. Without valid approval, tool must not call Java.
@@ -371,8 +375,12 @@ async def publish_now(
 
     # Check for pending approval
     pending = ctx.session.pending_approval
-    if pending and pending.operation == "publication.publish_now":
-        if pending.resource_id and pending.resource_id != resolved_draft:
+    if (
+        pending
+        and pending.operation == "publication.publish_now"
+        and pending.resource_id
+        and pending.resource_id != resolved_draft
+    ):
             return ToolResult.validation_error(
                 "Approval resource mismatch",
                 user_message="审批资源与原请求不匹配，请重新确认。",
@@ -390,9 +398,9 @@ async def publish_now(
 async def publish_now_execute(
     ctx: ToolContext,
     draft_id: str,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Execute publish after approval. Only called when approval is valid."""
-    idempotency_key = ctx.idempotency_key("publish_now")
+    idempotency_key = ctx.idempotency_key("publish_now", scope=str(draft_id))
     request = PublishNowRequest(draftId=draft_id)
 
     result = await ctx.java.publish_now(

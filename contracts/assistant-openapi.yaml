@@ -4,39 +4,49 @@ info:
   version: 2.0.0
 paths:
   /api/v1/assistant/conversations:
+    get:
+      summary: List the authenticated user's conversations
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Owned conversations only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationListResponse'
     post:
-      summary: Create Conversation
-      operationId: create_conversation_api_v1_assistant_conversations_post
+      summary: Create a conversation
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ConversationCreateRequest'
-        required: true
       responses:
         '200':
-          description: Successful Response
+          description: Conversation created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ConversationResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ConversationSummary'
   /api/v1/assistant/conversations/{conversation_id}/messages:
+    parameters:
+      - $ref: '#/components/parameters/ConversationId'
+    get:
+      summary: List public messages in an owned conversation
+      responses:
+        '200':
+          description: User and assistant messages; no reasoning content
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageView'
     post:
-      summary: Send Message
-      operationId: send_message_api_v1_assistant_conversations__conversation_id__messages_post
-      parameters:
-      - name: conversation_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Conversation Id
+      summary: Create and execute a run for a message
       requestBody:
         required: true
         content:
@@ -44,273 +54,239 @@ paths:
             schema:
               $ref: '#/components/schemas/MessageCreateRequest'
       responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+        '202':
+          description: Run completed or is waiting for approval
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-      description: 'Send a message and receive Server-Sent Events (SSE). Events: RUN_STARTED,
-        ASSISTANT_MESSAGE_DELTA, TOOL_CALL_STARTED, TOOL_CALL_COMPLETED, TOOL_CALL_FAILED,
-        APPROVAL_REQUIRED, RUN_COMPLETED, RUN_FAILED'
-  /api/v1/assistant/runs/{run_id}:
+                $ref: '#/components/schemas/RunAcceptedResponse'
+        '502':
+          description: Model or tool execution failed; the failed run is persisted
+  /api/v1/assistant/runs:
     get:
-      summary: Get Run
-      operationId: get_run_api_v1_assistant_runs__run_id__get
+      summary: List owned runs
       parameters:
-      - name: run_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Run Id
+        - name: limit
+          in: query
+          schema: { type: integer, default: 30, minimum: 1 }
       responses:
         '200':
-          description: Successful Response
+          description: Owned runs only
+  /api/v1/assistant/runs/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get an owned run
+      responses:
+        '200':
+          description: Run state
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RunResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+        '404': { description: Missing or foreign run }
   /api/v1/assistant/runs/{run_id}/events:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
     get:
-      summary: Get Run Events
-      operationId: get_run_events_api_v1_assistant_runs__run_id__events_get
-      parameters:
-      - name: run_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Run Id
+      summary: Replay owned run events as SSE
       responses:
         '200':
-          description: Successful Response
+          description: text/event-stream
+          content:
+            text/event-stream: { schema: { type: string } }
+  /api/v1/assistant/runs/{run_id}/events/stream:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Stream owned run events as SSE
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream: { schema: { type: string } }
+  /api/v1/assistant/runs/{run_id}/cancel:
+    post:
+      summary: Cancel an owned run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200': { description: Updated run }
+  /api/v1/assistant/runs/{run_id}/interrupt:
+    post:
+      summary: Interrupt an owned run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200': { description: Updated run }
+  /api/v1/assistant/memory/settings:
+    get:
+      summary: Get memory settings
+      responses:
+        '200':
+          description: Current settings
           content:
             application/json:
-              schema: {}
-        '422':
-          description: Validation Error
+              schema: { $ref: '#/components/schemas/MemorySettings' }
+  /api/v1/assistant/memories:
+    get:
+      summary: List memories for the authenticated user
+      responses:
+        '200':
+          description: Memory list
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+  /api/v1/assistant/memory/episodes:
+    get:
+      summary: List episodic memories for the authenticated user
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        '200':
+          description: Episode list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  episodes:
+                    type: array
+                    items: { type: object, additionalProperties: true }
   /api/v1/assistant/approvals/{approval_id}/approve:
     post:
-      summary: Approve Operation
-      operationId: approve_operation_api_v1_assistant_approvals__approval_id__approve_post
+      summary: Approve an owned operation
       parameters:
-      - name: approval_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Approval Id
+        - $ref: '#/components/parameters/ApprovalId'
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/ApprovalDecisionRequest'
+            schema: { $ref: '#/components/schemas/ApprovalDecisionRequest' }
       responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-                title: Response Approve Operation Api V1 Assistant Approvals  Approval
-                  Id  Approve Post
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+        '200': { description: Approval state }
+        '404': { description: Missing or foreign approval }
   /api/v1/assistant/approvals/{approval_id}/reject:
     post:
-      summary: Reject Operation
-      operationId: reject_operation_api_v1_assistant_approvals__approval_id__reject_post
+      summary: Reject an owned operation
       parameters:
-      - name: approval_id
-        in: path
-        required: true
-        schema:
-          type: string
-          title: Approval Id
+        - $ref: '#/components/parameters/ApprovalId'
       responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-                title: Response Reject Operation Api V1 Assistant Approvals  Approval
-                  Id  Reject Post
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+        '200': { description: Approval state }
+        '404': { description: Missing or foreign approval }
   /health:
     get:
-      summary: Health
-      operationId: health_health_get
+      summary: Assistant health
       responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                additionalProperties: true
-                type: object
-                title: Response Health Health Get
+        '200': { description: Service is running }
 components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1, minimum: 1 }
+    Size:
+      name: size
+      in: query
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+    ConversationId:
+      name: conversation_id
+      in: path
+      required: true
+      schema: { type: string }
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema: { type: string }
+    ApprovalId:
+      name: approval_id
+      in: path
+      required: true
+      schema: { type: string }
   schemas:
-    ApprovalDecisionRequest:
-      properties:
-        decision:
-          type: string
-          pattern: ^(APPROVE|REJECT)$
-          title: Decision
-      type: object
-      required:
-      - decision
-      title: ApprovalDecisionRequest
     ConversationCreateRequest:
-      properties:
-        title:
-          anyOf:
-          - type: string
-            maxLength: 120
-          - type: 'null'
-          title: Title
-        context_post_id:
-          anyOf:
-          - type: string
-            maxLength: 64
-          - type: 'null'
-          title: Context Post Id
       type: object
-      title: ConversationCreateRequest
-    ConversationResponse:
       properties:
-        conversation_id:
-          type: string
-          title: Conversation Id
-        title:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Title
-        created_at:
-          type: string
-          title: Created At
+        title: { type: [string, 'null'], maxLength: 120 }
+    ConversationSummary:
       type: object
-      required:
-      - conversation_id
-      - created_at
-      title: ConversationResponse
-    HTTPValidationError:
+      required: [conversation_id, created_at, updated_at]
       properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          type: array
-          title: Detail
+        conversation_id: { type: string }
+        title: { type: [string, 'null'] }
+        active_draft_id: { type: [string, 'null'] }
+        active_schedule_id: { type: [string, 'null'] }
+        created_at: { type: string }
+        updated_at: { type: string }
+    ConversationListResponse:
       type: object
-      title: HTTPValidationError
+      required: [items, page, size, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ConversationSummary' } }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer }
     MessageCreateRequest:
-      properties:
-        content:
-          type: string
-          maxLength: 10000
-          minLength: 1
-          title: Content
-        timezone:
-          type: string
-          maxLength: 64
-          title: Timezone
-          default: Asia/Shanghai
       type: object
-      required:
-      - content
-      title: MessageCreateRequest
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 10000 }
+        timezone: { type: string, maxLength: 64, default: Asia/Shanghai }
+    MessageView:
+      type: object
+      required: [role, content, created_at]
+      properties:
+        role: { type: string }
+        content: { type: string }
+        trace_id: { type: [string, 'null'] }
+        created_at: { type: string }
+    RunAcceptedResponse:
+      type: object
+      required: [run_id, conversation_id, status, events_url]
+      properties:
+        run_id: { type: string }
+        conversation_id: { type: string }
+        status: { type: string }
+        events_url: { type: string }
+        replayed: { type: boolean, default: false }
     RunResponse:
-      properties:
-        run_id:
-          type: string
-          title: Run Id
-        conversation_id:
-          type: string
-          title: Conversation Id
-        status:
-          type: string
-          title: Status
-        content:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Content
-        trace_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Trace Id
-        tool_rounds:
-          type: integer
-          title: Tool Rounds
-          default: 0
       type: object
-      required:
-      - run_id
-      - conversation_id
-      - status
-      title: RunResponse
-    ValidationError:
+      required: [run_id, conversation_id, status]
       properties:
-        loc:
-          items:
-            anyOf:
-            - type: string
-            - type: integer
-          type: array
-          title: Location
-        msg:
-          type: string
-          title: Message
-        type:
-          type: string
-          title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
+        run_id: { type: string }
+        conversation_id: { type: string }
+        goal: { type: string }
+        status: { type: string }
+        final_response: { type: [string, 'null'] }
+        error_code: { type: [string, 'null'] }
+        error: { type: [string, 'null'] }
+        trace_id: { type: [string, 'null'] }
+        budget: { type: object, additionalProperties: true }
+        timing: { type: object, additionalProperties: true }
+        steps: { type: array, items: { type: object, additionalProperties: true } }
+        approval: { type: [object, 'null'], additionalProperties: true }
+    ApprovalDecisionRequest:
       type: object
-      required:
-      - loc
-      - msg
-      - type
-      title: ValidationError
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [APPROVE, REJECT] }
+    MemorySettings:
+      type: object
+      properties:
+        episodic_enabled: { type: boolean }
+        semantic_enabled: { type: boolean }
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: RS256 JWT Access Token
 security:
-- bearerAuth: []
+  - bearerAuth: []

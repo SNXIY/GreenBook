@@ -8,10 +8,10 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from greenbook_assistant_core.agent import CommunityOperationsAssistant
-from greenbook_assistant_core.context import SessionContext
+from greenbook_assistant_core.context import PendingApproval, SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_security.policy import requires_approval
 from pydantic import BaseModel, Field
@@ -65,6 +65,18 @@ class ConversationListResponse(BaseModel):
     total: int = 0
 
 
+class MessageView(BaseModel):
+    role: str
+    content: str
+    trace_id: str | None = None
+    created_at: str
+
+
+class MemorySettings(BaseModel):
+    episodic_enabled: bool = False
+    semantic_enabled: bool = False
+
+
 class MessageCreateRequest(BaseModel):
     content: str = Field(min_length=1, max_length=10_000)
     timezone: str = Field(default="Asia/Shanghai", max_length=64)
@@ -73,10 +85,20 @@ class MessageCreateRequest(BaseModel):
 class RunResponse(BaseModel):
     run_id: str
     conversation_id: str
+    goal: str = ""
     status: str
-    content: str | None = None
+    execution_path: str = "ORCHESTRATED"
+    workload_lane: str = "WRITE"
+    intent: str | None = None
+    summary: str | None = None
+    final_response: str | None = None
+    error_code: str | None = None
+    error: str | None = None
     trace_id: str | None = None
-    tool_rounds: int = 0
+    budget: dict[str, int] = {}
+    timing: dict[str, int | None] = {}
+    steps: list[dict[str, object]] = []
+    approval: object | None = None
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -114,21 +136,12 @@ def _get_session(request: Request, conversation_id: str) -> SessionContext:
             raise HTTPException(status_code=404, detail="Conversation not found")
         return SessionContext(**data)
 
-    # New conversation
-    now = _now_iso()
-    session = SessionContext(
-        conversation_id=conversation_id,
-        user_id=auth.user_id,
-        tenant_id=auth.tenant_id,
-        timezone=auth.timezone,
+    # Conversations are created explicitly by POST /conversations.  A guessed
+    # ID must never create an implicit resource or become a side channel.
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Conversation not found",
     )
-    store[conversation_id] = {
-        **session.model_dump(mode="json"),
-        "title": None,
-        "created_at": now,
-        "updated_at": now,
-    }
-    return session
 
 
 def _save_session(request: Request, session: SessionContext) -> None:
@@ -183,7 +196,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "community.search_public_posts",
+                "name": "community_search_public_posts",
                 "description": "Search public posts in the GreenBook community by keywords. Returns matching posts with titles, summaries, and engagement stats.",
                 "parameters": {
                     "type": "object",
@@ -200,7 +213,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "community.get_post",
+                "name": "community_get_post",
                 "description": "Get full details of a single post by ID, including body content",
                 "parameters": {
                     "type": "object",
@@ -212,7 +225,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "community.list_own_posts",
+                "name": "community_list_own_posts",
                 "description": "List the current logged-in user's own published posts",
                 "parameters": {
                     "type": "object",
@@ -226,7 +239,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "content.create_draft",
+                "name": "content_create_draft",
                 "description": "Create a new draft post. The system will use AI to generate content based on your instructions and any search references from this conversation.",
                 "parameters": {
                     "type": "object",
@@ -241,7 +254,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "content.get_draft",
+                "name": "content_get_draft",
                 "description": "Get a draft by ID. If no ID provided, resolves the most recent draft from this conversation.",
                 "parameters": {
                     "type": "object",
@@ -252,7 +265,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "content.list_drafts",
+                "name": "content_list_drafts",
                 "description": "List the current user's drafts",
                 "parameters": {"type": "object", "properties": {}},
             },
@@ -260,7 +273,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "content.revise_draft",
+                "name": "content_revise_draft",
                 "description": "Revise an existing draft. The system will regenerate content based on your revision instructions. If no draft_id specified, revises the most recent draft from this conversation.",
                 "parameters": {
                     "type": "object",
@@ -275,7 +288,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "publication.schedule",
+                "name": "publication_schedule",
                 "description": "Schedule a draft for future publication at a specific date and time.",
                 "parameters": {
                     "type": "object",
@@ -291,7 +304,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "publication.get_status",
+                "name": "publication_get_status",
                 "description": "Check the status of a scheduled publication",
                 "parameters": {
                     "type": "object",
@@ -302,7 +315,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "publication.update_schedule",
+                "name": "publication_update_schedule",
                 "description": "Change the scheduled publication time. Only works for schedules in SCHEDULED status.",
                 "parameters": {
                     "type": "object",
@@ -317,7 +330,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "publication.cancel_schedule",
+                "name": "publication_cancel_schedule",
                 "description": "Cancel a scheduled publication. Can only cancel SCHEDULED tasks.",
                 "parameters": {
                     "type": "object",
@@ -328,7 +341,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "publication.publish_now",
+                "name": "publication_publish_now",
                 "description": "Publish a draft immediately. REQUIRES user confirmation/approval before executing.",
                 "parameters": {
                     "type": "object",
@@ -339,7 +352,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "interaction.list_comments",
+                "name": "interaction_list_comments",
                 "description": "List comments on a post",
                 "parameters": {
                     "type": "object",
@@ -354,7 +367,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "interaction.send_reply",
+                "name": "interaction_send_reply",
                 "description": "Reply to a comment on a post. REQUIRES user approval before sending.",
                 "parameters": {
                     "type": "object",
@@ -370,7 +383,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "analytics.get_post_performance",
+                "name": "analytics_get_post_performance",
                 "description": "Get engagement metrics for a single post (likes, comments, views, shares, favorites)",
                 "parameters": {
                     "type": "object",
@@ -382,7 +395,7 @@ def _build_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "function": {
-                "name": "analytics.get_account_summary",
+                "name": "analytics_get_account_summary",
                 "description": "Get analytics summary for the current user's account (total posts, likes, comments, followers, etc.)",
                 "parameters": {"type": "object", "properties": {}},
             },
@@ -448,12 +461,24 @@ async def create_conversation(
     return _conversation_summary(store[conversation_id])
 
 
-@router.post("/conversations/{conversation_id}/messages")
+class RunAcceptedResponse(BaseModel):
+    run_id: str
+    conversation_id: str
+    status: str
+    events_url: str
+    replayed: bool = False
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=RunAcceptedResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def send_message(
     conversation_id: str,
     body: MessageCreateRequest,
     request: Request,
-) -> StreamingResponse:
+):
     auth = _get_auth(request)
     session = _get_session(request, conversation_id)
     # Enforce timezone from the request on this turn
@@ -466,7 +491,21 @@ async def send_message(
     trace_id = str(uuid.uuid4())
     run_id = str(uuid.uuid4())
 
+    # Replay only public conversation messages.  Tool observations and model
+    # reasoning are intentionally never sent to the frontend or stored here.
+    msg_store = request.app.state.message_store
+    conversation_history = [
+        {"role": item["role"], "content": item["content"]}
+        for item in msg_store.get(conversation_id, [])
+        if item.get("role") in {"user", "assistant"}
+    ]
+    msg_store.setdefault(conversation_id, []).append({
+        "role": "user", "content": body.content,
+        "created_at": _now_iso(),
+    })
+
     events: list[dict[str, Any]] = []
+    tool_failure: dict[str, str] | None = None
 
     async def emit_event(event_type: str, data: dict[str, Any]) -> None:
         events.append({"event": event_type, "data": data})
@@ -475,20 +514,48 @@ async def send_message(
         tool_name: str, tool_args: dict[str, Any],
         _session: SessionContext, agent_run_id: str, tool_call_id: str,
     ) -> dict[str, Any]:
-        if requires_approval(tool_name):
+        # DeepSeek rejects dots in function names — convert _ to . for MCP lookup
+        mcp_name = tool_name.replace("_", ".", 1) if "_" in tool_name else tool_name
+        if requires_approval(mcp_name):
             pending = _session.pending_approval
-            if not pending or pending.operation != tool_name:
+            if not pending or pending.operation != mcp_name:
+                approval_id = str(uuid.uuid4())
+                approval = PendingApproval(
+                    approval_id=approval_id,
+                    operation=mcp_name,
+                    resource_id=(
+                        str(tool_args["draft_id"])
+                        if tool_args.get("draft_id") is not None
+                        else None
+                    ),
+                    description=f"Approve {mcp_name}",
+                )
+                _session.pending_approval = approval
+                _auth_store_put(
+                    "approval_store",
+                    request,
+                    approval_id,
+                    {
+                        "approval_id": approval_id,
+                        "conversation_id": conversation_id,
+                        "run_id": agent_run_id,
+                        "operation": mcp_name,
+                        "resource_id": approval.resource_id,
+                        "description": approval.description,
+                        "status": "PENDING",
+                    },
+                )
                 return {
                     "ok": False,
                     "code": "APPROVAL_REQUIRED",
-                    "message": f"Tool '{tool_name}' requires user approval",
+                    "message": f"Tool '{mcp_name}' requires user approval",
                     "user_message": "此操作需要您的确认。请确认是否继续。",
                     "retryable": False,
                     "request_sent": False,
                     "trace_id": trace_id,
                 }
         result = await mcp.execute_tool(
-            tool_name,
+            mcp_name,
             auth=auth,
             session=_session,
             trace_id=trace_id,
@@ -504,7 +571,13 @@ async def send_message(
         })
 
     async def on_tool_complete(tool_name: str, tool_call_id: str, result: dict[str, Any]) -> None:
+        nonlocal tool_failure
         event_type = "TOOL_CALL_COMPLETED" if result.get("ok") else "TOOL_CALL_FAILED"
+        if not result.get("ok") and result.get("code") != "APPROVAL_REQUIRED":
+            tool_failure = {
+                "code": str(result.get("code") or "TOOL_EXECUTION_FAILED"),
+                "message": str(result.get("user_message") or "工具执行失败，请稍后重试。"),
+            }
         await emit_event(event_type, {
             "run_id": run_id, "tool_name": tool_name, "tool_call_id": tool_call_id,
             "ok": result.get("ok"), "code": result.get("code"),
@@ -529,61 +602,201 @@ async def send_message(
             user_message=body.content,
             session=session,
             tool_handler=tool_handler,
+            conversation_history=conversation_history,
             trace_id=trace_id,
             run_id=run_id,
             on_tool_start=on_tool_start,
             on_tool_complete=on_tool_complete,
             on_assistant_delta=on_assistant_delta,
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("Run failed run_id=%s", run_id)
-        await emit_event("RUN_FAILED", {"run_id": run_id, "error": str(exc)})
+        _save_session(request, session)
+        error_code = "MODEL_REQUEST_FAILED"
+        error_message = "模型请求失败，请稍后重试。"
+        await emit_event(
+            "RUN_FAILED",
+            {"run_id": run_id, "code": error_code, "message": error_message},
+        )
         run_record = {
             "run_id": run_id, "conversation_id": conversation_id,
             "user_id": auth.user_id, "tenant_id": auth.tenant_id,
-            "status": "FAILED", "error": str(exc),
+            "status": "FAILED", "error_code": error_code,
+            "error": error_message,
             "trace_id": trace_id, "tool_rounds": 0, "events": events,
         }
         request.app.state.run_store[run_id] = run_record
-        return StreamingResponse(
-            _sse_stream(run_record["events"]),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "code": error_code,
+                "message": error_message,
+                "run_id": run_id,
+                "events_url": f"/api/v1/assistant/runs/{run_id}/events",
+            },
+        ) from None
+
+    if tool_failure is not None:
+        _save_session(request, session)
+        await emit_event(
+            "RUN_FAILED",
+            {
+                "run_id": run_id,
+                "code": tool_failure["code"],
+                "message": tool_failure["message"],
+            },
+        )
+        request.app.state.run_store[run_id] = {
+            "run_id": run_id,
+            "conversation_id": conversation_id,
+            "user_id": auth.user_id,
+            "tenant_id": auth.tenant_id,
+            "status": "FAILED",
+            "error_code": tool_failure["code"],
+            "error": tool_failure["message"],
+            "trace_id": trace_id,
+            "tool_rounds": result.get("tool_rounds", 0),
+            "events": events,
+        }
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "code": tool_failure["code"],
+                "message": tool_failure["message"],
+                "run_id": run_id,
+                "events_url": f"/api/v1/assistant/runs/{run_id}/events",
+            },
         )
 
     _save_session(request, session)
 
-    await emit_event("RUN_COMPLETED", {
-        "run_id": run_id, "content": result["content"],
-        "tool_rounds": result["tool_rounds"],
-    })
+    # Save assistant response to message history
+    assistant_content = result.get("content", "")
+    if assistant_content:
+        msg_store.setdefault(conversation_id, []).append({
+            "role": "assistant", "content": assistant_content,
+            "trace_id": trace_id, "created_at": _now_iso(),
+        })
+
+    run_status = "WAITING_APPROVAL" if session.pending_approval else "COMPLETED"
+    await emit_event(
+        "RUN_WAITING_APPROVAL" if session.pending_approval else "RUN_COMPLETED",
+        {
+            "run_id": run_id,
+            "content": result["content"],
+            "tool_rounds": result["tool_rounds"],
+        },
+    )
+    if run_status == "COMPLETED":
+        session.last_successful_run_id = run_id
+        _save_session(request, session)
 
     run_record = {
         "run_id": run_id, "conversation_id": conversation_id,
         "user_id": auth.user_id, "tenant_id": auth.tenant_id,
-        "status": "COMPLETED", "content": result["content"],
+        "status": run_status, "content": result["content"],
         "trace_id": trace_id, "tool_rounds": result["tool_rounds"],
         "events": events, "session_snapshot": result.get("session_snapshot"),
+        "approval_id": session.pending_approval.approval_id if session.pending_approval else None,
     }
     request.app.state.run_store[run_id] = run_record
 
-    return StreamingResponse(
-        _sse_stream(events),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    return RunAcceptedResponse(
+        run_id=run_id, conversation_id=conversation_id,
+        status=run_status,
+        events_url=f"/api/v1/assistant/runs/{run_id}/events",
     )
+
+
+@router.get("/conversations/{conversation_id}/messages")
+async def get_messages(conversation_id: str, request: Request) -> list[MessageView]:
+    """Get message history for a conversation (ownership-verified)."""
+    auth = _get_auth(request)
+    store = request.app.state.conversation_store
+    if conversation_id not in store:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if not _conversation_belongs_to(auth, store[conversation_id]):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    msg_store = request.app.state.message_store
+    return [
+        MessageView(role=m["role"], content=m["content"],
+                    trace_id=m.get("trace_id"), created_at=m.get("created_at", ""))
+        for m in msg_store.get(conversation_id, [])
+    ]
+
+
+@router.get("/memories")
+async def get_memories(request: Request) -> dict[str, object]:
+    _get_auth(request)
+    return {"memories": []}
+
+
+@router.get("/memory/episodes")
+async def get_episodes(request: Request, limit: int = 10) -> dict[str, object]:
+    _get_auth(request)
+    return {"episodes": []}
+
+
+@router.get("/memory/settings")
+async def get_memory_settings(request: Request) -> MemorySettings:
+    _get_auth(request)
+    return MemorySettings()
 
 
 @router.get("/runs/{run_id}")
 async def get_run(run_id: str, request: Request) -> RunResponse:
     record = _auth_store_get("run_store", request, run_id)
+    events = record.get("events", [])
+    steps: list[dict[str, object]] = []
+    for i, evt in enumerate(events):
+        if evt.get("event") in ("TOOL_CALL_STARTED", "TOOL_CALL_COMPLETED", "TOOL_CALL_FAILED"):
+            data = evt.get("data", {})
+            event_name = evt.get("event")
+            steps.append({
+                "step_id": data.get("tool_call_id", f"step-{i}"),
+                "ordinal": i + 1,
+                "kind": "TOOL",
+                "tool_name": data.get("tool_name", ""),
+                "label": data.get("tool_name", f"Step {i+1}"),
+                "status": (
+                    "RUNNING" if event_name == "TOOL_CALL_STARTED"
+                    else "COMPLETED" if data.get("ok") else "FAILED"
+                ),
+                "output": data,
+            })
+    content = record.get("content", "")
+    approval = None
+    approval_id = record.get("approval_id")
+    if approval_id:
+        approval_record = request.app.state.approval_store.get(approval_id)
+        if approval_record and _conversation_belongs_to(_get_auth(request), approval_record):
+            approval = {
+                "approval_id": approval_id,
+                "action": approval_record.get("operation", ""),
+                "status": approval_record.get("status", "PENDING"),
+                "description": approval_record.get("description", ""),
+                "preview": {"resource_id": approval_record.get("resource_id")},
+                "expires_at": approval_record.get("expires_at", ""),
+                "expected_run_version": 0,
+            }
     return RunResponse(
         run_id=record["run_id"],
         conversation_id=record["conversation_id"],
+        goal=content[:120] if content else "",
         status=record["status"],
-        content=record.get("content"),
+        summary=content[:200] if content else None,
+        final_response=content,
+        error_code=record.get("error_code"),
+        error=record.get("error"),
         trace_id=record.get("trace_id"),
-        tool_rounds=record.get("tool_rounds", 0),
+        budget={
+            "model_calls": 1, "max_model_calls": 6,
+            "tool_calls": record.get("tool_rounds", 0), "max_tool_calls": 30,
+            "replan_count": 0, "max_replans": 0,
+        },
+        timing={"queue_ms": None, "model_ms": 0, "tool_ms": 0, "dependency_wait_ms": 0, "total_ms": None},
+        steps=steps,
+        approval=approval,
     )
 
 
@@ -596,6 +809,65 @@ async def get_run_events(run_id: str, request: Request) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache"},
     )
+
+
+@router.get("/runs")
+async def list_runs(request: Request, limit: int = 30) -> list[RunResponse]:
+    auth = _get_auth(request)
+    run_store = request.app.state.run_store
+    owned = [
+        r for r in run_store.values()
+        if r.get("user_id") == auth.user_id and r.get("tenant_id") == auth.tenant_id
+    ]
+    owned.sort(key=lambda r: r.get("trace_id", ""), reverse=True)
+    return [
+        RunResponse(
+            run_id=r["run_id"], conversation_id=r["conversation_id"],
+            goal="", status=r["status"],
+            summary=(r.get("content") or "")[:200],
+            final_response=r.get("content"),
+            error_code=r.get("error_code"),
+            error=r.get("error"),
+            trace_id=r.get("trace_id"),
+            budget={"model_calls": 1, "max_model_calls": 6, "tool_calls": r.get("tool_rounds", 0), "max_tool_calls": 30, "replan_count": 0, "max_replans": 0},
+            timing={"queue_ms": None, "model_ms": 0, "tool_ms": 0, "dependency_wait_ms": 0, "total_ms": None},
+            steps=[],
+        )
+        for r in owned[:limit]
+    ]
+
+
+@router.get("/runs/{run_id}/events/stream")
+async def stream_run_events(run_id: str, request: Request) -> StreamingResponse:
+    record = _auth_store_get("run_store", request, run_id)
+    events = record.get("events", [])
+    return StreamingResponse(
+        _sse_stream(events),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/runs/{run_id}/cancel")
+async def cancel_run(run_id: str, request: Request) -> RunResponse:
+    record = _auth_store_get("run_store", request, run_id)
+    record["status"] = "CANCELLED"
+    record.setdefault("events", []).append({
+        "event": "RUN_CANCELLED",
+        "data": {"run_id": run_id},
+    })
+    return await get_run(run_id, request)
+
+
+@router.post("/runs/{run_id}/interrupt")
+async def interrupt_run(run_id: str, request: Request) -> RunResponse:
+    record = _auth_store_get("run_store", request, run_id)
+    record["status"] = "CANCELLED"
+    record.setdefault("events", []).append({
+        "event": "RUN_INTERRUPTED",
+        "data": {"run_id": run_id},
+    })
+    return await get_run(run_id, request)
 
 
 @router.post("/approvals/{approval_id}/approve")
@@ -646,34 +918,10 @@ async def _sse_stream(events: Any):
     yield "event: done\ndata: {}\n\n"
 
 
-_SYSTEM_PROMPT = """你是 GreenBook 社区的运营助手，也是知光社区的官方创作伙伴。
+_SYSTEM_PROMPT = """你是 GreenBook 社区助手。
 
-## 你的能力
-- 日常问候和GreenBook产品帮助
-- 普通知识问答
-- 搜索和浏览社区公共帖子
-- 查询用户自己的帖子和草稿
-- 通过AI创作社区帖子内容
-- 管理草稿（创建、修改、查看）
-- 定时发布管理（创建、修改、取消）
-- 查看评论和回复
-- 帖子数据分析和账号运营分析
-- 基于真实数据生成运营建议
+硬性规则：用户要求搜索社区、搜索帖子或查找社区主题时，必须先调用 community_search_public_posts，再根据工具真实返回回答；禁止直接用常识回答。用户要求写作并保存草稿时，直接调用 content_create_draft；除非用户同时明确要求参考社区帖子，否则不要先调用 community_search_public_posts。用户要求修改草稿时，必须调用 content_revise_draft；用户要求定时发布时，必须调用 publication_schedule。只有简单问候和一般知识问答不调用工具。
 
-## 产品默认语义
-- "社区"默认指GreenBook站内公共社区
-- "热门帖子"默认调用公共搜索
-- "我的帖子"只查询当前登录用户
-- "发布"默认发布到GreenBook当前账号
-- "刚才那篇"优先指当前对话最近创建的草稿
-- 相对时间使用用户时区
-- 未明确要求全网搜索时，不调用外部搜索
-- 未明确提及外部平台时，不询问发布平台
-- 搜索结果是创作输入，不是搜索完成后直接结束
+你可以帮助用户搜索社区、查询个人数据、创作和管理帖子、安排发布。社区默认指 GreenBook 站内社区；“我的帖子”只查询当前登录用户；“刚才那篇”优先指当前会话最近成功操作的草稿；相对时间使用用户时区。
 
-## 重要规则
-- 不要编造未发生的事实
-- 不要声称已完成的动作（如果工具调用失败就如实告知）
-- 不要暴露系统内部信息（密钥、Token、堆栈）
-- 只在你确实需要真实数据时才调用工具
-- 简单问候和知识问答直接回复，不需要调用任何工具"""
+不要编造工具未返回的事实，工具失败时如实说明；不要暴露 Token、密钥、reasoning_content 或内部堆栈；未明确提及外部平台时，不调用外部平台。"""

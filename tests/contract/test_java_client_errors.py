@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-import httpx
 from unittest.mock import patch
 
+import httpx
+import pytest
 from greenbook_java_client.client import JavaClient
 
 
@@ -15,23 +15,23 @@ def client():
 
 
 @pytest.mark.asyncio
-async def test_connection_refused_is_dependency_unavailable(client):
-    """ConnectError → DEPENDENCY_UNAVAILABLE, not RESULT_UNKNOWN."""
+async def test_connection_refused_is_java_backend_unavailable(client):
+    """ConnectError → JAVA_BACKEND_UNAVAILABLE, not RESULT_UNKNOWN."""
     with patch.object(client.http, "request", side_effect=httpx.ConnectError("refused")):
         result = await client.search_posts(query="test")
         assert result.ok is False
-        assert result.code == "DEPENDENCY_UNAVAILABLE"
+        assert result.code == "JAVA_BACKEND_UNAVAILABLE"
         assert result.retryable is True
         assert result.request_sent is False
 
 
 @pytest.mark.asyncio
 async def test_result_never_blindly_says_unknown(client):
-    """All connection failures must be DEPENDENCY_UNAVAILABLE, not RESULT_UNKNOWN."""
+    """All connection failures must be JAVA_BACKEND_UNAVAILABLE, not RESULT_UNKNOWN."""
     with patch.object(client.http, "request", side_effect=httpx.ConnectError("refused")):
         result = await client.get_post("123")
         assert result.code != "RESULT_UNKNOWN"
-        assert result.code == "DEPENDENCY_UNAVAILABLE"
+        assert result.code == "JAVA_BACKEND_UNAVAILABLE"
 
 
 @pytest.mark.asyncio

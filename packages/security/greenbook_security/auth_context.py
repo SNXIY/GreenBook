@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Header, HTTPException, Request, status
 from greenbook_contracts.identity import AuthContext
+
 from greenbook_security.jwt import JwtValidationError, validate_access_token
 
 logger = logging.getLogger(__name__)
@@ -31,11 +32,16 @@ class AuthContextResolver:
         request: Request,
         authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     ) -> AuthContext:
+        if not authorization:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "missing_authorization_header"},
+            )
         token = _extract_bearer(authorization)
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing or invalid Authorization header",
+                detail={"code": "malformed_bearer_token"},
             )
 
         try:
@@ -46,13 +52,11 @@ class AuthContextResolver:
                 audience=self._audience,
             )
         except JwtValidationError as exc:
-            logger.warning("JWT validation failed: %s", exc)
-            http_status = (
-                status.HTTP_401_UNAUTHORIZED
-                if exc.code == "AUTHENTICATION_REQUIRED"
-                else status.HTTP_400_BAD_REQUEST
-            )
-            raise HTTPException(status_code=http_status, detail=str(exc)) from exc
+            logger.warning("JWT validation failed code=%s", exc.code)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": exc.code},
+            ) from exc
 
         # Store on request state for downstream use
         request.state.auth_context = auth_ctx

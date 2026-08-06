@@ -35,12 +35,21 @@ async def fetch_jwks(jwks_url: str, *, force: bool = False) -> dict[str, Any]:
     if not force and _JWKS_CACHE and (now - _JWKS_CACHE_TS) < _JWKS_TTL_SECONDS:
         return _JWKS_CACHE
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
-        resp = await client.get(jwks_url)
-        resp.raise_for_status()
-        data = resp.json()
-        if "keys" not in data:
-            raise JwtValidationError("JWKS response missing 'keys'", code="INTERNAL_ERROR")
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            resp = await client.get(jwks_url)
+            resp.raise_for_status()
+            data = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise JwtValidationError(
+            "Unable to fetch the configured JWKS endpoint",
+            code="jwks_fetch_failed",
+        ) from exc
+    if "keys" not in data:
+        raise JwtValidationError(
+            "JWKS response missing 'keys'",
+            code="jwks_fetch_failed",
+        )
 
     _JWKS_CACHE = data
     _JWKS_CACHE_TS = now
@@ -54,7 +63,7 @@ def _find_key(jwks: dict[str, Any], kid: str) -> dict[str, Any] | None:
     return None
 
 
-def _build_public_key(jwk: dict[str, Any]) -> str:
+def _build_public_key(jwk: dict[str, Any]) -> Any:
     from jwt.algorithms import RSAAlgorithm
     return RSAAlgorithm.from_jwk(jwk)
 
@@ -77,17 +86,26 @@ async def validate_access_token(
             token, options={"verify_signature": False}
         )
     except Exception as exc:
-        raise JwtValidationError(f"Malformed JWT: {exc}") from exc
+        raise JwtValidationError(
+            "Malformed bearer token",
+            code="malformed_bearer_token",
+        ) from exc
 
     header = unverified.get("header", {})
     kid = header.get("kid")
     alg = header.get("alg", "").upper()
 
     if not kid:
-        raise JwtValidationError("JWT missing 'kid' in header")
+        raise JwtValidationError(
+            "JWT missing 'kid' in header",
+            code="unknown_kid",
+        )
 
     if alg != "RS256":
-        raise JwtValidationError(f"Unsupported algorithm: {alg}. Only RS256 accepted.")
+        raise JwtValidationError(
+            "Unsupported JWT signing algorithm",
+            code="invalid_signature",
+        )
 
     # Fetch JWKS
     jwks = await fetch_jwks(jwks_url)
@@ -99,10 +117,17 @@ async def validate_access_token(
         jwk = _find_key(jwks, kid)
         if jwk is None:
             raise JwtValidationError(
-                f"Unknown kid '{kid}' in JWT header. JWKS refresh did not find it."
+                "JWT kid was not found in JWKS",
+                code="unknown_kid",
             )
 
-    public_key = _build_public_key(jwk)
+    try:
+        public_key = _build_public_key(jwk)
+    except Exception as exc:
+        raise JwtValidationError(
+            "JWT public key could not be constructed",
+            code="invalid_signature",
+        ) from exc
 
     try:
         payload = jwt.decode(
@@ -111,37 +136,59 @@ async def validate_access_token(
             algorithms=["RS256"],
             issuer=issuer,
             audience=audience,
-            options={"verify_exp": True, "verify_nbf": True},
+            options={
+                "verify_exp": True,
+                "verify_nbf": True,
+                "require": ["exp"],
+            },
         )
     except jwt.ExpiredSignatureError as exc:
-        raise JwtValidationError("Access token has expired", code="AUTHENTICATION_REQUIRED") from exc
+        raise JwtValidationError("Access token has expired", code="token_expired") from exc
     except jwt.InvalidAudienceError as exc:
         raise JwtValidationError(
-            f"Audience mismatch: expected '{audience}'", code="AUTHENTICATION_REQUIRED"
+            "JWT audience is invalid", code="invalid_audience"
         ) from exc
     except jwt.InvalidIssuerError as exc:
         raise JwtValidationError(
-            f"Issuer mismatch: expected '{issuer}'", code="AUTHENTICATION_REQUIRED"
+            "JWT issuer is invalid", code="invalid_issuer"
         ) from exc
     except jwt.ImmatureSignatureError as exc:
-        raise JwtValidationError("Token not yet valid (nbf)", code="AUTHENTICATION_REQUIRED") from exc
-    except Exception as exc:
-        raise JwtValidationError(f"JWT verification failed: {exc}", code="AUTHENTICATION_REQUIRED") from exc
+        raise JwtValidationError("Token is not yet valid", code="invalid_signature") from exc
+    except jwt.MissingRequiredClaimError as exc:
+        claim_codes = {
+            "iss": "invalid_issuer",
+            "sub": "missing_user_id",
+            "uid": "missing_user_id",
+            "tenant_id": "missing_tenant_id",
+            "token_type": "invalid_token_type",
+        }
+        raise JwtValidationError(
+            "JWT is missing a required claim",
+            code=claim_codes.get(exc.claim, "invalid_signature"),
+        ) from exc
+    except jwt.InvalidSignatureError as exc:
+        raise JwtValidationError("JWT signature is invalid", code="invalid_signature") from exc
+    except jwt.DecodeError as exc:
+        raise JwtValidationError("JWT could not be decoded", code="malformed_bearer_token") from exc
+    except jwt.InvalidTokenError as exc:
+        raise JwtValidationError("JWT validation failed", code="invalid_signature") from exc
 
     # Application-level claims
     token_type = payload.get("token_type", "")
     if token_type != "access":
         raise JwtValidationError(
-            f"token_type must be 'access', got '{token_type}'"
+            "JWT token_type is not access",
+            code="invalid_token_type",
         )
 
     uid = payload.get("uid") or payload.get("sub") or ""
+    uid = str(uid)  # Java sends uid as Long, Pydantic expects str
     if not uid:
-        raise JwtValidationError("JWT missing 'uid' claim")
+        raise JwtValidationError("JWT missing user identity", code="missing_user_id")
 
-    tenant_id = payload.get("tenant_id") or ""
+    tenant_id = str(payload.get("tenant_id") or "")
     if not tenant_id:
-        raise JwtValidationError("JWT missing 'tenant_id' claim")
+        raise JwtValidationError("JWT missing tenant identity", code="missing_tenant_id")
 
     roles = payload.get("roles", [])
     if isinstance(roles, str):

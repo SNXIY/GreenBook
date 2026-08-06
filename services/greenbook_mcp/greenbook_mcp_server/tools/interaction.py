@@ -18,7 +18,7 @@ async def list_comments(
     post_id: str,
     cursor: str | None = None,
     size: int = 20,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """List comments on a post."""
     result = await ctx.java.list_comments(
         post_id,
@@ -40,7 +40,7 @@ async def send_reply(
     post_id: str,
     parent_comment_id: str,
     content: str,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Reply to a comment. Requires approval."""
     # Approval check
     pending = ctx.session.pending_approval
@@ -50,7 +50,10 @@ async def send_reply(
             user_message="发送回复需要用户确认。请确认回复内容。",
         )
 
-    idempotency_key = ctx.idempotency_key("reply")
+    idempotency_key = ctx.idempotency_key(
+        "reply",
+        scope=f"{post_id}|{parent_comment_id}|{content}",
+    )
     reply = AgentCommentReplyRequest(
         postId=post_id,
         parentCommentId=parent_comment_id,

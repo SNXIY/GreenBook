@@ -22,11 +22,10 @@ content.revise_draft:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from greenbook_contracts.tool_result import ResourceRef, ToolResult
-from greenbook_creator_client.client import CreatorClient, extract_creator_document
+from greenbook_creator_client.client import extract_creator_document
 from greenbook_java_client.models import (
     AgentDraftCreateRequest,
     AgentDraftUpdateRequest,
@@ -44,7 +43,7 @@ async def create_draft(
     instruction: str,
     references: list[dict[str, Any]] | None = None,
     summary: str | None = None,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Create a new draft via Creator Agent → Java Facade."""
     trace_id = ctx.trace_id
     refs = references or []
@@ -68,7 +67,10 @@ async def create_draft(
         )[:12_000]
 
     # Step 1: Submit Creator task with AUTO interaction mode
-    idempotency_key = ctx.idempotency_key("create_draft")
+    idempotency_key = ctx.idempotency_key(
+        "create_draft",
+        scope=f"{title}|{instruction}|{summary or ''}",
+    )
 
     creator_result = await ctx.creator.create_task(
         kind="CREATE_CONTENT",
@@ -88,7 +90,8 @@ async def create_draft(
     if not creator_result.ok:
         return creator_result
 
-    task_id = str(creator_result.data.get("task_id", ""))
+    creator_data = creator_result.data or {}
+    task_id = str(creator_data.get("task_id", ""))
     if not task_id:
         return ToolResult.internal_error("Creator returned a task without task_id", trace_id=trace_id)
 
@@ -109,31 +112,33 @@ async def create_draft(
     document: dict[str, str | None] = {"title": title, "description": summary, "body_markdown": instruction}
     creator_artifact_id: str | None = None
 
+    if not final_artifact_id:
+        return ToolResult.creator_unavailable(
+            "Creator completed without a final artifact",
+            trace_id=trace_id,
+        )
+
     if final_artifact_id:
         artifact_result = await ctx.creator.get_artifact(
             task_id, final_artifact_id,
             bearer_token=ctx.auth.raw_access_token,
             trace_id=trace_id,
         )
-        if artifact_result.ok:
-            doc = extract_creator_document(artifact_result.data or {})
-            document = {
-                "title": doc["title"] or title,
-                "description": doc["description"] or summary,
-                "body_markdown": doc["body_markdown"] or instruction,
-            }
-            creator_artifact_id = final_artifact_id
+        if not artifact_result.ok:
+            return artifact_result
+        doc = extract_creator_document(artifact_result.data or {})
+        document = {
+            "title": doc["title"] or title,
+            "description": doc["description"] or summary,
+            "body_markdown": doc["body_markdown"] or instruction,
+        }
+        creator_artifact_id = final_artifact_id
 
-    # Step 4: Create handoff and get content
-    handoff_result = await ctx.creator.create_handoff(
-        task_id,
-        source_artifact_id=creator_artifact_id,
-        bearer_token=ctx.auth.raw_access_token,
-        idempotency_key=f"{idempotency_key}-handoff",
-        trace_id=trace_id,
-    )
-
-    # Step 5: Call Java POST /drafts
+    # Step 4: Call Java Agent Facade POST /drafts.  Creator publication
+    # handoff is intentionally not used here: that endpoint creates a
+    # second Java draft, which would make one Assistant operation produce
+    # duplicate drafts.  The Assistant owns this single handoff to the
+    # Java Agent Facade; Creator remains the content-generation service.
     java_create = AgentDraftCreateRequest(
         title=str(document["title"] or title)[:256],
         content=str(document["body_markdown"] or instruction),
@@ -158,7 +163,7 @@ async def create_draft(
 
     draft_id = draft.draft_id
 
-    # Step 6: Verify via GET /drafts/{draftId}
+    # Step 5: Verify via GET /drafts/{draftId}
     verify_result = await ctx.java.get_draft(
         draft_id,
         bearer_token=ctx.auth.raw_access_token,
@@ -171,7 +176,7 @@ async def create_draft(
             trace_id=trace_id,
         )
 
-    # Step 7: Update SessionContext
+    # Step 6: Update SessionContext
     ctx.session.active_draft_id = draft_id
     ctx.session.record_entity(
         ref=f"draft:{draft_id}", kind="DRAFT", entity_id=draft_id,
@@ -208,7 +213,7 @@ async def create_draft(
 async def get_draft(
     ctx: ToolContext,
     draft_id: str | None = None,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Get a draft by ID. If no draft_id provided, resolves from session context."""
     resolved_id = draft_id or ctx.session.active_draft_id
     if not resolved_id:
@@ -238,7 +243,7 @@ async def get_draft(
 
 async def list_drafts(
     ctx: ToolContext,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """List current user's drafts."""
     result = await ctx.java.list_own_drafts(
         bearer_token=ctx.auth.raw_access_token,
@@ -255,7 +260,7 @@ async def revise_draft(
     ctx: ToolContext,
     instruction: str,
     draft_id: str | None = None,
-) -> ToolResult[dict[str, Any]]:
+) -> ToolResult[Any]:
     """Revise an existing draft via Creator Agent → Java Facade.
 
     Uses expectedVersion=updatedAt from Java for optimistic concurrency control.
@@ -293,7 +298,10 @@ async def revise_draft(
     current_title = draft_data.title or ""
 
     # Step 3: Submit Creator revise task
-    idempotency_key = ctx.idempotency_key("revise_draft")
+    idempotency_key = ctx.idempotency_key(
+        "revise_draft",
+        scope=f"{resolved_id}|{instruction}",
+    )
 
     creator_result = await ctx.creator.create_task(
         kind="IMPROVE_DRAFT",
@@ -315,7 +323,8 @@ async def revise_draft(
     if not creator_result.ok:
         return creator_result
 
-    task_id = str(creator_result.data.get("task_id", ""))
+    creator_data = creator_result.data or {}
+    task_id = str(creator_data.get("task_id", ""))
     if not task_id:
         return ToolResult.internal_error("Creator returned a task without task_id", trace_id=trace_id)
 
@@ -355,16 +364,9 @@ async def revise_draft(
         title=revised_title,
         content=revised_content,
         summary=revised_summary,
-        expectedVersion=expected_version_str,  # noqa: F841
+        expectedVersion=expected_version_str,
     )
-    update_dict = {
-        "title": revised_title,
-        "content": revised_content,
-        "summary": revised_summary,
-        "expectedVersion": expected_version_str,
-    }
 
-    # Use raw dict to avoid alias issues
     update_result = await ctx.java.update_draft(
         resolved_id,
         update_request,
@@ -411,13 +413,16 @@ async def revise_draft(
             trace_id=trace_id,
             conversation_id=ctx.conversation_id,
         )
-        if schedule_result.ok and schedule_result.data:
-            if schedule_result.data.draft_id != resolved_id:
-                logger.warning(
-                    "Schedule %s draft_id mismatch after revise: expected=%s actual=%s",
-                    ctx.session.active_schedule_id, resolved_id,
-                    schedule_result.data.draft_id,
-                )
+        if (
+            schedule_result.ok
+            and schedule_result.data
+            and schedule_result.data.draft_id != resolved_id
+        ):
+            logger.warning(
+                "Schedule %s draft_id mismatch after revise: expected=%s actual=%s",
+                ctx.session.active_schedule_id, resolved_id,
+                schedule_result.data.draft_id,
+            )
 
     updated = verify_result.data
     if isinstance(updated, DraftResponse):
@@ -433,7 +438,12 @@ async def revise_draft(
             trace_id=trace_id,
         )
 
-    return ToolResult.success(
-        verify_result.data.model_dump(mode="json") if hasattr(verify_result.data, "model_dump") else verify_result.data,
-        trace_id=trace_id,
+    verified_data = verify_result.data
+    if verified_data is None:
+        return ToolResult.result_unknown("Updated draft could not be verified", trace_id=trace_id)
+    payload = (
+        verified_data.model_dump(mode="json")
+        if hasattr(verified_data, "model_dump")
+        else verified_data
     )
+    return ToolResult.success(payload, trace_id=trace_id)

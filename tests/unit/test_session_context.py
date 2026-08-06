@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-from greenbook_assistant_core.context import RecentEntity, RecentToolCall, SessionContext
+from greenbook_assistant_core.context import RecentEntity, SessionContext
+from pydantic import ValidationError
 
 
 def make_session() -> SessionContext:
@@ -23,7 +24,7 @@ def test_active_draft_resolved_first():
     s.recent_entities = [
         RecentEntity(
             ref="draft:draft-2", kind="DRAFT", entity_id="draft-2",
-            label="Second", timestamp=datetime.now(timezone.utc),
+            label="Second", timestamp=datetime.now(UTC),
         ),
     ]
     resolved, _ = s.resolve_active_draft_id()
@@ -89,5 +90,5 @@ def test_record_entity_dedup():
 
 def test_user_id_frozen():
     s = make_session()
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         s.user_id = "hacked"

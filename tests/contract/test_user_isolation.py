@@ -2,22 +2,29 @@
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
+from greenbook_contracts.identity import AuthContext
 from starlette.testclient import TestClient
 
 from apps.assistant_api.greenbook_assistant_api.main import create_app
-from greenbook_contracts.identity import AuthContext
 
 
 @pytest.fixture
 def client():
-    app = create_app()
+    def test_auth(token: str) -> AuthContext:
+        user_id, _, tenant_id = token.partition(":")
+        return AuthContext(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            raw_access_token=token,
+        )
+
+    app = create_app(auth_validator=test_auth)
     # Initialize state manually (lifespan doesn't run under sync TestClient)
     app.state.conversation_store = {}
     app.state.run_store = {}
     app.state.approval_store = {}
+    app.state.message_store = {}
     return TestClient(app)
 
 
