@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.agentfacade.mapper.ScheduledPublicationMapper">
+
+    <resultMap id="ScheduledPublicationRecordMap" type="com.tongji.agentfacade.mapper.ScheduledPublicationRecord">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="draftId" column="draft_id"/>
+        <result property="runAt" column="run_at"/>
+        <result property="timezone" column="timezone"/>
+        <result property="status" column="status"/>
+        <result property="version" column="version"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="publishedPostId" column="published_post_id"/>
+        <result property="failureCode" column="failure_code"/>
+        <result property="failureMessage" column="failure_message"/>
+        <result property="auditActor" column="audit_actor"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="cancelledAt" column="cancelled_at"/>
+        <result property="publishedAt" column="published_at"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO scheduled_publications (
+            id, user_id, draft_id, run_at, timezone, status,
+            idempotency_key, audit_actor, created_at, updated_at
+        ) VALUES (
+            #{id}, #{userId}, #{draftId}, #{runAt}, #{timezone}, #{status},
+            #{idempotencyKey}, #{auditActor}, NOW(3), NOW(3)
+        )
+    </insert>
+
+    <select id="findById" resultMap="ScheduledPublicationRecordMap">
+        SELECT * FROM scheduled_publications WHERE id = #{id}
+    </select>
+
+    <select id="findByUserAndIdempotencyKey" resultMap="ScheduledPublicationRecordMap">
+        SELECT * FROM scheduled_publications
+        WHERE user_id = #{userId}
+          AND idempotency_key = #{idempotencyKey}
+        LIMIT 1
+    </select>
+
+    <select id="findByUser" resultMap="ScheduledPublicationRecordMap">
+        SELECT * FROM scheduled_publications
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+
+    <update id="updateRunAt">
+        UPDATE scheduled_publications
+        SET run_at = #{runAt}, version = version + 1, updated_at = NOW(3)
+        WHERE id = #{id}
+          AND user_id = #{userId}
+          AND status = 'SCHEDULED'
+          AND version = #{expectedVersion}
+    </update>
+
+    <update id="cancel">
+        UPDATE scheduled_publications
+        SET status = #{status}, cancelled_at = NOW(3), updated_at = NOW(3)
+        WHERE id = #{id}
+          AND user_id = #{userId}
+          AND status IN ('SCHEDULED')
+    </update>
+
+    <update id="markPublished">
+        UPDATE scheduled_publications
+        SET status = 'PUBLISHED',
+            published_post_id = #{publishedPostId},
+            published_at = #{publishedAt},
+            updated_at = NOW(3),
+            version = version + 1
+        WHERE id = #{id}
+          AND status = 'PROCESSING'
+          AND published_post_id IS NULL
+    </update>
+
+    <update id="markFailed">
+        UPDATE scheduled_publications
+        SET status = 'FAILED',
+            failure_code = #{failureCode},
+            failure_message = #{failureMessage},
+            updated_at = NOW(3),
+            version = version + 1
+        WHERE id = #{id}
+          AND status = 'PROCESSING'
+    </update>
+
+    <select id="findDue" resultMap="ScheduledPublicationRecordMap">
+        SELECT * FROM scheduled_publications
+        WHERE status = 'SCHEDULED'
+          AND run_at &lt;= #{before}
+        ORDER BY run_at
+        LIMIT #{limit}
+    </select>
+
+    <update id="claimForExecution">
+        UPDATE scheduled_publications
+        SET status = 'PROCESSING', version = version + 1, updated_at = NOW(3)
+        WHERE id = #{id} AND status = 'SCHEDULED'
+    </update>
+
+    <select id="recoverStaleProcessing" resultMap="ScheduledPublicationRecordMap">
+        SELECT * FROM scheduled_publications
+        WHERE status = 'PROCESSING'
+          AND updated_at &lt; #{before}
+        ORDER BY updated_at
+        LIMIT #{limit}
+    </select>
+
+</mapper>

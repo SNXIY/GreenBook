@@ -1,0 +1,161 @@
+﻿spring:
+  application:
+    name: greenbook-community
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:33306}/${MYSQL_DB:zhiguang}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 600000
+      max-lifetime: 1700000
+      connection-timeout: 30000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:26379}
+      password: ${REDIS_PASSWORD:mindflow}
+      database: ${REDIS_DATABASE:1}
+  kafka:
+    bootstrap-servers: ${KAFKA_HOST:127.0.0.1}:${KAFKA_PORT:39092}
+    template:
+      default-topic: counter-events
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      linger: 10ms
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+    consumer:
+      group-id: counter-agg
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: latest
+      enable-auto-commit: false
+    listener:
+      type: single
+      ack-mode: manual
+  ai:
+    deepseek:
+      api-key: "sk-dummy-for-local-dev"
+      base-url: https://api.deepseek.com
+      chat:
+        options:
+          model: deepseek-chat
+          temperature: 0.8
+canal:
+  enabled: ${CANAL_ENABLED:false}
+  host: ${CANAL_HOST:127.0.0.1}
+  port: ${CANAL_PORT:11111}
+  destination: ${CANAL_DESTINATION:example}
+  username: ${CANAL_USERNAME:}
+  password: ${CANAL_PASSWORD:}
+  filter: ${CANAL_FILTER:zhiguang\.outbox}
+  batchSize: ${CANAL_BATCH_SIZE:1000}
+  intervalMs: ${CANAL_INTERVAL_MS:1000}
+
+outbox:
+  cleanup:
+    enabled: true
+    retention-days: 7
+    batch-size: 1000
+    initial-delay-ms: 60000
+    fixed-delay-ms: 3600000
+
+counter:
+  rebuild:
+    enabled: false
+    lock:
+      ttl-ms: 5000
+      watchdog-ms: 30000
+    rate:
+      permits: 3
+      window-seconds: 10
+    backoff:
+      base-ms: 500
+      max-ms: 30000
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+auth:
+  jwt:
+    issuer: ${JWT_ISSUER:zhiguang}
+    key-id: zhiguang-key
+    private-key: classpath:keys/private.pem
+    public-key: classpath:keys/public.pem
+    access-token-ttl: PT15M
+    refresh-token-ttl: P7D
+  verification:
+    code-length: 6
+    ttl: PT5M
+    max-attempts: 5
+    send-interval: PT60S
+    daily-limit: 10
+  password:
+    bcrypt-strength: 12
+    min-length: 8
+
+logging:
+  level:
+    root: INFO
+    '[com.tongji]': DEBUG
+    '[com.tongji.relation.outbox.OutboxMapper]': WARN
+    '[com.tongji.relation.outbox.OutboxPollingPublisher]': INFO
+    '[com.tongji.relation.outbox.OutboxCleanupTask]': INFO
+    '[com.tongji.agentfacade.mapper.ScheduledPublicationMapper]': WARN
+
+oss:
+  provider: ${STORAGE_PROVIDER:aliyun}
+  endpoint: ${OSS_ENDPOINT:oss-cn-beijing.aliyuncs.com}
+  access-key-id: ${OSS_ACCESS_KEY_ID:}
+  access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+  bucket: ${OSS_BUCKET:}
+  public-domain: ${OSS_PUBLIC_DOMAIN:}
+  folder: avatars
+  local-root: ${LOCAL_STORAGE_ROOT:./data/storage}
+  local-public-base-url: ${LOCAL_STORAGE_PUBLIC_BASE_URL:http://127.0.0.1:8080}
+
+creator:
+  handoff:
+    shared-secret: ${CREATOR_HANDOFF_SHARED_SECRET:change-me-creator-handoff}
+
+assistant:
+  shared-secret: ${ASSISTANT_SERVICE_SHARED_SECRET:}
+
+app:
+  cors:
+    allowed-origins: ${JAVA_CORS_ALLOWED_ORIGINS:http://127.0.0.1:5173,http://localhost:5173}
+
+cache:
+  l2:
+    public-cfg:
+      ttl-seconds: 15
+      max-size: 1000
+    mine-cfg:
+      ttl-seconds: 10
+      max-size: 1000
+  hotkey:
+    window-seconds: 60
+    segment-seconds: 10
+    level-low: 50
+    level-medium: 200
+    level-high: 500
+    extend-low-seconds: 20
+    extend-medium-seconds: 60
+    extend-high-seconds: 120

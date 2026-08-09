@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.relation.outbox.OutboxMapper">
+    <insert id="insert">
+        INSERT INTO outbox (id, aggregate_type, aggregate_id, type, payload, status, retry_count, created_at)
+        VALUES (#{id}, #{aggregateType}, #{aggregateId}, #{type}, #{payload}, 'NEW', 0, NOW(3))
+    </insert>
+
+    <update id="markPublished">
+        UPDATE outbox
+        SET status = 'PUBLISHED',
+            published_at = NOW(3),
+            updated_at = NOW(3)
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+          AND status = 'NEW'
+    </update>
+
+    <select id="selectNew" resultType="map">
+        SELECT
+            id,
+            aggregate_type,
+            aggregate_id,
+            type,
+            payload,
+            status,
+            created_at
+        FROM outbox
+        WHERE status = 'NEW'
+        ORDER BY created_at
+        LIMIT #{limit}
+    </select>
+
+    <delete id="deletePublishedBefore">
+        DELETE FROM outbox
+        WHERE status = 'PUBLISHED'
+          AND created_at &lt; DATE_SUB(NOW(3), INTERVAL #{retentionDays} DAY)
+        ORDER BY created_at
+        LIMIT #{batchSize}
+    </delete>
+</mapper>

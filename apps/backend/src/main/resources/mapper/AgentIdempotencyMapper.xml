@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.agentfacade.mapper.AgentIdempotencyMapper">
+
+    <resultMap id="AgentIdempotencyRecordMap" type="com.tongji.agentfacade.mapper.AgentIdempotencyRecord">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="operation" column="operation"/>
+        <result property="idempotencyKey" column="idempotency_key"/>
+        <result property="requestHash" column="request_hash"/>
+        <result property="status" column="status"/>
+        <result property="responseStatus" column="response_status"/>
+        <result property="responseBody" column="response_body"/>
+        <result property="resourceType" column="resource_type"/>
+        <result property="resourceId" column="resource_id"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="expiresAt" column="expires_at"/>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO agent_idempotency_record (
+            id, user_id, operation, idempotency_key, request_hash,
+            status, response_status, response_body, resource_type, resource_id,
+            created_at, expires_at
+        ) VALUES (
+            #{id}, #{userId}, #{operation}, #{idempotencyKey}, #{requestHash},
+            #{status}, #{responseStatus}, #{responseBody}, #{resourceType}, #{resourceId},
+            NOW(3), #{expiresAt}
+        )
+    </insert>
+
+    <select id="findByUserOpKey" resultMap="AgentIdempotencyRecordMap">
+        SELECT * FROM agent_idempotency_record
+        WHERE user_id = #{userId}
+          AND operation = #{operation}
+          AND idempotency_key = #{idempotencyKey}
+        LIMIT 1
+    </select>
+
+    <update id="complete">
+        UPDATE agent_idempotency_record
+        SET status = #{status},
+            response_status = #{responseStatus},
+            response_body = #{responseBody},
+            resource_type = #{resourceType},
+            resource_id = #{resourceId},
+            completed_at = NOW(3)
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteExpired">
+        DELETE FROM agent_idempotency_record
+        WHERE expires_at &lt; #{before}
+        LIMIT 1000
+    </delete>
+
+</mapper>

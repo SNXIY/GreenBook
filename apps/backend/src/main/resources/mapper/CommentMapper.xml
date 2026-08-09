@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.comment.mapper.CommentMapper">
+
+    <resultMap id="CommentRowMap" type="com.tongji.comment.model.CommentRow">
+        <id column="id" property="id"/>
+        <result column="post_id" property="postId"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="root_id" property="rootId"/>
+        <result column="user_id" property="userId"/>
+        <result column="content" property="content"/>
+        <result column="status" property="status"/>
+        <result column="is_top" property="isTop"/>
+        <result column="reply_count" property="replyCount"/>
+        <result column="create_time" property="createTime"/>
+        <result column="author_nickname" property="authorNickname"/>
+        <result column="author_avatar" property="authorAvatar"/>
+        <result column="is_assistant" property="assistant"/>
+        <result column="assistant_run_id" property="assistantRunId"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.tongji.comment.model.Comment">
+        INSERT INTO comments (
+            id, post_id, parent_id, root_id, user_id, content, status, is_top,
+            reply_count, create_time, update_time
+        ) VALUES (
+            #{id}, #{postId}, #{parentId}, #{rootId}, #{userId}, #{content}, #{status}, #{isTop},
+            #{replyCount}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="findById" resultMap="CommentRowMap">
+        SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
+               (acp.comment_id IS NOT NULL) AS is_assistant,
+               acp.assistant_run_id
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
+        WHERE c.id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="findPostCreatorId" resultType="long">
+        SELECT creator_id
+        FROM know_posts
+        WHERE id = #{postId}
+          AND status != 'deleted'
+        LIMIT 1
+    </select>
+
+    <update id="incrementReplyCount">
+        UPDATE comments
+        SET reply_count = reply_count + 1,
+            update_time = NOW(3)
+        WHERE id = #{id}
+          AND status = 'published'
+    </update>
+
+    <update id="decrementReplyCount">
+        UPDATE comments
+        SET reply_count = IF(reply_count > 0, reply_count - 1, 0),
+            update_time = NOW(3)
+        WHERE id = #{id}
+    </update>
+
+    <update id="softDelete">
+        UPDATE comments
+        SET status = 'deleted',
+            content = '',
+            update_time = NOW(3)
+        WHERE id = #{id}
+          AND user_id = #{userId}
+          AND status = 'published'
+    </update>
+
+    <update id="updateTop">
+        UPDATE comments c
+        JOIN know_posts p ON c.post_id = p.id
+        SET c.is_top = #{top},
+            c.update_time = NOW(3)
+        WHERE c.id = #{id}
+          AND p.creator_id = #{postCreatorId}
+          AND c.parent_id IS NULL
+          AND c.status = 'published'
+    </update>
+
+    <select id="listTopLevel" resultMap="CommentRowMap">
+        SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
+               (acp.comment_id IS NOT NULL) AS is_assistant,
+               acp.assistant_run_id
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
+        WHERE c.post_id = #{postId}
+          AND c.parent_id IS NULL
+          AND c.status = 'published'
+        <if test="cursor != null">
+          AND c.id &lt; #{cursor}
+        </if>
+        ORDER BY c.is_top DESC, c.id DESC
+        LIMIT #{size}
+    </select>
+
+    <select id="listReplies" resultMap="CommentRowMap">
+        SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
+               (acp.comment_id IS NOT NULL) AS is_assistant,
+               acp.assistant_run_id
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
+        WHERE c.parent_id = #{parentId}
+          AND c.status = 'published'
+        <if test="cursor != null">
+          AND c.id &gt; #{cursor}
+        </if>
+        ORDER BY c.id ASC
+        LIMIT #{size}
+    </select>
+
+    <select id="listByIds" resultMap="CommentRowMap">
+        SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
+               (acp.comment_id IS NOT NULL) AS is_assistant,
+               acp.assistant_run_id
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
+        WHERE c.status = 'published'
+          AND c.id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+</mapper>

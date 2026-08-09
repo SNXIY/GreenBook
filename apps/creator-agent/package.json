@@ -1,0 +1,22 @@
+{
+  "name": "mindflow-creator-frontend",
+  "private": true,
+  "scripts": {
+    "build:frontend": "esbuild frontend/creator-editor.js --bundle --minify --format=iife --target=es2020 --outfile=app/static/creator-editor.js",
+    "verify:ui": "node scripts/verify-creator-ui.mjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.29.0",
+    "@tiptap/extension-character-count": "3.29.0",
+    "@tiptap/extension-placeholder": "3.29.0",
+    "@tiptap/starter-kit": "3.29.0",
+    "dompurify": "3.4.12",
+    "lucide": "1.27.0",
+    "marked": "18.0.7",
+    "turndown": "7.2.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "playwright-core": "^1.62.0"
+  }
+}

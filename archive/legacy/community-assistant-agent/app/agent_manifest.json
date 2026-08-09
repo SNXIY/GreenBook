@@ -1,0 +1,61 @@
+[
+  {
+    "name": "SearchAgent",
+    "description": "Search and summarize evidence from the GreenBook community.",
+    "capabilities": ["search", "read_post", "summarize"],
+    "tools": ["community.search_posts", "community.get_post", "community.summarize_post"],
+    "max_parallel_tasks": 4
+  },
+  {
+    "name": "AnalyticsAgent",
+    "description": "Analyze community trends, engagement and time-window metrics.",
+    "capabilities": ["analysis", "trend_analysis"],
+    "tools": [
+      "community.analyze_engagement",
+      "community.aggregate_post_topics"
+    ],
+    "max_parallel_tasks": 2
+  },
+  {
+    "name": "UserInsightAgent",
+    "description": "Analyze user interaction, contributors and audience activity.",
+    "capabilities": ["analysis", "user_insight"],
+    "tools": [
+      "community.analyze_engagement",
+      "community.list_active_users",
+      "community.list_posts_by_users"
+    ],
+    "max_parallel_tasks": 2
+  },
+  {
+    "name": "ContentCreationAgent",
+    "description": "Delegate community draft generation and rewriting to Creator Agent.",
+    "capabilities": ["generation", "rewrite_content"],
+    "tools": ["creator.create_draft", "creator.revise_draft"]
+  },
+  {
+    "name": "PublishAgent",
+    "description": "Publish or schedule approved drafts within authorization boundaries.",
+    "capabilities": ["publishing", "schedule_publish"],
+    "tools": ["community.get_own_draft", "publication.publish_now", "publication.schedule", "publication.get_schedule", "publication.update_schedule", "publication.cancel_schedule", "publication.schedule_batch"]
+  },
+  {
+    "name": "InteractionAgent",
+    "description": "Reply to a community comment through the assistant identity.",
+    "capabilities": ["comment_interaction"],
+    "tools": ["community.reply_comment"]
+  },
+  {
+    "name": "ContentManagementAgent",
+    "description": "List and delete content owned by the current user.",
+    "capabilities": ["list_own_content", "delete_content"],
+    "tools": ["community.list_own_posts", "community.delete_post", "community.delete_own_posts_batch"]
+  },
+  {
+    "name": "MCPAgent",
+    "description": "Use explicitly allowlisted external MCP tools.",
+    "capabilities": ["external_research", "mcp_tool"],
+    "tools": ["mcp.*"],
+    "max_parallel_tasks": 2
+  }
+]

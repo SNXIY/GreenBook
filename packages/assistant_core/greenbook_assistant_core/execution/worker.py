@@ -1,0 +1,357 @@
+"""ExecutionWorker — drives an ExecutablePlan to completion.
+
+Phase 4.1: sequential DAG execution with pause/resume/retry.
+Phase 5.2: injects upstream artifacts into downstream step constraints.
+"""
+
+from __future__ import annotations
+
+import logging
+from enum import StrEnum
+from typing import Any
+
+from greenbook_assistant_core.orchestration.models import PlanStep, TaskPlan
+from greenbook_assistant_core.planning.models import ExecutablePlan
+
+from .capability_executor import CapabilityExecutor
+from .events import EventType, ExecutionEvent
+from .exceptions import ExecutionBlockedError
+from .invocation import ExecutionResult
+from .models import ExecutionStatus, PlanExecution, StepExecution, StepStatus
+from .recovery import RecoveryPolicy
+from .repository import ExecutionRepository
+from .runtime_guard import (
+    ExecutionBlockedError as RuntimeGuardBlockedError,
+)
+from .runtime_guard import (
+    RuntimeGuard,
+)
+from .runtime_manager import RuntimeManager
+from .scheduler import StepScheduler
+from .state_manager import ExecutionStateManager
+
+logger = logging.getLogger(__name__)
+
+
+class RunOutcome(StrEnum):
+    COMPLETED = "COMPLETED"
+    WAITING_APPROVAL = "WAITING_APPROVAL"
+    PAUSED = "PAUSED"
+    BLOCKED = "BLOCKED"
+    FAILED = "FAILED"
+    WAITING_ASYNC = "WAITING_ASYNC"
+    # Backward-compatible name for callers compiled against Phase 11.x.
+    # Runtime code must use WAITING_ASYNC so STALLED cannot hide failures.
+    STALLED = "STALLED"
+
+
+class ExecutionWorker:
+    """Drive an ExecutablePlan through its capability steps.
+
+    Does NOT own the retry loop (the caller decides whether to re-invoke
+    after WAITING_APPROVAL or FAILED_RETRYABLE).  A single call to
+    ``run()`` advances the execution as far as it can go in one pass.
+    """
+
+    def __init__(
+        self,
+        executor: CapabilityExecutor,
+        repository: ExecutionRepository | None = None,
+        trace: Any = None,  # AgentTrace | None
+        event_store: Any = None,
+    ) -> None:
+        self._executor = executor
+        self._repo = repository or ExecutionRepository()
+        self._state = ExecutionStateManager(self._repo, event_store=event_store)
+        self._runtime_guard = RuntimeGuard(RuntimeManager(self._state))
+        self._recovery_policy = RecoveryPolicy()
+        self._scheduler = StepScheduler()
+        self._trace = trace
+
+    # ── main entry ───────────────────────────────────────────────
+
+    async def run(self, execution_id: str) -> RunOutcome:
+        """Advance *execution_id* as far as possible in one pass.
+
+        Returns the reason the pass stopped.
+        """
+        ex = self._state._require_execution(execution_id)
+
+        # Ensure execution is started
+        if ex.status == ExecutionStatus.PENDING:
+            self._state.start_execution(execution_id)
+
+        # Resume any retryable or crashed steps
+        if ex.status not in (
+            ExecutionStatus.WAITING_APPROVAL,
+            ExecutionStatus.PAUSED,
+        ):
+            ex = self._state.resume_execution(execution_id)
+
+        # Main loop — sequential (Phase 4.1: no parallel execution)
+        while True:
+            ex = self._state._require_execution(execution_id)
+
+            # Terminal?
+            if ex.is_terminal:
+                if ex.status == ExecutionStatus.COMPLETED:
+                    return RunOutcome.COMPLETED
+                if ex.status == ExecutionStatus.CANCELLED:
+                    return RunOutcome.BLOCKED
+                return RunOutcome.FAILED
+
+            # Approval pending?
+            if ex.status == ExecutionStatus.WAITING_APPROVAL:
+                return RunOutcome.WAITING_APPROVAL
+
+            # Find next ready step
+            ready = self._scheduler.get_ready_steps(ex)
+            if not ready:
+                self._state._update_execution_status(execution_id)
+                ex = self._state._require_execution(execution_id)
+                if ex.is_terminal:
+                    if ex.status == ExecutionStatus.COMPLETED:
+                        return RunOutcome.COMPLETED
+                    return RunOutcome.FAILED
+                if any(s.status == StepStatus.RUNNING for s in ex.steps):
+                    return RunOutcome.WAITING_ASYNC
+                # A non-terminal execution with no ready step and no running
+                # step is a broken dependency/state graph, not a long task.
+                # Surface it as a failure instead of leaving RUNNING forever.
+                self._state.fail_execution(
+                    execution_id,
+                    error_code="EXECUTION_STALLED",
+                    error_message="No ready step remains for this execution",
+                )
+                return RunOutcome.FAILED
+
+            # Execute the first ready step (sequential)
+            step_ex = ready[0]
+            outcome = await self._execute_one_step(ex, step_ex)
+            if outcome == RunOutcome.WAITING_APPROVAL:
+                return RunOutcome.WAITING_APPROVAL
+            if outcome == RunOutcome.WAITING_ASYNC:
+                return RunOutcome.WAITING_ASYNC
+            if outcome in (RunOutcome.PAUSED, RunOutcome.BLOCKED):
+                return outcome
+
+    # ── single-step execution ────────────────────────────────────
+
+    async def _execute_one_step(
+        self,
+        ex: PlanExecution,
+        step_ex: StepExecution,
+    ) -> RunOutcome:
+        """Execute one StepExecution → update state → return outcome."""
+        execution_id = ex.execution_id
+        sid = step_ex.step_execution_id
+        try:
+            self._runtime_guard.check_execution(execution_id)
+        except (RuntimeGuardBlockedError, ExecutionBlockedError) as blocked:
+            status = getattr(blocked, "current_status", None)
+            if status is None:
+                status = getattr(blocked, "status", None)
+            if status == ExecutionStatus.PAUSED:
+                return RunOutcome.PAUSED
+            return RunOutcome.BLOCKED
+
+        # 1. Claim + start (skip if already RUNNING — post-approval)
+        if step_ex.status == StepStatus.PENDING:
+            self._state.start_step(execution_id, sid)
+        elif step_ex.status != StepStatus.RUNNING:
+            return RunOutcome.WAITING_ASYNC
+
+        self._state.event_store.append(
+            ExecutionEvent(
+                execution_id=execution_id,
+                event_type=EventType.STEP_STARTED,
+                step_id=step_ex.step_id,
+                payload={"step_execution_id": sid},
+            )
+        )
+
+        # Trace: STEP_STARTED
+        if self._trace is not None:
+            self._trace.step_started(step_ex)
+
+        # 2. Build PlanStep — inject transitive upstream artifacts into constraints
+        constraints: dict[str, Any] = dict(
+            step_ex.checkpoint_data.get("constraints", {})
+        )
+        # Walk ALL transitive ancestors (not just direct depends_on)
+        visited: set[str] = set()
+        queue: list[str] = list(step_ex.depends_on)
+        while queue:
+            dep_id = queue.pop(0)
+            if dep_id in visited:
+                continue
+            visited.add(dep_id)
+            upstream = next((s for s in ex.steps if s.step_id == dep_id), None)
+            if upstream:
+                queue.extend(upstream.depends_on)
+                if upstream.output_artifact:
+                    art = upstream.output_artifact
+                    if art.artifact_type == "DRAFT" and art.resource_id:
+                        constraints.setdefault("draft_id", art.resource_id)
+                    elif art.artifact_type == "SCHEDULE" and art.resource_id:
+                        constraints.setdefault("schedule_id", art.resource_id)
+
+        plan_step = PlanStep(
+            step_id=step_ex.step_id,
+            capability=step_ex.capability,
+            ordinal=step_ex.ordinal,
+            input_artifact_types=list(step_ex.input_artifact_types),
+            output_artifact_type=step_ex.output_artifact_type,
+            constraints=constraints,
+        )
+
+        # 3. Execute
+        result: ExecutionResult = await self._executor.execute_step(plan_step)
+
+        # 4. Handle result
+        if result.pending:
+            # The tool has acknowledged a long-running task.  Keep the step
+            # RUNNING and let the Runtime continuation resume this Worker
+            # when ToolRuntime receives the completion callback.
+            return RunOutcome.WAITING_ASYNC
+        if result.ok:
+            if step_ex.retry_count > 0:
+                self._state.event_store.append(
+                    ExecutionEvent(
+                        execution_id=execution_id,
+                        event_type=EventType.STEP_RETRY_COMPLETED,
+                        step_id=step_ex.step_id,
+                        payload={
+                            "step_execution_id": sid,
+                            "retry_count": step_ex.retry_count,
+                        },
+                    )
+                )
+            self._state.event_store.append(
+                ExecutionEvent(
+                    execution_id=execution_id,
+                    event_type=EventType.STEP_COMPLETED,
+                    step_id=step_ex.step_id,
+                    payload={"step_execution_id": sid},
+                )
+            )
+            self._state.complete_step(
+                execution_id, sid,
+                output_artifact=result.artifact,
+            )
+            if self._trace is not None:
+                self._trace.step_completed(step_ex)
+        elif result.approval_required:
+            self._state.pause_for_approval(execution_id, sid)
+            return RunOutcome.WAITING_APPROVAL
+        elif self._recovery_policy.can_retry_failure(
+            step_ex, result.error_code
+        ):
+            self._state.event_store.append(
+                ExecutionEvent(
+                    execution_id=execution_id,
+                    event_type=EventType.STEP_FAILED,
+                    step_id=step_ex.step_id,
+                    payload={
+                        "step_execution_id": sid,
+                        "retryable": True,
+                        "error_code": result.error_code,
+                        "error_message": result.error_message,
+                    },
+                )
+            )
+            failed_step = self._state.fail_step(
+                execution_id, sid,
+                error_code=result.error_code,
+                error_message=result.error_message,
+            )
+            if failed_step.status == StepStatus.FAILED:
+                self._state.event_store.append(
+                    ExecutionEvent(
+                        execution_id=execution_id,
+                        event_type=EventType.STEP_RETRY_EXHAUSTED,
+                        step_id=step_ex.step_id,
+                        payload={
+                            "step_execution_id": sid,
+                            "retry_count": failed_step.retry_count,
+                            "reason": result.error_code,
+                        },
+                    )
+                )
+        else:
+            # Permanent failure — mark downstream SKIPPED
+            if self._trace is not None:
+                self._trace.step_failed(step_ex, result.error_message)
+            self._state.event_store.append(
+                ExecutionEvent(
+                    execution_id=execution_id,
+                    event_type=EventType.STEP_FAILED,
+                    step_id=step_ex.step_id,
+                    payload={
+                        "step_execution_id": sid,
+                        "retryable": False,
+                        "error_code": result.error_code,
+                        "error_message": result.error_message,
+                    },
+                )
+            )
+            self._state.fail_step(
+                execution_id, sid,
+                error_code=result.error_code,
+                error_message=result.error_message,
+                permanent=True,
+            )
+            ex_store = self._repo.find_by_id(execution_id)
+            if ex_store is not None:
+                skipped = self._scheduler.mark_skipped_downstream(
+                    ex_store, step_ex.step_id)
+                if skipped:
+                    self._repo.save(ex_store)
+                    self._state._update_execution_status(execution_id)
+
+        return RunOutcome.COMPLETED  # step-level done
+
+    # ── resume after approval ────────────────────────────────────
+
+    async def resume_after_approval(self, execution_id: str) -> RunOutcome:
+        """Resume a WAITING_APPROVAL execution after user approves."""
+        ex = self._state._require_execution(execution_id)
+        if ex.status != ExecutionStatus.WAITING_APPROVAL:
+            return RunOutcome.FAILED
+
+        # Find the WAITING_APPROVAL step
+        waiting = next(
+            (s for s in ex.steps if s.status == StepStatus.WAITING_APPROVAL),
+            None,
+        )
+        if waiting is None:
+            return RunOutcome.FAILED
+
+        # TODO: Phase 4.2 — check approval decision from DB
+        # For now, auto-approve (test-friendly)
+        self._state.approve_and_resume(execution_id, waiting.step_execution_id)
+
+        # Execute the resumed step
+        step_ex = self._state._repo.find_step(execution_id, waiting.step_execution_id)
+        if step_ex is None:
+            return RunOutcome.FAILED
+        return await self._execute_one_step(
+            self._state._require_execution(execution_id),
+            step_ex,
+        )
+
+    # ── helpers ─────────────────────────────────────────────────
+
+    def init_from_plan(
+        self,
+        executable: ExecutablePlan,
+        task_id: str = "",
+    ) -> PlanExecution:
+        """Create + persist a PlanExecution from an ExecutablePlan."""
+        plan = TaskPlan(
+            plan_id=executable.plan_id,
+            task_id=task_id,
+            template_name=executable.template_name,
+            steps=executable.steps,
+        )
+        return self._state.init_execution(plan, executable)

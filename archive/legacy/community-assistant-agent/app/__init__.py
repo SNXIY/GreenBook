@@ -1,0 +1,2 @@
+"""GreenBook community assistant agent."""
+

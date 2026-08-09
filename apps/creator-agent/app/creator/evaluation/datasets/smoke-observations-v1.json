@@ -1,0 +1,177 @@
+{
+  "schema_version": "1.0",
+  "dataset_id": "creator-smoke",
+  "dataset_version": "1.0.0",
+  "observations": [
+    {
+      "schema_version": "1.0",
+      "case_id": "agent-harness-hitl-article",
+      "tenant_id": "tenant-eval",
+      "creator_id": "creator-eval",
+      "task_id": "task-eval-smoke",
+      "run_id": "run-eval-smoke",
+      "trace_id": "trace-eval-smoke",
+      "task_status": "COMPLETED",
+      "goal": "Write a practical article about a production Agent Harness and human approval checkpoints.",
+      "final_artifact_kind": "FINAL_CONTENT",
+      "evidence": [
+        {
+          "evidence_id": "evidence-agent-harness",
+          "document_id": "post-agent-harness",
+          "rank": 1,
+          "text": "A production Agent Harness owns sessions, durable task state, checkpoints, tools, traces, and recovery.",
+          "source": "community:post-agent-harness",
+          "authority_verified": true
+        },
+        {
+          "evidence_id": "evidence-hitl",
+          "document_id": "post-hitl",
+          "rank": 2,
+          "text": "Human-in-the-loop workflows persist an interrupt and resume the exact checkpoint after an authorized decision.",
+          "source": "community:post-hitl",
+          "authority_verified": true
+        },
+        {
+          "evidence_id": "evidence-unrelated",
+          "document_id": "post-unrelated",
+          "rank": 3,
+          "text": "A general post about content operations.",
+          "source": "community:post-unrelated",
+          "authority_verified": true
+        }
+      ],
+      "plans": [
+        {
+          "revision": 1,
+          "reason": "Research, plan, generate, review, and evaluate the requested article.",
+          "steps": [
+            {
+              "step_id": "research",
+              "capability": "RESEARCH_TOPIC",
+              "dependencies": []
+            },
+            {
+              "step_id": "topics",
+              "capability": "PLAN_TOPICS",
+              "dependencies": [
+                "research"
+              ]
+            },
+            {
+              "step_id": "outline",
+              "capability": "BUILD_OUTLINE",
+              "dependencies": [
+                "topics"
+              ]
+            },
+            {
+              "step_id": "write",
+              "capability": "WRITE_DRAFT",
+              "dependencies": [
+                "outline"
+              ]
+            },
+            {
+              "step_id": "critic",
+              "capability": "CRITIQUE_CONTENT",
+              "dependencies": [
+                "write"
+              ]
+            },
+            {
+              "step_id": "evaluate",
+              "capability": "EVALUATE_RUN",
+              "dependencies": [
+                "critic"
+              ]
+            }
+          ]
+        }
+      ],
+      "executions": [
+        {
+          "execution_id": "exec-research",
+          "step_id": "research",
+          "capability": "RESEARCH_TOPIC",
+          "agent": "ResearchAgent",
+          "status": "SUCCEEDED"
+        },
+        {
+          "execution_id": "exec-topics",
+          "step_id": "topics",
+          "capability": "PLAN_TOPICS",
+          "agent": "StrategyAgent",
+          "status": "SUCCEEDED"
+        },
+        {
+          "execution_id": "exec-outline",
+          "step_id": "outline",
+          "capability": "BUILD_OUTLINE",
+          "agent": "StrategyAgent",
+          "status": "SUCCEEDED"
+        },
+        {
+          "execution_id": "exec-write",
+          "step_id": "write",
+          "capability": "WRITE_DRAFT",
+          "agent": "WriterAgent",
+          "status": "SUCCEEDED"
+        },
+        {
+          "execution_id": "exec-critic",
+          "step_id": "critic",
+          "capability": "CRITIQUE_CONTENT",
+          "agent": "CriticAgent",
+          "status": "SUCCEEDED"
+        },
+        {
+          "execution_id": "exec-evaluate",
+          "step_id": "evaluate",
+          "capability": "EVALUATE_RUN",
+          "agent": "EvaluationAgent",
+          "status": "SUCCEEDED"
+        }
+      ],
+      "tool_calls": [
+        {
+          "call_id": "call-search-posts",
+          "name": "search_posts",
+          "status": "SUCCESS",
+          "arguments_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "latency_ms": 18
+        }
+      ],
+      "generation": {
+        "title": "Production Agent Harness with Human Approval",
+        "body_markdown": "# Agent Architecture\n\nA production Agent Harness owns the session, durable task lifecycle, checkpoint, tools, trace, and recovery policy. The Supervisor selects specialist capabilities dynamically, while specialists exchange immutable artifacts instead of hidden prompts.\n\n# Human Decision Flow\n\nHuman-in-the-loop is a durable state transition. The runtime records an interrupt, exposes the available decision options, and resumes the exact checkpoint only after an authorized choice. This keeps topic selection and outline approval explicit without turning the workflow into a fixed prompt chain.\n\nThe final quality gate evaluates retrieval, planning, tool use, evidence support, relevance, and creator style as separate versioned metrics.",
+        "cited_evidence_ids": [
+          "evidence-agent-harness",
+          "evidence-hitl"
+        ],
+        "declared_unsupported_claims": [],
+        "claim_assessments": [
+          {
+            "claim": "A production Agent Harness owns durable task state, checkpoints, tools, traces, and recovery.",
+            "verdict": "SUPPORTED",
+            "supporting_evidence_ids": [
+              "evidence-agent-harness"
+            ],
+            "reason": "The first evidence item directly supports the claim."
+          },
+          {
+            "claim": "Human-in-the-loop resumes the exact checkpoint after an authorized decision.",
+            "verdict": "SUPPORTED",
+            "supporting_evidence_ids": [
+              "evidence-hitl"
+            ],
+            "reason": "The second evidence item directly supports the claim."
+          }
+        ]
+      },
+      "replan_count": 0,
+      "runtime_error_codes": [],
+      "limitations": [],
+      "captured_at": "2026-07-24T12:00:00Z"
+    }
+  ]
+}
