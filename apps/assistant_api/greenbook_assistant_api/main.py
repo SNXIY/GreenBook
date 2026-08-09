@@ -22,12 +22,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from greenbook_creator_client.client import CreatorClient
 from greenbook_java_client.client import JavaClient
 from greenbook_mcp_server.server import GreenBookMCPServer
+from greenbook_assistant_core.execution.event_store import ExecutionEventStore
+from greenbook_assistant_core.execution.repository import ExecutionRepository
+from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
+from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
 from greenbook_security.auth_context import AuthContextResolver, _extract_bearer
 from greenbook_security.jwt import JwtValidationError, validate_access_token
 from openai import AsyncOpenAI
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .api.routes import router
+from .services.runtime_agent_service import RuntimeAgentService
 
 _ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 if _ENV_FILE.exists():
@@ -157,6 +162,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.run_store = {}
     app.state.approval_store = {}
     app.state.message_store = {}
+
+    execution_repository = ExecutionRepository()
+    execution_event_store = ExecutionEventStore()
+    execution_state_manager = ExecutionStateManager(
+        repository=execution_repository,
+        event_store=execution_event_store,
+    )
+    execution_runtime_manager = RuntimeManager(
+        state_manager=execution_state_manager,
+    )
+    runtime_agent_service = RuntimeAgentService(
+        repository=execution_repository,
+        event_store=execution_event_store,
+    )
+
+    app.state.execution_repository = execution_repository
+    app.state.execution_event_store = execution_event_store
+    app.state.execution_state_manager = execution_state_manager
+    app.state.execution_runtime_manager = execution_runtime_manager
+    app.state.runtime_agent_service = runtime_agent_service
 
     logger.info(
         "Assistant API ready java=%s creator=%s issuer=%s audience=%s model=%s",
