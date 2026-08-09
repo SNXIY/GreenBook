@@ -32,6 +32,7 @@ from openai import AsyncOpenAI
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .api.routes import router
+from .api.runtime_routes import router as runtime_router
 from .services.runtime_agent_service import RuntimeAgentService
 
 _ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
@@ -218,6 +219,7 @@ def create_app(*, auth_validator: Callable[[str], Any] | None = None) -> FastAPI
         allow_headers=["*"],
     )
     app.include_router(router)
+    app.include_router(runtime_router, prefix="/api/v1")
 
     @app.get("/health")
     async def health(request: Request) -> dict[str, object]:
