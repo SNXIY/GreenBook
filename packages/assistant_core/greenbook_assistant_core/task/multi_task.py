@@ -288,6 +288,10 @@ class ConversationTargetResolver:
             if len(ordered) == 1:
                 return TargetResolution(ordered[0], reason="recent_unique")
             return TargetResolution(None, tuple(ordered), reason="ambiguous_recent")
+        if len(candidates) > 1 and any(
+            token in text for token in ("优化", "修改", "改一下", "调整", "improve", "update")
+        ):
+            return TargetResolution(None, tuple(candidates), reason="ambiguous_unscoped_action")
         return TargetResolution(None, reason="unmatched")
 
     @staticmethod

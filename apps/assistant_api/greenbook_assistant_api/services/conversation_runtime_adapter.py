@@ -33,6 +33,10 @@ from greenbook_assistant_core.task.multi_task import (
     intent_delta_from_spec,
     split_task_segments,
 )
+from greenbook_assistant_core.task.graph import (
+    ConversationTaskGraph,
+    TaskGraphBuilder,
+)
 from greenbook_assistant_core.task.models import (
     ArtifactRef,
     TaskExecutionRef,
@@ -45,6 +49,12 @@ from ..models.runtime_result import RuntimeResult
 from .intent_compiler import IntentCompilationError, IntentCompiler
 from .runtime_agent_service import RuntimeAgentService
 from .task_provider import TaskBinding, TaskProvider, TaskProviderError, TaskScope
+from .query_handler import (
+    QueryHandler,
+    QueryHandlerError,
+    QueryRequest,
+    ReadOnlyQueryHandler,
+)
 
 
 class ConversationRuntimeAdapter:
@@ -62,6 +72,8 @@ class ConversationRuntimeAdapter:
         intent_compiler: IntentCompiler | None = None,
         runtime_service: RuntimeAgentService | Any | None = None,
         execution_repository: Any | None = None,
+        graph_builder: TaskGraphBuilder | None = None,
+        query_handler: QueryHandler | None = None,
     ) -> None:
         self._intent_provider = intent_provider or IntentSpecProvider()
         self._task_provider = task_provider or TaskProvider()
@@ -71,6 +83,11 @@ class ConversationRuntimeAdapter:
         )
         self._execution_repository = execution_repository
         self._task_indexes: dict[str, ConversationTaskIndex] = {}
+        self._graph_builder = graph_builder or TaskGraphBuilder(
+            self._intent_provider,
+            legacy_splitter=split_task_segments,
+        )
+        self._query_handler = query_handler or ReadOnlyQueryHandler()
 
     async def execute(
         self,
@@ -94,6 +111,7 @@ class ConversationRuntimeAdapter:
         _skip_multi: bool = False,
         _intent_spec_override: IntentSpec | None = None,
         _resolved_target_id: str | None = None,
+        _artifact_refs_override: Sequence[ArtifactRef] | None = None,
     ) -> RuntimeResult:
         """Adapt one old message request into a RuntimeResult.
 
@@ -103,14 +121,16 @@ class ConversationRuntimeAdapter:
         """
 
         if not _skip_multi:
-            segments = split_task_segments(message)
-            if len(segments) > 1:
-                return await self.execute_many(
+            graph = await self._graph_builder.build(
+                message,
+                existing_tasks=existing_tasks,
+            )
+            if len(graph.nodes) > 1:
+                return await self.execute_graph(
+                    graph=graph,
                     conversation_id=conversation_id,
                     user_id=user_id,
                     tenant_id=tenant_id,
-                    message=message,
-                    segments=segments,
                     history=history,
                     session=session,
                     timezone=timezone,
@@ -122,8 +142,10 @@ class ConversationRuntimeAdapter:
                     auth=auth,
                     detach=detach,
                     completion_callback=completion_callback,
-                    existing_tasks=existing_tasks,
                 )
+            if graph.nodes:
+                _intent_spec_override = graph.nodes[0].intent
+                message = graph.nodes[0].text or message
 
         request_session = self._coerce_session(
             session,
@@ -197,16 +219,31 @@ class ConversationRuntimeAdapter:
             if relation == "DIRECT" and all(
                 str(action.action) == "QUERY" for action in intent_spec.actions
             ):
-                return self._query_result(
-                    intent_spec,
+                return await self._run_query(
+                    intent_spec=intent_spec,
+                    message=message,
+                    conversation_id=conversation_id,
                     run_id=run_id or "",
                     trace_id=trace_id or "",
+                    mcp=mcp,
+                    auth=auth,
+                    session=request_session,
                 )
             if relation in {"NEW_TASK", "DIRECT", "QUERY_TASK"}:
                 task = await self._task_provider.create_task(scope, intent_spec)
             else:
                 binding = await self._task_provider.resolve_task(scope, task_intent)
                 task = binding.task
+
+            if _artifact_refs_override:
+                known_ids = {ref.artifact_id for ref in task.artifacts}
+                for ref in _artifact_refs_override:
+                    if ref.artifact_id in known_ids:
+                        continue
+                    task.artifacts.append(
+                        ref.model_copy(update={"task_id": task.task_id})
+                    )
+                    known_ids.add(ref.artifact_id)
 
             target_context = binding.target if binding is not None else None
             task_context = self._intent_compiler.compile(
@@ -436,6 +473,175 @@ class ConversationRuntimeAdapter:
                 ],
             },
         )
+
+    async def execute_graph(
+        self,
+        *,
+        graph: ConversationTaskGraph,
+        conversation_id: str,
+        user_id: str,
+        tenant_id: str,
+        history: Sequence[Mapping[str, str]] | None = None,
+        session: SessionContext | Any | None = None,
+        timezone: str | None = None,
+        run_id: str | None = None,
+        trace_id: str | None = None,
+        mcp: Any = None,
+        llm: Any = None,
+        model: str = "",
+        auth: Any = None,
+        detach: bool = False,
+        completion_callback: Any = None,
+    ) -> RuntimeResult:
+        """Execute semantic goals in dependency order via existing Runtime."""
+        results: dict[str, RuntimeResult] = {}
+        dependency_artifacts: dict[str, list[ArtifactRef]] = {}
+        ordered_nodes = graph.topological_order()
+        for node in ordered_nodes:
+            refs = [
+                ref
+                for dependency in node.depends_on
+                for ref in dependency_artifacts.get(dependency, [])
+            ]
+            if node.read_only:
+                result = await self._run_query(
+                    intent_spec=node.intent,
+                    message=node.text,
+                    conversation_id=conversation_id,
+                    run_id=run_id or "",
+                    trace_id=trace_id or "",
+                    mcp=mcp,
+                    auth=auth,
+                    session=session,
+                )
+            else:
+                result = await self.execute(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    message=node.text,
+                    history=history,
+                    session=session,
+                    timezone=timezone,
+                    run_id=run_id,
+                    trace_id=trace_id,
+                    mcp=mcp,
+                    llm=llm,
+                    model=model,
+                    auth=auth,
+                    detach=detach,
+                    completion_callback=completion_callback,
+                    _skip_multi=True,
+                    _intent_spec_override=node.intent,
+                    _artifact_refs_override=refs,
+                )
+            results[node.node_id] = result
+            dependency_artifacts[node.node_id] = self._result_artifacts(
+                result,
+                source_task_id=result.task_id or f"query:{node.node_id}",
+            )
+
+        failed = [result for result in results.values() if not result.success]
+        execution_ids = [result.execution_id for result in results.values() if result.execution_id]
+        task_ids = [result.task_id for result in results.values() if result.task_id]
+        return RuntimeResult(
+            success=not failed,
+            status="COMPLETED" if not failed else "PARTIAL",
+            run_id=run_id or next((result.run_id for result in results.values() if result.run_id), ""),
+            trace_id=trace_id or next((result.trace_id for result in results.values() if result.trace_id), ""),
+            task_id=task_ids[0] if task_ids else "",
+            execution_id=execution_ids[0] if execution_ids else None,
+            execution_path="runtime",
+            content="\n\n".join(result.content for result in results.values() if result.content),
+            error_code=next((result.error_code for result in failed if result.error_code), ""),
+            partial_results={
+                "task_graph": True,
+                "multi_task": True,
+                "nodes": [
+                    {
+                        "node_id": node.node_id,
+                        "task_id": results[node.node_id].task_id,
+                        "execution_id": results[node.node_id].execution_id,
+                        "read_only": node.read_only,
+                        "depends_on": list(node.depends_on),
+                        "status": results[node.node_id].status,
+                    }
+                    for node in ordered_nodes
+                ],
+                "task_ids": task_ids,
+                "execution_ids": execution_ids,
+            },
+        )
+
+    async def _run_query(
+        self,
+        *,
+        intent_spec: IntentSpec,
+        message: str,
+        conversation_id: str,
+        run_id: str,
+        trace_id: str,
+        mcp: Any,
+        auth: Any,
+        session: Any,
+    ) -> RuntimeResult:
+        try:
+            query = await self._query_handler.handle(QueryRequest(
+                message=message,
+                intent=intent_spec,
+                conversation_id=conversation_id,
+                run_id=run_id,
+                trace_id=trace_id,
+                mcp=mcp,
+                auth=auth,
+                session=session,
+            ))
+            partial_results: dict[str, Any] = {
+                "query_only": True,
+                "side_effect": False,
+            }
+            if query.data:
+                partial_results["data"] = query.data
+            return RuntimeResult(
+                success=True,
+                status="COMPLETED",
+                run_id=run_id,
+                trace_id=trace_id,
+                execution_path="runtime",
+                content=query.content,
+                summary="QUERY completed without creating a Task or Execution",
+                intent_spec=intent_spec.model_dump(mode="json"),
+                artifact_ids=[ref.artifact_id for ref in query.artifacts],
+                artifacts=[ref.model_dump(mode="json") for ref in query.artifacts],
+                partial_results=partial_results,
+            )
+        except QueryHandlerError as exc:
+            return RuntimeResult(
+                success=False,
+                status="FAILED",
+                run_id=run_id,
+                trace_id=trace_id,
+                execution_path="runtime",
+                error_code=str(exc),
+                error_message=str(exc),
+                intent_spec=intent_spec.model_dump(mode="json"),
+                partial_results={"query_only": True, "side_effect": False},
+            )
+
+    @staticmethod
+    def _result_artifacts(
+        result: RuntimeResult, *, source_task_id: str,
+    ) -> list[ArtifactRef]:
+        refs: list[ArtifactRef] = []
+        for raw in result.artifacts:
+            try:
+                refs.append(ArtifactRef.model_validate({
+                    **raw,
+                    "task_id": source_task_id,
+                }))
+            except Exception:
+                continue
+        return refs
 
     @staticmethod
     def _query_result(
