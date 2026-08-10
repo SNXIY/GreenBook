@@ -26,6 +26,7 @@ from .operation_tracking import (
     OperationStatus,
 )
 from .reconciliation import ReconciliationService
+from .retry_scheduler import RetryScheduler, RetryTask
 from .temporal_resolver import TemporalResolver
 
 __all__ = [
@@ -49,6 +50,8 @@ __all__ = [
     "ExternalOperationTracker",
     "OperationStatus",
     "ReconciliationService",
+    "RetryScheduler",
+    "RetryTask",
     "TemporalResolver",
     "ToolArguments",
 ]
