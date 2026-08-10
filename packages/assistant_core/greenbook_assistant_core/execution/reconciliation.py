@@ -13,7 +13,7 @@ from typing import Any
 
 from .operation_tracking import (
     ExternalOperationRecord,
-    ExternalOperationStore,
+    ExternalOperationStoreProtocol,
     OperationStatus,
 )
 
@@ -27,7 +27,7 @@ class ReconciliationService:
     def __init__(
         self,
         *,
-        store: ExternalOperationStore | None = None,
+        store: ExternalOperationStoreProtocol | None = None,
         query: OperationStatusQuery | None = None,
     ) -> None:
         self.store = store or ExternalOperationStore()

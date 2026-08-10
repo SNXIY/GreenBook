@@ -22,9 +22,11 @@ from .retry_decision import (
 from .operation_tracking import (
     ExternalOperationRecord,
     ExternalOperationStore,
+    ExternalOperationStoreProtocol,
     ExternalOperationTracker,
     OperationStatus,
 )
+from .persistent_stores import PostgresExternalOperationStore
 from .reconciliation import ReconciliationService
 from .retry_scheduler import RetryScheduler, RetryTask
 from .temporal_resolver import TemporalResolver
@@ -47,8 +49,10 @@ __all__ = [
     "RetryEvidenceResolver",
     "ExternalOperationRecord",
     "ExternalOperationStore",
+    "ExternalOperationStoreProtocol",
     "ExternalOperationTracker",
     "OperationStatus",
+    "PostgresExternalOperationStore",
     "ReconciliationService",
     "RetryScheduler",
     "RetryTask",

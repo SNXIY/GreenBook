@@ -76,6 +76,24 @@ execution_leases = sa.Table(
     sa.Column("lease_until", sa.String(64), nullable=False),
 )
 
+external_operations = sa.Table(
+    "external_operation",
+    execution_metadata,
+    sa.Column("operation_id", sa.String(128), primary_key=True),
+    sa.Column("execution_id", sa.String(128), nullable=False),
+    sa.Column("step_id", sa.String(128), nullable=False),
+    sa.Column("tool_name", sa.String(256), nullable=False, default=""),
+    sa.Column("status", sa.String(32), nullable=False),
+    sa.Column("external_operation_id", sa.String(256)),
+    sa.Column("receipt_id", sa.String(256)),
+    sa.Column("idempotency_key", sa.String(256)),
+    sa.Column("runtime_idempotency_key", sa.String(256)),
+    sa.Column("external_idempotency_key", sa.String(256)),
+    sa.Column("created_at", sa.String(64), nullable=False),
+    sa.Column("updated_at", sa.String(64), nullable=False),
+    sa.Column("evidence", sa.JSON),
+)
+
 
 __all__ = [
     "execution_metadata",
@@ -84,4 +102,5 @@ __all__ = [
     "execution_events",
     "checkpoints",
     "execution_leases",
+    "external_operations",
 ]

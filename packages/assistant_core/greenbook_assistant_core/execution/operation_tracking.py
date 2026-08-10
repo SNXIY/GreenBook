@@ -7,9 +7,10 @@ an external service, reconcile an unknown result, or trigger a retry.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import StrEnum
-from collections.abc import Callable
+from typing import Protocol
 
 from greenbook_contracts import ExternalAgentFailure, SideEffectState
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,6 +50,39 @@ class ExternalOperationRecord(BaseModel):
     evidence: ExecutionEvidence | None = None
 
 
+class ExternalOperationStoreProtocol(Protocol):
+    """Storage contract shared by memory and SQLAlchemy operation stores."""
+
+    def create(self, record: ExternalOperationRecord) -> ExternalOperationRecord: ...
+
+    def save(self, record: ExternalOperationRecord) -> ExternalOperationRecord: ...
+
+    def get(self, operation_id: str) -> ExternalOperationRecord | None: ...
+
+    def update_status(
+        self,
+        operation_id: str,
+        status: OperationStatus,
+    ) -> ExternalOperationRecord | None: ...
+
+    def find(
+        self,
+        *,
+        execution_id: str | None = None,
+        external_operation_id: str | None = None,
+        receipt_id: str | None = None,
+    ) -> ExternalOperationRecord | None: ...
+
+    def find_by_execution_id(self, execution_id: str) -> list[ExternalOperationRecord]: ...
+
+    def find_by_external_operation_id(
+        self,
+        external_operation_id: str,
+    ) -> ExternalOperationRecord | None: ...
+
+    def list(self) -> list[ExternalOperationRecord]: ...
+
+
 class ExternalOperationStore:
     """Small idempotent Runtime store for operation records."""
 
@@ -58,6 +92,9 @@ class ExternalOperationStore:
     def get(self, operation_id: str) -> ExternalOperationRecord | None:
         record = self._records.get(operation_id)
         return record.model_copy(deep=True) if record is not None else None
+
+    def create(self, record: ExternalOperationRecord) -> ExternalOperationRecord:
+        return self.save(record)
 
     def save(self, record: ExternalOperationRecord) -> ExternalOperationRecord:
         self._records[record.operation_id] = record.model_copy(deep=True)
@@ -83,10 +120,17 @@ class ExternalOperationStore:
     def find(
         self,
         *,
+        execution_id: str | None = None,
         external_operation_id: str | None = None,
         receipt_id: str | None = None,
     ) -> ExternalOperationRecord | None:
         for record in self._records.values():
+            if execution_id is not None and record.execution_id != execution_id:
+                continue
+            if external_operation_id is None and receipt_id is None:
+                if execution_id is not None:
+                    return record.model_copy(deep=True)
+                continue
             if (
                 external_operation_id is not None
                 and record.external_operation_id == external_operation_id
@@ -96,14 +140,35 @@ class ExternalOperationStore:
                 return record.model_copy(deep=True)
         return None
 
+    def find_by_execution_id(self, execution_id: str) -> list[ExternalOperationRecord]:
+        return [
+            record.model_copy(deep=True)
+            for record in self._records.values()
+            if record.execution_id == execution_id
+        ]
+
+    def find_by_external_operation_id(
+        self,
+        external_operation_id: str,
+    ) -> ExternalOperationRecord | None:
+        return self.find(external_operation_id=external_operation_id)
+
+    def find_by_receipt_id(self, receipt_id: str) -> ExternalOperationRecord | None:
+        return self.find(receipt_id=receipt_id)
+
     def list(self) -> list[ExternalOperationRecord]:
         return [record.model_copy(deep=True) for record in self._records.values()]
 
     def count(self) -> int:
         return len(self._records)
 
-    def clear(self) -> None:
-        self._records.clear()
+    def clear(self, execution_id: str | None = None) -> None:
+        if execution_id is None:
+            self._records.clear()
+            return
+        for operation_id, record in list(self._records.items()):
+            if record.execution_id == execution_id:
+                del self._records[operation_id]
 
 
 class ExternalOperationTracker:
@@ -117,7 +182,7 @@ class ExternalOperationTracker:
 
     def __init__(
         self,
-        store: ExternalOperationStore | None = None,
+        store: ExternalOperationStoreProtocol | None = None,
         *,
         now_factory: Callable[[], datetime] | None = None,
     ) -> None:
@@ -247,6 +312,7 @@ class ExternalOperationTracker:
 __all__ = [
     "ExternalOperationRecord",
     "ExternalOperationStore",
+    "ExternalOperationStoreProtocol",
     "ExternalOperationTracker",
     "OperationStatus",
 ]
