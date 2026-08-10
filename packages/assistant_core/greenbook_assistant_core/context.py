@@ -37,6 +37,8 @@ class SessionContext(BaseModel):
     user_id: str = Field(frozen=True)
     tenant_id: str = Field(frozen=True)
     timezone: str = "Asia/Shanghai"
+    active_task_id: str | None = None
+    active_artifact_id: str | None = None
     active_draft_id: str | None = None
     active_post_id: str | None = None
     active_schedule_id: str | None = None
