@@ -25,6 +25,7 @@ from .operation_tracking import (
     ExternalOperationTracker,
     OperationStatus,
 )
+from .reconciliation import ReconciliationService
 from .temporal_resolver import TemporalResolver
 
 __all__ = [
@@ -47,6 +48,7 @@ __all__ = [
     "ExternalOperationStore",
     "ExternalOperationTracker",
     "OperationStatus",
+    "ReconciliationService",
     "TemporalResolver",
     "ToolArguments",
 ]
