@@ -84,7 +84,15 @@ class RuntimePersistenceFactory:
         bind: Any | None = None,
         create_tables: bool = True,
     ) -> RuntimePersistence:
-        selected = (storage or os.getenv("ASSISTANT_RUNTIME_STORAGE", cls.MEMORY)).strip().lower()
+        configured_storage = storage or os.getenv("ASSISTANT_RUNTIME_STORAGE")
+        if configured_storage:
+            selected = configured_storage.strip().lower()
+        else:
+            # The repository's deployment configuration historically exposed
+            # ``ASSISTANT_DATABASE_URL``.  Treat a configured database as the
+            # durable default, while keeping an explicitly selected memory
+            # profile available for tests and local development.
+            selected = cls.POSTGRES if cls._database_url() else cls.MEMORY
         if selected in {"postgresql", "postgresql+psycopg", "pg"}:
             selected = cls.POSTGRES
         if selected == cls.MEMORY:
@@ -166,6 +174,7 @@ class RuntimePersistenceFactory:
     def _database_url() -> str:
         for name in (
             "ASSISTANT_RUNTIME_DATABASE_URL",
+            "ASSISTANT_DATABASE_URL",
             "ASSISTANT_DB_URL",
             "GREENBOOK_DB_URL",
         ):
