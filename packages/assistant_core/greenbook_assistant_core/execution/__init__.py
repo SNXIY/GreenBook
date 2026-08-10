@@ -2,6 +2,12 @@
 
 from .argument_binder import ArgumentBinder, ToolArguments
 from .evidence import ExecutionEvidence
+from .external_adapters import (
+    CreatorAdapter,
+    ExternalOperationAdapter,
+    JavaCommunityAdapter,
+    MockExternalOperationAdapter,
+)
 from .failure_decision import (
     FailureCategory,
     FailureClassification,
@@ -45,6 +51,10 @@ from .temporal_resolver import TemporalResolver
 __all__ = [
     "ArgumentBinder",
     "ExecutionEvidence",
+    "ExternalOperationAdapter",
+    "CreatorAdapter",
+    "JavaCommunityAdapter",
+    "MockExternalOperationAdapter",
     "FailureCategory",
     "FailureClassification",
     "FailureClassifier",

@@ -11,8 +11,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from enum import StrEnum
 from typing import Any
+
 from pydantic import BaseModel, ConfigDict
 
+from .external_adapters import ExternalOperationAdapter
 from .operation_tracking import (
     ExternalOperationRecord,
     ExternalOperationStoreProtocol,
@@ -55,9 +57,11 @@ class ReconciliationService:
         *,
         store: ExternalOperationStoreProtocol | None = None,
         query: OperationStatusQuery | None = None,
+        adapter: ExternalOperationAdapter | None = None,
     ) -> None:
         self.store = store or ExternalOperationStore()
         self._query = query
+        self._adapter = adapter
 
     def reconcile(self, operation: ExternalOperationRecord) -> OperationStatus:
         """Backward-compatible status-only facade.
@@ -94,7 +98,7 @@ class ReconciliationService:
         )
 
     def _query_status(self, operation: ExternalOperationRecord) -> OperationStatus:
-        if self._query is None:
+        if self._adapter is None and self._query is None:
             return OperationStatus.UNKNOWN
 
         identifier = self._query_identifier(operation)
@@ -102,7 +106,10 @@ class ReconciliationService:
             return OperationStatus.UNKNOWN
 
         try:
-            raw_status = self._query(**identifier)
+            if self._adapter is not None:
+                raw_status = self._adapter.query_operation_status(**identifier)
+            else:
+                raw_status = self._query(**identifier)
         except Exception:
             # A failed status lookup is itself an unknown observation.  The
             # service must not convert a query outage into NOT_FOUND.
