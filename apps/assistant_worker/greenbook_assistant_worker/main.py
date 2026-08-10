@@ -28,8 +28,16 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
     process to consume the durable Execution Queue; the queue worker delegates
     execution and never invokes tools directly.
     """
-    java_base = os.getenv("ASSISTANT_JAVA_BASE_URL", "http://127.0.0.1:8080")
-    java = JavaClient(java_base)
+    java_base = os.getenv("ASSISTANT_JAVA_BASE_URL") or os.getenv(
+        "GREENBOOK_JAVA_BASE_URL",
+        "http://127.0.0.1:8080",
+    )
+    java_factory = getattr(JavaClient, "from_env", None)
+    java = (
+        java_factory(base_url=java_base)
+        if callable(java_factory)
+        else JavaClient(java_base)
+    )
     persistence = None
     retry_worker = None
     execution_queue_worker = None
@@ -96,11 +104,11 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
 
                 from .execution_handler import RuntimeExecutionQueueHandler
 
-                creator_base = os.getenv(
-                    "ASSISTANT_CREATOR_BASE_URL",
+                creator_base = os.getenv("ASSISTANT_CREATOR_BASE_URL") or os.getenv(
+                    "GREENBOOK_CREATOR_BASE_URL",
                     "http://127.0.0.1:8092",
                 )
-                creator = CreatorClient(base_url=creator_base)
+                creator = CreatorClient.from_env(base_url=creator_base)
                 mcp = GreenBookMCPServer(java=java, creator=creator)
                 llm_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv(
                     "OPENAI_API_KEY",

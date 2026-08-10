@@ -170,8 +170,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "DEEPSEEK_API_KEY or OPENAI_API_KEY is required. Set either environment variable."
         )
 
-    app.state.java = JavaClient(base_url=java_base)
-    app.state.creator = CreatorClient(base_url=creator_base)
+    app.state.java = JavaClient.from_env(base_url=java_base)
+    app.state.creator = CreatorClient.from_env(base_url=creator_base)
     app.state.mcp = GreenBookMCPServer(java=app.state.java, creator=app.state.creator)
     app.state.auth_resolver = AuthContextResolver(
         jwks_url=jwks_url,

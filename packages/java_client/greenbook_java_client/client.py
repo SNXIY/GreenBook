@@ -8,6 +8,7 @@ SHA256: 1409b6d825a11dc161b501668ac09e07349a38b0690f060396ac77c60668eeef
 from __future__ import annotations
 
 import logging
+import os
 import re
 from contextlib import suppress
 from typing import Any
@@ -45,6 +46,42 @@ _SENSITIVE_RE = re.compile(
 
 def _sanitize(value: str) -> str:
     return _SENSITIVE_RE.sub(r"\1=[REDACTED]", value)
+
+
+def _env_first(*names: str, default: str) -> str:
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return default
+
+
+def _positive_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    value = default if raw is None or not raw.strip() else float(raw)
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
+def _positive_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    value = default if raw is None or not raw.strip() else int(raw)
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
+def _boolean_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
 
 
 # ── Public API ───────────────────────────────────────────────────────
@@ -90,6 +127,33 @@ class JavaClient:
             ),
             verify=verify,
             limits=limits,
+        )
+
+    @classmethod
+    def from_env(cls, *, base_url: str | None = None) -> JavaClient:
+        """Build the real Java client from the Assistant deployment config."""
+
+        return cls(
+            base_url=base_url or _env_first(
+                "ASSISTANT_JAVA_BASE_URL",
+                "GREENBOOK_JAVA_BASE_URL",
+                default="http://127.0.0.1:8080",
+            ),
+            connect_timeout=_positive_float(
+                "ASSISTANT_JAVA_CONNECT_TIMEOUT_SECONDS", 5.0
+            ),
+            read_timeout=_positive_float(
+                "ASSISTANT_JAVA_READ_TIMEOUT_SECONDS", 30.0
+            ),
+            write_timeout=_positive_float(
+                "ASSISTANT_JAVA_WRITE_TIMEOUT_SECONDS", 30.0
+            ),
+            pool_timeout=_positive_float(
+                "ASSISTANT_JAVA_POOL_TIMEOUT_SECONDS", 5.0
+            ),
+            max_connections=_positive_int("ASSISTANT_JAVA_MAX_CONNECTIONS", 20),
+            max_keepalive=_positive_int("ASSISTANT_JAVA_MAX_KEEPALIVE", 10),
+            verify=_boolean_env("ASSISTANT_JAVA_VERIFY_TLS", True),
         )
 
     async def close(self) -> None:
@@ -173,9 +237,11 @@ class JavaClient:
             )
         except httpx.WriteTimeout:
             logger.warning("Java write timeout path=%s method=%s", path, method)
-            return ToolResult.request_not_sent(
+            result = ToolResult.request_not_sent(
                 "Request body could not be fully sent. You may safely retry."
             )
+            result.trace_id = trace_id
+            return result
         except httpx.PoolTimeout:
             logger.warning("Java pool timeout path=%s", path)
             return ToolResult.java_backend_unavailable(
@@ -194,6 +260,15 @@ class JavaClient:
                 "Java backend request timed out. You may safely retry."
             )
         except (httpx.RemoteProtocolError, httpx.NetworkError):
+            if is_write:
+                return ToolResult.failure(
+                    "JAVA_BACKEND_UNAVAILABLE",
+                    "Java backend network error during a write request",
+                    "Java 社区服务网络异常，无法确认本次写入是否提交。",
+                    retryable=True,
+                    request_sent=None,
+                    trace_id=trace_id,
+                )
             return ToolResult.java_backend_unavailable(
                 "Java backend network error. No request was processed.",
                 trace_id=trace_id,
@@ -222,7 +297,15 @@ class JavaClient:
             data = resp.json() if resp.content else {}
             return ToolResult.success(data, trace_id=resp_trace_id, receipt_id=receipt_id)
 
-        return await self._map_error(resp, resp_trace_id, receipt_id)
+        result = await self._map_error(resp, resp_trace_id, receipt_id)
+        # An HTTP response proves that the request crossed the downstream
+        # boundary, even when the response is an auth/business/server error.
+        # Preserve this fact for the evidence envelope and carry the receipt
+        # when the facade supplied one.
+        result.request_sent = True
+        if receipt_id and not result.receipt_id:
+            result.receipt_id = receipt_id
+        return result
 
     async def _map_error(
         self,
