@@ -226,8 +226,8 @@ def _context_from_evidence(record: ExternalOperationRecord) -> TraceContext | No
         trace_id=evidence.trace_id if evidence is not None and evidence.trace_id else "",
         execution_id=record.execution_id,
         step_id=record.step_id,
-        invocation_id=evidence.invocation_id if evidence is not None else "",
-        tool_call_id=evidence.tool_call_id if evidence is not None else "",
+        invocation_id=(evidence.invocation_id or "") if evidence is not None else "",
+        tool_call_id=(evidence.tool_call_id or "") if evidence is not None else "",
         operation_id=record.operation_id,
     )
 
