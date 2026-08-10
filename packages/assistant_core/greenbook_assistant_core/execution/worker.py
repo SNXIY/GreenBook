@@ -25,6 +25,7 @@ from .failure_decision import (
 from .evidence import ExecutionEvidence
 from .invocation import ExecutionResult
 from .models import ExecutionStatus, PlanExecution, StepExecution, StepStatus
+from .operation_tracking import ExternalOperationTracker
 from .recovery import RecoveryPolicy
 from .retry_decision import RetryDecisionEngine, evidence_from_failure
 from .retry_manager import RetryManager
@@ -69,6 +70,7 @@ class ExecutionWorker:
         trace: Any = None,  # AgentTrace | None
         event_store: Any = None,
         failure_decision_engine: FailureDecisionEngine | None = None,
+        operation_tracker: ExternalOperationTracker | None = None,
     ) -> None:
         self._executor = executor
         self._repo = repository or ExecutionRepository()
@@ -87,6 +89,7 @@ class ExecutionWorker:
             runtime_manager=self._runtime,
             decision_engine=self._retry_decision_engine,
         )
+        self._operation_tracker = operation_tracker or ExternalOperationTracker()
         self._scheduler = StepScheduler()
         self._trace = trace
 
@@ -235,8 +238,34 @@ class ExecutionWorker:
             # The tool has acknowledged a long-running task.  Keep the step
             # RUNNING and let the Runtime continuation resume this Worker
             # when ToolRuntime receives the completion callback.
+            evidence = self._evidence_from_result(
+                result,
+                None,
+                execution_id=execution_id,
+                step_id=step_ex.step_id,
+            )
+            if evidence is not None:
+                self._operation_tracker.observe_pending(
+                    execution_id=execution_id,
+                    step_id=step_ex.step_id,
+                    tool_name=result.tool_name,
+                    evidence=evidence,
+                )
             return RunOutcome.WAITING_ASYNC
         if result.ok:
+            evidence = self._evidence_from_result(
+                result,
+                None,
+                execution_id=execution_id,
+                step_id=step_ex.step_id,
+            )
+            if evidence is not None:
+                self._operation_tracker.observe_success(
+                    execution_id=execution_id,
+                    step_id=step_ex.step_id,
+                    tool_name=result.tool_name,
+                    evidence=evidence,
+                )
             if step_ex.retry_count > 0:
                 self._state.event_store.append(
                     ExecutionEvent(
@@ -294,6 +323,14 @@ class ExecutionWorker:
                 execution_id=execution_id,
                 step_id=step_ex.step_id,
             )
+            if evidence is not None:
+                self._operation_tracker.observe_failure(
+                    execution_id=execution_id,
+                    step_id=step_ex.step_id,
+                    tool_name=result.tool_name,
+                    evidence=evidence,
+                    failure=failure,
+                )
             retry_decision = self._retry_decision_engine.decide_for_step(
                 failure,
                 step_ex,
@@ -406,7 +443,9 @@ class ExecutionWorker:
         execution_id: str,
         step_id: str,
     ) -> ExecutionEvidence | None:
-        evidence = result.evidence or evidence_from_failure(failure)
+        evidence = result.evidence or (
+            evidence_from_failure(failure) if failure is not None else None
+        )
         if evidence is None:
             return None
         updates: dict[str, str] = {}

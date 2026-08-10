@@ -19,6 +19,12 @@ from .retry_decision import (
     RetryDecisionEngine,
     RetryEvidenceResolver,
 )
+from .operation_tracking import (
+    ExternalOperationRecord,
+    ExternalOperationStore,
+    ExternalOperationTracker,
+    OperationStatus,
+)
 from .temporal_resolver import TemporalResolver
 
 __all__ = [
@@ -37,6 +43,10 @@ __all__ = [
     "RetryDecision",
     "RetryDecisionEngine",
     "RetryEvidenceResolver",
+    "ExternalOperationRecord",
+    "ExternalOperationStore",
+    "ExternalOperationTracker",
+    "OperationStatus",
     "TemporalResolver",
     "ToolArguments",
 ]
