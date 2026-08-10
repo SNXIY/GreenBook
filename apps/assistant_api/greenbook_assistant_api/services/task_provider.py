@@ -231,6 +231,34 @@ class TaskProvider:
             and (not allowed_statuses or task.status in allowed_statuses)
         ]
 
+    async def persist_projection(self, scope: TaskScope, task: Task) -> Task | None:
+        """Persist Goal/Execution/Resource read-model fields for a Task.
+
+        This does not alter Task lifecycle or Runtime execution state.  It is
+        the durable conversation index used by the next cross-turn resolver.
+        """
+        scope = self._coerce_scope(scope)
+        if not self._in_scope(task, scope):
+            raise TaskProviderError(
+                "TASK_SCOPE_MISMATCH",
+                "The Task projection is outside the requested scope.",
+            )
+        try:
+            async with self._registry_context() as registry:
+                return await registry.update_task(
+                    task.task_id,
+                    goals=[goal.model_dump(mode="json") for goal in task.goals],
+                    execution_refs=[ref.model_dump(mode="json") for ref in task.execution_refs],
+                    resource_index=[resource.model_dump(mode="json") for resource in task.resource_index],
+                    last_action=task.last_action,
+                    action_history=task.action_history,
+                )
+        except Exception as exc:
+            raise TaskProviderError(
+                "TASK_PROJECTION_PERSIST_FAILED",
+                "The Task conversation projection could not be persisted.",
+            ) from exc
+
     async def resolve_task(
         self,
         scope: TaskScope,

@@ -14,7 +14,15 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import ArtifactRef, Task, TaskIntent, TaskStatus
+from .models import (
+    ArtifactRef,
+    Task,
+    TaskExecutionRef,
+    TaskGoal,
+    TaskIntent,
+    TaskResourceRef,
+    TaskStatus,
+)
 
 # ── DB tables ────────────────────────────────────────────────────────
 
@@ -32,6 +40,11 @@ _tasks = sa.Table(
     sa.Column("phase", sa.String(64)),
     sa.Column("artifacts", JSONB, default=list),
     sa.Column("depends_on", JSONB, default=list),
+    sa.Column("goals", JSONB, default=list),
+    sa.Column("execution_refs", JSONB, default=list),
+    sa.Column("resource_index", JSONB, default=list),
+    sa.Column("last_action", sa.String(64)),
+    sa.Column("action_history", JSONB, default=list),
     sa.Column("last_error", sa.Text),
     sa.Column("retry_count", sa.Integer, default=0),
     sa.Column("max_retries", sa.Integer, default=3),
@@ -148,6 +161,23 @@ class TaskRepository:
         async with self._session.bind.begin() as conn:
             await conn.run_sync(_tasks.metadata.create_all, checkfirst=True)
             await conn.run_sync(_task_intents.metadata.create_all, checkfirst=True)
+            # Phase15-B adds a task read-model projection.  Keep this additive
+            # and idempotent so existing Phase15-A databases remain usable.
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS goals JSONB"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS execution_refs JSONB"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS resource_index JSONB"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS last_action VARCHAR(64)"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS action_history JSONB"
+            )
 
     async def insert(self, task: Task) -> Task:
         values = {
@@ -162,6 +192,11 @@ class TaskRepository:
             "phase": task.phase,
             "artifacts": [a.model_dump(mode="json") for a in task.artifacts],
             "depends_on": task.depends_on,
+            "goals": [g.model_dump(mode="json") for g in task.goals],
+            "execution_refs": [e.model_dump(mode="json") for e in task.execution_refs],
+            "resource_index": [r.model_dump(mode="json") for r in task.resource_index],
+            "last_action": task.last_action,
+            "action_history": task.action_history,
             "version": task.version,
             "created_at": datetime.fromisoformat(task.created_at),
             "updated_at": datetime.fromisoformat(task.updated_at),
@@ -228,6 +263,15 @@ class TaskRepository:
                 ArtifactRef(**a) for a in (d.get("artifacts") or [])
             ],
             depends_on=list(d.get("depends_on") or []),
+            goals=[TaskGoal(**g) for g in (d.get("goals") or [])],
+            execution_refs=[
+                TaskExecutionRef(**e) for e in (d.get("execution_refs") or [])
+            ],
+            resource_index=[
+                TaskResourceRef(**r) for r in (d.get("resource_index") or [])
+            ],
+            last_action=d.get("last_action"),
+            action_history=list(d.get("action_history") or []),
             last_error=d.get("last_error"),
             retry_count=int(d.get("retry_count", 0)),
             max_retries=int(d.get("max_retries", 3)),

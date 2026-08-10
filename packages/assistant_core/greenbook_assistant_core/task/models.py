@@ -108,6 +108,47 @@ class ArtifactRef(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
+class TaskGoal(BaseModel):
+    """A durable goal inside a Task.
+
+    ``Task`` remains the long-lived business objective and ``Execution`` stays
+    the runtime instance.  This small projection lets the conversation layer
+    track sub-goals without changing execution state.
+    """
+
+    goal_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    task_id: str
+    description: str = ""
+    kind: str = ""
+    status: str = "PENDING"
+    depends_on_goal_ids: list[str] = []
+    artifact_refs: list[ArtifactRef] = []
+    execution_id: str | None = None
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+class TaskExecutionRef(BaseModel):
+    """A read-model link from a Task/Goal to a Runtime execution."""
+
+    execution_id: str
+    task_id: str
+    goal_id: str | None = None
+    status: str = "PENDING"
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+class TaskResourceRef(BaseModel):
+    """Structured resource index used by cross-turn target resolution."""
+
+    resource_id: str
+    resource_kind: str = ""
+    title: str | None = None
+    status: str | None = None
+    scheduled_at: str | None = None
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
 class Task(BaseModel):
     """A long-running user goal that may span multiple turns."""
 
@@ -128,6 +169,11 @@ class Task(BaseModel):
     # ── data ──
     artifacts: list[ArtifactRef] = []
     depends_on: list[str] = []        # task_ids this task depends on
+    goals: list[TaskGoal] = []
+    execution_refs: list[TaskExecutionRef] = []
+    resource_index: list[TaskResourceRef] = []
+    last_action: str | None = None
+    action_history: list[str] = []
 
     # ── tracking ──
     last_error: str | None = None
