@@ -94,6 +94,33 @@ external_operations = sa.Table(
     sa.Column("evidence", sa.JSON),
 )
 
+retry_tasks = sa.Table(
+    "retry_task",
+    execution_metadata,
+    sa.Column("task_id", sa.String(128), primary_key=True),
+    sa.Column("execution_id", sa.String(128), nullable=False),
+    sa.Column("step_id", sa.String(128), nullable=False),
+    sa.Column("attempt", sa.Integer, nullable=False),
+    sa.Column("next_retry_time", sa.String(64), nullable=False),
+    sa.Column("backoff", sa.Float, nullable=False, default=0.0),
+    sa.Column("reason", sa.Text, nullable=False),
+    sa.Column("retry_budget", sa.Integer, nullable=False, default=1),
+    sa.Column("max_attempts", sa.Integer, nullable=False, default=1),
+    sa.Column("deadline", sa.String(64)),
+    sa.Column("operation_id", sa.String(128)),
+    sa.Column("status", sa.String(32), nullable=False),
+    sa.Column("claimed_by", sa.String(128)),
+    sa.Column("claim_until", sa.String(64)),
+    sa.Column("created_at", sa.String(64), nullable=False),
+    sa.Column("updated_at", sa.String(64), nullable=False),
+    sa.UniqueConstraint(
+        "execution_id",
+        "step_id",
+        "attempt",
+        name="uq_retry_task_execution_step_attempt",
+    ),
+)
+
 
 __all__ = [
     "execution_metadata",
@@ -103,4 +130,5 @@ __all__ = [
     "checkpoints",
     "execution_leases",
     "external_operations",
+    "retry_tasks",
 ]

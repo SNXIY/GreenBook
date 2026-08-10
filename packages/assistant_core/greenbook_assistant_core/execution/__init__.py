@@ -28,7 +28,13 @@ from .operation_tracking import (
 )
 from .persistent_stores import PostgresExternalOperationStore
 from .reconciliation import ReconciliationService
-from .retry_scheduler import RetryScheduler, RetryTask
+from .retry_scheduler import RetryScheduler, RetryTask, RetryTaskStatus
+from .retry_task_store import (
+    PostgresRetryTaskStore,
+    RetryTaskStore,
+    RetryTaskStoreProtocol,
+)
+from .retry_worker import RetryBackgroundWorker
 from .temporal_resolver import TemporalResolver
 
 __all__ = [
@@ -56,6 +62,11 @@ __all__ = [
     "ReconciliationService",
     "RetryScheduler",
     "RetryTask",
+    "RetryTaskStatus",
+    "RetryTaskStore",
+    "RetryTaskStoreProtocol",
+    "PostgresRetryTaskStore",
+    "RetryBackgroundWorker",
     "TemporalResolver",
     "ToolArguments",
 ]

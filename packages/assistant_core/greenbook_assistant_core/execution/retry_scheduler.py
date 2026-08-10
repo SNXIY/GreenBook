@@ -12,51 +12,38 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict, Field
-
 from .retry_decision import RetryDecision
+from .retry_task import RetryTask, RetryTaskStatus
+from .retry_task_store import RetryTaskStore, RetryTaskStoreProtocol
 
 if TYPE_CHECKING:
     from .models import StepExecution
     from .retry_manager import RetryManager
 
 
-class RetryTask(BaseModel):
-    """One delayed retry request, keyed by execution, step, and attempt."""
-
-    model_config = ConfigDict(frozen=True)
-
-    execution_id: str
-    step_id: str
-    attempt: int = Field(ge=1)
-    next_retry_time: datetime
-    backoff: float = Field(default=0.0, ge=0.0)
-    reason: str
-    retry_budget: int = Field(default=1, ge=0)
-    max_attempts: int = Field(default=1, ge=1)
-    deadline: datetime | None = None
-    operation_id: str | None = None
-
-    @property
-    def key(self) -> tuple[str, str, int]:
-        """Stable idempotency key for one logical step attempt."""
-
-        return (self.execution_id, self.step_id, self.attempt)
-
-
 class RetryScheduler:
-    """In-memory delayed retry queue with duplicate-attempt protection."""
+    """Delayed retry facade backed by memory or a durable task store."""
 
     def __init__(
         self,
         *,
         now_factory: Callable[[], datetime] | None = None,
+        task_store: RetryTaskStoreProtocol | None = None,
+        worker_id: str = "retry-scheduler",
+        lease_seconds: int = 60,
     ) -> None:
         self._now = now_factory or (lambda: datetime.now(UTC))
-        self._pending: dict[tuple[str, str, int], RetryTask] = {}
-        # Keep consumed keys as well as pending keys.  A duplicate request
-        # arriving after dispatch must not create a second retry task.
-        self._known: dict[tuple[str, str, int], RetryTask] = {}
+        self._task_store = task_store or RetryTaskStore(now_factory=self._now)
+        self._worker_id = worker_id
+        self._lease_seconds = lease_seconds
+
+    @property
+    def task_store(self) -> RetryTaskStoreProtocol:
+        return self._task_store
+
+    @property
+    def worker_id(self) -> str:
+        return self._worker_id
 
     def schedule(self, task: RetryTask) -> RetryTask | None:
         """Enqueue a task, or return the original task for a duplicate.
@@ -66,7 +53,7 @@ class RetryScheduler:
         calls idempotent without executing the retry twice.
         """
 
-        existing = self._known.get(task.key)
+        existing = self._task_store.get_by_key(task.key)
         if existing is not None:
             return existing
         if task.retry_budget <= 0:
@@ -75,9 +62,7 @@ class RetryScheduler:
             return None
         if task.deadline is not None and task.next_retry_time > task.deadline:
             return None
-        self._known[task.key] = task
-        self._pending[task.key] = task
-        return task
+        return self._task_store.create(task)
 
     def schedule_decision(
         self,
@@ -140,24 +125,21 @@ class RetryScheduler:
         )
         return task, decision
 
-    def due(self, now: datetime | None = None) -> list[RetryTask]:
+    def due(
+        self,
+        now: datetime | None = None,
+        *,
+        worker_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[RetryTask]:
         """Claim and return due tasks in deterministic time/key order."""
 
-        current = now or self._now()
-        for key, task in list(self._pending.items()):
-            if task.deadline is not None and current > task.deadline:
-                self._pending.pop(key, None)
-        due_tasks = sorted(
-            (
-                task
-                for task in self._pending.values()
-                if task.next_retry_time <= current
-            ),
-            key=lambda task: (task.next_retry_time, task.key),
+        return self._task_store.claim_due(
+            now or self._now(),
+            worker_id=worker_id or self._worker_id,
+            lease_seconds=self._lease_seconds,
+            limit=limit,
         )
-        for task in due_tasks:
-            self._pending.pop(task.key, None)
-        return due_tasks
 
     def dispatch_due(
         self,
@@ -172,33 +154,34 @@ class RetryScheduler:
         """
 
         dispatched: list[tuple[RetryTask, StepExecution]] = []
-        for task in self.due(now):
-            step = retry_manager.retry_step(
-                task.execution_id,
-                task.step_id,
-                source="retry_scheduler",
-                user_requested_retry=False,
-            )
+        for task in self.due(now, worker_id=self._worker_id):
+            try:
+                step = retry_manager.retry_step(
+                    task.execution_id,
+                    task.step_id,
+                    source="retry_scheduler",
+                    user_requested_retry=False,
+                )
+            except Exception:
+                self._task_store.release(task.task_id, worker_id=self._worker_id)
+                raise
+            self._task_store.complete(task.task_id, worker_id=self._worker_id)
             dispatched.append((task, step))
         return dispatched
 
     def pending(self) -> list[RetryTask]:
         """Return pending tasks without claiming them."""
 
-        return sorted(
-            self._pending.values(),
-            key=lambda task: (task.next_retry_time, task.key),
-        )
+        return sorted(self._task_store.list_ready(), key=lambda task: (task.next_retry_time, task.key))
 
     def count(self) -> int:
-        return len(self._pending)
+        return self._task_store.count_ready()
 
     def cancel(self, execution_id: str, step_id: str, attempt: int) -> bool:
-        """Remove a pending task; its key remains consumed for idempotency."""
+        """Cancel a pending task while retaining its idempotency record."""
 
-        return (
-            self._pending.pop((execution_id, step_id, attempt), None) is not None
-        )
+        task = self._task_store.get_by_key((execution_id, step_id, attempt))
+        return task is not None and self._task_store.cancel(task.task_id) is not None
 
 
-__all__ = ["RetryScheduler", "RetryTask"]
+__all__ = ["RetryScheduler", "RetryTask", "RetryTaskStatus"]

@@ -42,7 +42,10 @@ def test_scheduler_delays_and_claims_due_retry() -> None:
     assert scheduler.due() == []
 
     clock[0] += timedelta(seconds=30)
-    assert scheduler.due() == [task]
+    claimed = scheduler.due()
+    assert len(claimed) == 1
+    assert claimed[0].key == task.key
+    assert claimed[0].status.value == "CLAIMED"
     assert scheduler.count() == 0
 
 
@@ -68,7 +71,9 @@ def test_duplicate_attempt_is_idempotent_before_and_after_dispatch() -> None:
         step_id="step-1",
         decision=decision,
     )
-    assert after_dispatch == first
+    assert after_dispatch is not None
+    assert after_dispatch.key == first.key
+    assert after_dispatch.status.value == "CLAIMED"
     assert scheduler.count() == 0
 
 
@@ -112,7 +117,8 @@ def test_dispatch_due_uses_retry_manager_instead_of_executing_a_tool() -> None:
             return SimpleNamespace(status="PENDING")
 
     result = scheduler.dispatch_due(retry_manager=RetryManager(), now=NOW)
-    assert result[0][0] == task
+    assert result[0][0].key == task.key
+    assert result[0][0].status.value == "CLAIMED"
     assert result[0][1].status == "PENDING"
     assert calls == [
         {
