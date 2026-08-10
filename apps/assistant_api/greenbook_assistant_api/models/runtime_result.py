@@ -19,7 +19,9 @@ class RuntimeResult:
     status: str = ""             # COMPLETED | FAILED | WAITING_APPROVAL | PARTIAL_FAILURE
     run_id: str = ""
     task_id: str = ""
+    plan_id: str = ""
     execution_id: str | None = None
+    intent_spec: dict[str, Any] | None = None
 
     # ── user-visible ──
     content: str = ""
