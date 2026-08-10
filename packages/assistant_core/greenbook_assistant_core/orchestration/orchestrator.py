@@ -10,6 +10,7 @@ from greenbook_assistant_core.task.intent_models import ActionType, IntentSpec
 from greenbook_assistant_core.task.models import TaskGoal, TaskIntent
 
 from .context import PlanningContext, build_planning_context
+from .agent_registry import AgentRegistry, AgentResolutionError
 from .models import MultiGoalPlan, TaskPlan
 from .templates import PlanTemplate, get_template
 
@@ -23,8 +24,13 @@ class TaskOrchestrator:
     validated TaskPlan.
     """
 
-    def __init__(self, registry: CapabilityRegistry | None = None) -> None:
+    def __init__(
+        self,
+        registry: CapabilityRegistry | None = None,
+        agent_registry: AgentRegistry | None = None,
+    ) -> None:
         self._registry = registry or CapabilityRegistry()
+        self._agent_registry = agent_registry or AgentRegistry()
 
     # ── main entry ───────────────────────────────────────────────
 
@@ -69,7 +75,22 @@ class TaskOrchestrator:
 
         # 4. Validate capabilities exist in registry
         plan = self._validate_capabilities(plan)
+        # 5. Resolve declared Agent metadata without changing execution.
+        plan = self._resolve_agents(plan)
 
+        return plan
+
+    def _resolve_agents(self, plan: TaskPlan) -> TaskPlan:
+        for step in plan.steps:
+            try:
+                metadata = self._agent_registry.resolve_agent(
+                    step.capability,
+                    input_artifacts=list(step.input_artifact_types),
+                    output_artifact=step.output_artifact_type,
+                )
+                step.agent_name = metadata.name
+            except AgentResolutionError as exc:
+                step.description = f"{step.description} [WARN: {exc}]"
         return plan
 
     def generate_goal_plan(

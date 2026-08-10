@@ -30,6 +30,7 @@ class PlanStep(BaseModel):
     parallelizable: bool = False
     constraints: dict[str, Any] = {}
     goal_id: str | None = None
+    agent_name: str | None = None
 
 
 class TaskPlan(BaseModel):
