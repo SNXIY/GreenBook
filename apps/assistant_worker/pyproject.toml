@@ -5,6 +5,7 @@ description = "GreenBook Assistant async worker — Kafka consumers and schedule
 requires-python = ">=3.12"
 dependencies = [
     "greenbook-contracts",
+    "greenbook-assistant-core",
     "greenbook-java-client",
     "aiokafka>=0.12",
 ]
