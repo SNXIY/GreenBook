@@ -69,13 +69,17 @@ class ExecutionWorker:
         repository: ExecutionRepository | None = None,
         trace: Any = None,  # AgentTrace | None
         event_store: Any = None,
+        checkpoint_store: Any = None,
         failure_decision_engine: FailureDecisionEngine | None = None,
         operation_tracker: ExternalOperationTracker | None = None,
     ) -> None:
         self._executor = executor
         self._repo = repository or ExecutionRepository()
         self._state = ExecutionStateManager(self._repo, event_store=event_store)
-        self._runtime = RuntimeManager(self._state)
+        self._runtime = RuntimeManager(
+            self._state,
+            checkpoint_store=checkpoint_store,
+        )
         self._runtime_guard = RuntimeGuard(self._runtime)
         self._recovery_policy = RecoveryPolicy()
         self._failure_decision_engine = failure_decision_engine or FailureDecisionEngine(

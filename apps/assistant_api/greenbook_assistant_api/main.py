@@ -23,8 +23,10 @@ from greenbook_creator_client.client import CreatorClient
 from greenbook_java_client.client import JavaClient
 from greenbook_mcp_server.server import GreenBookMCPServer
 from greenbook_assistant_core.compatibility.history import RunExecutionAdapter
-from greenbook_assistant_core.execution.event_store import ExecutionEventStore
-from greenbook_assistant_core.execution.repository import ExecutionRepository
+from greenbook_assistant_core.execution.operation_tracking import ExternalOperationTracker
+from greenbook_assistant_core.execution.persistence_provider import RuntimePersistenceFactory
+from greenbook_assistant_core.execution.retry_manager import RetryManager
+from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
 from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
 from greenbook_assistant_core.task.intent_spec_provider import IntentSpecProvider
@@ -183,18 +185,31 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.approval_store = {}
     app.state.message_store = {}
 
-    execution_repository = ExecutionRepository()
-    execution_event_store = ExecutionEventStore()
+    runtime_persistence = RuntimePersistenceFactory.from_env()
+    execution_repository = runtime_persistence.execution_repository
+    execution_event_store = runtime_persistence.execution_event_store
     execution_state_manager = ExecutionStateManager(
         repository=execution_repository,
         event_store=execution_event_store,
     )
     execution_runtime_manager = RuntimeManager(
         state_manager=execution_state_manager,
+        checkpoint_store=runtime_persistence.checkpoint_store,
     )
     runtime_agent_service = RuntimeAgentService(
         repository=execution_repository,
         event_store=execution_event_store,
+        checkpoint_store=runtime_persistence.checkpoint_store,
+        operation_tracker=ExternalOperationTracker(
+            store=runtime_persistence.external_operation_store,
+        ),
+    )
+    execution_retry_manager = RetryManager(
+        state_manager=execution_state_manager,
+        runtime_manager=execution_runtime_manager,
+    )
+    execution_retry_scheduler = RetryScheduler(
+        task_store=runtime_persistence.retry_task_store,
     )
     task_provider = TaskProvider()
     conversation_runtime_adapter = ConversationRuntimeAdapter(
@@ -210,8 +225,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     app.state.execution_repository = execution_repository
     app.state.execution_event_store = execution_event_store
+    app.state.execution_checkpoint_store = runtime_persistence.checkpoint_store
+    app.state.external_operation_store = runtime_persistence.external_operation_store
+    app.state.retry_task_store = runtime_persistence.retry_task_store
+    app.state.execution_lease_manager = runtime_persistence.lease_manager
+    app.state.runtime_persistence = runtime_persistence
     app.state.execution_state_manager = execution_state_manager
     app.state.execution_runtime_manager = execution_runtime_manager
+    app.state.execution_retry_manager = execution_retry_manager
+    app.state.execution_retry_scheduler = execution_retry_scheduler
     app.state.runtime_agent_service = runtime_agent_service
     app.state.task_provider = task_provider
     app.state.execution_authorizer = execution_authorizer
@@ -221,17 +243,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.runtime_enabled = runtime_enabled
 
     logger.info(
-        "Assistant API ready java=%s creator=%s issuer=%s audience=%s model=%s",
+        "Assistant API ready java=%s creator=%s issuer=%s audience=%s model=%s storage=%s",
         java_base,
         creator_base,
         issuer,
         audience,
         llm_model,
+        runtime_persistence.storage,
     )
 
     try:
         yield
     finally:
+        runtime_persistence.close()
         await app.state.java.close()
         await app.state.creator.close()
         await app.state.llm.close()

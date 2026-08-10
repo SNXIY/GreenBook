@@ -33,6 +33,11 @@ from .operation_tracking import (
     OperationStatus,
 )
 from .persistent_stores import PostgresExternalOperationStore
+from .persistence_provider import (
+    MemoryCheckpointStore,
+    RuntimePersistence,
+    RuntimePersistenceFactory,
+)
 from .reconciliation import (
     ReconciliationAction,
     ReconciliationRecoveryService,
@@ -74,6 +79,9 @@ __all__ = [
     "ExternalOperationTracker",
     "OperationStatus",
     "PostgresExternalOperationStore",
+    "MemoryCheckpointStore",
+    "RuntimePersistence",
+    "RuntimePersistenceFactory",
     "ReconciliationService",
     "ReconciliationAction",
     "ReconciliationRecoveryService",

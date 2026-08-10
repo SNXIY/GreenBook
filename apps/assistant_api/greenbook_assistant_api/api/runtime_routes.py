@@ -122,6 +122,16 @@ def _manager(request: Request) -> RuntimeManager:
             configured_state,
             checkpoint_store=getattr(request.app.state, "execution_checkpoint_store", None),
         )
+    persistence = getattr(request.app.state, "runtime_persistence", None)
+    if persistence is not None:
+        state = ExecutionStateManager(
+            persistence.execution_repository,
+            event_store=persistence.execution_event_store,
+        )
+        return RuntimeManager(
+            state,
+            checkpoint_store=persistence.checkpoint_store,
+        )
     repository = getattr(request.app.state, "execution_repository", None)
     event_store = getattr(request.app.state, "execution_event_store", None)
     state = ExecutionStateManager(repository or ExecutionRepository(), event_store=event_store)

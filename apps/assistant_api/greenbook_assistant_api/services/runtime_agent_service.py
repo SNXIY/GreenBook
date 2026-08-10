@@ -26,6 +26,7 @@ from greenbook_assistant_core.execution.capability_executor import CapabilityExe
 from greenbook_assistant_core.execution.event_store import ExecutionEventStore
 from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
 from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
+from greenbook_assistant_core.execution.operation_tracking import ExternalOperationTracker
 from greenbook_assistant_core.execution.repository import ExecutionRepository
 from greenbook_assistant_core.execution.runtime.invocation_context import (
     ToolInvocationContext,
@@ -64,9 +65,13 @@ class RuntimeAgentService:
         *,
         repository: ExecutionRepository | None = None,
         event_store: ExecutionEventStore | None = None,
+        checkpoint_store: Any | None = None,
+        operation_tracker: ExternalOperationTracker | None = None,
     ) -> None:
         self._execution_repository = repository
         self._execution_event_store = event_store
+        self._execution_checkpoint_store = checkpoint_store
+        self._operation_tracker = operation_tracker
         self._registry = CapabilityRegistry()
         self._mapper = CapabilityMapper(self._registry)
         self._orchestrator = TaskOrchestrator(self._registry)
@@ -382,6 +387,8 @@ class RuntimeAgentService:
             repository=self._execution_repository,
             trace=trace,
             event_store=self._execution_event_store,
+            checkpoint_store=self._execution_checkpoint_store,
+            operation_tracker=self._operation_tracker,
         )
         execution = worker.init_from_plan(executable, task_id=task_id)
         worker_ref["worker"] = worker
