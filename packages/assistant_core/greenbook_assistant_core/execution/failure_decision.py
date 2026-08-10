@@ -420,6 +420,18 @@ def normalize_failure_payload(
     """
 
     raw = dict(payload or {})
+    raw_evidence = raw.get("evidence")
+    evidence_data: dict[str, Any] = {}
+    if isinstance(raw_evidence, dict):
+        evidence_data = dict(raw_evidence)
+    else:
+        model_dump = getattr(raw_evidence, "model_dump", None)
+        if callable(model_dump):
+            dumped = model_dump(mode="json")
+            if isinstance(dumped, dict):
+                evidence_data = dict(dumped)
+    if evidence_data:
+        raw["evidence"] = evidence_data
     raw["ok"] = False
     raw["code"] = str(raw.get("code") or error_code or "UNKNOWN_ERROR")
     raw["message"] = str(raw.get("message") or error_message or "")
@@ -434,16 +446,25 @@ def normalize_failure_payload(
 
     try:
         result = ToolResult.model_validate(raw)
-        failure = normalize_external_failure(result)
+        failure = normalize_external_failure(
+            result,
+            evidence=evidence_data or None,
+        )
     except (ValidationError, ValueError, TypeError):
         # A malformed side-effect hint must fail closed.  Preserve the code
         # and message, but use the conservative unknown-delivery evidence.
         raw["request_sent"] = None
         raw["state"] = None
         result = ToolResult.model_validate(raw)
-        failure = normalize_external_failure(result)
+        failure = normalize_external_failure(
+            result,
+            evidence=evidence_data or None,
+        )
 
-    return result.model_dump(mode="python"), failure
+    normalized_payload = result.model_dump(mode="python")
+    if evidence_data:
+        normalized_payload["evidence"] = evidence_data
+    return normalized_payload, failure
 
 
 __all__ = [

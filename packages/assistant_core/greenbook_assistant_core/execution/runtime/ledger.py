@@ -12,6 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ..evidence import ExecutionEvidence
 from .invocation_context import ToolInvocationContext
 
 
@@ -43,6 +44,7 @@ class LedgerEntry(BaseModel):
     started_at: str = ""
     finished_at: str = ""
     duration_ms: float = 0.0
+    evidence: ExecutionEvidence | None = None
 
 
 class ToolExecutionLedger:
@@ -65,7 +67,11 @@ class ToolExecutionLedger:
 
     # ── lifecycle ──
 
-    def record_start(self, ctx: ToolInvocationContext) -> LedgerEntry:
+    def record_start(
+        self,
+        ctx: ToolInvocationContext,
+        evidence: ExecutionEvidence | None = None,
+    ) -> LedgerEntry:
         """Create a PENDING→RUNNING entry.  Raises if key already used."""
         existing = self.find_by_key(ctx.idempotency_key)
         if existing is not None:
@@ -81,6 +87,7 @@ class ToolExecutionLedger:
             step_id=ctx.step_id,
             status=InvocationStatus.RUNNING,
             started_at=datetime.now(UTC).isoformat(),
+            evidence=evidence or ExecutionEvidence.from_context(ctx),
         )
         self._entries[entry.invocation_id] = entry
         self._by_key[entry.idempotency_key] = entry.invocation_id
@@ -91,12 +98,16 @@ class ToolExecutionLedger:
         invocation_id: str,
         result: dict[str, Any],
         duration_ms: float,
+        *,
+        evidence: ExecutionEvidence | None = None,
     ) -> LedgerEntry:
         entry = self._require(invocation_id)
         entry.status = InvocationStatus.COMPLETED
         entry.result = result
         entry.finished_at = datetime.now(UTC).isoformat()
         entry.duration_ms = duration_ms
+        if evidence is not None:
+            entry.evidence = evidence
         return entry
 
     def record_failure(
@@ -106,6 +117,8 @@ class ToolExecutionLedger:
         error_message: str,
         duration_ms: float,
         result: dict[str, Any] | None = None,
+        *,
+        evidence: ExecutionEvidence | None = None,
     ) -> LedgerEntry:
         entry = self._require(invocation_id)
         entry.status = InvocationStatus.FAILED
@@ -115,6 +128,8 @@ class ToolExecutionLedger:
             entry.result = dict(result)
         entry.finished_at = datetime.now(UTC).isoformat()
         entry.duration_ms = duration_ms
+        if evidence is not None:
+            entry.evidence = evidence
         return entry
 
     def record_timeout(
@@ -122,6 +137,8 @@ class ToolExecutionLedger:
         invocation_id: str,
         duration_ms: float,
         result: dict[str, Any] | None = None,
+        *,
+        evidence: ExecutionEvidence | None = None,
     ) -> LedgerEntry:
         entry = self._require(invocation_id)
         entry.status = InvocationStatus.TIMEOUT
@@ -131,6 +148,19 @@ class ToolExecutionLedger:
             entry.result = dict(result)
         entry.finished_at = datetime.now(UTC).isoformat()
         entry.duration_ms = duration_ms
+        if evidence is not None:
+            entry.evidence = evidence
+        return entry
+
+    def record_evidence(
+        self,
+        invocation_id: str,
+        evidence: ExecutionEvidence,
+    ) -> LedgerEntry:
+        """Update the observed evidence without changing lifecycle status."""
+
+        entry = self._require(invocation_id)
+        entry.evidence = evidence
         return entry
 
     # ── replay ──

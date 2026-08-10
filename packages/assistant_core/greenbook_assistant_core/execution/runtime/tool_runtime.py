@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from ..evidence import ExecutionEvidence
 from .invocation_context import ToolInvocationContext
 from .ledger import ToolExecutionLedger
 
@@ -56,12 +57,13 @@ class InvocationResult(BaseModel):
     error_code: str = ""
     error_message: str = ""
     retryable: bool = False
-    request_sent: bool = False
+    request_sent: bool | None = None
     duration_ms: float = 0.0
     replayed: bool = False           # True when returned from ledger cache
     status: str = "COMPLETED"
     pending: bool = False
     async_task_id: str = ""
+    evidence: ExecutionEvidence | None = None
 
     @classmethod
     def from_tool_result(
@@ -70,7 +72,10 @@ class InvocationResult(BaseModel):
         tool_name: str,
         raw: dict[str, Any],
         duration_ms: float,
+        evidence: ExecutionEvidence | None = None,
     ) -> InvocationResult:
+        resolved_evidence = ExecutionEvidence.from_payload(raw, base=evidence)
+        raw_request_sent = raw.get("request_sent", resolved_evidence.request_sent)
         return cls(
             ok=bool(raw.get("ok", False)),
             invocation_id=invocation_id,
@@ -79,9 +84,14 @@ class InvocationResult(BaseModel):
             error_code=str(raw.get("code") or ""),
             error_message=str(raw.get("user_message") or raw.get("message", "")),
             retryable=bool(raw.get("retryable", False)),
-            request_sent=bool(raw.get("request_sent", False)),
+            request_sent=(
+                raw_request_sent
+                if isinstance(raw_request_sent, bool) or raw_request_sent is None
+                else resolved_evidence.request_sent
+            ),
             duration_ms=duration_ms,
             status="COMPLETED" if bool(raw.get("ok", False)) else "FAILED",
+            evidence=resolved_evidence,
         )
 
 
@@ -116,6 +126,8 @@ class ToolRuntime:
     async def invoke(self, ctx: ToolInvocationContext) -> InvocationResult:
         """Execute *ctx* through the tool handler with full lifecycle."""
 
+        base_evidence = ExecutionEvidence.from_context(ctx)
+
         # 1. Idempotency check — replay completed calls
         if ctx.idempotency_key:
             pending = self._pending_results.get(ctx.idempotency_key)
@@ -133,19 +145,21 @@ class ToolRuntime:
                 logger.debug("Replaying cached invocation %s", ctx.invocation_id)
                 result = InvocationResult.from_tool_result(
                     ctx.invocation_id, ctx.tool_name, cached.result, 0.0,
+                    evidence=cached.evidence or base_evidence,
                 )
                 result.replayed = True
                 return result
 
         # 2. Record start
         try:
-            self._ledger.record_start(ctx)
+            self._ledger.record_start(ctx, evidence=base_evidence)
         except ValueError:
             # Key conflict (race) — try replay one more time
             cached = self._ledger.try_replay(ctx.idempotency_key)
             if cached is not None:
                 result = InvocationResult.from_tool_result(
                     ctx.invocation_id, ctx.tool_name, cached.result, 0.0,
+                    evidence=cached.evidence or base_evidence,
                 )
                 result.replayed = True
                 return result
@@ -166,7 +180,20 @@ class ToolRuntime:
             elapsed = (time.monotonic() - start) * 1000.0
         except TimeoutError:
             elapsed = (time.monotonic() - start) * 1000.0
-            self._ledger.record_timeout(ctx.invocation_id, elapsed)
+            evidence = ExecutionEvidence.from_payload(
+                {},
+                base=base_evidence,
+                request_sent=None,
+                side_effect_state="UNKNOWN",
+                error_code="TIMEOUT",
+                raw_error_type="TimeoutError",
+                phase="TOOL_RUNTIME_TIMEOUT",
+            )
+            self._ledger.record_timeout(
+                ctx.invocation_id,
+                elapsed,
+                evidence=evidence,
+            )
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_FAILED",
                                       step_id=ctx.step_id, capability=ctx.capability,
@@ -179,11 +206,25 @@ class ToolRuntime:
                 retryable=True,
                 duration_ms=elapsed,
                 status="TIMEOUT",
+                evidence=evidence,
             )
         except Exception as exc:
             elapsed = (time.monotonic() - start) * 1000.0
+            evidence = ExecutionEvidence.from_payload(
+                {},
+                base=base_evidence,
+                request_sent=None,
+                side_effect_state="UNKNOWN",
+                error_code="TOOL_EXECUTION_FAILED",
+                raw_error_type=type(exc).__name__,
+                phase="TOOL_HANDLER_EXCEPTION",
+            )
             self._ledger.record_failure(
-                ctx.invocation_id, "TOOL_EXECUTION_FAILED", str(exc), elapsed,
+                ctx.invocation_id,
+                "TOOL_EXECUTION_FAILED",
+                str(exc),
+                elapsed,
+                evidence=evidence,
             )
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_FAILED",
@@ -197,12 +238,24 @@ class ToolRuntime:
                 retryable=False,
                 duration_ms=elapsed,
                 status="FAILED",
+                evidence=evidence,
             )
 
         # 5. A long tool may acknowledge work before its final result exists.
         # Do not apply the normal timeout to the task's completion awaitable;
         # the returned handle is tracked by the Runtime instead.
         if isinstance(raw, AsyncTaskHandle):
+            pending_evidence = ExecutionEvidence.from_payload(
+                raw.metadata,
+                base=base_evidence,
+                request_sent=True,
+                external_operation_id=raw.task_id,
+                phase="ASYNC_ACCEPTED",
+            )
+            self._ledger.record_evidence(
+                ctx.invocation_id,
+                pending_evidence,
+            )
             pending = InvocationResult(
                 ok=False,
                 invocation_id=ctx.invocation_id,
@@ -216,6 +269,7 @@ class ToolRuntime:
                 status=raw.status,
                 pending=True,
                 async_task_id=raw.task_id,
+                evidence=pending_evidence,
             )
             if ctx.idempotency_key:
                 self._pending_results[ctx.idempotency_key] = pending
@@ -235,23 +289,49 @@ class ToolRuntime:
 
         # 6. Record result
         ok = bool(raw.get("ok", False))
+        code = str(raw.get("code") or "")
+        evidence = ExecutionEvidence.from_payload(
+            raw,
+            base=base_evidence,
+            error_code=code or None,
+        )
         if ok:
-            self._ledger.record_complete(ctx.invocation_id, raw, elapsed)
+            self._ledger.record_complete(
+                ctx.invocation_id,
+                raw,
+                elapsed,
+                evidence=evidence,
+            )
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_COMPLETED",
                                       step_id=ctx.step_id, capability=ctx.capability,
                                       payload={"ok": True})
         else:
-            code = str(raw.get("code") or "TOOL_EXECUTION_FAILED")
+            code = code or "TOOL_EXECUTION_FAILED"
             msg = str(raw.get("user_message") or raw.get("message", ""))
-            self._ledger.record_failure(ctx.invocation_id, code, msg, elapsed)
+            evidence = ExecutionEvidence.from_payload(
+                raw,
+                base=base_evidence,
+                error_code=code,
+            )
+            self._ledger.record_failure(
+                ctx.invocation_id,
+                code,
+                msg,
+                elapsed,
+                evidence=evidence,
+            )
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_FAILED",
                                       step_id=ctx.step_id, capability=ctx.capability,
                                       payload={"error": code})
 
         return InvocationResult.from_tool_result(
-            ctx.invocation_id, ctx.tool_name, raw, elapsed,
+            ctx.invocation_id,
+            ctx.tool_name,
+            raw,
+            elapsed,
+            evidence=evidence,
         )
 
     async def _complete_async_handle(
@@ -259,6 +339,12 @@ class ToolRuntime:
         ctx: ToolInvocationContext,
         handle: AsyncTaskHandle,
     ) -> None:
+        ledger_entry = self._ledger.find_by_id(ctx.invocation_id)
+        base_evidence = (
+            ledger_entry.evidence
+            if ledger_entry is not None and ledger_entry.evidence is not None
+            else ExecutionEvidence.from_context(ctx)
+        )
         start = time.monotonic()
         try:
             deadline = handle.deadline or (
@@ -279,18 +365,34 @@ class ToolRuntime:
                     "message": "Async tool returned an invalid result",
                 }
             elapsed = (time.monotonic() - start) * 1000.0
+            code = str(raw.get("code") or "")
+            evidence = ExecutionEvidence.from_payload(
+                raw,
+                base=base_evidence,
+                error_code=code or None,
+            )
             if raw.get("ok", False):
-                self._ledger.record_complete(ctx.invocation_id, raw, elapsed)
+                self._ledger.record_complete(
+                    ctx.invocation_id,
+                    raw,
+                    elapsed,
+                    evidence=evidence,
+                )
             else:
                 self._ledger.record_failure(
                     ctx.invocation_id,
-                    str(raw.get("code") or "TOOL_EXECUTION_FAILED"),
+                    code or "TOOL_EXECUTION_FAILED",
                     str(raw.get("user_message") or raw.get("message", "")),
                     elapsed,
                     raw,
+                    evidence=evidence,
                 )
             result = InvocationResult.from_tool_result(
-                ctx.invocation_id, ctx.tool_name, raw, elapsed,
+                ctx.invocation_id,
+                ctx.tool_name,
+                raw,
+                elapsed,
+                evidence=evidence,
             )
             if self._trace is not None:
                 self._trace._emit_raw(
@@ -309,7 +411,20 @@ class ToolRuntime:
                 "user_message": message,
                 "retryable": True,
             }
-            self._ledger.record_timeout(ctx.invocation_id, elapsed, raw)
+            evidence = ExecutionEvidence.from_payload(
+                raw,
+                base=base_evidence,
+                request_sent=None,
+                side_effect_state="UNKNOWN",
+                raw_error_type="TimeoutError",
+                phase="ASYNC_TOOL_TIMEOUT",
+            )
+            self._ledger.record_timeout(
+                ctx.invocation_id,
+                elapsed,
+                raw,
+                evidence=evidence,
+            )
             result = InvocationResult(
                 invocation_id=ctx.invocation_id,
                 tool_name=ctx.tool_name,
@@ -319,6 +434,7 @@ class ToolRuntime:
                 duration_ms=elapsed,
                 status="TIMEOUT",
                 async_task_id=handle.task_id,
+                evidence=evidence,
             )
             if self._trace is not None:
                 self._trace._emit_raw(
@@ -330,8 +446,21 @@ class ToolRuntime:
                 )
         except Exception as exc:
             elapsed = (time.monotonic() - start) * 1000.0
+            evidence = ExecutionEvidence.from_payload(
+                {},
+                base=base_evidence,
+                request_sent=None,
+                side_effect_state="UNKNOWN",
+                error_code="TOOL_EXECUTION_FAILED",
+                raw_error_type=type(exc).__name__,
+                phase="ASYNC_HANDLER_EXCEPTION",
+            )
             self._ledger.record_failure(
-                ctx.invocation_id, "TOOL_EXECUTION_FAILED", str(exc), elapsed,
+                ctx.invocation_id,
+                "TOOL_EXECUTION_FAILED",
+                str(exc),
+                elapsed,
+                evidence=evidence,
             )
             result = InvocationResult(
                 invocation_id=ctx.invocation_id,
@@ -341,6 +470,7 @@ class ToolRuntime:
                 duration_ms=elapsed,
                 status="FAILED",
                 async_task_id=handle.task_id,
+                evidence=evidence,
             )
 
         # Store both success and failure before resuming the Worker.  The

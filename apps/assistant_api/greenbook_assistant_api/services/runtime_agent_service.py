@@ -217,13 +217,25 @@ class RuntimeAgentService:
         tool_results: dict[str, dict[str, Any]] = {}
         worker_ref: dict[str, Any] = {}
 
+        def evidence_payload(value: Any) -> dict[str, Any] | None:
+            if value is None:
+                return None
+            model_dump = getattr(value, "model_dump", None)
+            if callable(model_dump):
+                dumped = model_dump(mode="json")
+                return dict(dumped) if isinstance(dumped, dict) else None
+            if isinstance(value, dict):
+                return dict(value)
+            return None
+
         async def raw_handler(tool_name: str, tool_args: dict) -> dict:
+            tool_call_id = str(uuid.uuid4())
             call_kwargs = {
                 "auth": ctx.auth,
                 "session": session,
                 "trace_id": ctx.trace_id,
                 "agent_run_id": ctx.run_id,
-                "tool_call_id": str(uuid.uuid4()),
+                "tool_call_id": tool_call_id,
             }
             if detach:
                 call_kwargs["async_mode"] = True
@@ -231,7 +243,18 @@ class RuntimeAgentService:
             # fallback silently re-entered the synchronous Creator wait and
             # made a detached HTTP request block or time out.  A host that
             # has not implemented the contract must fail explicitly.
-            return await mcp.execute_tool(tool_name, **call_kwargs, **tool_args)
+            raw_result = await mcp.execute_tool(
+                tool_name,
+                **call_kwargs,
+                **tool_args,
+            )
+            if isinstance(raw_result, dict):
+                enriched = dict(raw_result)
+                evidence = evidence_payload(enriched.get("evidence")) or {}
+                evidence["tool_call_id"] = tool_call_id
+                enriched["evidence"] = evidence
+                return enriched
+            return raw_result
 
         async def on_async_complete(
             inv_ctx: ToolInvocationContext,
@@ -247,6 +270,7 @@ class RuntimeAgentService:
                 "error_message": inv_result.error_message,
                 "pending": False,
                 "async_task_id": inv_result.async_task_id,
+                "evidence": evidence_payload(inv_result.evidence),
             }
             current_worker = worker_ref.get("worker")
             if current_worker is None:
@@ -326,6 +350,7 @@ class RuntimeAgentService:
                 "error_message": inv_result.error_message,
                 "pending": inv_result.pending,
                 "async_task_id": inv_result.async_task_id,
+                "evidence": evidence_payload(inv_result.evidence),
             }
             return {
                 "ok": inv_result.ok,
@@ -336,6 +361,7 @@ class RuntimeAgentService:
                 "request_sent": inv_result.request_sent,
                 "pending": inv_result.pending,
                 "async_task_id": inv_result.async_task_id,
+                "evidence": evidence_payload(inv_result.evidence),
             }
 
         executor = CapabilityExecutor(

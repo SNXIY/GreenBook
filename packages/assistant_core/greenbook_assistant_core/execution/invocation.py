@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 from greenbook_assistant_core.execution.models import ArtifactHandle
 
+from .evidence import ExecutionEvidence
+
 
 class ToolInvocation(BaseModel):
     """A concrete call to an MCP tool, ready for execution."""
@@ -42,9 +44,26 @@ class ExecutionResult(BaseModel):
     request_sent: bool | None = False    # did the request reach the downstream?
     pending: bool = False                # long-running tool acknowledged work
     async_task_id: str = ""
+    evidence: ExecutionEvidence | None = None
     # Transient, lossless failure fact for the Worker decision boundary. It
     # is deliberately not part of Execution/StepExecution persistence.
     external_failure: ExternalAgentFailure | None = None
+
+    @staticmethod
+    def _evidence_from_tool_result(
+        tool_result: dict[str, Any] | None,
+    ) -> ExecutionEvidence | None:
+        if not isinstance(tool_result, dict):
+            return None
+        raw_evidence = tool_result.get("evidence")
+        if raw_evidence is None:
+            return None
+        if isinstance(raw_evidence, ExecutionEvidence):
+            return raw_evidence
+        try:
+            return ExecutionEvidence.model_validate(raw_evidence)
+        except (TypeError, ValueError):
+            return None
 
     @classmethod
     def success(
@@ -53,6 +72,7 @@ class ExecutionResult(BaseModel):
         tool_name: str,
         tool_result: dict[str, Any],
         artifact: ArtifactHandle | None = None,
+        evidence: ExecutionEvidence | None = None,
     ) -> ExecutionResult:
         return cls(
             ok=True,
@@ -60,6 +80,7 @@ class ExecutionResult(BaseModel):
             tool_name=tool_name,
             tool_result=tool_result,
             artifact=artifact,
+            evidence=evidence or cls._evidence_from_tool_result(tool_result),
         )
 
     @classmethod
@@ -103,7 +124,9 @@ class ExecutionResult(BaseModel):
         request_sent: bool | None = False,
         tool_result: dict[str, Any] | None = None,
         external_failure: ExternalAgentFailure | None = None,
+        evidence: ExecutionEvidence | None = None,
     ) -> ExecutionResult:
+        resolved_evidence = evidence or cls._evidence_from_tool_result(tool_result)
         return cls(
             capability=capability,
             tool_name=tool_name,
@@ -112,6 +135,7 @@ class ExecutionResult(BaseModel):
             retryable=retryable,
             request_sent=request_sent,
             tool_result=tool_result or {},
+            evidence=resolved_evidence,
             external_failure=external_failure,
         )
 
@@ -122,7 +146,9 @@ class ExecutionResult(BaseModel):
         tool_name: str,
         tool_result: dict[str, Any],
         task_id: str,
+        evidence: ExecutionEvidence | None = None,
     ) -> ExecutionResult:
+        resolved_evidence = evidence or cls._evidence_from_tool_result(tool_result)
         return cls(
             capability=capability,
             tool_name=tool_name,
@@ -130,4 +156,5 @@ class ExecutionResult(BaseModel):
             pending=True,
             async_task_id=task_id,
             request_sent=True,
+            evidence=resolved_evidence,
         )
