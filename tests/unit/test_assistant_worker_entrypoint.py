@@ -98,6 +98,7 @@ async def test_worker_entrypoint_can_consume_execution_queue(monkeypatch) -> Non
 
     assert captured["queue"] is persistence.execution_queue
     assert captured["execution_handler"] is handler
+    assert captured["lease_manager"] is persistence.lease_manager
     assert captured["retry_run"] is True
     assert captured["execution_run"] is True
     assert captured["execution_shutdown"] is True

@@ -48,6 +48,10 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
 
     try:
         persistence = RuntimePersistenceFactory.from_env()
+        queue_consumer_flag = os.getenv(
+            "ASSISTANT_EXECUTION_QUEUE_CONSUMER",
+            "true" if persistence.storage == RuntimePersistenceFactory.POSTGRES else "false",
+        ).strip().lower()
         metrics_collector = MemoryMetricsCollector()
         state_manager = ExecutionStateManager(
             repository=persistence.execution_repository,
@@ -82,15 +86,9 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                 lease_seconds=lease_seconds,
                 poll_interval_seconds=poll_interval,
                 batch_size=batch_size,
+                lease_manager=persistence.lease_manager,
             )
         else:
-            queue_consumer_flag = os.getenv(
-                "ASSISTANT_EXECUTION_QUEUE_CONSUMER",
-                "true"
-                if os.getenv("ASSISTANT_RUNTIME_STORAGE", "memory").strip().lower()
-                in {"postgres", "postgresql", "postgresql+psycopg", "pg"}
-                else "false",
-            ).strip().lower()
             if queue_consumer_flag in {"1", "true", "yes", "on"}:
                 from greenbook_creator_client.client import CreatorClient
                 from greenbook_mcp_server.server import GreenBookMCPServer
@@ -137,6 +135,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     lease_seconds=lease_seconds,
                     poll_interval_seconds=poll_interval,
                     batch_size=batch_size,
+                    lease_manager=persistence.lease_manager,
                 )
             else:
                 logger.warning(
@@ -152,10 +151,20 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
         if execution_queue_worker is None:
             await retry_worker.run()
         else:
-            await asyncio.gather(
-                retry_worker.run(),
-                execution_queue_worker.run(),
-            )
+            consumer_tasks = [
+                asyncio.create_task(retry_worker.run(), name="retry-consumer"),
+                asyncio.create_task(
+                    execution_queue_worker.run(),
+                    name="execution-consumer",
+                ),
+            ]
+            try:
+                await asyncio.gather(*consumer_tasks)
+            finally:
+                for task in consumer_tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*consumer_tasks, return_exceptions=True)
     except asyncio.CancelledError:
         logger.info("Worker shutting down")
     finally:

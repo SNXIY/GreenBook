@@ -14,6 +14,7 @@ from greenbook_assistant_core.execution.execution_queue import (
     PostgresExecutionQueue,
 )
 from greenbook_assistant_core.execution.execution_queue_worker import ExecutionQueueWorker
+from greenbook_assistant_core.execution.lease import ExecutionLeaseManager
 
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
@@ -104,3 +105,45 @@ async def test_queue_worker_fails_message_when_handler_raises() -> None:
     assert failed is not None
     assert failed.status == ExecutionQueueStatus.FAILED
     assert failed.last_error == "handler unavailable"
+
+
+@pytest.mark.asyncio
+async def test_queue_worker_acquires_and_releases_execution_lease() -> None:
+    queue = ExecutionQueue(now_factory=lambda: NOW)
+    message = queue.enqueue("execution-leased")
+    leases = ExecutionLeaseManager()
+
+    async def handler(_item: ExecutionQueueMessage) -> None:
+        assert leases.get(message.execution_id) is not None
+
+    worker = ExecutionQueueWorker(
+        queue=queue,
+        execution_handler=handler,
+        worker_id="worker-lease",
+        lease_manager=leases,
+    )
+
+    await worker.run_once(now=NOW)
+
+    assert leases.get(message.execution_id) is None
+
+
+@pytest.mark.asyncio
+async def test_queue_worker_releases_execution_lease_on_handler_failure() -> None:
+    queue = ExecutionQueue(now_factory=lambda: NOW)
+    message = queue.enqueue("execution-leased-failure")
+    leases = ExecutionLeaseManager()
+
+    async def handler(_item: ExecutionQueueMessage) -> None:
+        raise RuntimeError("handler unavailable")
+
+    worker = ExecutionQueueWorker(
+        queue=queue,
+        execution_handler=handler,
+        worker_id="worker-lease",
+        lease_manager=leases,
+    )
+
+    await worker.run_once(now=NOW)
+
+    assert leases.get(message.execution_id) is None

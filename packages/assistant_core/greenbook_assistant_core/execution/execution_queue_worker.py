@@ -40,6 +40,7 @@ class ExecutionQueueWorker:
         lease_seconds: int = 60,
         poll_interval_seconds: float = 1.0,
         batch_size: int = 10,
+        lease_manager: Any | None = None,
     ) -> None:
         self._queue = queue
         self._handler = execution_handler
@@ -47,8 +48,14 @@ class ExecutionQueueWorker:
         self._lease_seconds = max(1, lease_seconds)
         self._poll_interval = max(0.0, poll_interval_seconds)
         self._batch_size = max(1, batch_size)
+        # Queue claims prevent duplicate delivery while the message lease is
+        # valid.  The Runtime lease is an additional execution-level guard
+        # shared by API/worker processes and is deliberately optional for
+        # older embedders and unit tests.
+        self._lease_manager = lease_manager
         self._stop = asyncio.Event()
         self._claimed: set[str] = set()
+        self._execution_leases: dict[str, str] = {}
 
     @property
     def stopped(self) -> bool:
@@ -73,6 +80,12 @@ class ExecutionQueueWorker:
             if self.stopped:
                 self._release(message)
                 continue
+            if not self._acquire_execution_lease(message):
+                # Another process already owns this execution.  Release the
+                # queue claim so the message can be claimed again after the
+                # owning lease expires or the process exits.
+                self._release(message)
+                continue
             try:
                 result = self._handler(message)
                 if inspect.isawaitable(result):
@@ -91,6 +104,7 @@ class ExecutionQueueWorker:
                     worker_id=self._worker_id,
                     error=str(exc) or type(exc).__name__,
                 )
+                self._release_execution_lease(message.message_id, message.execution_id)
                 self._claimed.discard(message.message_id)
                 continue
 
@@ -98,6 +112,7 @@ class ExecutionQueueWorker:
                 message.message_id,
                 worker_id=self._worker_id,
             )
+            self._release_execution_lease(message.message_id, message.execution_id)
             self._claimed.discard(message.message_id)
             if acked is not None:
                 handled.append(acked)
@@ -135,11 +150,54 @@ class ExecutionQueueWorker:
             message = self._queue.get(message_id)
             if message is not None:
                 self._queue.release(message_id, worker_id=self._worker_id)
+                execution_id = message.execution_id
+            else:
+                execution_id = self._execution_leases.get(message_id)
+            self._release_execution_lease(message_id, execution_id)
             self._claimed.discard(message_id)
 
     def _release(self, message: ExecutionQueueMessage) -> None:
         self._queue.release(message.message_id, worker_id=self._worker_id)
+        self._release_execution_lease(message.message_id, message.execution_id)
         self._claimed.discard(message.message_id)
+
+    def _acquire_execution_lease(self, message: ExecutionQueueMessage) -> bool:
+        if self._lease_manager is None:
+            return True
+        try:
+            acquired = bool(
+                self._lease_manager.acquire(
+                    message.execution_id,
+                    self._worker_id,
+                    ttl_seconds=self._lease_seconds,
+                )
+            )
+        except Exception:
+            logger.exception(
+                "Execution lease acquisition failed execution_id=%s",
+                message.execution_id,
+            )
+            return False
+        if acquired:
+            self._execution_leases[message.message_id] = message.execution_id
+        return acquired
+
+    def _release_execution_lease(
+        self,
+        message_id: str,
+        execution_id: str | None,
+    ) -> None:
+        tracked_execution_id = self._execution_leases.pop(message_id, None)
+        execution_id = execution_id or tracked_execution_id
+        if self._lease_manager is None or not execution_id:
+            return
+        try:
+            self._lease_manager.release(execution_id, self._worker_id)
+        except Exception:
+            logger.exception(
+                "Execution lease release failed execution_id=%s",
+                execution_id,
+            )
 
 
 __all__ = ["ExecutionHandler", "ExecutionQueueWorker"]
