@@ -60,6 +60,12 @@ from .retry_task_store import (
 )
 from .retry_worker import RetryBackgroundWorker
 from .temporal_resolver import TemporalResolver
+from .timeline import (
+    ExecutionTimeline,
+    ExecutionTimelineItem,
+    ExecutionTimelineService,
+    TimelineItemKind,
+)
 
 __all__ = [
     "ArgumentBinder",
@@ -109,4 +115,8 @@ __all__ = [
     "RetryBackgroundWorker",
     "TemporalResolver",
     "ToolArguments",
+    "ExecutionTimeline",
+    "ExecutionTimelineItem",
+    "ExecutionTimelineService",
+    "TimelineItemKind",
 ]

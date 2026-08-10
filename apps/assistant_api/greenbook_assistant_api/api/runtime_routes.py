@@ -17,6 +17,10 @@ from greenbook_assistant_core.execution.repository import ExecutionRepository
 from greenbook_assistant_core.execution.retry_manager import RetryManager
 from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
+from greenbook_assistant_core.execution.timeline import (
+    ExecutionTimeline,
+    ExecutionTimelineService,
+)
 from pydantic import BaseModel, Field
 
 router = APIRouter()
@@ -62,6 +66,10 @@ class ExecutionEventsResponse(BaseModel):
 
     execution_id: str
     events: list[ExecutionEvent]
+
+
+class ExecutionTimelineResponse(ExecutionTimeline):
+    """Read-only timeline assembled from events and operation records."""
 
 
 class ExecutionListItem(BaseModel):
@@ -319,6 +327,30 @@ async def get_execution_events(
     )
 
 
+@router.get(
+    "/executions/{execution_id}/timeline",
+    response_model=ExecutionTimelineResponse,
+)
+async def get_execution_timeline(
+    execution_id: str,
+    request: Request,
+) -> ExecutionTimelineResponse:
+    """Return a chronological Runtime read model without mutating execution."""
+
+    manager = _manager(request)
+    execution = _execution_or_404(manager, execution_id)
+    await _require_execution_access(request, execution)
+    operation_store = getattr(request.app.state, "external_operation_store", None)
+    persistence = getattr(request.app.state, "runtime_persistence", None)
+    if operation_store is None and persistence is not None:
+        operation_store = getattr(persistence, "external_operation_store", None)
+    timeline = ExecutionTimelineService(
+        manager.event_store,
+        operation_store=operation_store,
+    ).build(execution_id)
+    return ExecutionTimelineResponse.model_validate(timeline.model_dump(mode="python"))
+
+
 async def _control_execution(
     request: Request,
     execution_id: str,
@@ -469,8 +501,10 @@ __all__ = [
     "get_execution_status",
     "get_execution_steps",
     "get_execution_events",
+    "get_execution_timeline",
     "ExecutionStepsResponse",
     "ExecutionEventsResponse",
+    "ExecutionTimelineResponse",
     "stream_execution_events",
     "pause_execution",
     "resume_execution",
