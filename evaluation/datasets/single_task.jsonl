@@ -1,0 +1,2 @@
+{"case_id":"single-create-draft","input":"写一篇 Java 后端实习准备文章，只保存草稿。","expected_tasks":1,"expected_goals":1,"expected_dependencies":[],"expected_agents":["CreatorAgent"],"expected_side_effects":["DRAFT_CREATED"]}
+{"case_id":"single-schedule","input":"把 Java 后端实习准备文章安排下周一上午九点发布。","expected_tasks":1,"expected_goals":1,"expected_dependencies":[],"expected_agents":["PublishAgent"],"expected_side_effects":["SCHEDULE_CREATED"]}

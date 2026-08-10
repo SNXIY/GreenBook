@@ -1,0 +1,2 @@
+{"case_id":"compound-update-query","input":"Java 那篇别动，Redis 那篇加布隆过滤器，然后告诉我最近 Java 帖子趋势。","expected_tasks":3,"expected_goals":2,"expected_dependencies":[],"expected_agents":["CreatorAgent","SearchAgent"],"expected_side_effects":["DRAFT_REVISED"]}
+{"case_id":"compound-cancel-query","input":"Java 那篇取消发布；Redis 那篇保持原计划。然后分析一下最近 Java 热门帖子大家更关心八股还是项目经验，只告诉我结论。","expected_tasks":3,"expected_goals":2,"expected_dependencies":[],"expected_agents":["PublishAgent","SearchAgent"],"expected_side_effects":["SCHEDULE_CANCELLED"]}

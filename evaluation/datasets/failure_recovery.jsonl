@@ -1,0 +1,2 @@
+{"case_id":"failure-worker-restart","input":"Worker 重启后继续完成 Java 草稿并发布。","expected_tasks":1,"expected_goals":1,"expected_dependencies":[],"expected_agents":["CreatorAgent","PublishAgent"],"expected_side_effects":["WORKER_RESTART_RECOVERED"]}
+{"case_id":"failure-creator-timeout","input":"Creator 超时后不要重复创建草稿，先恢复并查询已有结果。","expected_tasks":1,"expected_goals":1,"expected_dependencies":[],"expected_agents":["CreatorAgent"],"expected_side_effects":["RECONCILIATION_REQUIRED"]}
