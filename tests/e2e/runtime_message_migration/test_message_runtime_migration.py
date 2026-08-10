@@ -8,8 +8,6 @@ import pytest
 from greenbook_contracts.identity import AuthContext
 from starlette.testclient import TestClient
 
-pytest.importorskip("fastapi")
-
 from apps.assistant_api.greenbook_assistant_api.main import create_app
 from apps.assistant_api.greenbook_assistant_api.models.runtime_result import (
     RuntimeResult,
