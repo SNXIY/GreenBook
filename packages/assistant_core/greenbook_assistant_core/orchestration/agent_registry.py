@@ -7,6 +7,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from greenbook_assistant_core.artifact.schema import (
+    ArtifactSchemaRegistry,
+    ArtifactSchemaValidationError,
+)
+
 
 class SideEffectLevel(StrEnum):
     READ_ONLY = "READ_ONLY"
@@ -22,6 +27,14 @@ class AgentMetadata(BaseModel):
     output_artifacts: list[str] = []
     side_effect_level: SideEffectLevel = SideEffectLevel.NONE
     version: str = "1"
+    input_schema: list[str] = []
+    output_schema: list[str] = []
+    artifact_policy: "ArtifactPolicy" = Field(default_factory=lambda: ArtifactPolicy())
+
+
+class ArtifactPolicy(BaseModel):
+    reusable: bool = False
+    max_size: int | None = None
 
 
 class AgentResolutionError(ValueError):
@@ -31,9 +44,15 @@ class AgentResolutionError(ValueError):
 class AgentRegistry:
     """Resolve semantic task/capability types to one declared Agent."""
 
-    def __init__(self, agents: list[AgentMetadata] | None = None) -> None:
+    def __init__(
+        self,
+        agents: list[AgentMetadata] | None = None,
+        *,
+        schema_registry: ArtifactSchemaRegistry | None = None,
+    ) -> None:
         self._metadata: dict[str, AgentMetadata] = {}
         self._implementations: dict[str, Any] = {}
+        self._schemas = schema_registry or ArtifactSchemaRegistry()
         for metadata in agents or default_agent_metadata():
             self.register_agent(metadata)
 
@@ -77,6 +96,10 @@ class AgentRegistry:
     def get_agent(self, name: str) -> Any | None:
         return self._implementations.get(name)
 
+    def get_metadata(self, name: str) -> AgentMetadata | None:
+        metadata = self._metadata.get(name)
+        return metadata.model_copy(deep=True) if metadata else None
+
     def list_agents(self) -> list[AgentMetadata]:
         return [metadata.model_copy(deep=True) for metadata in self._metadata.values()]
 
@@ -86,6 +109,28 @@ class AgentRegistry:
         if output_artifact and not _artifact_type_compatible(output_artifact, metadata.output_artifacts):
             raise AgentResolutionError(f"AGENT_OUTPUT_ARTIFACT_MISMATCH:{metadata.name}")
 
+    def validate_schema_contract(self, producer: str, consumer: str) -> None:
+        producer_meta = self.get_metadata(producer)
+        consumer_meta = self.get_metadata(consumer)
+        if producer_meta is None or consumer_meta is None:
+            raise AgentResolutionError("AGENT_NOT_REGISTERED_FOR_SCHEMA_VALIDATION")
+        if not producer_meta.output_schema or not consumer_meta.input_schema:
+            raise AgentResolutionError(
+                f"PLAN_SCHEMA_CONTRACT_MISSING:{producer}->{consumer}"
+            )
+        if not any(
+            self._schemas.compatible(output_schema, input_schema)
+            for output_schema in producer_meta.output_schema
+            for input_schema in consumer_meta.input_schema
+        ):
+            raise AgentResolutionError(
+                f"PLAN_SCHEMA_CONTRACT_MISMATCH:{producer}->{consumer}"
+            )
+
+    @staticmethod
+    def artifact_types_compatible(actual: str, expected: str) -> bool:
+        return _artifact_type_compatible(actual, [expected])
+
 
 def default_agent_metadata() -> list[AgentMetadata]:
     return [
@@ -94,6 +139,7 @@ def default_agent_metadata() -> list[AgentMetadata]:
             capabilities=["QUERY", "SEARCH", "ANALYZE_COMMUNITY", "SEARCH_COMMUNITY"],
             output_artifacts=["POST_COLLECTION"],
             side_effect_level=SideEffectLevel.READ_ONLY,
+            output_schema=["POST_COLLECTION_SCHEMA"],
         ),
         AgentMetadata(
             name="AnalyticsAgent",
@@ -101,6 +147,8 @@ def default_agent_metadata() -> list[AgentMetadata]:
             input_artifacts=["POST_COLLECTION", "SEARCH_RESULT"],
             output_artifacts=["POST_ANALYSIS", "ANALYSIS_REPORT"],
             side_effect_level=SideEffectLevel.READ_ONLY,
+            input_schema=["POST_COLLECTION_SCHEMA"],
+            output_schema=["POST_ANALYSIS_SCHEMA"],
         ),
         AgentMetadata(
             name="CreatorAgent",
@@ -108,6 +156,8 @@ def default_agent_metadata() -> list[AgentMetadata]:
             input_artifacts=["POST_ANALYSIS", "ANALYSIS_REPORT", "POST_COLLECTION", "SEARCH_RESULT"],
             output_artifacts=["CONTENT_DRAFT", "DRAFT"],
             side_effect_level=SideEffectLevel.NONE,
+            input_schema=["POST_ANALYSIS_SCHEMA", "POST_COLLECTION_SCHEMA"],
+            output_schema=["CONTENT_DRAFT_SCHEMA"],
         ),
         AgentMetadata(
             name="PublishAgent",
@@ -115,6 +165,8 @@ def default_agent_metadata() -> list[AgentMetadata]:
             input_artifacts=["CONTENT_DRAFT", "DRAFT"],
             output_artifacts=["PUBLISHED_POST", "SCHEDULE"],
             side_effect_level=SideEffectLevel.WRITE,
+            input_schema=["CONTENT_DRAFT_SCHEMA"],
+            output_schema=["PUBLISHED_POST_SCHEMA"],
         ),
         AgentMetadata(
             name="QualityAgent",

@@ -77,6 +77,8 @@ class TaskOrchestrator:
         plan = self._validate_capabilities(plan)
         # 5. Resolve declared Agent metadata without changing execution.
         plan = self._resolve_agents(plan)
+        # 6. Validate producer/consumer schema contracts before execution.
+        plan = self._validate_agent_schema_flow(plan)
 
         return plan
 
@@ -91,6 +93,30 @@ class TaskOrchestrator:
                 step.agent_name = metadata.name
             except AgentResolutionError as exc:
                 step.description = f"{step.description} [WARN: {exc}]"
+        return plan
+
+    def _validate_agent_schema_flow(self, plan: TaskPlan) -> TaskPlan:
+        by_id = {step.step_id: step for step in plan.steps}
+        for step in plan.steps:
+            if not step.agent_name or not step.input_artifact_types:
+                continue
+            for dependency_id in step.depends_on:
+                producer = by_id.get(dependency_id)
+                if producer is None or not producer.agent_name or not producer.output_artifact_type:
+                    continue
+                if not any(
+                    self._agent_registry.artifact_types_compatible(
+                        producer.output_artifact_type, needed,
+                    )
+                    for needed in step.input_artifact_types
+                ):
+                    continue
+                try:
+                    self._agent_registry.validate_schema_contract(
+                        producer.agent_name, step.agent_name,
+                    )
+                except AgentResolutionError as exc:
+                    step.description = f"{step.description} [PLAN_VALIDATION_FAILURE: {exc}]"
         return plan
 
     def generate_goal_plan(
