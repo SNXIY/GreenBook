@@ -9,6 +9,10 @@ from greenbook_assistant_core.execution.operation_tracking import (
     ExternalOperationRecord,
     OperationStatus,
 )
+from greenbook_assistant_core.execution.execution_queue import (
+    ExecutionQueue,
+    PostgresExecutionQueue,
+)
 from greenbook_assistant_core.execution.persistence_provider import (
     MemoryCheckpointStore,
     RuntimePersistenceFactory,
@@ -28,6 +32,7 @@ def test_memory_profile_builds_all_runtime_dependencies() -> None:
     assert persistence.execution_repository.__class__.__name__ == "ExecutionRepository"
     assert persistence.external_operation_store.__class__.__name__ == "ExternalOperationStore"
     assert persistence.retry_task_store.__class__.__name__ == "RetryTaskStore"
+    assert isinstance(persistence.execution_queue, ExecutionQueue)
     persistence.close()
 
 
@@ -59,6 +64,7 @@ def test_postgres_profile_uses_one_bind_for_all_runtime_stores() -> None:
     )
     assert isinstance(restarted.external_operation_store, PostgresExternalOperationStore)
     assert isinstance(restarted.retry_task_store, PostgresRetryTaskStore)
+    assert isinstance(restarted.execution_queue, PostgresExecutionQueue)
     assert restarted.external_operation_store.get(record.operation_id) is not None
     assert restarted.retry_task_store.get(task.task_id) is not None
     persistence.close()

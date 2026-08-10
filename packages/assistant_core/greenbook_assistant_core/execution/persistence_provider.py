@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from .checkpoint import ExecutionCheckpoint
 from .event_store import ExecutionEventStore
+from .execution_queue import ExecutionQueue, ExecutionQueueProtocol, PostgresExecutionQueue
 from .lease import ExecutionLeaseManager, PostgresExecutionLeaseManager
 from .operation_tracking import ExternalOperationStore, ExternalOperationStoreProtocol
 from .persistent_stores import (
@@ -54,6 +55,7 @@ class RuntimePersistence:
     checkpoint_store: Any
     external_operation_store: ExternalOperationStoreProtocol
     retry_task_store: RetryTaskStoreProtocol
+    execution_queue: ExecutionQueueProtocol
     lease_manager: Any
     bind: Any | None = None
     owns_bind: bool = False
@@ -114,6 +116,7 @@ class RuntimePersistenceFactory:
             checkpoint_store=MemoryCheckpointStore(),
             external_operation_store=ExternalOperationStore(),
             retry_task_store=RetryTaskStore(),
+            execution_queue=ExecutionQueue(),
             lease_manager=ExecutionLeaseManager(),
         )
 
@@ -144,6 +147,10 @@ class RuntimePersistenceFactory:
                 create_tables=create_tables,
             ),
             retry_task_store=PostgresRetryTaskStore(
+                bind,
+                create_tables=create_tables,
+            ),
+            execution_queue=PostgresExecutionQueue(
                 bind,
                 create_tables=create_tables,
             ),

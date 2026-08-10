@@ -121,6 +121,23 @@ retry_tasks = sa.Table(
     ),
 )
 
+execution_queue_messages = sa.Table(
+    "execution_queue_message",
+    execution_metadata,
+    sa.Column("message_id", sa.String(128), primary_key=True),
+    sa.Column("execution_id", sa.String(128), nullable=False, unique=True),
+    sa.Column("created_at", sa.String(64), nullable=False),
+    sa.Column("available_at", sa.String(64), nullable=False),
+    sa.Column("attempt", sa.Integer, nullable=False, default=0),
+    sa.Column("trace_id", sa.String(128), nullable=False, default=""),
+    sa.Column("status", sa.String(32), nullable=False),
+    sa.Column("claimed_by", sa.String(128)),
+    sa.Column("claim_until", sa.String(64)),
+    sa.Column("last_error", sa.Text, nullable=False, default=""),
+    sa.Column("payload", sa.JSON, nullable=False, default=dict),
+    sa.Column("updated_at", sa.String(64), nullable=False),
+)
+
 
 __all__ = [
     "execution_metadata",
@@ -131,4 +148,5 @@ __all__ = [
     "execution_leases",
     "external_operations",
     "retry_tasks",
+    "execution_queue_messages",
 ]
