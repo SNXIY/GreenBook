@@ -591,12 +591,32 @@ async def create_conversation(
     return _conversation_summary(store[conversation_id])
 
 
+@router.get("/conversations/{conversation_id}/tasks")
+async def list_conversation_tasks(conversation_id: str, request: Request):
+    """Return the structured Task/Goal/Execution index for one conversation."""
+    auth = _get_auth(request)
+    session = _get_session(request, conversation_id)
+    if session.user_id != auth.user_id or session.tenant_id != auth.tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Conversation scope mismatch")
+    adapter = _conversation_runtime_adapter(request)
+    return {
+        "conversation_id": conversation_id,
+        "items": await adapter.get_task_index(
+            conversation_id=conversation_id,
+            user_id=auth.user_id,
+            tenant_id=auth.tenant_id,
+        ),
+    }
+
+
 class RunAcceptedResponse(BaseModel):
     run_id: str
     conversation_id: str
     status: str
     events_url: str
     execution_id: str | None = None
+    execution_ids: list[str] = []
+    task_ids: list[str] = []
     execution_events_url: str | None = None
     error_code: str | None = None
     error: str | None = None
@@ -691,6 +711,8 @@ def _runtime_run_record(
         "tool_rounds": result.tool_rounds,
         "events": _runtime_events(result, run_id),
         "execution_id": result.execution_id,
+        "execution_ids": list((result.partial_results or {}).get("execution_ids", [])),
+        "task_ids": list((result.partial_results or {}).get("task_ids", [])),
         "plan_id": result.plan_id,
         "task_id": result.task_id,
         "steps": list(result.steps),
@@ -799,6 +821,8 @@ async def _send_runtime_message(
         status=result.status,
         events_url=f"/api/v1/assistant/runs/{run_id}/events",
         execution_id=result.execution_id,
+        execution_ids=list((result.partial_results or {}).get("execution_ids", [])),
+        task_ids=list((result.partial_results or {}).get("task_ids", [])),
         execution_events_url=(
             f"/api/v1/executions/{result.execution_id}/events"
             if result.execution_id else None
