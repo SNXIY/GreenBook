@@ -42,6 +42,7 @@ from greenbook_assistant_core.execution.runtime.tool_runtime import ToolRuntime
 from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
 from greenbook_assistant_core.observability.collector import TraceCollector
 from greenbook_assistant_core.observability.context import TraceContext
+from greenbook_assistant_core.observability.metrics import MetricsCollector
 from greenbook_assistant_core.observability.trace import AgentTrace
 from greenbook_assistant_core.orchestration.context import PlanningContext
 from greenbook_assistant_core.orchestration.models import TaskPlan
@@ -78,6 +79,7 @@ class RuntimeAgentService:
         operation_tracker: ExternalOperationTracker | None = None,
         execution_queue: ExecutionQueueProtocol | None = None,
         dispatch_mode: str = "direct",
+        metrics_collector: MetricsCollector | None = None,
     ) -> None:
         self._execution_repository = repository
         self._execution_event_store = event_store
@@ -85,6 +87,7 @@ class RuntimeAgentService:
         self._operation_tracker = operation_tracker
         self._execution_queue = execution_queue
         self._dispatch_mode = dispatch_mode.strip().lower()
+        self._metrics = metrics_collector
         self._registry = CapabilityRegistry()
         self._mapper = CapabilityMapper(self._registry)
         self._orchestrator = TaskOrchestrator(self._registry)
@@ -466,6 +469,7 @@ class RuntimeAgentService:
             ledger=ledger,
             trace=trace,
             on_async_complete=on_async_complete,
+            metrics_collector=self._metrics,
         )
 
         # ── 6. CapabilityExecutor (via invoke_fn → ToolRuntime) ──
@@ -514,6 +518,7 @@ class RuntimeAgentService:
             event_store=self._execution_event_store,
             checkpoint_store=self._execution_checkpoint_store,
             operation_tracker=self._operation_tracker,
+            metrics_collector=self._metrics,
         )
         if existing_execution_id:
             execution = worker._repo.find_by_id(existing_execution_id)
@@ -1036,8 +1041,22 @@ class RuntimeAgentService:
                            if s.status in (StepStatus.COMPLETED, StepStatus.FAILED,
                                             StepStatus.FAILED_RETRYABLE)
                            and s.capability not in ("ANALYZE_CONTENT_PATTERNS",
-                                                    "VALIDATE_QUALITY")),
+                                                     "VALIDATE_QUALITY")),
         )
+
+        if self._metrics is not None:
+            metrics_context = TraceContext(
+                conversation_id=ctx.conversation_id,
+                run_id=ctx.run_id,
+                trace_id=ctx.trace_id,
+                task_id=task_id,
+                execution_id=execution_id,
+            )
+            self._metrics.record_execution(
+                status="FAILED" if execution_failed else "COMPLETED",
+                duration_ms=elapsed,
+                context=metrics_context,
+            )
 
         return RuntimeResult(
             success=not execution_failed,

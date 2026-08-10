@@ -14,6 +14,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from greenbook_assistant_core.observability.context import TraceContext
+from greenbook_assistant_core.observability.metrics import MetricsCollector
 from .external_adapters import ExternalOperationAdapter
 from .operation_tracking import (
     ExternalOperationRecord,
@@ -58,10 +60,12 @@ class ReconciliationService:
         store: ExternalOperationStoreProtocol | None = None,
         query: OperationStatusQuery | None = None,
         adapter: ExternalOperationAdapter | None = None,
+        metrics_collector: MetricsCollector | None = None,
     ) -> None:
         self.store = store or ExternalOperationStore()
         self._query = query
         self._adapter = adapter
+        self._metrics = metrics_collector
 
     def reconcile(self, operation: ExternalOperationRecord) -> OperationStatus:
         """Backward-compatible status-only facade.
@@ -87,6 +91,16 @@ class ReconciliationService:
         self.store.save(operation)
         status = self._query_status(operation)
         self._record_status(operation, status)
+        if self._metrics is not None:
+            context = None
+            if operation.evidence is not None:
+                context = TraceContext(
+                    trace_id=operation.evidence.trace_id or "",
+                    execution_id=operation.execution_id,
+                    step_id=operation.step_id,
+                    operation_id=operation.operation_id,
+                )
+            self._metrics.record_reconciliation(status=status.value, context=context)
         action = self._action_for(status)
         return ReconciliationResult(
             operation_id=operation.operation_id,

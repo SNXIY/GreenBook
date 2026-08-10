@@ -17,6 +17,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from ..evidence import ExecutionEvidence
+from ...observability.metrics import MetricsCollector
 from .invocation_context import ToolInvocationContext
 from .ledger import ToolExecutionLedger
 
@@ -113,11 +114,13 @@ class ToolRuntime:
         on_async_complete: Callable[
             [ToolInvocationContext, InvocationResult], Awaitable[None] | None
         ] | None = None,
+        metrics_collector: MetricsCollector | None = None,
     ) -> None:
         self._handler = tool_handler
         self._ledger = ledger or ToolExecutionLedger()
         self._trace = trace
         self._on_async_complete = on_async_complete
+        self._metrics = metrics_collector
         self._pending_results: dict[str, InvocationResult] = {}
         self._async_results: dict[str, InvocationResult] = {}
 
@@ -168,7 +171,8 @@ class ToolRuntime:
         # 3. Emit trace: TOOL_INVOKED
         if self._trace is not None:
             self._trace._emit_raw(ctx.tool_name, "TOOL_INVOKED",
-                                  step_id=ctx.step_id, capability=ctx.capability)
+                                  step_id=ctx.step_id, capability=ctx.capability,
+                                  invocation_id=ctx.invocation_id)
 
         # 4. Execute with timeout
         start = time.monotonic()
@@ -194,10 +198,12 @@ class ToolRuntime:
                 elapsed,
                 evidence=evidence,
             )
+            self._record_tool_metrics(ctx, "TIMEOUT", elapsed)
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_FAILED",
                                       step_id=ctx.step_id, capability=ctx.capability,
-                                      payload={"error": "TIMEOUT"})
+                                      payload={"error": "TIMEOUT"},
+                                      invocation_id=ctx.invocation_id)
             return InvocationResult(
                 invocation_id=ctx.invocation_id,
                 tool_name=ctx.tool_name,
@@ -226,10 +232,12 @@ class ToolRuntime:
                 elapsed,
                 evidence=evidence,
             )
+            self._record_tool_metrics(ctx, "FAILED", elapsed)
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_FAILED",
                                       step_id=ctx.step_id, capability=ctx.capability,
-                                      payload={"error": str(exc)})
+                                      payload={"error": str(exc)},
+                                      invocation_id=ctx.invocation_id)
             return InvocationResult(
                 invocation_id=ctx.invocation_id,
                 tool_name=ctx.tool_name,
@@ -256,6 +264,7 @@ class ToolRuntime:
                 ctx.invocation_id,
                 pending_evidence,
             )
+            self._record_tool_metrics(ctx, "PENDING", elapsed)
             pending = InvocationResult(
                 ok=False,
                 invocation_id=ctx.invocation_id,
@@ -280,6 +289,9 @@ class ToolRuntime:
                     step_id=ctx.step_id,
                     capability=ctx.capability,
                     payload={"task_id": raw.task_id},
+                    invocation_id=ctx.invocation_id,
+                    tool_call_id=pending_evidence.tool_call_id or "",
+                    operation_id=pending_evidence.operation_id or "",
                 )
             asyncio.create_task(
                 self._complete_async_handle(ctx, raw),
@@ -302,10 +314,14 @@ class ToolRuntime:
                 elapsed,
                 evidence=evidence,
             )
+            self._record_tool_metrics(ctx, "COMPLETED", elapsed)
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_COMPLETED",
                                       step_id=ctx.step_id, capability=ctx.capability,
-                                      payload={"ok": True})
+                                      payload={"ok": True},
+                                      invocation_id=ctx.invocation_id,
+                                      tool_call_id=evidence.tool_call_id or "",
+                                      operation_id=evidence.operation_id or "")
         else:
             code = code or "TOOL_EXECUTION_FAILED"
             msg = str(raw.get("user_message") or raw.get("message", ""))
@@ -321,10 +337,14 @@ class ToolRuntime:
                 elapsed,
                 evidence=evidence,
             )
+            self._record_tool_metrics(ctx, "FAILED", elapsed)
             if self._trace is not None:
                 self._trace._emit_raw(ctx.tool_name, "TOOL_FAILED",
                                       step_id=ctx.step_id, capability=ctx.capability,
-                                      payload={"error": code})
+                                      payload={"error": code},
+                                      invocation_id=ctx.invocation_id,
+                                      tool_call_id=evidence.tool_call_id or "",
+                                      operation_id=evidence.operation_id or "")
 
         return InvocationResult.from_tool_result(
             ctx.invocation_id,
@@ -401,6 +421,9 @@ class ToolRuntime:
                     step_id=ctx.step_id,
                     capability=ctx.capability,
                     payload={"task_id": handle.task_id, "ok": result.ok},
+                    invocation_id=ctx.invocation_id,
+                    tool_call_id=evidence.tool_call_id or "",
+                    operation_id=evidence.operation_id or "",
                 )
         except TimeoutError:
             elapsed = (time.monotonic() - start) * 1000.0
@@ -443,6 +466,7 @@ class ToolRuntime:
                     step_id=ctx.step_id,
                     capability=ctx.capability,
                     payload={"task_id": handle.task_id, "error": "TIMEOUT"},
+                    invocation_id=ctx.invocation_id,
                 )
         except Exception as exc:
             elapsed = (time.monotonic() - start) * 1000.0
@@ -493,6 +517,20 @@ class ToolRuntime:
                     handle.task_id,
                 )
                 raise
+
+    def _record_tool_metrics(
+        self,
+        ctx: ToolInvocationContext,
+        status: str,
+        latency_ms: float,
+    ) -> None:
+        if self._metrics is None:
+            return
+        self._metrics.record_tool(
+            status=status,
+            latency_ms=latency_ms,
+            context=ctx.trace_context,
+        )
 
     # ── queries ──
 

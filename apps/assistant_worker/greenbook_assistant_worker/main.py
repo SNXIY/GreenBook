@@ -14,6 +14,7 @@ from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
 from greenbook_assistant_core.execution.retry_worker import RetryBackgroundWorker
 from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
+from greenbook_assistant_core.observability.metrics import MemoryMetricsCollector
 from greenbook_java_client import JavaClient
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
 
     try:
         persistence = RuntimePersistenceFactory.from_env()
+        metrics_collector = MemoryMetricsCollector()
         state_manager = ExecutionStateManager(
             repository=persistence.execution_repository,
             event_store=persistence.execution_event_store,
@@ -58,6 +60,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
         retry_manager = RetryManager(
             state_manager=state_manager,
             runtime_manager=runtime_manager,
+            metrics_collector=metrics_collector,
         )
         scheduler = RetryScheduler(
             task_store=persistence.retry_task_store,
@@ -125,6 +128,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     ),
                     llm=llm,
                     model=os.getenv("LLM_MODEL", "deepseek-v4-flash"),
+                    metrics_collector=metrics_collector,
                 )
                 execution_queue_worker = ExecutionQueueWorker(
                     queue=persistence.execution_queue,

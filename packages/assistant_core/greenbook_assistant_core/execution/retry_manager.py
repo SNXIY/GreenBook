@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .events import EventType, ExecutionEvent
+from greenbook_assistant_core.observability.metrics import MetricsCollector
 from .models import StepExecution
 from .recovery import RecoveryPolicy
 from .retry_decision import (
@@ -29,6 +30,7 @@ class RetryManager:
         policy: RecoveryPolicy | None = None,
         runtime_manager: RuntimeManager | None = None,
         decision_engine: RetryDecisionEngine | None = None,
+        metrics_collector: MetricsCollector | None = None,
     ) -> None:
         self._state = state_manager or ExecutionStateManager()
         # Retained for source compatibility. Retry authorization is now owned
@@ -37,6 +39,7 @@ class RetryManager:
         self._runtime = runtime_manager or RuntimeManager(self._state)
         self._decision_engine = decision_engine or RetryDecisionEngine()
         self._evidence = RetryEvidenceResolver(self._state.event_store)
+        self._metrics = metrics_collector
 
     def retry_step(
         self,
@@ -88,6 +91,11 @@ class RetryManager:
                 "retry_decision": decision.model_dump(mode="json"),
             },
         )
+        if self._metrics is not None:
+            context = self._state.trace_context(execution_id)
+            if context is not None:
+                context = context.for_step(step.step_id)
+            self._metrics.record_retry(context=context)
         return result
 
     def decision_for_step(

@@ -7,12 +7,14 @@ Phase 5.2: injects upstream artifacts into downstream step constraints.
 from __future__ import annotations
 
 import logging
+import time
 from enum import StrEnum
 from typing import Any
 
 from greenbook_assistant_core.orchestration.models import PlanStep, TaskPlan
 from greenbook_assistant_core.planning.models import ExecutablePlan
 from greenbook_assistant_core.observability.context import TraceContext
+from greenbook_assistant_core.observability.metrics import MetricsCollector
 
 from .capability_executor import CapabilityExecutor
 from .events import EventType, ExecutionEvent
@@ -74,6 +76,7 @@ class ExecutionWorker:
         failure_decision_engine: FailureDecisionEngine | None = None,
         operation_tracker: ExternalOperationTracker | None = None,
         trace_context: TraceContext | None = None,
+        metrics_collector: MetricsCollector | None = None,
     ) -> None:
         self._executor = executor
         self._repo = repository or ExecutionRepository()
@@ -94,11 +97,13 @@ class ExecutionWorker:
             state_manager=self._state,
             runtime_manager=self._runtime,
             decision_engine=self._retry_decision_engine,
+            metrics_collector=metrics_collector,
         )
         self._operation_tracker = operation_tracker or ExternalOperationTracker()
         self._scheduler = StepScheduler()
         self._trace = trace
         self._trace_context = trace_context
+        self._metrics = metrics_collector
 
     def bind_trace_context(self, context: TraceContext) -> None:
         """Bind correlation metadata after the canonical Execution exists."""
@@ -233,6 +238,7 @@ class ExecutionWorker:
         """Execute one StepExecution → update state → return outcome."""
         execution_id = ex.execution_id
         sid = step_ex.step_execution_id
+        step_started = time.monotonic()
         try:
             self._runtime_guard.check_execution(execution_id)
         except (RuntimeGuardBlockedError, ExecutionBlockedError) as blocked:
@@ -312,6 +318,7 @@ class ExecutionWorker:
                     tool_name=result.tool_name,
                     evidence=evidence,
                 )
+            self._record_step_metrics(step_ex, "PENDING", step_started)
             return RunOutcome.WAITING_ASYNC
         if result.ok:
             evidence = self._evidence_from_result(
@@ -329,6 +336,11 @@ class ExecutionWorker:
                     evidence=evidence,
                 )
             if step_ex.retry_count > 0:
+                if self._metrics is not None:
+                    retry_context = self._trace_context
+                    if retry_context is not None:
+                        retry_context = retry_context.for_step(step_ex.step_id)
+                    self._metrics.record_retry(success=True, context=retry_context)
                 self._append_event(
                     EventType.STEP_RETRY_COMPLETED,
                     execution_id=execution_id,
@@ -358,6 +370,7 @@ class ExecutionWorker:
             )
             if self._trace is not None:
                 self._trace.step_completed(step_ex)
+            self._record_step_metrics(step_ex, "COMPLETED", step_started)
         elif result.approval_required:
             self._state.pause_for_approval(execution_id, sid)
             return RunOutcome.WAITING_APPROVAL
@@ -407,6 +420,7 @@ class ExecutionWorker:
 
             if decision.action == RecoveryAction.REQUEST_USER_INPUT:
                 self._state.pause_execution(execution_id)
+                self._record_step_metrics(step_ex, "FAILED", step_started)
                 return RunOutcome.PAUSED
 
             if retry_decision.allowed:
@@ -482,8 +496,29 @@ class ExecutionWorker:
                     if skipped:
                         self._repo.save(ex_store)
                         self._state._update_execution_status(execution_id)
+                self._record_step_metrics(step_ex, "FAILED_RETRYABLE", step_started)
+
+            if not retry_decision.allowed:
+                self._record_step_metrics(step_ex, "FAILED", step_started)
 
         return RunOutcome.COMPLETED  # step-level done
+
+    def _record_step_metrics(
+        self,
+        step: StepExecution,
+        status: str,
+        started_at: float,
+    ) -> None:
+        if self._metrics is None:
+            return
+        context = self._trace_context
+        if context is not None:
+            context = context.for_step(step.step_id)
+        self._metrics.record_step(
+            status=status,
+            latency_ms=(time.monotonic() - started_at) * 1000.0,
+            context=context,
+        )
 
     # ── resume after approval ────────────────────────────────────
 

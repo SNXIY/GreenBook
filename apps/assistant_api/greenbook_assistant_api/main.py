@@ -29,6 +29,7 @@ from greenbook_assistant_core.execution.retry_manager import RetryManager
 from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
 from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
+from greenbook_assistant_core.observability.metrics import MemoryMetricsCollector
 from greenbook_assistant_core.task.intent_spec_provider import IntentSpecProvider
 from greenbook_security.auth_context import AuthContextResolver, _extract_bearer
 from greenbook_security.jwt import JwtValidationError, validate_access_token
@@ -186,6 +187,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.message_store = {}
 
     runtime_persistence = RuntimePersistenceFactory.from_env()
+    metrics_collector = MemoryMetricsCollector()
     dispatch_mode = _env_first(
         "ASSISTANT_EXECUTION_DISPATCH",
         default=("queue" if runtime_persistence.storage == "postgres" else "direct"),
@@ -213,10 +215,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ),
         execution_queue=runtime_persistence.execution_queue,
         dispatch_mode=dispatch_mode,
+        metrics_collector=metrics_collector,
     )
     execution_retry_manager = RetryManager(
         state_manager=execution_state_manager,
         runtime_manager=execution_runtime_manager,
+        metrics_collector=metrics_collector,
     )
     execution_retry_scheduler = RetryScheduler(
         task_store=runtime_persistence.retry_task_store,
@@ -253,6 +257,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.execution_mode = execution_mode
     app.state.runtime_enabled = runtime_enabled
     app.state.execution_dispatch_mode = dispatch_mode
+    app.state.metrics_collector = metrics_collector
 
     logger.info(
         "Assistant API ready java=%s creator=%s issuer=%s audience=%s model=%s storage=%s dispatch=%s",
