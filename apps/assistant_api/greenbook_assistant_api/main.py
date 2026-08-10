@@ -19,9 +19,6 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from greenbook_creator_client.client import CreatorClient
-from greenbook_java_client.client import JavaClient
-from greenbook_mcp_server.server import GreenBookMCPServer
 from greenbook_assistant_core.compatibility.history import RunExecutionAdapter
 from greenbook_assistant_core.execution.operation_tracking import ExternalOperationTracker
 from greenbook_assistant_core.execution.persistence_provider import RuntimePersistenceFactory
@@ -31,6 +28,9 @@ from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
 from greenbook_assistant_core.observability.metrics import MemoryMetricsCollector
 from greenbook_assistant_core.task.intent_spec_provider import IntentSpecProvider
+from greenbook_creator_client.client import CreatorClient
+from greenbook_java_client.client import JavaClient
+from greenbook_mcp_server.server import GreenBookMCPServer
 from greenbook_security.auth_context import AuthContextResolver, _extract_bearer
 from greenbook_security.jwt import JwtValidationError, validate_access_token
 from openai import AsyncOpenAI
@@ -50,6 +50,8 @@ if _ENV_FILE.exists():
     _load_dotenv(_ENV_FILE)
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_ASSISTANT_IDENTITY_AUDIENCE = "greenbook-assistant-runtime"
 
 
 class _JwtAuthMiddleware(BaseHTTPMiddleware):
@@ -145,7 +147,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     audience = _env_first(
         "ASSISTANT_IDENTITY_AUDIENCE",
         "GREENBOOK_JAVA_AUDIENCE",
-        default="community-assistant-agent",
+        default=DEFAULT_ASSISTANT_IDENTITY_AUDIENCE,
     )
     deepseek_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
     deepseek_base = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
@@ -217,6 +219,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             store=runtime_persistence.external_operation_store,
         ),
         execution_queue=runtime_persistence.execution_queue,
+        artifact_store=runtime_persistence.artifact_store,
         dispatch_mode=dispatch_mode,
         metrics_collector=metrics_collector,
         retry_scheduler=execution_retry_scheduler,
@@ -244,6 +247,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.external_operation_store = runtime_persistence.external_operation_store
     app.state.retry_task_store = runtime_persistence.retry_task_store
     app.state.execution_queue = runtime_persistence.execution_queue
+    app.state.artifact_store = runtime_persistence.artifact_store
     app.state.execution_lease_manager = runtime_persistence.lease_manager
     app.state.runtime_persistence = runtime_persistence
     app.state.execution_state_manager = execution_state_manager
@@ -270,6 +274,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         runtime_persistence.storage,
         dispatch_mode,
     )
+    logger.info("Runtime API started dispatch=%s storage=%s", dispatch_mode, runtime_persistence.storage)
 
     try:
         yield

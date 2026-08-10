@@ -19,7 +19,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from greenbook_assistant_core.artifact.store import ArtifactStore
+from greenbook_assistant_core.artifact.store import ArtifactStore, ArtifactStorePort
 from greenbook_assistant_core.context import SessionContext
 from greenbook_assistant_core.capability.mapper import CapabilityMapper
 from greenbook_assistant_core.capability.registry import CapabilityRegistry
@@ -82,6 +82,7 @@ class RuntimeAgentService:
         dispatch_mode: str = "direct",
         metrics_collector: MetricsCollector | None = None,
         retry_scheduler: RetryScheduler | None = None,
+        artifact_store: ArtifactStorePort | None = None,
     ) -> None:
         self._execution_repository = repository
         self._execution_event_store = event_store
@@ -91,6 +92,7 @@ class RuntimeAgentService:
         self._dispatch_mode = dispatch_mode.strip().lower()
         self._metrics = metrics_collector
         self._retry_scheduler = retry_scheduler
+        self._artifact_store = artifact_store or ArtifactStore()
         self._registry = CapabilityRegistry()
         self._mapper = CapabilityMapper(self._registry)
         self._orchestrator = TaskOrchestrator(self._registry)
@@ -929,7 +931,7 @@ class RuntimeAgentService:
         tool_results: dict[str, dict[str, Any]] | None = None,
     ) -> RuntimeResult:
         """Collect artifacts + build result after Worker completes."""
-        artifact_store = ArtifactStore()
+        artifact_store = self._artifact_store
         final = worker._repo.find_by_id(execution_id)
 
         if final is not None:

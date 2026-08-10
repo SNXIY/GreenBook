@@ -14,6 +14,7 @@ from greenbook_assistant_core.observability.context import TraceContext
 from .events import EventType, ExecutionEvent
 from .evidence import ExecutionEvidence
 from .operation_tracking import ExternalOperationRecord
+from greenbook_assistant_core.artifact.events import ArtifactLifecycleEvent
 
 
 class TimelineItemKind(StrEnum):
@@ -25,6 +26,7 @@ class TimelineItemKind(StrEnum):
     RETRY = "retry"
     RECONCILIATION = "reconciliation"
     EXTERNAL_OPERATION = "external_operation"
+    ARTIFACT = "artifact"
 
 
 class ExecutionTimelineItem(BaseModel):
@@ -69,6 +71,10 @@ class _OperationStore(Protocol):
     def find_by_execution_id(self, execution_id: str) -> list[ExternalOperationRecord]: ...
 
 
+class _ArtifactEventStore(Protocol):
+    def list_events(self, execution_id: str) -> list[ArtifactLifecycleEvent]: ...
+
+
 _RETRY_EVENTS = frozenset({
     EventType.STEP_RETRY_REQUESTED,
     EventType.STEP_RETRY_DENIED,
@@ -105,9 +111,11 @@ class ExecutionTimelineService:
         self,
         event_store: _EventStore,
         operation_store: _OperationStore | None = None,
+        artifact_store: _ArtifactEventStore | None = None,
     ) -> None:
         self._events = event_store
         self._operations = operation_store
+        self._artifacts = artifact_store
 
     def build(self, execution_id: str) -> ExecutionTimeline:
         items: list[ExecutionTimelineItem] = [
@@ -118,6 +126,11 @@ class ExecutionTimelineService:
             items.extend(
                 self._operation_item(record)
                 for record in self._operations.find_by_execution_id(execution_id)
+            )
+        if self._artifacts is not None:
+            items.extend(
+                self._artifact_item(event)
+                for event in self._artifacts.list_events(execution_id)
             )
         items.sort(key=lambda item: (_timestamp_key(item.timestamp), item.item_id))
         return ExecutionTimeline(execution_id=execution_id, items=items)
@@ -204,6 +217,26 @@ class ExecutionTimelineService:
                 "status": record.status.value,
                 "external_operation_id": record.external_operation_id,
                 "receipt_id": record.receipt_id,
+            },
+        )
+
+    @staticmethod
+    def _artifact_item(event: ArtifactLifecycleEvent) -> ExecutionTimelineItem:
+        return ExecutionTimelineItem(
+            item_id=f"artifact:{event.event_id}",
+            kind=TimelineItemKind.ARTIFACT,
+            source="artifact_event",
+            timestamp=event.timestamp,
+            execution_id=event.execution_id,
+            event_id=event.event_id,
+            event_type=event.event_type.value,
+            payload={
+                "artifact_id": event.artifact_id,
+                "artifact_type": event.artifact_type,
+                "task_id": event.task_id,
+                "agent_name": event.agent_name,
+                "lifecycle": event.lifecycle,
+                **event.payload,
             },
         )
 

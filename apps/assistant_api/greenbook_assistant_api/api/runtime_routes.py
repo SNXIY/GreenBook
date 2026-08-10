@@ -344,9 +344,13 @@ async def get_execution_timeline(
     persistence = getattr(request.app.state, "runtime_persistence", None)
     if operation_store is None and persistence is not None:
         operation_store = getattr(persistence, "external_operation_store", None)
+    artifact_store = getattr(request.app.state, "artifact_store", None)
+    if artifact_store is None and persistence is not None:
+        artifact_store = getattr(persistence, "artifact_store", None)
     timeline = ExecutionTimelineService(
         manager.event_store,
         operation_store=operation_store,
+        artifact_store=artifact_store,
     ).build(execution_id)
     return ExecutionTimelineResponse.model_validate(timeline.model_dump(mode="python"))
 
