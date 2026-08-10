@@ -4,6 +4,10 @@ import asyncio
 import logging
 import os
 
+from greenbook_assistant_core.execution.execution_queue_worker import (
+    ExecutionHandler,
+    ExecutionQueueWorker,
+)
 from greenbook_assistant_core.execution.persistence_provider import RuntimePersistenceFactory
 from greenbook_assistant_core.execution.retry_manager import RetryManager
 from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
@@ -15,17 +19,21 @@ from greenbook_java_client import JavaClient
 logger = logging.getLogger(__name__)
 
 
-async def main() -> None:
+async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
     """Run Runtime background work from a separately deployable process.
 
     The retry worker only claims durable retry tasks and hands each task to
-    ``RetryManager``. It does not invoke tools directly; execution remains at
-    the existing Runtime/Worker boundary.
+    ``RetryManager``. An injected ``execution_handler`` enables the same
+    process to consume the durable Execution Queue; the queue worker delegates
+    execution and never invokes tools directly.
     """
     java_base = os.getenv("ASSISTANT_JAVA_BASE_URL", "http://127.0.0.1:8080")
     java = JavaClient(java_base)
     persistence = None
     retry_worker = None
+    execution_queue_worker = None
+    creator = None
+    llm = None
 
     poll_interval = float(
         os.getenv("ASSISTANT_RETRY_POLL_INTERVAL_SECONDS", "1")
@@ -63,6 +71,73 @@ async def main() -> None:
             batch_size=batch_size,
             worker_id=worker_id,
         )
+        if execution_handler is not None:
+            execution_queue_worker = ExecutionQueueWorker(
+                queue=persistence.execution_queue,
+                execution_handler=execution_handler,
+                worker_id=worker_id,
+                lease_seconds=lease_seconds,
+                poll_interval_seconds=poll_interval,
+                batch_size=batch_size,
+            )
+        else:
+            queue_consumer_flag = os.getenv(
+                "ASSISTANT_EXECUTION_QUEUE_CONSUMER",
+                "true"
+                if os.getenv("ASSISTANT_RUNTIME_STORAGE", "memory").strip().lower()
+                in {"postgres", "postgresql", "postgresql+psycopg", "pg"}
+                else "false",
+            ).strip().lower()
+            if queue_consumer_flag in {"1", "true", "yes", "on"}:
+                from greenbook_creator_client.client import CreatorClient
+                from greenbook_mcp_server.server import GreenBookMCPServer
+                from openai import AsyncOpenAI
+
+                from .execution_handler import RuntimeExecutionQueueHandler
+
+                creator_base = os.getenv(
+                    "ASSISTANT_CREATOR_BASE_URL",
+                    "http://127.0.0.1:8092",
+                )
+                creator = CreatorClient(base_url=creator_base)
+                mcp = GreenBookMCPServer(java=java, creator=creator)
+                llm_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv(
+                    "OPENAI_API_KEY",
+                    "",
+                )
+                if llm_key:
+                    llm = AsyncOpenAI(
+                        api_key=llm_key,
+                        base_url=os.getenv(
+                            "DEEPSEEK_BASE_URL",
+                            "https://api.deepseek.com",
+                        ),
+                    )
+                execution_handler = RuntimeExecutionQueueHandler(
+                    repository=persistence.execution_repository,
+                    event_store=persistence.execution_event_store,
+                    checkpoint_store=persistence.checkpoint_store,
+                    external_operation_store=persistence.external_operation_store,
+                    mcp=mcp,
+                    worker_access_token=os.getenv(
+                        "ASSISTANT_WORKER_ACCESS_TOKEN",
+                        "",
+                    ),
+                    llm=llm,
+                    model=os.getenv("LLM_MODEL", "deepseek-v4-flash"),
+                )
+                execution_queue_worker = ExecutionQueueWorker(
+                    queue=persistence.execution_queue,
+                    execution_handler=execution_handler,
+                    worker_id=worker_id,
+                    lease_seconds=lease_seconds,
+                    poll_interval_seconds=poll_interval,
+                    batch_size=batch_size,
+                )
+            else:
+                logger.warning(
+                    "Execution queue consumer is not enabled: no execution_handler was injected"
+                )
 
         logger.info(
             "Assistant worker started java=%s storage=%s worker_id=%s",
@@ -70,14 +145,26 @@ async def main() -> None:
             persistence.storage,
             worker_id,
         )
-        await retry_worker.run()
+        if execution_queue_worker is None:
+            await retry_worker.run()
+        else:
+            await asyncio.gather(
+                retry_worker.run(),
+                execution_queue_worker.run(),
+            )
     except asyncio.CancelledError:
         logger.info("Worker shutting down")
     finally:
         if retry_worker is not None:
             await retry_worker.shutdown()
+        if execution_queue_worker is not None:
+            await execution_queue_worker.shutdown()
         if persistence is not None:
             persistence.close()
+        if creator is not None:
+            await creator.close()
+        if llm is not None:
+            await llm.close()
         await java.close()
 
 

@@ -10,6 +10,10 @@ from greenbook_assistant_api.models.runtime_context import RuntimeContext, TaskC
 from greenbook_assistant_api.services.runtime_agent_service import (
     RuntimeAgentService,
 )
+from greenbook_assistant_core.execution.execution_queue import (
+    ExecutionQueue,
+    ExecutionQueueStatus,
+)
 from greenbook_assistant_core.task.models import ArtifactRef, TaskIntent
 
 
@@ -375,3 +379,35 @@ async def test_runtime_rejects_missing_task_context() -> None:
     assert result.success is False
     assert result.status == "FAILED"
     assert result.error_code == "TASK_CONTEXT_REQUIRED"
+
+
+@pytest.mark.asyncio
+async def test_queue_dispatch_creates_execution_without_running_tool() -> None:
+    queue = ExecutionQueue()
+    calls: list[str] = []
+    mcp = _mock_mcp({
+        "content.create_draft": {
+            "ok": True,
+            "code": "",
+            "data": {"draft_id": "must-not-be-created"},
+        },
+    })
+
+    async def execute_tool(tool_name: str, **_kwargs: Any) -> dict[str, Any]:
+        calls.append(tool_name)
+        return {"ok": True, "code": "", "data": {}}
+
+    mcp.execute_tool = execute_tool
+    service = RuntimeAgentService(
+        execution_queue=queue,
+        dispatch_mode="queue",
+    )
+    result = await service.execute(_ctx(mcp=mcp))
+
+    assert result.status == "QUEUED"
+    assert result.execution_id
+    assert calls == []
+    message = queue.get_by_execution_id(result.execution_id)
+    assert message is not None
+    assert message.status == ExecutionQueueStatus.READY
+    assert "raw_access_token" not in message.payload

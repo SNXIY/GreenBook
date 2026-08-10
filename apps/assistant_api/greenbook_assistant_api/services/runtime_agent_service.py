@@ -15,16 +15,22 @@ import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from greenbook_assistant_core.artifact.store import ArtifactStore
+from greenbook_assistant_core.context import SessionContext
 from greenbook_assistant_core.capability.mapper import CapabilityMapper
 from greenbook_assistant_core.capability.registry import CapabilityRegistry
 from greenbook_assistant_core.execution.argument_binder import ArgumentBinder
 from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
 from greenbook_assistant_core.execution.event_store import ExecutionEventStore
 from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
+from greenbook_assistant_core.execution.execution_queue import (
+    ExecutionQueueMessage,
+    ExecutionQueueProtocol,
+)
 from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
 from greenbook_assistant_core.execution.operation_tracking import ExternalOperationTracker
 from greenbook_assistant_core.execution.repository import ExecutionRepository
@@ -37,12 +43,14 @@ from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcom
 from greenbook_assistant_core.observability.collector import TraceCollector
 from greenbook_assistant_core.observability.trace import AgentTrace
 from greenbook_assistant_core.orchestration.context import PlanningContext
+from greenbook_assistant_core.orchestration.models import TaskPlan
 from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
+from greenbook_assistant_core.planning.models import ExecutablePlan
 from greenbook_assistant_core.planning.validation import PlanValidator
 from greenbook_assistant_core.task.intent_models import IntentSpec
 from greenbook_assistant_core.task.models import TaskIntent
 
-from ..models.runtime_context import RuntimeContext
+from ..models.runtime_context import RuntimeContext, TargetContext, TaskContext
 from ..models.runtime_result import RuntimeResult
 
 logger = logging.getLogger(__name__)
@@ -67,11 +75,15 @@ class RuntimeAgentService:
         event_store: ExecutionEventStore | None = None,
         checkpoint_store: Any | None = None,
         operation_tracker: ExternalOperationTracker | None = None,
+        execution_queue: ExecutionQueueProtocol | None = None,
+        dispatch_mode: str = "direct",
     ) -> None:
         self._execution_repository = repository
         self._execution_event_store = event_store
         self._execution_checkpoint_store = checkpoint_store
         self._operation_tracker = operation_tracker
+        self._execution_queue = execution_queue
+        self._dispatch_mode = dispatch_mode.strip().lower()
         self._registry = CapabilityRegistry()
         self._mapper = CapabilityMapper(self._registry)
         self._orchestrator = TaskOrchestrator(self._registry)
@@ -136,12 +148,108 @@ class RuntimeAgentService:
         """Return a completed detached result, if one is available."""
         return self._background_results.get(run_id)
 
+    async def execute_queued(
+        self,
+        message: ExecutionQueueMessage,
+        *,
+        mcp: Any,
+        llm: Any = None,
+        model: str = "",
+        auth: Any = None,
+    ) -> RuntimeResult:
+        """Execute an already-created PlanExecution from a queue envelope.
+
+        The queue worker supplies process-local MCP/LLM/auth dependencies. The
+        queue message supplies only a serializable dispatch snapshot and never
+        a bearer token. This method does not create a second Execution.
+        """
+
+        payload = message.payload
+        try:
+            task_intent_data = dict(payload["task_intent"])
+            if payload.get("intent_spec") is not None:
+                task_intent_data["intent_spec"] = payload["intent_spec"]
+            task_intent = TaskIntent.model_validate(task_intent_data)
+            executable = ExecutablePlan.model_validate(payload["executable_plan"])
+            task_context_data = payload.get("task_context") or {}
+            target_data = task_context_data.get("target") or None
+            target = (
+                TargetContext(**target_data)
+                if isinstance(target_data, dict)
+                else None
+            )
+            task_context = TaskContext(
+                task_id=str(task_context_data.get("task_id") or payload["task_id"]),
+                goal=str(task_context_data.get("goal") or ""),
+                task_intent=task_intent,
+                target=target,
+                constraints=tuple(task_context_data.get("constraints") or ()),
+                active_artifact_id=task_context_data.get("active_artifact_id"),
+                artifact_refs=tuple(task_context_data.get("artifact_refs") or ()),
+            )
+            session_payload = payload.get("session") or {}
+            session = SessionContext.model_validate({
+                "conversation_id": session_payload.get(
+                    "conversation_id", payload.get("conversation_id", "")
+                ),
+                "user_id": session_payload.get("user_id", payload.get("user_id", "")),
+                "tenant_id": session_payload.get(
+                    "tenant_id", payload.get("tenant_id", "")
+                ),
+                **{
+                    key: value
+                    for key, value in session_payload.items()
+                    if key not in {"conversation_id", "user_id", "tenant_id"}
+                },
+            })
+            ctx = RuntimeContext(
+                conversation_id=str(payload.get("conversation_id", "")),
+                run_id=str(payload.get("run_id", "")),
+                trace_id=str(payload.get("trace_id", message.trace_id)),
+                task_id=str(payload["task_id"]),
+                execution_id=message.execution_id,
+                task_context=task_context,
+                user_id=str(payload.get("user_id", "")),
+                tenant_id=str(payload.get("tenant_id", "")),
+                timezone=str(payload.get("timezone", "Asia/Shanghai")),
+                user_message=str(payload.get("user_message", "")),
+                conversation_history=[
+                    dict(item) for item in (payload.get("conversation_history") or ())
+                ],
+                task_intent=task_intent,
+                session=session,
+                active_artifact_id=payload.get("active_artifact_id"),
+                active_draft_id=payload.get("active_draft_id"),
+                active_schedule_id=payload.get("active_schedule_id"),
+                mcp=mcp,
+                llm=llm,
+                model=model,
+                auth=auth,
+            )
+        except Exception as exc:
+            return self._fail(
+                RuntimeContext(
+                    run_id=str(payload.get("run_id", "")),
+                    trace_id=str(payload.get("trace_id", message.trace_id)),
+                ),
+                "EXECUTION_DISPATCH_INVALID",
+                f"Queued execution dispatch payload is invalid: {exc}",
+            )
+
+        return await self._execute_single(
+            ctx,
+            existing_execution_id=message.execution_id,
+            executable_override=executable,
+        )
+
     async def _execute_single(
         self,
         ctx: RuntimeContext,
         *,
         detach: bool = False,
         completion_callback: RuntimeCompletionCallback | None = None,
+        existing_execution_id: str | None = None,
+        executable_override: ExecutablePlan | None = None,
     ) -> RuntimeResult:
         t0 = time.monotonic()
         task_context = ctx.task_context
@@ -176,10 +284,18 @@ class RuntimeAgentService:
                 ctx.task_intent,
                 intent_spec,
             )
-        plan = self._orchestrator.generate_plan(
-            task_id=task_id, goal_category=gc, requirements=reqs,
-            planning_context=planning_context,
-        )
+        if executable_override is None:
+            plan = self._orchestrator.generate_plan(
+                task_id=task_id, goal_category=gc, requirements=reqs,
+                planning_context=planning_context,
+            )
+        else:
+            plan = TaskPlan(
+                plan_id=executable_override.plan_id,
+                task_id=task_id,
+                template_name=executable_override.template_name,
+                steps=[step.model_copy(deep=True) for step in executable_override.steps],
+            )
 
         # Bind known arguments before validation/execution.  Runtime execution
         # still binds at the last boundary so upstream artifact IDs (for
@@ -200,7 +316,7 @@ class RuntimeAgentService:
         )
 
         # ── 3. Validate ─────────────────────────────────────
-        executable = self._validator.validate(plan)
+        executable = executable_override or self._validator.validate(plan)
         if not executable.is_valid:
             errors = "; ".join(e.message for e in executable.errors)
             return self._fail(ctx, "PLAN_INVALID", errors)
@@ -390,19 +506,73 @@ class RuntimeAgentService:
             checkpoint_store=self._execution_checkpoint_store,
             operation_tracker=self._operation_tracker,
         )
-        execution = worker.init_from_plan(executable, task_id=task_id)
+        if existing_execution_id:
+            execution = worker._repo.find_by_id(existing_execution_id)
+            if execution is None:
+                return self._fail(
+                    ctx,
+                    "EXECUTION_NOT_FOUND",
+                    f"Queued execution {existing_execution_id} was not found.",
+                )
+        else:
+            execution = worker.init_from_plan(executable, task_id=task_id)
         worker_ref["worker"] = worker
 
         # ExecutionStateManager intentionally owns lifecycle transitions and
         # does not know tool arguments.  Persist the already-bound plan
         # constraints in each step checkpoint so Worker can carry them into
         # its PlanStep without changing that protected state machine.
-        _seed_step_constraints(execution, plan, getattr(worker, "_repo", None))
+        if not existing_execution_id:
+            _seed_step_constraints(execution, plan, getattr(worker, "_repo", None))
 
         # Backfill execution_id for trace + executor
         ctx.execution_id = execution.execution_id
         trace.execution_id = execution.execution_id
         executor._execution_id = execution.execution_id
+        if self._dispatch_mode == "queue" and not existing_execution_id:
+            if self._execution_queue is None:
+                return self._fail(
+                    ctx,
+                    "EXECUTION_QUEUE_UNAVAILABLE",
+                    "Runtime queue dispatch is enabled but no ExecutionQueue is configured.",
+                )
+            self._execution_queue.enqueue(
+                execution.execution_id,
+                trace_id=ctx.trace_id,
+                payload=_execution_dispatch_payload(
+                    ctx=ctx,
+                    executable=executable,
+                    intent_spec=intent_spec,
+                ),
+            )
+            initial_steps = [
+                {
+                    "step_id": step.step_id,
+                    "capability": step.capability,
+                    "status": step.status.value,
+                    "retry_count": step.retry_count,
+                    "error_code": step.error_code,
+                    "error_message": step.error_message,
+                    "started_at": step.started_at,
+                    "completed_at": step.completed_at,
+                }
+                for step in execution.steps
+            ]
+            return RuntimeResult(
+                success=False,
+                status="QUEUED",
+                run_id=ctx.run_id,
+                task_id=task_id,
+                plan_id=executable.plan_id,
+                execution_id=execution.execution_id,
+                content="",
+                summary=ctx.user_message[:200],
+                started_execution=False,
+                execution_path="runtime",
+                steps=initial_steps,
+                trace_id=ctx.trace_id,
+            )
+
         trace.execution_started()
 
         # ── 8. Execute ──────────────────────────────────────
@@ -1093,6 +1263,73 @@ def _seed_step_constraints(execution: Any, plan: Any, repository: Any) -> None:
         if bound is not None:
             step_execution.checkpoint_data["constraints"] = bound
     repository.save(execution)
+
+
+def _execution_dispatch_payload(
+    *,
+    ctx: RuntimeContext,
+    executable: Any,
+    intent_spec: IntentSpec | None,
+) -> dict[str, Any]:
+    """Build a non-secret handoff snapshot for a queue consumer.
+
+    The queue owns delivery only. A future process-specific execution handler
+    can use this snapshot to rebuild its Runtime context. Access tokens are
+    intentionally removed; a worker must resolve authorization through its
+    configured credential boundary instead of reading a bearer token from the
+    queue.
+    """
+
+    auth_payload = _safe_model_payload(ctx.auth)
+    for secret_name in ("raw_access_token", "access_token", "refresh_token"):
+        auth_payload.pop(secret_name, None)
+    task_context = ctx.task_context
+    return {
+        "run_id": ctx.run_id,
+        "trace_id": ctx.trace_id,
+        "conversation_id": ctx.conversation_id,
+        "user_id": ctx.user_id,
+        "tenant_id": ctx.tenant_id,
+        "task_id": ctx.task_id,
+        "timezone": ctx.timezone,
+        "user_message": ctx.user_message,
+        "conversation_history": [dict(item) for item in ctx.conversation_history],
+        "active_artifact_id": ctx.active_artifact_id,
+        "active_draft_id": ctx.active_draft_id,
+        "active_schedule_id": ctx.active_schedule_id,
+        "task_intent": _safe_model_payload(ctx.task_intent),
+        "task_context": {
+            "task_id": task_context.task_id,
+            "goal": task_context.goal,
+            "constraints": [dict(item) for item in task_context.constraints],
+            "target": _safe_model_payload(task_context.target),
+            "active_artifact_id": task_context.active_artifact_id,
+            "artifact_refs": [
+                _safe_model_payload(item) for item in task_context.artifact_refs
+            ],
+        } if task_context is not None else None,
+        "intent_spec": (
+            intent_spec.model_dump(mode="json") if intent_spec is not None else None
+        ),
+        "executable_plan": _safe_model_payload(executable),
+        "session": _safe_model_payload(ctx.session),
+        "auth_context": auth_payload,
+    }
+
+
+def _safe_model_payload(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        dumped = model_dump(mode="json")
+        return dict(dumped) if isinstance(dumped, dict) else {}
+    if isinstance(value, dict):
+        return dict(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        dumped = asdict(value)
+        return dict(dumped) if isinstance(dumped, dict) else {}
+    return {}
 
 
 def _now_iso() -> str:

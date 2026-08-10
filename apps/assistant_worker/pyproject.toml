@@ -6,8 +6,12 @@ requires-python = ">=3.12"
 dependencies = [
     "greenbook-contracts",
     "greenbook-assistant-core",
+    "greenbook-assistant-api",
+    "greenbook-creator-client",
     "greenbook-java-client",
+    "greenbook-mcp-server",
     "aiokafka>=0.12",
+    "openai>=1.80",
 ]
 
 [tool.hatch.build.targets.wheel]

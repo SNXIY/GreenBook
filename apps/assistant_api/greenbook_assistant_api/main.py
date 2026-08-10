@@ -186,6 +186,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.message_store = {}
 
     runtime_persistence = RuntimePersistenceFactory.from_env()
+    dispatch_mode = _env_first(
+        "ASSISTANT_EXECUTION_DISPATCH",
+        default=("queue" if runtime_persistence.storage == "postgres" else "direct"),
+    ).strip().lower()
+    if dispatch_mode not in {"direct", "queue"}:
+        raise RuntimeError(
+            "ASSISTANT_EXECUTION_DISPATCH must be 'direct' or 'queue'"
+        )
     execution_repository = runtime_persistence.execution_repository
     execution_event_store = runtime_persistence.execution_event_store
     execution_state_manager = ExecutionStateManager(
@@ -203,6 +211,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         operation_tracker=ExternalOperationTracker(
             store=runtime_persistence.external_operation_store,
         ),
+        execution_queue=runtime_persistence.execution_queue,
+        dispatch_mode=dispatch_mode,
     )
     execution_retry_manager = RetryManager(
         state_manager=execution_state_manager,
@@ -228,6 +238,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.execution_checkpoint_store = runtime_persistence.checkpoint_store
     app.state.external_operation_store = runtime_persistence.external_operation_store
     app.state.retry_task_store = runtime_persistence.retry_task_store
+    app.state.execution_queue = runtime_persistence.execution_queue
     app.state.execution_lease_manager = runtime_persistence.lease_manager
     app.state.runtime_persistence = runtime_persistence
     app.state.execution_state_manager = execution_state_manager
@@ -241,15 +252,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.run_execution_adapter = RunExecutionAdapter()
     app.state.execution_mode = execution_mode
     app.state.runtime_enabled = runtime_enabled
+    app.state.execution_dispatch_mode = dispatch_mode
 
     logger.info(
-        "Assistant API ready java=%s creator=%s issuer=%s audience=%s model=%s storage=%s",
+        "Assistant API ready java=%s creator=%s issuer=%s audience=%s model=%s storage=%s dispatch=%s",
         java_base,
         creator_base,
         issuer,
         audience,
         llm_model,
         runtime_persistence.storage,
+        dispatch_mode,
     )
 
     try:
