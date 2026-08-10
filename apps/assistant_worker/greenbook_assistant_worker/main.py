@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 def _worker_health_path() -> Path | None:
-    value = os.getenv("ASSISTANT_WORKER_HEALTH_FILE", "").strip()
+    value = os.getenv(
+        "ASSISTANT_WORKER_HEALTH_FILE",
+        ".runtime/assistant-worker-health.json",
+    ).strip()
     return Path(value) if value else None
 
 

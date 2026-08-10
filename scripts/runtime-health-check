@@ -96,9 +96,10 @@ def _probe_http(name: str, base_url: str, paths: tuple[str, ...], *, config_only
 
 
 def _check_worker(*, config_only: bool, timeout: float) -> Check:
-    health_file_value = os.getenv("ASSISTANT_WORKER_HEALTH_FILE", "").strip()
-    if not health_file_value:
-        return Check("Assistant Worker", False, "ASSISTANT_WORKER_HEALTH_FILE is not configured")
+    health_file_value = os.getenv(
+        "ASSISTANT_WORKER_HEALTH_FILE",
+        ".runtime/assistant-worker-health.json",
+    ).strip()
     path = Path(health_file_value)
     if config_only:
         return Check("Assistant Worker", True, f"heartbeat configured at {path}")

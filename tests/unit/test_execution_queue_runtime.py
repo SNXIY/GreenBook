@@ -14,6 +14,8 @@ from greenbook_assistant_api.services.runtime_agent_service import RuntimeAgentS
 from greenbook_assistant_core.context import SessionContext
 from greenbook_assistant_core.execution.event_store import ExecutionEventStore
 from greenbook_assistant_core.execution.execution_queue import ExecutionQueue
+from greenbook_assistant_core.execution.execution_queue_worker import ExecutionQueueWorker
+from greenbook_assistant_core.execution.events import EventType
 from greenbook_assistant_core.execution.repository import ExecutionRepository
 from greenbook_assistant_core.task.models import TaskIntent
 
@@ -120,13 +122,27 @@ async def test_queued_runtime_is_consumed_against_existing_execution() -> None:
         repository=repository,
         event_store=event_store,
     )
-    completed = await worker_service.execute_queued(
-        message,
-        mcp=MCP(),
-        auth=auth,
-    )
 
-    assert completed.execution_id == queued.execution_id
+    async def handle(queued_message) -> None:
+        await worker_service.execute_queued(
+            queued_message,
+            mcp=MCP(),
+            auth=auth,
+        )
+
+    queue_worker = ExecutionQueueWorker(
+        queue=queue,
+        execution_handler=handle,
+        worker_id="execution-test-worker",
+        lease_seconds=30,
+    )
+    handled = await queue_worker.run_once()
+
+    assert len(handled) == 1
+    completed = repository.find_by_id(queued.execution_id)
+    assert completed is not None
     assert completed.status == "COMPLETED"
     assert calls == ["content.create_draft"]
     assert len(repository.list_all()) == 1
+    events = event_store.list_events(queued.execution_id)
+    assert any(event.event_type == EventType.STEP_STARTED for event in events)
