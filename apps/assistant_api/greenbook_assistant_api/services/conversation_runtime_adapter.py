@@ -26,6 +26,19 @@ from greenbook_assistant_core.task.intent_spec_provider import (
     IntentSpecProviderError,
 )
 from greenbook_assistant_core.task.models import Task
+from greenbook_assistant_core.task.multi_task import (
+    ConversationTaskIndex,
+    ConversationTargetResolver,
+    TaskSegment,
+    intent_delta_from_spec,
+    split_task_segments,
+)
+from greenbook_assistant_core.task.models import (
+    ArtifactRef,
+    TaskExecutionRef,
+    TaskGoal,
+    TaskResourceRef,
+)
 
 from ..models.runtime_context import RuntimeContext
 from ..models.runtime_result import RuntimeResult
@@ -57,6 +70,7 @@ class ConversationRuntimeAdapter:
             repository=execution_repository,
         )
         self._execution_repository = execution_repository
+        self._task_indexes: dict[str, ConversationTaskIndex] = {}
 
     async def execute(
         self,
@@ -77,6 +91,9 @@ class ConversationRuntimeAdapter:
         detach: bool = False,
         completion_callback: Any = None,
         existing_tasks: Sequence[Mapping[str, str]] | None = None,
+        _skip_multi: bool = False,
+        _intent_spec_override: IntentSpec | None = None,
+        _resolved_target_id: str | None = None,
     ) -> RuntimeResult:
         """Adapt one old message request into a RuntimeResult.
 
@@ -84,6 +101,29 @@ class ConversationRuntimeAdapter:
         Any provider/compiler failure is represented as a failed RuntimeResult
         so callers get one stable envelope instead of a legacy success message.
         """
+
+        if not _skip_multi:
+            segments = split_task_segments(message)
+            if len(segments) > 1:
+                return await self.execute_many(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    message=message,
+                    segments=segments,
+                    history=history,
+                    session=session,
+                    timezone=timezone,
+                    run_id=run_id,
+                    trace_id=trace_id,
+                    mcp=mcp,
+                    llm=llm,
+                    model=model,
+                    auth=auth,
+                    detach=detach,
+                    completion_callback=completion_callback,
+                    existing_tasks=existing_tasks,
+                )
 
         request_session = self._coerce_session(
             session,
@@ -117,14 +157,51 @@ class ConversationRuntimeAdapter:
                 [dict(item) for item in existing_tasks]
                 if existing_tasks is not None else None
             )
-            intent_spec = await self._intent_provider.resolve(
+            intent_spec = _intent_spec_override or await self._intent_provider.resolve(
                 message,
                 existing_tasks=task_hints,
             )
             task_intent = to_task_intent(intent_spec)
+            # Resolve structured conversation references before the legacy
+            # TaskProvider fallback.  This covers a single-message weak
+            # reference as well as multi-task child segments.
+            if str(task_intent.relation) in {
+                "CONTINUE_TASK", "MODIFY_TASK", "CANCEL_TASK",
+            } and not task_intent.target_task_id:
+                task_index = self._task_indexes.setdefault(
+                    conversation_id, ConversationTaskIndex(),
+                )
+                try:
+                    known_tasks = await self._task_provider.list_tasks(scope)
+                except Exception:
+                    known_tasks = []
+                for known_task in known_tasks:
+                    task_index.register(known_task)
+                resolution = task_index.resolve(message)
+                if resolution.is_ambiguous:
+                    raise TaskProviderError(
+                        "TASK_TARGET_AMBIGUOUS",
+                        "Multiple Tasks match the requested target.",
+                        candidates=[task.task_id for task in resolution.candidates],
+                    )
+                if resolution.task is not None:
+                    task_intent.target_task_id = resolution.task.task_id
+            if _resolved_target_id:
+                task_intent.target_task_id = _resolved_target_id
 
             binding: TaskBinding | None = None
             relation = str(task_intent.relation)
+            # QUERY is a read-only conversation result.  It must not create a
+            # Task or enqueue an Execution merely because it arrived via the
+            # Runtime message endpoint.
+            if relation == "DIRECT" and all(
+                str(action.action) == "QUERY" for action in intent_spec.actions
+            ):
+                return self._query_result(
+                    intent_spec,
+                    run_id=run_id or "",
+                    trace_id=trace_id or "",
+                )
             if relation in {"NEW_TASK", "DIRECT", "QUERY_TASK"}:
                 task = await self._task_provider.create_task(scope, intent_spec)
             else:
@@ -177,11 +254,14 @@ class ConversationRuntimeAdapter:
                 detach=detach,
                 completion_callback=completion_callback,
             )
-            return await self._complete_result(
+            completed = await self._complete_result(
                 result,
                 intent_spec=intent_spec,
                 task_id=task.task_id,
             )
+            self._sync_task_index(task, intent_spec, completed)
+            await self._persist_task_projection(scope, task)
+            return completed
         except (
             IntentSpecProviderError,
             TaskProviderError,
@@ -214,6 +294,207 @@ class ConversationRuntimeAdapter:
         """Convenience alias for callers that name the operation ``run``."""
 
         return await self.execute(**kwargs)
+
+    async def get_task_index(
+        self, *, conversation_id: str, user_id: str, tenant_id: str,
+    ) -> list[dict[str, object]]:
+        """Return the scoped conversation Task/Goal/Execution projection."""
+        scope = TaskScope(
+            user_id=user_id, tenant_id=tenant_id, conversation_id=conversation_id,
+        )
+        index = self._task_indexes.setdefault(conversation_id, ConversationTaskIndex())
+        for task in await self._task_provider.list_tasks(scope):
+            index.register(task)
+        return index.snapshot()
+
+    async def execute_many(
+        self,
+        *,
+        conversation_id: str,
+        user_id: str,
+        tenant_id: str,
+        message: str,
+        segments: Sequence[TaskSegment] | None = None,
+        history: Sequence[Mapping[str, str]] | None = None,
+        session: SessionContext | Any | None = None,
+        timezone: str | None = None,
+        run_id: str | None = None,
+        trace_id: str | None = None,
+        mcp: Any = None,
+        llm: Any = None,
+        model: str = "",
+        auth: Any = None,
+        detach: bool = False,
+        completion_callback: Any = None,
+        existing_tasks: Sequence[Mapping[str, str]] | None = None,
+    ) -> RuntimeResult:
+        """Resolve and dispatch each independent Task through normal Runtime.
+
+        Each child keeps its own Task and Execution.  The aggregate is only a
+        presentation envelope; Queue/Worker still see ordinary executions.
+        """
+        child_segments = list(segments or split_task_segments(message))
+        scope = TaskScope(user_id=user_id, tenant_id=tenant_id, conversation_id=conversation_id)
+        index = self._task_indexes.setdefault(conversation_id, ConversationTaskIndex())
+        try:
+            tasks = await self._task_provider.list_tasks(scope)
+        except Exception:
+            tasks = []
+        for task in tasks:
+            index.register(task)
+
+        results: list[RuntimeResult] = []
+        for child in child_segments:
+            child_spec = await self._intent_provider.resolve(
+                child.text,
+                existing_tasks=existing_tasks,
+            )
+            if child.is_query:
+                results.append(self._query_result(
+                    child_spec,
+                    run_id=run_id or "",
+                    trace_id=trace_id or "",
+                ))
+                continue
+
+            target_id: str | None = None
+            relation = str(to_task_intent(child_spec).relation)
+            if relation in {"CONTINUE_TASK", "MODIFY_TASK", "CANCEL_TASK"}:
+                resolution = ConversationTargetResolver().resolve(child.text, index.list())
+                if resolution.is_ambiguous:
+                    results.append(RuntimeResult(
+                        success=False, status="FAILED", run_id=run_id or "",
+                        trace_id=trace_id or "", execution_path="runtime",
+                        error_code="TASK_TARGET_AMBIGUOUS",
+                        error_message="Multiple Tasks match the requested target.",
+                        partial_results={"candidates": [task.task_id for task in resolution.candidates]},
+                    ))
+                    continue
+                if resolution.task is not None:
+                    target_id = resolution.task.task_id
+                elif not child_spec.target_hint:
+                    results.append(RuntimeResult(
+                        success=False, status="FAILED", run_id=run_id or "",
+                        trace_id=trace_id or "", execution_path="runtime",
+                        error_code="TASK_NOT_FOUND",
+                        error_message="No Task matches the requested target.",
+                    ))
+                    continue
+
+            child_result = await self.execute(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                tenant_id=tenant_id,
+                message=child.text,
+                history=history,
+                session=session,
+                timezone=timezone,
+                run_id=run_id,
+                trace_id=trace_id,
+                mcp=mcp,
+                llm=llm,
+                model=model,
+                auth=auth,
+                detach=detach,
+                completion_callback=completion_callback,
+                existing_tasks=existing_tasks,
+                _skip_multi=True,
+                _intent_spec_override=child_spec,
+                _resolved_target_id=target_id,
+            )
+            results.append(child_result)
+
+        if not results:
+            return RuntimeResult(success=True, status="COMPLETED", run_id=run_id or "", trace_id=trace_id or "")
+        successes = [result for result in results if result.success]
+        execution_ids = [result.execution_id for result in results if result.execution_id]
+        task_ids = [result.task_id for result in results if result.task_id]
+        status = "COMPLETED" if len(successes) == len(results) else "PARTIAL"
+        return RuntimeResult(
+            success=len(successes) == len(results),
+            status=status,
+            run_id=run_id or next((result.run_id for result in results if result.run_id), ""),
+            trace_id=trace_id or next((result.trace_id for result in results if result.trace_id), ""),
+            task_id=task_ids[0] if task_ids else "",
+            execution_id=execution_ids[0] if execution_ids else None,
+            execution_path="runtime",
+            content="\n\n".join(result.content for result in results if result.content),
+            error_code=next((result.error_code for result in results if result.error_code), ""),
+            partial_results={
+                "multi_task": True,
+                "task_ids": task_ids,
+                "execution_ids": execution_ids,
+                "results": [
+                    {
+                        "task_id": result.task_id,
+                        "execution_id": result.execution_id,
+                        "status": result.status,
+                        "success": result.success,
+                        "error_code": result.error_code,
+                    }
+                    for result in results
+                ],
+            },
+        )
+
+    @staticmethod
+    def _query_result(
+        intent_spec: IntentSpec, *, run_id: str, trace_id: str,
+    ) -> RuntimeResult:
+        return RuntimeResult(
+            success=True,
+            status="COMPLETED",
+            run_id=run_id,
+            trace_id=trace_id,
+            execution_path="runtime",
+            content=intent_spec.goal or "查询已完成。",
+            summary="QUERY completed without creating a Task or Execution",
+            intent_spec=intent_spec.model_dump(mode="json"),
+            partial_results={"query_only": True, "side_effect": False},
+        )
+
+    def _sync_task_index(self, task: Task, spec: IntentSpec, result: RuntimeResult) -> None:
+        index = self._task_indexes.setdefault(task.conversation_id, ConversationTaskIndex())
+        index.register(task)
+        if not task.goals:
+            for action in spec.actions or []:
+                goal = TaskGoal(
+                    task_id=task.task_id,
+                    description=spec.goal,
+                    kind=str(action.action),
+                )
+                index.record_goal(task.task_id, goal)
+        if result.execution_id:
+            index.record_execution(task.task_id, TaskExecutionRef(
+                execution_id=result.execution_id,
+                task_id=task.task_id,
+                status=result.status,
+            ))
+        if result.draft_id:
+            index.record_resource(task.task_id, TaskResourceRef(
+                resource_id=result.draft_id, resource_kind="DRAFT",
+            ))
+        if result.schedule_id:
+            index.record_resource(task.task_id, TaskResourceRef(
+                resource_id=result.schedule_id, resource_kind="SCHEDULE",
+            ))
+        delta = intent_delta_from_spec(spec, spec.goal, [task.task_id])
+        for operation in delta.operations:
+            index.mark_action(task.task_id, operation)
+
+    async def _persist_task_projection(self, scope: TaskScope, task: Task) -> None:
+        persist = getattr(self._task_provider, "persist_projection", None)
+        if persist is None:
+            return
+        try:
+            maybe = persist(scope, task)
+            if inspect.isawaitable(maybe):
+                await maybe
+        except Exception:
+            # Runtime completion is canonical.  A projection write must not
+            # turn a successful execution into a business failure; the next
+            # request can rebuild the index from the Task store.
+            return
 
     async def _complete_result(
         self,
