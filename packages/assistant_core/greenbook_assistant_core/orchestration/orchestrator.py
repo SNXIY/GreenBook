@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from greenbook_assistant_core.capability.registry import CapabilityRegistry
 from greenbook_assistant_core.task.intent_models import ActionType, IntentSpec
-from greenbook_assistant_core.task.models import TaskIntent
+from greenbook_assistant_core.task.models import TaskGoal, TaskIntent
 
 from .context import PlanningContext, build_planning_context
-from .models import TaskPlan
+from .models import MultiGoalPlan, TaskPlan
 from .templates import PlanTemplate, get_template
 
 
@@ -71,6 +71,59 @@ class TaskOrchestrator:
         plan = self._validate_capabilities(plan)
 
         return plan
+
+    def generate_goal_plan(
+        self,
+        *,
+        task_id: str,
+        goals: list[dict[str, object]],
+        requirements: list[dict[str, str]] | None = None,
+        goal_category: str = "COMPOSITE",
+    ) -> MultiGoalPlan:
+        """Build semantic Goal records and bind them to one existing DAG.
+
+        A Goal is not an execution step.  The physical step catalog remains
+        unchanged; e.g. ``CREATE_DRAFT`` is represented by the GENERATE step's
+        DRAFT artifact, so no new ToolRuntime capability is introduced.
+        """
+        task_goals: list[TaskGoal] = []
+        for item in goals:
+            task_goals.append(TaskGoal(
+                task_id=task_id,
+                description=str(item.get("description", "")),
+                kind=str(item.get("kind", "")),
+                depends_on_goal_ids=[str(value) for value in item.get("depends_on_goal_ids", []) or []],
+            ))
+        inferred = requirements or [
+            {"type": kind}
+            for kind in (goal.kind.upper() for goal in task_goals)
+            if kind in {"SEARCH", "ANALYZE", "CREATE", "GENERATE", "IMPROVE", "PUBLISH", "CANCEL"}
+        ]
+        aliases = {"GENERATE": "CREATE", "DRAFT": "CREATE", "SCHEDULE": "PUBLISH"}
+        inferred = [{"type": aliases.get(str(item.get("type", "")).upper(), str(item.get("type", "")).upper())} for item in inferred]
+        plan = self.generate_plan(
+            task_id=task_id,
+            goal_category=goal_category,
+            requirements=inferred,
+        )
+        kind_to_goal: dict[str, TaskGoal] = {}
+        for goal in task_goals:
+            kind_to_goal.setdefault(goal.kind.upper(), goal)
+        capability_kind = {
+            "SEARCH_COMMUNITY": "SEARCH",
+            "ANALYZE_CONTENT_PATTERNS": "ANALYZE",
+            "GENERATE_CONTENT": "GENERATE",
+            "IMPROVE_CONTENT": "IMPROVE",
+            "SCHEDULE_PUBLISH": "PUBLISH",
+            "CANCEL_SCHEDULE": "CANCEL",
+        }
+        for step in plan.steps:
+            goal = kind_to_goal.get(capability_kind.get(step.capability, ""))
+            if goal is None and step.capability == "GENERATE_CONTENT":
+                goal = kind_to_goal.get("DRAFT") or kind_to_goal.get("CREATE")
+            if goal is not None:
+                step.goal_id = goal.goal_id
+        return MultiGoalPlan(task_id=task_id, goals=task_goals, plan=plan)
 
     @staticmethod
     def _apply_intent_constraints(

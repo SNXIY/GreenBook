@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from greenbook_assistant_core.task.models import TaskGoal
+
 
 class PlanStep(BaseModel):
     """A single step in a TaskPlan."""
@@ -27,6 +29,7 @@ class PlanStep(BaseModel):
     # ── execution hints ──
     parallelizable: bool = False
     constraints: dict[str, Any] = {}
+    goal_id: str | None = None
 
 
 class TaskPlan(BaseModel):
@@ -40,6 +43,14 @@ class TaskPlan(BaseModel):
     # ── metadata ──
     template_name: str = ""                 # which template produced this plan
     generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+class MultiGoalPlan(BaseModel):
+    """A Task's semantic goals plus the existing executable TaskPlan."""
+
+    task_id: str
+    goals: list[TaskGoal] = []
+    plan: TaskPlan
 
 
 class PlanTemplate(BaseModel):
