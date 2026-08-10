@@ -16,6 +16,12 @@ from greenbook_assistant_core.planning.models import ExecutablePlan
 from .capability_executor import CapabilityExecutor
 from .events import EventType, ExecutionEvent
 from .exceptions import ExecutionBlockedError
+from .failure_decision import (
+    FailureDecisionEngine,
+    FailurePolicyContext,
+    RecoveryAction,
+    normalize_failure_payload,
+)
 from .invocation import ExecutionResult
 from .models import ExecutionStatus, PlanExecution, StepExecution, StepStatus
 from .recovery import RecoveryPolicy
@@ -59,12 +65,16 @@ class ExecutionWorker:
         repository: ExecutionRepository | None = None,
         trace: Any = None,  # AgentTrace | None
         event_store: Any = None,
+        failure_decision_engine: FailureDecisionEngine | None = None,
     ) -> None:
         self._executor = executor
         self._repo = repository or ExecutionRepository()
         self._state = ExecutionStateManager(self._repo, event_store=event_store)
         self._runtime_guard = RuntimeGuard(RuntimeManager(self._state))
         self._recovery_policy = RecoveryPolicy()
+        self._failure_decision_engine = failure_decision_engine or FailureDecisionEngine(
+            retry_eligibility=self._recovery_policy.is_retryable_error,
+        )
         self._scheduler = StepScheduler()
         self._trace = trace
 
@@ -244,74 +254,121 @@ class ExecutionWorker:
         elif result.approval_required:
             self._state.pause_for_approval(execution_id, sid)
             return RunOutcome.WAITING_APPROVAL
-        elif self._recovery_policy.can_retry_failure(
-            step_ex, result.error_code
-        ):
-            self._state.event_store.append(
-                ExecutionEvent(
-                    execution_id=execution_id,
-                    event_type=EventType.STEP_FAILED,
-                    step_id=step_ex.step_id,
-                    payload={
-                        "step_execution_id": sid,
-                        "retryable": True,
-                        "error_code": result.error_code,
-                        "error_message": result.error_message,
+        else:
+            failure = self._failure_from_result(result)
+            decision = self._failure_decision_engine.decide(
+                failure,
+                FailurePolicyContext(
+                    attempt=step_ex.retry_count + 1,
+                    retry_budget=max(
+                        0,
+                        step_ex.max_retries - step_ex.retry_count,
+                    ),
+                    capability=step_ex.capability,
+                    tool_name=result.tool_name or None,
+                    has_side_effect=failure.side_effect_state.value in {
+                        "POSSIBLE",
+                        "UNKNOWN",
+                        "CONFIRMED",
                     },
-                )
+                    idempotent=bool(failure.idempotency_key),
+                    idempotency_key=failure.idempotency_key,
+                    supports_reconciliation=bool(failure.receipt_id),
+                ),
             )
-            failed_step = self._state.fail_step(
-                execution_id, sid,
-                error_code=result.error_code,
-                error_message=result.error_message,
-            )
-            if failed_step.status == StepStatus.FAILED:
+
+            if decision.action == RecoveryAction.REQUEST_USER_INPUT:
+                self._state.pause_execution(execution_id)
+                return RunOutcome.PAUSED
+
+            if decision.retry_allowed:
                 self._state.event_store.append(
                     ExecutionEvent(
                         execution_id=execution_id,
-                        event_type=EventType.STEP_RETRY_EXHAUSTED,
+                        event_type=EventType.STEP_FAILED,
                         step_id=step_ex.step_id,
                         payload={
                             "step_execution_id": sid,
-                            "retry_count": failed_step.retry_count,
-                            "reason": result.error_code,
+                            "retryable": True,
+                            "error_code": result.error_code,
+                            "error_message": result.error_message,
+                            "failure_category": decision.category.value,
+                            "recovery_action": decision.action.value,
+                            "recovery_reason": decision.reason,
                         },
                     )
                 )
-        else:
-            # Permanent failure — mark downstream SKIPPED
-            if self._trace is not None:
-                self._trace.step_failed(step_ex, result.error_message)
-            self._state.event_store.append(
-                ExecutionEvent(
-                    execution_id=execution_id,
-                    event_type=EventType.STEP_FAILED,
-                    step_id=step_ex.step_id,
-                    payload={
-                        "step_execution_id": sid,
-                        "retryable": False,
-                        "error_code": result.error_code,
-                        "error_message": result.error_message,
-                    },
+                failed_step = self._state.fail_step(
+                    execution_id, sid,
+                    error_code=result.error_code,
+                    error_message=result.error_message,
                 )
-            )
-            self._state.fail_step(
-                execution_id, sid,
-                error_code=result.error_code,
-                error_message=result.error_message,
-                permanent=True,
-            )
-            ex_store = self._repo.find_by_id(execution_id)
-            if ex_store is not None:
-                skipped = self._scheduler.mark_skipped_downstream(
-                    ex_store, step_ex.step_id)
-                if skipped:
-                    self._repo.save(ex_store)
-                    self._state._update_execution_status(execution_id)
+                if failed_step.status == StepStatus.FAILED:
+                    self._state.event_store.append(
+                        ExecutionEvent(
+                            execution_id=execution_id,
+                            event_type=EventType.STEP_RETRY_EXHAUSTED,
+                            step_id=step_ex.step_id,
+                            payload={
+                                "step_execution_id": sid,
+                                "retry_count": failed_step.retry_count,
+                                "reason": result.error_code,
+                            },
+                        )
+                    )
+            else:
+                # Permanent failure - mark downstream SKIPPED.
+                if self._trace is not None:
+                    self._trace.step_failed(step_ex, result.error_message)
+                self._state.event_store.append(
+                    ExecutionEvent(
+                        execution_id=execution_id,
+                        event_type=EventType.STEP_FAILED,
+                        step_id=step_ex.step_id,
+                        payload={
+                            "step_execution_id": sid,
+                            "retryable": False,
+                            "error_code": result.error_code,
+                            "error_message": result.error_message,
+                            "failure_category": decision.category.value,
+                            "recovery_action": decision.action.value,
+                            "recovery_reason": decision.reason,
+                        },
+                    )
+                )
+                self._state.fail_step(
+                    execution_id, sid,
+                    error_code=result.error_code,
+                    error_message=result.error_message,
+                    permanent=True,
+                )
+                ex_store = self._repo.find_by_id(execution_id)
+                if ex_store is not None:
+                    skipped = self._scheduler.mark_skipped_downstream(
+                        ex_store, step_ex.step_id)
+                    if skipped:
+                        self._repo.save(ex_store)
+                        self._state._update_execution_status(execution_id)
 
         return RunOutcome.COMPLETED  # step-level done
 
     # ── resume after approval ────────────────────────────────────
+
+    @staticmethod
+    def _failure_from_result(result: ExecutionResult):
+        """Recover a failure fact for legacy callers without the envelope."""
+
+        if result.external_failure is not None:
+            return result.external_failure
+
+        _, failure = normalize_failure_payload(
+            result.tool_result,
+            error_code=result.error_code,
+            error_message=result.error_message,
+            retryable=result.retryable,
+            request_sent=result.request_sent,
+        )
+        return failure
 
     async def resume_after_approval(self, execution_id: str) -> RunOutcome:
         """Resume a WAITING_APPROVAL execution after user approves."""

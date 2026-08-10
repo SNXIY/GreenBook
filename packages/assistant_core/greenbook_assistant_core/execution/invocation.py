@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from greenbook_contracts import ExternalAgentFailure
 from pydantic import BaseModel
 
 from greenbook_assistant_core.execution.models import ArtifactHandle
@@ -38,9 +39,12 @@ class ExecutionResult(BaseModel):
 
     # ── control flow ──
     approval_required: bool = False
-    request_sent: bool = False           # did the request reach the downstream?
+    request_sent: bool | None = False    # did the request reach the downstream?
     pending: bool = False                # long-running tool acknowledged work
     async_task_id: str = ""
+    # Transient, lossless failure fact for the Worker decision boundary. It
+    # is deliberately not part of Execution/StepExecution persistence.
+    external_failure: ExternalAgentFailure | None = None
 
     @classmethod
     def success(
@@ -96,7 +100,9 @@ class ExecutionResult(BaseModel):
         error_code: str,
         error_message: str,
         retryable: bool = False,
-        request_sent: bool = False,
+        request_sent: bool | None = False,
+        tool_result: dict[str, Any] | None = None,
+        external_failure: ExternalAgentFailure | None = None,
     ) -> ExecutionResult:
         return cls(
             capability=capability,
@@ -105,6 +111,8 @@ class ExecutionResult(BaseModel):
             error_message=error_message,
             retryable=retryable,
             request_sent=request_sent,
+            tool_result=tool_result or {},
+            external_failure=external_failure,
         )
 
     @classmethod

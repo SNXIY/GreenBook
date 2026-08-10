@@ -16,6 +16,7 @@ from greenbook_assistant_core.orchestration.context import PlanningContext
 from greenbook_assistant_core.orchestration.models import PlanStep
 from greenbook_assistant_core.task.intent_models import IntentSpec
 
+from .failure_decision import normalize_failure_payload
 from .invocation import ExecutionResult
 from .models import ArtifactHandle
 from .runtime.invocation_context import ToolInvocationContext
@@ -74,7 +75,14 @@ class CapabilityExecutor:
         # 1. Look up capability
         cap = self._registry.get(step.capability)
         if cap is None:
-            return ExecutionResult.unknown_capability(step.capability)
+            return self._failure_result(
+                capability=step.capability,
+                tool_name="",
+                error_code="UNKNOWN_CAPABILITY",
+                error_message=f"Capability '{step.capability}' is not registered",
+                retryable=False,
+                request_sent=False,
+            )
 
         # 2. LLM-only step — no tool call needed
         if cap.is_llm_step:
@@ -90,7 +98,14 @@ class CapabilityExecutor:
 
         # 3. Pick tool
         if not cap.tools:
-            return ExecutionResult.missing_tool(cap.name)
+            return self._failure_result(
+                capability=cap.name,
+                tool_name="",
+                error_code="MISSING_TOOL",
+                error_message=f"Capability '{cap.name}' has no tool mapping",
+                retryable=False,
+                request_sent=False,
+            )
 
         tool_name = cap.tools[0]
 
@@ -113,22 +128,24 @@ class CapabilityExecutor:
             elif self._tool_handler is not None:
                 result = await self._tool_handler(tool_name, tool_args)
             else:
-                return ExecutionResult.from_tool_error(
+                return self._failure_result(
                     capability=cap.name,
                     tool_name=tool_name,
                     error_code="NO_HANDLER",
                     error_message="No tool_handler or invoke_fn configured",
                     retryable=False,
+                    request_sent=False,
                 )
         except Exception:
             logger.exception("Tool handler raised for capability=%s tool=%s",
                              cap.name, tool_name)
-            return ExecutionResult.from_tool_error(
+            return self._failure_result(
                 capability=cap.name,
                 tool_name=tool_name,
                 error_code="TOOL_EXECUTION_FAILED",
                 error_message="Tool handler raised an exception",
                 retryable=False,
+                request_sent=None,
             )
 
         # 6. Interpret result
@@ -159,16 +176,46 @@ class CapabilityExecutor:
                 artifact=artifact,
             )
 
-        return ExecutionResult.from_tool_error(
+        return self._failure_result(
             capability=cap.name,
             tool_name=tool_name,
+            payload=result,
             error_code=code or "TOOL_EXECUTION_FAILED",
             error_message=str(result.get("user_message") or result.get("message", "")),
             retryable=bool(result.get("retryable", False)),
-            request_sent=bool(result.get("request_sent", False)),
+            request_sent=result.get("request_sent", False),
         )
 
     # ── helpers ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _failure_result(
+        *,
+        capability: str,
+        tool_name: str,
+        error_code: str,
+        error_message: str,
+        retryable: bool,
+        request_sent: bool | None,
+        payload: dict[str, Any] | None = None,
+    ) -> ExecutionResult:
+        tool_result, failure = normalize_failure_payload(
+            payload,
+            error_code=error_code,
+            error_message=error_message,
+            retryable=retryable,
+            request_sent=request_sent,
+        )
+        return ExecutionResult.from_tool_error(
+            capability=capability,
+            tool_name=tool_name,
+            error_code=error_code,
+            error_message=error_message,
+            retryable=failure.retryable,
+            request_sent=failure.request_sent,
+            tool_result=tool_result,
+            external_failure=failure,
+        )
 
     @staticmethod
     def _build_tool_args(step: PlanStep) -> dict[str, Any]:
