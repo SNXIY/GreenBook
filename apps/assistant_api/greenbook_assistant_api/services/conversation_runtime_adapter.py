@@ -37,6 +37,8 @@ from greenbook_assistant_core.task.graph import (
     ConversationTaskGraph,
     TaskGraphBuilder,
 )
+from greenbook_assistant_core.artifact.models import Artifact
+from greenbook_assistant_core.artifact.registry import ArtifactRegistry
 from greenbook_assistant_core.task.models import (
     ArtifactRef,
     TaskExecutionRef,
@@ -74,6 +76,7 @@ class ConversationRuntimeAdapter:
         execution_repository: Any | None = None,
         graph_builder: TaskGraphBuilder | None = None,
         query_handler: QueryHandler | None = None,
+        artifact_registry: ArtifactRegistry | None = None,
     ) -> None:
         self._intent_provider = intent_provider or IntentSpecProvider()
         self._task_provider = task_provider or TaskProvider()
@@ -88,6 +91,7 @@ class ConversationRuntimeAdapter:
             legacy_splitter=split_task_segments,
         )
         self._query_handler = query_handler or ReadOnlyQueryHandler()
+        self._artifact_registry = artifact_registry or ArtifactRegistry()
 
     async def execute(
         self,
@@ -228,6 +232,7 @@ class ConversationRuntimeAdapter:
                     mcp=mcp,
                     auth=auth,
                     session=request_session,
+                    agent_name="SearchAgent",
                 )
             if relation in {"NEW_TASK", "DIRECT", "QUERY_TASK"}:
                 task = await self._task_provider.create_task(scope, intent_spec)
@@ -297,6 +302,7 @@ class ConversationRuntimeAdapter:
                 task_id=task.task_id,
             )
             self._sync_task_index(task, intent_spec, completed)
+            self._register_runtime_artifacts(task, completed)
             await self._persist_task_projection(scope, task)
             return completed
         except (
@@ -496,6 +502,7 @@ class ConversationRuntimeAdapter:
         """Execute semantic goals in dependency order via existing Runtime."""
         results: dict[str, RuntimeResult] = {}
         dependency_artifacts: dict[str, list[ArtifactRef]] = {}
+        input_artifacts: dict[str, list[ArtifactRef]] = {}
         ordered_nodes = graph.topological_order()
         for node in ordered_nodes:
             refs = [
@@ -503,6 +510,7 @@ class ConversationRuntimeAdapter:
                 for dependency in node.depends_on
                 for ref in dependency_artifacts.get(dependency, [])
             ]
+            input_artifacts[node.node_id] = list(refs)
             if node.read_only:
                 result = await self._run_query(
                     intent_spec=node.intent,
@@ -513,6 +521,7 @@ class ConversationRuntimeAdapter:
                     mcp=mcp,
                     auth=auth,
                     session=session,
+                    agent_name=node.agent_name,
                 )
             else:
                 result = await self.execute(
@@ -540,6 +549,15 @@ class ConversationRuntimeAdapter:
                 result,
                 source_task_id=result.task_id or f"query:{node.node_id}",
             )
+            if result.task_id:
+                for ref in refs:
+                    try:
+                        self._artifact_registry.mark_consumed(
+                            ref.artifact_id,
+                            consumer_task_id=result.task_id,
+                        )
+                    except Exception:
+                        pass
 
         failed = [result for result in results.values() if not result.success]
         execution_ids = [result.execution_id for result in results.values() if result.execution_id]
@@ -563,7 +581,19 @@ class ConversationRuntimeAdapter:
                         "task_id": results[node.node_id].task_id,
                         "execution_id": results[node.node_id].execution_id,
                         "read_only": node.read_only,
+                        "agent_name": node.agent_name,
                         "depends_on": list(node.depends_on),
+                        "input_artifacts": [
+                            ref.model_dump(mode="json") for ref in input_artifacts[node.node_id]
+                        ],
+                        "output_artifacts": [
+                            ref.model_dump(mode="json")
+                            for ref in self._result_artifacts(
+                                results[node.node_id],
+                                source_task_id=results[node.node_id].task_id
+                                or f"query:{node.node_id}",
+                            )
+                        ],
                         "status": results[node.node_id].status,
                     }
                     for node in ordered_nodes
@@ -584,6 +614,7 @@ class ConversationRuntimeAdapter:
         mcp: Any,
         auth: Any,
         session: Any,
+        agent_name: str = "SearchAgent",
     ) -> RuntimeResult:
         try:
             query = await self._query_handler.handle(QueryRequest(
@@ -596,6 +627,17 @@ class ConversationRuntimeAdapter:
                 auth=auth,
                 session=session,
             ))
+            for ref in query.artifacts:
+                artifact = self._artifact_registry.register(Artifact(
+                    artifact_id=ref.artifact_id,
+                    artifact_type=ref.artifact_type,
+                    task_id=ref.task_id,
+                    owner_task_id=ref.task_id,
+                    created_by_agent=agent_name,
+                    summary=ref.summary or "",
+                    metadata_schema="greenbook.query_result.v1",
+                ))
+                self._artifact_registry.mark_available(artifact.artifact_id)
             partial_results: dict[str, Any] = {
                 "query_only": True,
                 "side_effect": False,
@@ -642,6 +684,22 @@ class ConversationRuntimeAdapter:
             except Exception:
                 continue
         return refs
+
+    def _register_runtime_artifacts(self, task: Task, result: RuntimeResult) -> None:
+        for raw in result.artifacts:
+            try:
+                artifact = Artifact.model_validate({
+                    **raw,
+                    "task_id": task.task_id,
+                    "execution_id": result.execution_id or "",
+                    "owner_task_id": task.task_id,
+                    "owner_execution_id": result.execution_id or "",
+                    "created_by_agent": "RuntimeAgent",
+                })
+                self._artifact_registry.register(artifact)
+                self._artifact_registry.mark_available(artifact.artifact_id)
+            except Exception:
+                continue
 
     @staticmethod
     def _query_result(

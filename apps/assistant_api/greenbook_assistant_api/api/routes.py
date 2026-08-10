@@ -713,6 +713,8 @@ def _runtime_run_record(
         "execution_id": result.execution_id,
         "execution_ids": list((result.partial_results or {}).get("execution_ids", [])),
         "task_ids": list((result.partial_results or {}).get("task_ids", [])),
+        "partial_results": result.partial_results or {},
+        "agent_timeline": list((result.partial_results or {}).get("nodes", [])),
         "plan_id": result.plan_id,
         "task_id": result.task_id,
         "steps": list(result.steps),

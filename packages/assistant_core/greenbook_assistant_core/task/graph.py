@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from .intent_models import ActionType, IntentSpec
+from ..orchestration.agent_registry import AgentRegistry, AgentResolutionError
 
 
 class ConversationGoalNode(BaseModel):
@@ -27,6 +28,7 @@ class ConversationGoalNode(BaseModel):
     create_task: bool = True
     artifact_inputs: list[str] = []
     artifact_outputs: list[str] = []
+    agent_name: str = ""
 
 
 class ConversationTaskGraph(BaseModel):
@@ -80,9 +82,16 @@ class TaskGraphBuilder:
     fallback and is never used by the semantic graph analyzer itself.
     """
 
-    def __init__(self, intent_provider: Any, *, legacy_splitter: Any = None) -> None:
+    def __init__(
+        self,
+        intent_provider: Any,
+        *,
+        legacy_splitter: Any = None,
+        agent_registry: AgentRegistry | None = None,
+    ) -> None:
         self._provider = intent_provider
         self._legacy_splitter = legacy_splitter
+        self._agent_registry = agent_registry or AgentRegistry()
 
     async def build(
         self,
@@ -119,6 +128,7 @@ class TaskGraphBuilder:
                 for value in proposal.depends_on
             ]
             read_only = _is_read_only(proposal.intent)
+            agent_name = self._resolve_agent_name(proposal.intent)
             nodes.append(ConversationGoalNode(
                 node_id=node_id,
                 text=proposal.text,
@@ -129,6 +139,7 @@ class TaskGraphBuilder:
                 create_task=not read_only,
                 artifact_inputs=list(proposal.artifact_inputs),
                 artifact_outputs=list(proposal.artifact_outputs),
+                agent_name=agent_name,
             ))
 
         graph = ConversationTaskGraph(
@@ -137,6 +148,23 @@ class TaskGraphBuilder:
         )
         graph.validate_graph()
         return graph
+
+    def _resolve_agent_name(self, intent: IntentSpec) -> str:
+        if not intent.actions:
+            return ""
+        action = intent.actions[0].action
+        requested = action.value
+        if action == ActionType.UPDATE:
+            requested = "PUBLISH" if any(
+                item.resource and str(item.resource) == "SCHEDULE"
+                for item in intent.actions
+            ) else "IMPROVE_CONTENT"
+        elif action == ActionType.DELETE:
+            requested = "PUBLISH"
+        try:
+            return self._agent_registry.resolve_agent(requested).name
+        except AgentResolutionError:
+            return ""
 
     @staticmethod
     def _dependency_id(value: int | str, current_index: int) -> str:
