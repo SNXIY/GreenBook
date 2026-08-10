@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from greenbook_assistant_core.agent import CommunityOperationsAssistant
 from greenbook_assistant_core.context import PendingApproval, SessionContext
+from greenbook_assistant_core.compatibility.history import RunExecutionAdapter
 from greenbook_assistant_core.time_parser import (
     format_local_schedule_time,
     parse_natural_schedule_time,
@@ -24,6 +25,9 @@ from greenbook_mcp_server.tool_schemas import (
 )
 from greenbook_security.policy import requires_approval
 from pydantic import BaseModel, Field
+
+from ..models.runtime_result import RuntimeResult
+from ..services.conversation_runtime_adapter import ConversationRuntimeAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,7 @@ class MessageCreateRequest(BaseModel):
 class RunResponse(BaseModel):
     run_id: str
     conversation_id: str
+    execution_id: str | None = None
     goal: str = ""
     status: str
     execution_path: str = "ORCHESTRATED"
@@ -591,7 +596,216 @@ class RunAcceptedResponse(BaseModel):
     conversation_id: str
     status: str
     events_url: str
+    execution_id: str | None = None
+    execution_events_url: str | None = None
+    error_code: str | None = None
+    error: str | None = None
     replayed: bool = False
+
+
+def _runtime_enabled(request: Request) -> bool:
+    """Read the reversible message-entry feature flag."""
+    configured = getattr(request.app.state, "runtime_enabled", False)
+    if isinstance(configured, str):
+        return configured.strip().lower() in {
+            "1", "true", "yes", "on", "runtime",
+        }
+    if configured:
+        return True
+    mode = str(getattr(request.app.state, "execution_mode", "legacy")).lower()
+    return mode in {"1", "true", "yes", "on", "runtime"}
+
+
+def _conversation_runtime_adapter(request: Request) -> ConversationRuntimeAdapter:
+    """Return the lifespan-wired adapter, with a test-safe lazy fallback."""
+    adapter = getattr(request.app.state, "conversation_runtime_adapter", None)
+    if adapter is None:
+        adapter = ConversationRuntimeAdapter(
+            runtime_service=getattr(request.app.state, "runtime_agent_service", None),
+            execution_repository=getattr(
+                request.app.state, "execution_repository", None,
+            ),
+        )
+        request.app.state.conversation_runtime_adapter = adapter
+    return adapter
+
+
+def _runtime_events(result: RuntimeResult, run_id: str) -> list[dict[str, Any]]:
+    """Project Runtime events into the legacy run-event envelope."""
+    projected: list[dict[str, Any]] = []
+    for raw in result.events:
+        if isinstance(raw, dict):
+            event_type = raw.get("event") or raw.get("event_type") or "RUNTIME_EVENT"
+            payload = raw.get("data")
+            if not isinstance(payload, dict):
+                payload = raw.get("payload")
+            if not isinstance(payload, dict):
+                payload = {}
+        else:
+            event_type = getattr(raw, "event_type", "RUNTIME_EVENT")
+            event_type = getattr(event_type, "value", event_type)
+            payload = getattr(raw, "payload", {})
+            if not isinstance(payload, dict):
+                payload = {}
+        projected.append({
+            "event": str(event_type),
+            "data": {"run_id": run_id, **payload},
+        })
+
+    if projected:
+        return projected
+
+    terminal_event = (
+        "RUN_COMPLETED" if result.status == "COMPLETED"
+        else "RUN_FAILED" if result.status == "FAILED"
+        else "RUN_STARTED"
+    )
+    data: dict[str, Any] = {"run_id": run_id, "status": result.status}
+    if result.error_code:
+        data["code"] = result.error_code
+    if result.error_message:
+        data["message"] = result.error_message
+    return [{"event": terminal_event, "data": data}]
+
+
+def _runtime_run_record(
+    result: RuntimeResult,
+    *,
+    run_id: str,
+    conversation_id: str,
+    user_id: str,
+    tenant_id: str,
+    trace_id: str,
+) -> dict[str, Any]:
+    """Create a compatibility projection; Runtime remains canonical state."""
+    return {
+        "run_id": run_id,
+        "conversation_id": conversation_id,
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "status": result.status,
+        "content": result.content,
+        "error_code": result.error_code or None,
+        "error": result.error_message or result.error or None,
+        "trace_id": trace_id,
+        "tool_rounds": result.tool_rounds,
+        "events": _runtime_events(result, run_id),
+        "execution_id": result.execution_id,
+        "plan_id": result.plan_id,
+        "task_id": result.task_id,
+        "steps": list(result.steps),
+        "artifacts": list(result.artifacts),
+        "intent_spec": result.intent_spec,
+    }
+
+
+async def _send_runtime_message(
+    conversation_id: str,
+    body: MessageCreateRequest,
+    request: Request,
+    auth: AuthContext,
+    session: SessionContext,
+) -> RunAcceptedResponse:
+    """Run the message through Runtime while preserving the old response IDs."""
+    if body.timezone:
+        session.timezone = body.timezone
+
+    run_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    msg_store = request.app.state.message_store
+    conversation_history = [
+        {"role": item["role"], "content": item["content"]}
+        for item in msg_store.get(conversation_id, [])
+        if item.get("role") in {"user", "assistant"}
+    ]
+    msg_store.setdefault(conversation_id, []).append({
+        "role": "user",
+        "content": body.content,
+        "created_at": _now_iso(),
+    })
+
+    adapter = _conversation_runtime_adapter(request)
+    try:
+        result = await adapter.execute(
+            conversation_id=conversation_id,
+            user_id=auth.user_id,
+            tenant_id=auth.tenant_id,
+            message=body.content,
+            history=conversation_history,
+            session=session,
+            timezone=session.timezone,
+            run_id=run_id,
+            trace_id=trace_id,
+            mcp=getattr(request.app.state, "mcp", None),
+            llm=getattr(request.app.state, "llm", None),
+            model=getattr(request.app.state, "model", ""),
+            auth=auth,
+        )
+    except Exception as exc:
+        logger.exception("Runtime message adapter failed run_id=%s", run_id)
+        result = RuntimeResult(
+            success=False,
+            status="FAILED",
+            run_id=run_id,
+            execution_path="runtime",
+            error_code="RUNTIME_ADAPTER_FAILED",
+            error_message=str(exc) or "Runtime adapter failed",
+            trace_id=trace_id,
+        )
+
+    if not result.status:
+        result.status = "COMPLETED" if result.success else "FAILED"
+    if not result.run_id:
+        result.run_id = run_id
+    if not result.trace_id:
+        result.trace_id = trace_id
+
+    if result.execution_id:
+        link_adapter = getattr(request.app.state, "run_execution_adapter", None)
+        if link_adapter is None:
+            link_adapter = RunExecutionAdapter()
+            request.app.state.run_execution_adapter = link_adapter
+        link_adapter.bind_run_execution(
+            run_id,
+            result.execution_id,
+            conversation_id=conversation_id,
+            task_id=result.task_id,
+        )
+
+    _save_session(request, session)
+    if result.content:
+        msg_store.setdefault(conversation_id, []).append({
+            "role": "assistant",
+            "content": result.content,
+            "trace_id": trace_id,
+            "created_at": _now_iso(),
+        })
+    if result.status == "COMPLETED":
+        session.last_successful_run_id = run_id
+        _save_session(request, session)
+
+    request.app.state.run_store[run_id] = _runtime_run_record(
+        result,
+        run_id=run_id,
+        conversation_id=conversation_id,
+        user_id=auth.user_id,
+        tenant_id=auth.tenant_id,
+        trace_id=trace_id,
+    )
+
+    return RunAcceptedResponse(
+        run_id=run_id,
+        conversation_id=conversation_id,
+        status=result.status,
+        events_url=f"/api/v1/assistant/runs/{run_id}/events",
+        execution_id=result.execution_id,
+        execution_events_url=(
+            f"/api/v1/executions/{result.execution_id}/events"
+            if result.execution_id else None
+        ),
+        error_code=result.error_code or None,
+        error=result.error_message or result.error or None,
+    )
 
 
 @router.post(
@@ -606,6 +820,14 @@ async def send_message(
 ):
     auth = _get_auth(request)
     session = _get_session(request, conversation_id)
+    if _runtime_enabled(request):
+        return await _send_runtime_message(
+            conversation_id,
+            body,
+            request,
+            auth,
+            session,
+        )
     # Enforce timezone from the request on this turn
     if body.timezone:
         session.timezone = body.timezone
@@ -1011,8 +1233,10 @@ async def get_memory_settings(request: Request) -> MemorySettings:
 async def get_run(run_id: str, request: Request) -> RunResponse:
     record = _auth_store_get("run_store", request, run_id)
     events = record.get("events", [])
-    steps: list[dict[str, object]] = []
+    steps: list[dict[str, object]] = list(record.get("steps", []))
     for i, evt in enumerate(events):
+        if steps:
+            break
         if evt.get("event") in ("TOOL_CALL_STARTED", "TOOL_CALL_COMPLETED", "TOOL_CALL_FAILED"):
             data = evt.get("data", {})
             event_name = evt.get("event")
@@ -1046,6 +1270,7 @@ async def get_run(run_id: str, request: Request) -> RunResponse:
     return RunResponse(
         run_id=record["run_id"],
         conversation_id=record["conversation_id"],
+        execution_id=record.get("execution_id"),
         goal=content[:120] if content else "",
         status=record["status"],
         summary=content[:200] if content else None,
@@ -1087,6 +1312,7 @@ async def list_runs(request: Request, limit: int = 30) -> list[RunResponse]:
     return [
         RunResponse(
             run_id=r["run_id"], conversation_id=r["conversation_id"],
+            execution_id=r.get("execution_id"),
             goal="", status=r["status"],
             summary=(r.get("content") or "")[:200],
             final_response=r.get("content"),

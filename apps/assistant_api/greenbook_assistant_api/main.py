@@ -22,10 +22,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from greenbook_creator_client.client import CreatorClient
 from greenbook_java_client.client import JavaClient
 from greenbook_mcp_server.server import GreenBookMCPServer
+from greenbook_assistant_core.compatibility.history import RunExecutionAdapter
 from greenbook_assistant_core.execution.event_store import ExecutionEventStore
 from greenbook_assistant_core.execution.repository import ExecutionRepository
 from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
+from greenbook_assistant_core.task.intent_spec_provider import IntentSpecProvider
 from greenbook_security.auth_context import AuthContextResolver, _extract_bearer
 from greenbook_security.jwt import JwtValidationError, validate_access_token
 from openai import AsyncOpenAI
@@ -33,7 +35,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .api.routes import router
 from .api.runtime_routes import router as runtime_router
+from .services.conversation_runtime_adapter import ConversationRuntimeAdapter
 from .services.runtime_agent_service import RuntimeAgentService
+from .services.task_provider import TaskProvider
 
 _ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 if _ENV_FILE.exists():
@@ -142,6 +146,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     deepseek_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
     deepseek_base = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
     llm_model = os.getenv("LLM_MODEL", "deepseek-v4-flash")
+    execution_mode = _env_first(
+        "ASSISTANT_EXECUTION_MODE",
+        default="runtime",
+    ).strip().lower()
+    runtime_flag = os.getenv("ASSISTANT_RUNTIME_ENABLED")
+    if runtime_flag is not None:
+        runtime_enabled = runtime_flag.strip().lower() in {
+            "1", "true", "yes", "on", "runtime",
+        }
+        execution_mode = "runtime" if runtime_enabled else "legacy"
+    else:
+        runtime_enabled = execution_mode in {
+            "1", "true", "yes", "on", "runtime",
+        }
 
     if not deepseek_key:
         raise RuntimeError(
@@ -177,12 +195,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         repository=execution_repository,
         event_store=execution_event_store,
     )
+    conversation_runtime_adapter = ConversationRuntimeAdapter(
+        intent_provider=IntentSpecProvider(
+            llm=app.state.llm,
+            model=llm_model,
+        ),
+        task_provider=TaskProvider(),
+        runtime_service=runtime_agent_service,
+        execution_repository=execution_repository,
+    )
 
     app.state.execution_repository = execution_repository
     app.state.execution_event_store = execution_event_store
     app.state.execution_state_manager = execution_state_manager
     app.state.execution_runtime_manager = execution_runtime_manager
     app.state.runtime_agent_service = runtime_agent_service
+    app.state.conversation_runtime_adapter = conversation_runtime_adapter
+    app.state.run_execution_adapter = RunExecutionAdapter()
+    app.state.execution_mode = execution_mode
+    app.state.runtime_enabled = runtime_enabled
 
     logger.info(
         "Assistant API ready java=%s creator=%s issuer=%s audience=%s model=%s",
