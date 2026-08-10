@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+from datetime import UTC, datetime
+from pathlib import Path
 
 from greenbook_assistant_core.execution.execution_queue_worker import (
     ExecutionHandler,
@@ -18,6 +21,58 @@ from greenbook_assistant_core.observability.metrics import MemoryMetricsCollecto
 from greenbook_java_client import JavaClient
 
 logger = logging.getLogger(__name__)
+
+
+def _worker_health_path() -> Path | None:
+    value = os.getenv("ASSISTANT_WORKER_HEALTH_FILE", "").strip()
+    return Path(value) if value else None
+
+
+def _write_worker_health(
+    path: Path | None,
+    *,
+    status: str,
+    storage: str = "",
+    queue_consumer: bool = False,
+    worker_id: str = "",
+    error: str = "",
+) -> None:
+    if path is None:
+        return
+    payload = {
+        "status": status,
+        "updated_at": datetime.now(UTC).isoformat(),
+        "pid": os.getpid(),
+        "storage": storage,
+        "queue_consumer": queue_consumer,
+        "worker_id": worker_id,
+    }
+    if error:
+        payload["error"] = error[:500]
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        logger.warning("Unable to write worker health file path=%s", path, exc_info=True)
+
+
+async def _worker_health_heartbeat(
+    path: Path,
+    *,
+    storage: str,
+    queue_consumer: bool,
+    worker_id: str,
+    interval_seconds: float,
+) -> None:
+    while True:
+        _write_worker_health(
+            path,
+            status="READY",
+            storage=storage,
+            queue_consumer=queue_consumer,
+            worker_id=worker_id,
+        )
+        await asyncio.sleep(interval_seconds)
 
 
 async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
@@ -43,7 +98,6 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
     execution_queue_worker = None
     creator = None
     llm = None
-
     poll_interval = float(
         os.getenv("ASSISTANT_RETRY_POLL_INTERVAL_SECONDS", "1")
     )
@@ -53,6 +107,9 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
         "ASSISTANT_RETRY_WORKER_ID",
         "assistant-retry-worker",
     )
+    health_path = _worker_health_path()
+    health_task = None
+    _write_worker_health(health_path, status="STARTING", worker_id=worker_id)
 
     try:
         persistence = RuntimePersistenceFactory.from_env()
@@ -158,6 +215,21 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
             persistence.storage,
             worker_id,
         )
+        if health_path is not None:
+            heartbeat_interval = max(
+                1.0,
+                float(os.getenv("ASSISTANT_WORKER_HEALTH_INTERVAL_SECONDS", "15")),
+            )
+            health_task = asyncio.create_task(
+                _worker_health_heartbeat(
+                    health_path,
+                    storage=persistence.storage,
+                    queue_consumer=execution_queue_worker is not None,
+                    worker_id=worker_id,
+                    interval_seconds=heartbeat_interval,
+                ),
+                name="assistant-worker-health-heartbeat",
+            )
         if execution_queue_worker is None:
             await retry_worker.run()
         else:
@@ -178,6 +250,9 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
     except asyncio.CancelledError:
         logger.info("Worker shutting down")
     finally:
+        if health_task is not None:
+            health_task.cancel()
+            await asyncio.gather(health_task, return_exceptions=True)
         if retry_worker is not None:
             await retry_worker.shutdown()
         if execution_queue_worker is not None:
@@ -189,6 +264,13 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
         if llm is not None:
             await llm.close()
         await java.close()
+        _write_worker_health(
+            health_path,
+            status="STOPPED",
+            storage=persistence.storage if persistence is not None else "",
+            queue_consumer=execution_queue_worker is not None,
+            worker_id=worker_id,
+        )
 
 
 if __name__ == "__main__":

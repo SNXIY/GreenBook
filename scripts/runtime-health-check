@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Check Runtime production configuration and local service readiness.
+
+The default mode probes configured endpoints and the PostgreSQL TCP address.
+``--config-only`` validates wiring without requiring any external service to
+be online, which is suitable for CI and deployment configuration checks.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import socket
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Check:
+    name: str
+    ready: bool
+    detail: str
+
+
+def _load_dotenv(path: Path) -> None:
+    if not path.exists():
+        return
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        for name, replacement in {**os.environ, **values}.items():
+            value = value.replace("${" + name + "}", replacement)
+        values[key] = value
+        os.environ.setdefault(key, value)
+
+
+def _env_first(*names: str, default: str) -> str:
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return default
+
+
+def _check_postgres(database_url: str, *, config_only: bool, timeout: float) -> Check:
+    if not database_url:
+        return Check("PostgreSQL", False, "database URL is not configured")
+    parsed = urllib.parse.urlparse(database_url)
+    if parsed.scheme not in {"postgres", "postgresql", "postgresql+asyncpg", "postgresql+psycopg"}:
+        return Check("PostgreSQL", False, f"unsupported database scheme: {parsed.scheme}")
+    host = parsed.hostname
+    port = parsed.port or 5432
+    if not host:
+        return Check("PostgreSQL", False, "database URL has no host")
+    if config_only:
+        return Check("PostgreSQL", True, f"configured {host}:{port}")
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return Check("PostgreSQL", True, f"reachable {host}:{port}")
+    except OSError as exc:
+        return Check("PostgreSQL", False, f"unreachable {host}:{port} ({type(exc).__name__})")
+
+
+def _probe_http(name: str, base_url: str, paths: tuple[str, ...], *, config_only: bool, timeout: float) -> Check:
+    if not base_url:
+        return Check(name, False, "base URL is not configured")
+    parsed = urllib.parse.urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return Check(name, False, f"invalid base URL: {base_url}")
+    if config_only:
+        return Check(name, True, f"configured {base_url}")
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    errors: list[str] = []
+    for path in paths:
+        try:
+            with opener.open(base_url.rstrip("/") + path, timeout=timeout) as response:
+                if 200 <= response.status < 300:
+                    return Check(name, True, f"reachable {path}")
+                errors.append(f"{path}: HTTP {response.status}")
+        except urllib.error.HTTPError as exc:
+            errors.append(f"{path}: HTTP {exc.code}")
+        except (OSError, urllib.error.URLError) as exc:
+            errors.append(f"{path}: {type(exc).__name__}")
+    return Check(name, False, "; ".join(errors))
+
+
+def _check_worker(*, config_only: bool, timeout: float) -> Check:
+    health_file_value = os.getenv("ASSISTANT_WORKER_HEALTH_FILE", "").strip()
+    if not health_file_value:
+        return Check("Assistant Worker", False, "ASSISTANT_WORKER_HEALTH_FILE is not configured")
+    path = Path(health_file_value)
+    if config_only:
+        return Check("Assistant Worker", True, f"heartbeat configured at {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        updated = datetime.fromisoformat(str(payload["updated_at"])).astimezone(UTC)
+        max_age = float(os.getenv("ASSISTANT_WORKER_HEALTH_MAX_AGE_SECONDS", "90"))
+        age = (datetime.now(UTC) - updated).total_seconds()
+        if payload.get("status") == "READY" and age <= max_age:
+            return Check("Assistant Worker", True, f"heartbeat age={age:.1f}s")
+        return Check("Assistant Worker", False, f"status={payload.get('status')} age={age:.1f}s")
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        return Check("Assistant Worker", False, f"heartbeat unavailable ({type(exc).__name__})")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config-only", action="store_true", help="skip network and heartbeat probes")
+    parser.add_argument("--timeout", type=float, default=2.0, help="probe timeout in seconds")
+    parser.add_argument("--env-file", type=Path, default=Path(__file__).resolve().parents[1] / ".env")
+    args = parser.parse_args()
+    if args.timeout <= 0:
+        parser.error("--timeout must be positive")
+
+    _load_dotenv(args.env_file)
+    database_url = _env_first(
+        "ASSISTANT_RUNTIME_DATABASE_URL",
+        "ASSISTANT_DATABASE_URL",
+        "ASSISTANT_DB_URL",
+        "GREENBOOK_DB_URL",
+        default="",
+    )
+    storage = os.getenv("ASSISTANT_RUNTIME_STORAGE", "").strip().lower()
+    if not storage and database_url:
+        # Match RuntimePersistenceFactory: an explicit database URL selects
+        # the durable profile even when the storage flag is omitted.
+        storage = "postgres"
+    checks = [
+        _check_postgres(database_url, config_only=args.config_only, timeout=args.timeout)
+        if storage == "postgres"
+        else Check("PostgreSQL", False, f"runtime storage is {storage or 'not configured'}"),
+        _probe_http(
+            "Assistant API",
+            _env_first("ASSISTANT_API_BASE_URL", default="http://127.0.0.1:8094"),
+            ("/health",),
+            config_only=args.config_only,
+            timeout=args.timeout,
+        ),
+        _check_worker(config_only=args.config_only, timeout=args.timeout),
+        _probe_http(
+            "Creator",
+            _env_first("ASSISTANT_CREATOR_BASE_URL", "GREENBOOK_CREATOR_BASE_URL", default="http://127.0.0.1:8092"),
+            ("/actuator/health/ready", "/actuator/health"),
+            config_only=args.config_only,
+            timeout=args.timeout,
+        ),
+        _probe_http(
+            "Java Backend",
+            _env_first("ASSISTANT_JAVA_BASE_URL", "GREENBOOK_JAVA_BASE_URL", default="http://127.0.0.1:8080"),
+            ("/actuator/health",),
+            config_only=args.config_only,
+            timeout=args.timeout,
+        ),
+    ]
+    for check in checks:
+        print(f"{check.name}: {'READY' if check.ready else 'NOT_READY'} - {check.detail}")
+    overall = all(check.ready for check in checks)
+    print(f"Overall: {'READY' if overall else 'NOT_READY'}")
+    return 0 if overall else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
