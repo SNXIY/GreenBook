@@ -85,6 +85,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
             poll_interval_seconds=poll_interval,
             batch_size=batch_size,
             worker_id=worker_id,
+            execution_queue=persistence.execution_queue,
         )
         if execution_handler is not None:
             execution_queue_worker = ExecutionQueueWorker(
@@ -135,6 +136,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     llm=llm,
                     model=os.getenv("LLM_MODEL", "deepseek-v4-flash"),
                     metrics_collector=metrics_collector,
+                    retry_scheduler=scheduler,
                 )
                 execution_queue_worker = ExecutionQueueWorker(
                     queue=persistence.execution_queue,

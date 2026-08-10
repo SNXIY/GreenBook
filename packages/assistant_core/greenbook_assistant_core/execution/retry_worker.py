@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from .execution_queue import ExecutionQueueProtocol, ExecutionQueueStatus
 from .retry_scheduler import RetryScheduler
 from .retry_task import RetryTask
 
@@ -34,12 +35,14 @@ class RetryBackgroundWorker:
         poll_interval_seconds: float = 1.0,
         batch_size: int = 20,
         worker_id: str | None = None,
+        execution_queue: ExecutionQueueProtocol | None = None,
     ) -> None:
         self._scheduler = scheduler
         self._retry_manager = retry_manager
         self._poll_interval = max(0.0, poll_interval_seconds)
         self._batch_size = max(1, batch_size)
         self._worker_id = worker_id or scheduler.worker_id
+        self._execution_queue = execution_queue
         self._stop = asyncio.Event()
         self._claimed: set[str] = set()
 
@@ -65,6 +68,24 @@ class RetryBackgroundWorker:
             if self.stopped:
                 self._release(task)
                 continue
+            queue_message = None
+            if self._execution_queue is not None:
+                queue_message = self._execution_queue.get_by_execution_id(
+                    task.execution_id
+                )
+                if queue_message is None:
+                    logger.error(
+                        "Retry task has no execution queue message execution_id=%s",
+                        task.execution_id,
+                    )
+                    self._release(task)
+                    continue
+                if queue_message.status == ExecutionQueueStatus.CLAIMED:
+                    # The original execution has not been acked yet.  Leave
+                    # the retry task ready and let the next poll re-dispatch
+                    # after the original queue claim is settled.
+                    self._release(task)
+                    continue
             try:
                 step = self._retry_manager.retry_step(
                     task.execution_id,
@@ -79,6 +100,29 @@ class RetryBackgroundWorker:
                 )
                 self._release(task)
                 continue
+            if self._execution_queue is not None and queue_message is not None:
+                try:
+                    queued = self._execution_queue.enqueue(
+                        task.execution_id,
+                        trace_id=queue_message.trace_id,
+                        payload=queue_message.payload,
+                        requeue=True,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Retry execution requeue failed execution_id=%s",
+                        task.execution_id,
+                    )
+                    self._release(task)
+                    continue
+                if queued.status != ExecutionQueueStatus.READY:
+                    logger.warning(
+                        "Retry execution was not made ready execution_id=%s status=%s",
+                        task.execution_id,
+                        queued.status,
+                    )
+                    self._release(task)
+                    continue
             self._scheduler.task_store.complete(
                 task.task_id,
                 worker_id=self._worker_id,

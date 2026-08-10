@@ -7,6 +7,7 @@ from typing import Any
 from greenbook_assistant_api.services.runtime_agent_service import RuntimeAgentService
 from greenbook_assistant_core.execution.execution_queue import ExecutionQueueMessage
 from greenbook_assistant_core.execution.operation_tracking import ExternalOperationTracker
+from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
 from greenbook_assistant_core.observability.metrics import MetricsCollector
 from greenbook_contracts.identity import AuthContext
 from greenbook_mcp_server.server import GreenBookMCPServer
@@ -32,6 +33,7 @@ class RuntimeExecutionQueueHandler:
         llm: Any = None,
         model: str = "",
         metrics_collector: MetricsCollector | None = None,
+        retry_scheduler: RetryScheduler | None = None,
     ) -> None:
         if not worker_access_token:
             raise RuntimeError(
@@ -49,6 +51,7 @@ class RuntimeExecutionQueueHandler:
                 store=external_operation_store,
             ),
             metrics_collector=metrics_collector,
+            retry_scheduler=retry_scheduler,
         )
 
     async def __call__(self, message: ExecutionQueueMessage) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .events import EventType, ExecutionEvent
 from greenbook_assistant_core.observability.metrics import MetricsCollector
-from .models import StepExecution
+from .models import StepExecution, StepStatus
 from .recovery import RecoveryPolicy
 from .retry_decision import (
     FailureEvidenceSnapshot,
@@ -52,6 +52,12 @@ class RetryManager:
         """Authorize and reset one failed Step for a later Worker pass."""
 
         step = self._find_step(execution_id, step_id)
+        # A durable retry task may be claimed, state-reset, and lose the
+        # process before its queue message is re-enqueued.  Treat the already
+        # pending state as an idempotent preparation for non-user workers so a
+        # later claim can finish dispatching the same attempt.
+        if step.status == StepStatus.PENDING and not user_requested_retry:
+            return step
         snapshot = self._evidence.resolve(execution_id, step)
         decision = self._decision_for_snapshot(
             snapshot,

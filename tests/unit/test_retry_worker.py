@@ -10,6 +10,10 @@ import pytest
 from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
 from greenbook_assistant_core.execution.retry_task import RetryTask, RetryTaskStatus
 from greenbook_assistant_core.execution.retry_worker import RetryBackgroundWorker
+from greenbook_assistant_core.execution.execution_queue import (
+    ExecutionQueue,
+    ExecutionQueueStatus,
+)
 
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
@@ -87,3 +91,31 @@ async def test_shutdown_releases_claimed_task_without_executing_it() -> None:
     worker.request_shutdown()
     assert await worker.run_once(now=NOW) == []
     assert scheduler.task_store.get(task.task_id).status == RetryTaskStatus.READY
+
+
+@pytest.mark.asyncio
+async def test_background_worker_requeues_execution_after_state_reset() -> None:
+    queue = ExecutionQueue(now_factory=lambda: NOW)
+    message = queue.enqueue(_task().execution_id, trace_id="trace-retry")
+    claimed = queue.claim(NOW, worker_id="execution-worker", lease_seconds=30)
+    assert queue.ack(claimed[0].message_id, worker_id="execution-worker") is not None
+    scheduler = RetryScheduler(now_factory=lambda: NOW, worker_id="worker-1")
+    task = scheduler.schedule(_task())
+
+    class RetryManager:
+        def retry_step(self, execution_id: str, step_id: str, **_kwargs):
+            return SimpleNamespace(status="PENDING")
+
+    worker = RetryBackgroundWorker(
+        scheduler=scheduler,
+        retry_manager=RetryManager(),
+        worker_id="worker-1",
+        execution_queue=queue,
+    )
+
+    await worker.run_once(now=NOW)
+
+    assert scheduler.task_store.get(task.task_id).status == RetryTaskStatus.COMPLETED
+    requeued = queue.get_by_execution_id(message.execution_id)
+    assert requeued is not None
+    assert requeued.status == ExecutionQueueStatus.READY

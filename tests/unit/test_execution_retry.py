@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import UTC, datetime
 
 import pytest
 
@@ -18,6 +19,7 @@ from greenbook_assistant_core.execution.models import (
 from greenbook_assistant_core.execution.recovery import RecoveryPolicy
 from greenbook_assistant_core.execution.repository import ExecutionRepository
 from greenbook_assistant_core.execution.retry_manager import RetryManager
+from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
 from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
 from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
@@ -98,6 +100,37 @@ async def test_timeout_retry_runs_again_and_records_checkpoint() -> None:
     assert EventType.STEP_RETRY_REQUESTED in event_types
     assert EventType.STEP_RETRY_STARTED in event_types
     assert EventType.STEP_RETRY_COMPLETED in event_types
+
+
+@pytest.mark.asyncio
+async def test_worker_failure_materializes_durable_retry_task() -> None:
+    registry, plan, state, runtime, execution = _runtime()
+
+    async def handler(tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "ok": False,
+            "code": "TIMEOUT",
+            "retryable": True,
+            "request_sent": False,
+            "state": {"side_effect_state": "NONE"},
+            "evidence": _safe_retry_evidence(),
+        }
+
+    scheduler = RetryScheduler(
+        now_factory=lambda: datetime(2026, 8, 10, 12, 0, tzinfo=UTC),
+    )
+    worker = ExecutionWorker(
+        CapabilityExecutor(registry, handler),
+        state._repo,
+        retry_scheduler=scheduler,
+    )
+
+    await worker.run(execution.execution_id)
+
+    pending = scheduler.pending()
+    assert len(pending) == 1
+    assert pending[0].execution_id == execution.execution_id
+    assert pending[0].step_id == state.list_steps(execution.execution_id)[0].step_id
 
 
 @pytest.mark.asyncio

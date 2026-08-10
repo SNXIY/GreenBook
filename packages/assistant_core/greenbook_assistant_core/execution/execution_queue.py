@@ -67,6 +67,7 @@ class ExecutionQueueProtocol(Protocol):
         *,
         trace_id: str = "",
         payload: dict[str, Any] | None = None,
+        requeue: bool = False,
     ) -> ExecutionQueueMessage: ...
 
     def get(self, message_id: str) -> ExecutionQueueMessage | None: ...
@@ -114,6 +115,7 @@ class ExecutionQueue:
         *,
         trace_id: str = "",
         payload: dict[str, Any] | None = None,
+        requeue: bool = False,
     ) -> ExecutionQueueMessage:
         message = _coerce_message(
             execution_id,
@@ -124,6 +126,23 @@ class ExecutionQueue:
         with self._lock:
             existing = self._messages.get(message.key)
             if existing is not None:
+                if requeue and existing.status in {
+                    ExecutionQueueStatus.ACKED,
+                    ExecutionQueueStatus.FAILED,
+                }:
+                    updated = existing.model_copy(
+                        update={
+                            "status": ExecutionQueueStatus.READY,
+                            "claimed_by": None,
+                            "claim_until": None,
+                            "available_at": _iso(self._now()),
+                            "last_error": "",
+                            "updated_at": _iso(self._now()),
+                        },
+                        deep=True,
+                    )
+                    self._messages[message.key] = updated
+                    return updated.model_copy(deep=True)
                 return existing.model_copy(deep=True)
             self._messages[message.key] = message
             return message.model_copy(deep=True)
@@ -300,6 +319,7 @@ class PostgresExecutionQueue:
         *,
         trace_id: str = "",
         payload: dict[str, Any] | None = None,
+        requeue: bool = False,
     ) -> ExecutionQueueMessage:
         message = _coerce_message(
             execution_id,
@@ -309,6 +329,35 @@ class PostgresExecutionQueue:
         )
         existing = self.get_by_execution_id(message.execution_id)
         if existing is not None:
+            if requeue and existing.status in {
+                ExecutionQueueStatus.ACKED,
+                ExecutionQueueStatus.FAILED,
+            }:
+                now = _now()
+                with self._connect() as conn:
+                    conn.execute(
+                        sa.update(execution_queue_messages)
+                        .where(
+                            execution_queue_messages.c.message_id == existing.message_id,
+                            execution_queue_messages.c.status.in_(
+                                [
+                                    ExecutionQueueStatus.ACKED.value,
+                                    ExecutionQueueStatus.FAILED.value,
+                                ]
+                            ),
+                        )
+                        .values(
+                            status=ExecutionQueueStatus.READY.value,
+                            claimed_by=None,
+                            claim_until=None,
+                            available_at=_iso(now),
+                            last_error="",
+                            updated_at=_iso(now),
+                        )
+                    )
+                refreshed = self.get(existing.message_id)
+                if refreshed is not None:
+                    return refreshed
             return existing
         try:
             with self._connect() as conn:

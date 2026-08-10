@@ -48,6 +48,19 @@ def test_memory_queue_release_reclaims_after_worker_shutdown() -> None:
     assert reclaimed[0].attempt == 2
 
 
+def test_memory_queue_requeue_reopens_acknowledged_execution() -> None:
+    queue = ExecutionQueue(now_factory=lambda: NOW)
+    message = queue.enqueue("execution-retry")
+    claimed = queue.claim(NOW, worker_id="worker-a", lease_seconds=30)
+    assert queue.ack(claimed[0].message_id, worker_id="worker-a") is not None
+
+    requeued = queue.enqueue("execution-retry", requeue=True)
+
+    assert requeued.message_id == message.message_id
+    assert requeued.status == ExecutionQueueStatus.READY
+    assert queue.claim(NOW, worker_id="worker-b", lease_seconds=30)[0].attempt == 2
+
+
 def test_postgres_queue_survives_store_recreation() -> None:
     engine = sa.create_engine("sqlite+pysqlite:///:memory:")
     queue = PostgresExecutionQueue(engine)

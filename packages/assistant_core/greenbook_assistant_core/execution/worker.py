@@ -32,6 +32,7 @@ from .operation_tracking import ExternalOperationTracker
 from .recovery import RecoveryPolicy
 from .retry_decision import RetryDecisionEngine, evidence_from_failure
 from .retry_manager import RetryManager
+from .retry_scheduler import RetryScheduler
 from .repository import ExecutionRepository
 from .runtime_guard import (
     ExecutionBlockedError as RuntimeGuardBlockedError,
@@ -77,6 +78,7 @@ class ExecutionWorker:
         operation_tracker: ExternalOperationTracker | None = None,
         trace_context: TraceContext | None = None,
         metrics_collector: MetricsCollector | None = None,
+        retry_scheduler: RetryScheduler | None = None,
     ) -> None:
         self._executor = executor
         self._repo = repository or ExecutionRepository()
@@ -104,6 +106,7 @@ class ExecutionWorker:
         self._trace = trace
         self._trace_context = trace_context
         self._metrics = metrics_collector
+        self._retry_scheduler = retry_scheduler
 
     def bind_trace_context(self, context: TraceContext) -> None:
         """Bind correlation metadata after the canonical Execution exists."""
@@ -424,28 +427,40 @@ class ExecutionWorker:
                 return RunOutcome.PAUSED
 
             if retry_decision.allowed:
+                failed_step = self._state.fail_step(
+                    execution_id, sid,
+                    error_code=result.error_code,
+                    error_message=result.error_message,
+                )
+                retry_task = None
+                if (
+                    failed_step.status == StepStatus.FAILED_RETRYABLE
+                    and self._retry_scheduler is not None
+                ):
+                    retry_task = self._retry_scheduler.schedule_decision(
+                        execution_id=execution_id,
+                        step_id=step_ex.step_id,
+                        decision=retry_decision,
+                        reason=result.error_code,
+                    )
                 self._append_event(
                     EventType.STEP_FAILED,
                     execution_id=execution_id,
                     step_id=step_ex.step_id,
                     payload={
                         "step_execution_id": sid,
-                        "retryable": True,
+                        "retryable": failed_step.status == StepStatus.FAILED_RETRYABLE,
                         "error_code": result.error_code,
                         "error_message": result.error_message,
                         "failure_category": decision.category.value,
                         "recovery_action": decision.action.value,
                         "recovery_reason": decision.reason,
                         "retry_decision": retry_decision.model_dump(mode="json"),
+                        "retry_task_id": retry_task.task_id if retry_task else None,
                         "tool_name": result.tool_name,
                     },
                     evidence=evidence,
                     operation_id=operation.operation_id if operation is not None else "",
-                )
-                failed_step = self._state.fail_step(
-                    execution_id, sid,
-                    error_code=result.error_code,
-                    error_message=result.error_message,
                 )
                 if failed_step.status == StepStatus.FAILED:
                     self._append_event(

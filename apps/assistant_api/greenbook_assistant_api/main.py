@@ -206,6 +206,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         state_manager=execution_state_manager,
         checkpoint_store=runtime_persistence.checkpoint_store,
     )
+    execution_retry_scheduler = RetryScheduler(
+        task_store=runtime_persistence.retry_task_store,
+    )
     runtime_agent_service = RuntimeAgentService(
         repository=execution_repository,
         event_store=execution_event_store,
@@ -216,14 +219,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         execution_queue=runtime_persistence.execution_queue,
         dispatch_mode=dispatch_mode,
         metrics_collector=metrics_collector,
+        retry_scheduler=execution_retry_scheduler,
     )
     execution_retry_manager = RetryManager(
         state_manager=execution_state_manager,
         runtime_manager=execution_runtime_manager,
         metrics_collector=metrics_collector,
-    )
-    execution_retry_scheduler = RetryScheduler(
-        task_store=runtime_persistence.retry_task_store,
     )
     task_provider = TaskProvider()
     conversation_runtime_adapter = ConversationRuntimeAdapter(

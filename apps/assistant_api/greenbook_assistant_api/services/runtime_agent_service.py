@@ -34,6 +34,7 @@ from greenbook_assistant_core.execution.execution_queue import (
 from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
 from greenbook_assistant_core.execution.operation_tracking import ExternalOperationTracker
 from greenbook_assistant_core.execution.repository import ExecutionRepository
+from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
 from greenbook_assistant_core.execution.runtime.invocation_context import (
     ToolInvocationContext,
 )
@@ -80,6 +81,7 @@ class RuntimeAgentService:
         execution_queue: ExecutionQueueProtocol | None = None,
         dispatch_mode: str = "direct",
         metrics_collector: MetricsCollector | None = None,
+        retry_scheduler: RetryScheduler | None = None,
     ) -> None:
         self._execution_repository = repository
         self._execution_event_store = event_store
@@ -88,6 +90,7 @@ class RuntimeAgentService:
         self._execution_queue = execution_queue
         self._dispatch_mode = dispatch_mode.strip().lower()
         self._metrics = metrics_collector
+        self._retry_scheduler = retry_scheduler
         self._registry = CapabilityRegistry()
         self._mapper = CapabilityMapper(self._registry)
         self._orchestrator = TaskOrchestrator(self._registry)
@@ -519,6 +522,7 @@ class RuntimeAgentService:
             checkpoint_store=self._execution_checkpoint_store,
             operation_tracker=self._operation_tracker,
             metrics_collector=self._metrics,
+            retry_scheduler=self._retry_scheduler,
         )
         if existing_execution_id:
             execution = worker._repo.find_by_id(existing_execution_id)
