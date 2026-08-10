@@ -11,12 +11,15 @@ pytest.importorskip("fastapi")
 from fastapi import HTTPException
 
 from greenbook_assistant_core.capability.registry import CapabilityRegistry
+from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
+from greenbook_assistant_core.execution.evidence import ExecutionEvidence
 from greenbook_assistant_core.execution.models import StepStatus
 from greenbook_assistant_core.execution.repository import ExecutionRepository
 from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
 from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
 from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_contracts import SideEffectState
 
 from apps.assistant_api.greenbook_assistant_api.api.runtime_routes import (
     cancel_execution,
@@ -102,6 +105,23 @@ async def test_retryable_failed_step_is_reset_to_pending() -> None:
         step.step_execution_id,
         error_code="TIMEOUT",
         error_message="temporary timeout",
+    )
+    manager.event_store.append(
+        ExecutionEvent(
+            execution_id=execution_id,
+            event_type=EventType.STEP_FAILED,
+            step_id=step_id,
+            payload={
+                "step_execution_id": step.step_execution_id,
+                "error_code": "TIMEOUT",
+                "error_message": "temporary timeout",
+                "retryable": True,
+                "evidence": ExecutionEvidence(
+                    request_sent=False,
+                    side_effect_state=SideEffectState.NONE,
+                ).model_dump(mode="json"),
+            },
+        )
     )
 
     response = await retry_execution_step(execution_id, step_id, request)

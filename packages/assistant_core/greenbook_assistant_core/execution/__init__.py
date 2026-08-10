@@ -12,6 +12,13 @@ from .failure_decision import (
     RecoveryAction,
     RecoveryDecision,
 )
+from .retry_decision import (
+    FailureEvidenceSnapshot,
+    RetryContext,
+    RetryDecision,
+    RetryDecisionEngine,
+    RetryEvidenceResolver,
+)
 from .temporal_resolver import TemporalResolver
 
 __all__ = [
@@ -25,6 +32,11 @@ __all__ = [
     "FailurePolicyContext",
     "RecoveryAction",
     "RecoveryDecision",
+    "FailureEvidenceSnapshot",
+    "RetryContext",
+    "RetryDecision",
+    "RetryDecisionEngine",
+    "RetryEvidenceResolver",
     "TemporalResolver",
     "ToolArguments",
 ]

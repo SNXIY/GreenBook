@@ -1,45 +1,79 @@
-"""Explicit step retry and recovery orchestration."""
+"""Explicit step retry and evidence-aware recovery orchestration."""
 
 from __future__ import annotations
 
 from .events import EventType, ExecutionEvent
 from .models import StepExecution
 from .recovery import RecoveryPolicy
+from .retry_decision import (
+    FailureEvidenceSnapshot,
+    RetryDecision,
+    RetryDecisionEngine,
+    RetryEvidenceResolver,
+)
 from .runtime_manager import RuntimeManager
 from .state_manager import ExecutionStateManager
 
 
 class RetryManager:
-    """Prepare failed steps for a later Worker.run() pass."""
+    """Prepare failed steps for a later Worker.run() pass.
+
+    ``RetryDecisionEngine`` is the only authorization gate.  This class still
+    performs the legacy state transition and checkpoint bookkeeping, but it
+    does not execute a tool itself.
+    """
 
     def __init__(
         self,
         state_manager: ExecutionStateManager | None = None,
         policy: RecoveryPolicy | None = None,
         runtime_manager: RuntimeManager | None = None,
+        decision_engine: RetryDecisionEngine | None = None,
     ) -> None:
         self._state = state_manager or ExecutionStateManager()
+        # Retained for source compatibility. Retry authorization is now owned
+        # by RetryDecisionEngine, not the legacy error-code policy.
         self._policy = policy or RecoveryPolicy()
         self._runtime = runtime_manager or RuntimeManager(self._state)
+        self._decision_engine = decision_engine or RetryDecisionEngine()
+        self._evidence = RetryEvidenceResolver(self._state.event_store)
 
-    def retry_step(self, execution_id: str, step_id: str) -> StepExecution:
+    def retry_step(
+        self,
+        execution_id: str,
+        step_id: str,
+        *,
+        source: str = "retry_api",
+        user_requested_retry: bool = True,
+    ) -> StepExecution:
+        """Authorize and reset one failed Step for a later Worker pass."""
+
         step = self._find_step(execution_id, step_id)
-        reason = step.error_code
+        snapshot = self._evidence.resolve(execution_id, step)
+        decision = self._decision_for_snapshot(
+            snapshot,
+            step,
+            source=source,
+            user_requested_retry=user_requested_retry,
+        )
         self._emit(
             execution_id,
             EventType.STEP_RETRY_REQUESTED,
             step,
-            {"retry_count": step.retry_count, "reason": reason},
+            {
+                "retry_count": step.retry_count,
+                "reason": step.error_code,
+                "retry_decision": decision.model_dump(mode="json"),
+            },
         )
 
-        if not self._policy.can_retry(step):
-            if self._policy.is_retryable_error(step.error_code):
-                self._emit(
-                    execution_id,
-                    EventType.STEP_RETRY_EXHAUSTED,
-                    step,
-                    {"retry_count": step.retry_count, "reason": reason},
-                )
+        if not decision.allowed:
+            self._emit(
+                execution_id,
+                EventType.STEP_RETRY_DENIED,
+                step,
+                {"retry_decision": decision.model_dump(mode="json")},
+            )
             return step
 
         result = self._state.retry_step(execution_id, step.step_execution_id)
@@ -48,9 +82,77 @@ class RetryManager:
             execution_id,
             EventType.STEP_RETRY_STARTED,
             result,
-            {"retry_count": result.retry_count, "reason": reason},
+            {
+                "retry_count": result.retry_count,
+                "reason": step.error_code,
+                "retry_decision": decision.model_dump(mode="json"),
+            },
         )
         return result
+
+    def decision_for_step(
+        self,
+        execution_id: str,
+        step_id: str,
+        *,
+        source: str = "retry",
+        user_requested_retry: bool = False,
+    ) -> RetryDecision:
+        """Return the decision without changing Step state."""
+
+        step = self._find_step(execution_id, step_id)
+        snapshot = self._evidence.resolve(execution_id, step)
+        return self._decision_for_snapshot(
+            snapshot,
+            step,
+            source=source,
+            user_requested_retry=user_requested_retry,
+        )
+
+    def resume_execution(self, execution_id: str):
+        """Resume only steps approved by the common retry decision gate."""
+
+        execution = self._state.get_execution(execution_id)
+        approved_retry_ids: set[str] = set()
+        approved_running_ids: set[str] = set()
+        for step in execution.steps:
+            if step.status.value == "FAILED_RETRYABLE":
+                decision = self.decision_for_step(
+                    execution_id,
+                    step.step_id,
+                    source="resume",
+                )
+                if decision.allowed:
+                    approved_retry_ids.add(step.step_execution_id)
+            elif step.status.value == "RUNNING":
+                decision = self.decision_for_step(
+                    execution_id,
+                    step.step_id,
+                    source="resume_crash_recovery",
+                )
+                if decision.allowed:
+                    approved_running_ids.add(step.step_execution_id)
+        return self._state.resume_execution(
+            execution_id,
+            retryable_step_ids=approved_retry_ids,
+            running_step_ids=approved_running_ids,
+        )
+
+    def _decision_for_snapshot(
+        self,
+        snapshot: FailureEvidenceSnapshot,
+        step: StepExecution,
+        *,
+        source: str,
+        user_requested_retry: bool,
+    ) -> RetryDecision:
+        return self._decision_engine.decide_for_step(
+            snapshot.failure,
+            step,
+            evidence=snapshot.evidence,
+            source=source,
+            user_requested_retry=user_requested_retry,
+        )
 
     def get_checkpoint(self, execution_id: str):
         return self._runtime.restore_checkpoint(execution_id)

@@ -22,9 +22,12 @@ from .failure_decision import (
     RecoveryAction,
     normalize_failure_payload,
 )
+from .evidence import ExecutionEvidence
 from .invocation import ExecutionResult
 from .models import ExecutionStatus, PlanExecution, StepExecution, StepStatus
 from .recovery import RecoveryPolicy
+from .retry_decision import RetryDecisionEngine, evidence_from_failure
+from .retry_manager import RetryManager
 from .repository import ExecutionRepository
 from .runtime_guard import (
     ExecutionBlockedError as RuntimeGuardBlockedError,
@@ -70,10 +73,19 @@ class ExecutionWorker:
         self._executor = executor
         self._repo = repository or ExecutionRepository()
         self._state = ExecutionStateManager(self._repo, event_store=event_store)
-        self._runtime_guard = RuntimeGuard(RuntimeManager(self._state))
+        self._runtime = RuntimeManager(self._state)
+        self._runtime_guard = RuntimeGuard(self._runtime)
         self._recovery_policy = RecoveryPolicy()
         self._failure_decision_engine = failure_decision_engine or FailureDecisionEngine(
             retry_eligibility=self._recovery_policy.is_retryable_error,
+        )
+        self._retry_decision_engine = RetryDecisionEngine(
+            classifier=self._failure_decision_engine.classifier,
+        )
+        self._retry_manager = RetryManager(
+            state_manager=self._state,
+            runtime_manager=self._runtime,
+            decision_engine=self._retry_decision_engine,
         )
         self._scheduler = StepScheduler()
         self._trace = trace
@@ -96,7 +108,7 @@ class ExecutionWorker:
             ExecutionStatus.WAITING_APPROVAL,
             ExecutionStatus.PAUSED,
         ):
-            ex = self._state.resume_execution(execution_id)
+            ex = self._retry_manager.resume_execution(execution_id)
 
         # Main loop — sequential (Phase 4.1: no parallel execution)
         while True:
@@ -276,12 +288,24 @@ class ExecutionWorker:
                     supports_reconciliation=bool(failure.receipt_id),
                 ),
             )
+            evidence = self._evidence_from_result(
+                result,
+                failure,
+                execution_id=execution_id,
+                step_id=step_ex.step_id,
+            )
+            retry_decision = self._retry_decision_engine.decide_for_step(
+                failure,
+                step_ex,
+                evidence=evidence,
+                source="worker_failure",
+            )
 
             if decision.action == RecoveryAction.REQUEST_USER_INPUT:
                 self._state.pause_execution(execution_id)
                 return RunOutcome.PAUSED
 
-            if decision.retry_allowed:
+            if retry_decision.allowed:
                 self._state.event_store.append(
                     ExecutionEvent(
                         execution_id=execution_id,
@@ -295,6 +319,8 @@ class ExecutionWorker:
                             "failure_category": decision.category.value,
                             "recovery_action": decision.action.value,
                             "recovery_reason": decision.reason,
+                            "evidence": self._evidence_payload(evidence),
+                            "retry_decision": retry_decision.model_dump(mode="json"),
                         },
                     )
                 )
@@ -333,6 +359,8 @@ class ExecutionWorker:
                             "failure_category": decision.category.value,
                             "recovery_action": decision.action.value,
                             "recovery_reason": decision.reason,
+                            "evidence": self._evidence_payload(evidence),
+                            "retry_decision": retry_decision.model_dump(mode="json"),
                         },
                     )
                 )
@@ -369,6 +397,30 @@ class ExecutionWorker:
             request_sent=result.request_sent,
         )
         return failure
+
+    @staticmethod
+    def _evidence_from_result(
+        result: ExecutionResult,
+        failure,
+        *,
+        execution_id: str,
+        step_id: str,
+    ) -> ExecutionEvidence | None:
+        evidence = result.evidence or evidence_from_failure(failure)
+        if evidence is None:
+            return None
+        updates: dict[str, str] = {}
+        if evidence.execution_id is None:
+            updates["execution_id"] = execution_id
+        if evidence.step_id is None:
+            updates["step_id"] = step_id
+        return evidence.model_copy(update=updates) if updates else evidence
+
+    @staticmethod
+    def _evidence_payload(evidence: ExecutionEvidence | None) -> dict[str, Any] | None:
+        if evidence is None:
+            return None
+        return evidence.model_dump(mode="json")
 
     async def resume_after_approval(self, execution_id: str) -> RunOutcome:
         """Resume a WAITING_APPROVAL execution after user approves."""

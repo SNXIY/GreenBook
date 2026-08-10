@@ -55,7 +55,15 @@ class RuntimeManager:
         return self._state.pause_execution(execution_id)
 
     def resume_execution(self, execution_id: str) -> PlanExecution:
-        return self._state.resume_execution(execution_id)
+        # User-facing resume must pass the same evidence-aware retry gate as
+        # the Worker, while the low-level StateManager remains compatible for
+        # legacy callers that explicitly own state transitions.
+        from .retry_manager import RetryManager
+
+        return RetryManager(
+            state_manager=self._state,
+            runtime_manager=self,
+        ).resume_execution(execution_id)
 
     def cancel_execution(self, execution_id: str) -> PlanExecution:
         return self._state.cancel_execution(execution_id)

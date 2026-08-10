@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from greenbook_assistant_core.capability.registry import CapabilityRegistry
 from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
+from greenbook_assistant_core.execution.evidence import ExecutionEvidence
 from greenbook_assistant_core.execution.lease import ExecutionLeaseManager
 from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
 from greenbook_assistant_core.execution.persistence import execution_metadata
@@ -24,6 +25,7 @@ from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
 from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
 from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
 from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_contracts import SideEffectState
 
 
 @pytest.fixture
@@ -97,7 +99,9 @@ def test_event_and_checkpoint_survive_store_recreation(engine) -> None:
 
 def test_recovery_service_preserves_completed_steps_after_restart(engine) -> None:
     repo = PostgresExecutionRepository(engine)
+    event_store = PostgresExecutionEventStore(engine)
     state, execution = _execution(repo)
+    state._event_store = event_store
     state.start_execution(execution.execution_id)
     first, second = execution.steps[:2]
     state.start_step(execution.execution_id, first.step_execution_id)
@@ -108,8 +112,27 @@ def test_recovery_service_preserves_completed_steps_after_restart(engine) -> Non
         second.step_execution_id,
         error_code="TIMEOUT",
     )
+    event_store.append(
+        ExecutionEvent(
+            execution_id=execution.execution_id,
+            event_type=EventType.STEP_FAILED,
+            step_id=second.step_id,
+            payload={
+                "step_execution_id": second.step_execution_id,
+                "error_code": "TIMEOUT",
+                "retryable": True,
+                "evidence": ExecutionEvidence(
+                    request_sent=False,
+                    side_effect_state=SideEffectState.NONE,
+                ).model_dump(mode="json"),
+            },
+        )
+    )
 
-    recovered_state = ExecutionStateManager(PostgresExecutionRepository(engine))
+    recovered_state = ExecutionStateManager(
+        PostgresExecutionRepository(engine),
+        event_store=PostgresExecutionEventStore(engine),
+    )
     recovered = ExecutionRecoveryService(recovered_state).restore_execution(
         execution.execution_id
     )

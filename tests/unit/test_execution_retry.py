@@ -8,7 +8,8 @@ import pytest
 
 from greenbook_assistant_core.capability.registry import CapabilityRegistry
 from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.events import EventType
+from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
+from greenbook_assistant_core.execution.evidence import ExecutionEvidence
 from greenbook_assistant_core.execution.invocation import ExecutionResult
 from greenbook_assistant_core.execution.models import (
     ExecutionStatus,
@@ -22,6 +23,7 @@ from greenbook_assistant_core.execution.state_manager import ExecutionStateManag
 from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
 from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
 from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_contracts import SideEffectState
 
 
 @pytest.fixture(autouse=True)
@@ -48,6 +50,13 @@ def _runtime(requirements: list[str] = ["CREATE"]):
     return registry, plan, state, runtime, execution
 
 
+def _safe_retry_evidence() -> dict[str, Any]:
+    return ExecutionEvidence(
+        request_sent=False,
+        side_effect_state=SideEffectState.NONE,
+    ).model_dump(mode="json")
+
+
 @pytest.mark.asyncio
 async def test_timeout_retry_runs_again_and_records_checkpoint() -> None:
     registry, plan, state, runtime, execution = _runtime()
@@ -57,7 +66,14 @@ async def test_timeout_retry_runs_again_and_records_checkpoint() -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
-            return {"ok": False, "code": "TIMEOUT", "retryable": True}
+            return {
+                "ok": False,
+                "code": "TIMEOUT",
+                "retryable": True,
+                "request_sent": False,
+                "state": {"side_effect_state": "NONE"},
+                "evidence": _safe_retry_evidence(),
+            }
         return {"ok": True, "code": "", "data": {"draft_id": "d1"}}
 
     worker = ExecutionWorker(CapabilityExecutor(registry, handler), state._repo)
@@ -89,7 +105,14 @@ async def test_retry_exhaustion_keeps_step_failed() -> None:
     registry, plan, state, runtime, execution = _runtime()
 
     async def handler(tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": False, "code": "TIMEOUT", "retryable": True}
+        return {
+            "ok": False,
+            "code": "TIMEOUT",
+            "retryable": True,
+            "request_sent": False,
+            "state": {"side_effect_state": "NONE"},
+            "evidence": _safe_retry_evidence(),
+        }
 
     worker = ExecutionWorker(CapabilityExecutor(registry, handler), state._repo)
     retry = RetryManager(state, runtime_manager=runtime)
@@ -140,6 +163,20 @@ def test_retry_preserves_completed_steps_in_checkpoint() -> None:
         steps[1].step_execution_id,
         error_code="TIMEOUT",
         permanent=True,
+    )
+    runtime.event_store.append(
+        ExecutionEvent(
+            execution_id=execution.execution_id,
+            event_type=EventType.STEP_FAILED,
+            step_id=steps[1].step_id,
+            payload={
+                "step_execution_id": steps[1].step_execution_id,
+                "error_code": "TIMEOUT",
+                "retryable": True,
+                "request_sent": False,
+                "evidence": _safe_retry_evidence(),
+            },
+        )
     )
 
     retry = RetryManager(state, runtime_manager=runtime)

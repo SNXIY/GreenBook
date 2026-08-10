@@ -305,7 +305,13 @@ class ExecutionStateManager:
 
     # ── resume ──────────────────────────────────────────────────
 
-    def resume_execution(self, execution_id: str) -> PlanExecution:
+    def resume_execution(
+        self,
+        execution_id: str,
+        *,
+        retryable_step_ids: set[str] | None = None,
+        running_step_ids: set[str] | None = None,
+    ) -> PlanExecution:
         """Prepare an execution for resumption.
 
         - COMPLETED steps → left as-is (skipped)
@@ -329,11 +335,21 @@ class ExecutionStateManager:
 
         for step in ex.steps:
             if step.status == StepStatus.FAILED_RETRYABLE:
+                if (
+                    retryable_step_ids is not None
+                    and step.step_execution_id not in retryable_step_ids
+                ):
+                    continue
                 step.status = StepStatus.PENDING
                 step.error_code = ""
                 step.error_message = ""
                 step.version += 1
             elif step.status == StepStatus.RUNNING:
+                if (
+                    running_step_ids is not None
+                    and step.step_execution_id not in running_step_ids
+                ):
+                    continue
                 # Process crashed mid-step — reset for retry
                 step.status = StepStatus.PENDING
                 step.version += 1
@@ -409,7 +425,11 @@ class ExecutionStateManager:
             s.status == StepStatus.WAITING_APPROVAL for s in ex.steps
         )
         any_failed = any(
-            s.status in (StepStatus.FAILED, StepStatus.FAILED_RETRYABLE)
+            s.status == StepStatus.FAILED
+            for s in ex.steps
+        )
+        any_retryable = any(
+            s.status == StepStatus.FAILED_RETRYABLE
             for s in ex.steps
         )
         all_terminal = all(
@@ -432,6 +452,8 @@ class ExecutionStateManager:
             ex.status = ExecutionStatus.WAITING_APPROVAL
         elif any_failed:
             ex.status = ExecutionStatus.FAILED
+        elif any_retryable:
+            ex.status = ExecutionStatus.RUNNING
         elif all_terminal:
             ex.status = ExecutionStatus.COMPLETED
             ex.completed_at = _now()
