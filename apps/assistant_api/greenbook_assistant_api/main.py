@@ -36,6 +36,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .api.routes import router
 from .api.runtime_routes import router as runtime_router
 from .services.conversation_runtime_adapter import ConversationRuntimeAdapter
+from .services.execution_authorizer import ExecutionAuthorizer
 from .services.runtime_agent_service import RuntimeAgentService
 from .services.task_provider import TaskProvider
 
@@ -195,21 +196,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         repository=execution_repository,
         event_store=execution_event_store,
     )
+    task_provider = TaskProvider()
     conversation_runtime_adapter = ConversationRuntimeAdapter(
         intent_provider=IntentSpecProvider(
             llm=app.state.llm,
             model=llm_model,
         ),
-        task_provider=TaskProvider(),
+        task_provider=task_provider,
         runtime_service=runtime_agent_service,
         execution_repository=execution_repository,
     )
+    execution_authorizer = ExecutionAuthorizer(task_provider=task_provider)
 
     app.state.execution_repository = execution_repository
     app.state.execution_event_store = execution_event_store
     app.state.execution_state_manager = execution_state_manager
     app.state.execution_runtime_manager = execution_runtime_manager
     app.state.runtime_agent_service = runtime_agent_service
+    app.state.task_provider = task_provider
+    app.state.execution_authorizer = execution_authorizer
     app.state.conversation_runtime_adapter = conversation_runtime_adapter
     app.state.run_execution_adapter = RunExecutionAdapter()
     app.state.execution_mode = execution_mode

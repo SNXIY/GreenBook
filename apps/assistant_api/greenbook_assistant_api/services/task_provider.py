@@ -171,6 +171,40 @@ class TaskProvider:
             return None
         return task
 
+    async def authorize_task(
+        self,
+        *,
+        task_id: str,
+        user_id: str,
+        tenant_id: str,
+    ) -> bool:
+        """Check execution ownership without accepting a conversation hint.
+
+        Execution resources carry the task id, but a request authorizer must
+        not trust a caller-provided conversation id to establish ownership.
+        This narrow lookup compares the persisted task's user and tenant
+        scope only and deliberately returns ``False`` for malformed or
+        unavailable records so the HTTP boundary can fail closed.
+        """
+
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (task_id, user_id, tenant_id)
+        ):
+            return False
+
+        try:
+            async with self._registry_context() as registry:
+                task = await registry.get_task(task_id)
+        except Exception:
+            return False
+
+        return bool(
+            task is not None
+            and task.user_id == user_id
+            and task.tenant_id == tenant_id
+        )
+
     async def list_tasks(
         self,
         scope: TaskScope,

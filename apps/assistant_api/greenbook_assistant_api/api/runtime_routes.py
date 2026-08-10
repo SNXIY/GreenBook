@@ -6,6 +6,7 @@ import base64
 import binascii
 import json
 from collections.abc import AsyncIterator
+from inspect import isawaitable
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -81,15 +82,34 @@ class ExecutionListResponse(BaseModel):
     next_cursor: str | None = None
 
 
-def _require_control_access(request: Request, execution) -> None:
-    """Require authentication and let the host provide resource authorization."""
+async def _is_authorized(request: Request, execution) -> bool:
+    """Evaluate the configured ownership policy for one Runtime resource."""
     auth_context = getattr(request.state, "auth_context", None)
     if auth_context is None:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     authorizer = getattr(request.app.state, "execution_authorizer", None)
-    if authorizer is not None and not authorizer(auth_context, execution):
+    if authorizer is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Execution authorization is not configured",
+        )
+
+    allowed = authorizer(auth_context, execution)
+    if isawaitable(allowed):
+        allowed = await allowed
+    return bool(allowed)
+
+
+async def _require_execution_access(request: Request, execution) -> None:
+    """Require authentication and ownership for a Runtime execution."""
+    if not await _is_authorized(request, execution):
         raise HTTPException(status_code=403, detail="Execution access denied")
+
+
+async def _require_control_access(request: Request, execution) -> None:
+    """Backward-compatible name for the Runtime ownership check."""
+    await _require_execution_access(request, execution)
 
 
 def _manager(request: Request) -> RuntimeManager:
@@ -172,18 +192,9 @@ def _decode_execution_cursor(cursor: str) -> tuple[str, str]:
         raise HTTPException(status_code=400, detail="Invalid execution cursor") from exc
 
 
-def _authorize_execution_list(request: Request, execution) -> bool:
-    """Require an explicit host authorization policy for list visibility."""
-    auth_context = getattr(request.state, "auth_context", None)
-    if auth_context is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    authorizer = getattr(request.app.state, "execution_authorizer", None)
-    if authorizer is None:
-        raise HTTPException(
-            status_code=403,
-            detail="Execution list authorization is not configured",
-        )
-    return bool(authorizer(auth_context, execution))
+async def _authorize_execution_list(request: Request, execution) -> bool:
+    """Require policy configuration and filter out other users' executions."""
+    return await _is_authorized(request, execution)
 
 
 @router.get("/executions", response_model=ExecutionListResponse)
@@ -213,7 +224,7 @@ async def list_executions(
 
     visible = []
     for execution in executions:
-        if _authorize_execution_list(request, execution):
+        if await _authorize_execution_list(request, execution):
             visible.append(execution)
 
     page = visible[:page_limit]
@@ -242,6 +253,7 @@ async def list_executions(
 async def get_execution_status(execution_id: str, request: Request) -> ExecutionStatusResponse:
     manager = _manager(request)
     execution = _execution_or_404(manager, execution_id)
+    await _require_execution_access(request, execution)
     total = execution.total_step_count
     progress = execution.completed_step_count / total if total else 1.0
     return ExecutionStatusResponse(
@@ -262,7 +274,8 @@ async def get_execution_steps(
     request: Request,
 ) -> ExecutionStepsResponse:
     manager = _manager(request)
-    _execution_or_404(manager, execution_id)
+    execution = _execution_or_404(manager, execution_id)
+    await _require_execution_access(request, execution)
     return ExecutionStepsResponse(
         execution_id=execution_id,
         steps=[
@@ -288,21 +301,22 @@ async def get_execution_events(
     request: Request,
 ) -> ExecutionEventsResponse:
     manager = _manager(request)
-    _execution_or_404(manager, execution_id)
+    execution = _execution_or_404(manager, execution_id)
+    await _require_execution_access(request, execution)
     return ExecutionEventsResponse(
         execution_id=execution_id,
         events=manager.list_events(execution_id),
     )
 
 
-def _control_execution(
+async def _control_execution(
     request: Request,
     execution_id: str,
     operation,
 ) -> ExecutionStatusResponse:
     manager = _manager(request)
     execution = _execution_or_404(manager, execution_id)
-    _require_control_access(request, execution)
+    await _require_control_access(request, execution)
     try:
         updated = operation(manager, execution_id)
     except ValueError as exc:
@@ -326,17 +340,29 @@ def _control_execution(
 
 @router.post("/executions/{execution_id}/pause", response_model=ExecutionStatusResponse)
 async def pause_execution(execution_id: str, request: Request) -> ExecutionStatusResponse:
-    return _control_execution(request, execution_id, lambda manager, value: manager.pause_execution(value))
+    return await _control_execution(
+        request,
+        execution_id,
+        lambda manager, value: manager.pause_execution(value),
+    )
 
 
 @router.post("/executions/{execution_id}/resume", response_model=ExecutionStatusResponse)
 async def resume_execution(execution_id: str, request: Request) -> ExecutionStatusResponse:
-    return _control_execution(request, execution_id, lambda manager, value: manager.resume_execution(value))
+    return await _control_execution(
+        request,
+        execution_id,
+        lambda manager, value: manager.resume_execution(value),
+    )
 
 
 @router.post("/executions/{execution_id}/cancel", response_model=ExecutionStatusResponse)
 async def cancel_execution(execution_id: str, request: Request) -> ExecutionStatusResponse:
-    return _control_execution(request, execution_id, lambda manager, value: manager.cancel_execution(value))
+    return await _control_execution(
+        request,
+        execution_id,
+        lambda manager, value: manager.cancel_execution(value),
+    )
 
 
 def _retry_manager(request: Request, manager: RuntimeManager) -> RetryManager:
@@ -360,7 +386,7 @@ async def retry_execution_step(
 ) -> StepExecutionResponse:
     manager = _manager(request)
     execution = _execution_or_404(manager, execution_id)
-    _require_control_access(request, execution)
+    await _require_control_access(request, execution)
     try:
         step = _retry_manager(request, manager).retry_step(execution_id, step_id)
     except ValueError as exc:
@@ -394,7 +420,8 @@ def _sse(event: ExecutionEvent) -> str:
 @router.get("/executions/{execution_id}/stream")
 async def stream_execution_events(execution_id: str, request: Request) -> StreamingResponse:
     manager = _manager(request)
-    _execution_or_404(manager, execution_id)
+    execution = _execution_or_404(manager, execution_id)
+    await _require_execution_access(request, execution)
     # A stream is a replayable Runtime feed, not a reduced tool-only feed.
     # Keep every lifecycle event visible so a client that connects after the
     # POST can reconstruct the complete task card and retry history.

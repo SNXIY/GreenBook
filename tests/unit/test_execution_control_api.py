@@ -32,10 +32,15 @@ class _Request:
             state=SimpleNamespace(
                 execution_runtime_manager=manager,
                 execution_state_manager=manager._state,
+                execution_authorizer=lambda _auth, _execution: True,
             )
         )
         self.state = SimpleNamespace(
-            auth_context=SimpleNamespace(user_id="user-1") if authenticated else None
+            auth_context=(
+                SimpleNamespace(user_id="user-1", tenant_id="tenant-1")
+                if authenticated
+                else None
+            )
         )
 
 
