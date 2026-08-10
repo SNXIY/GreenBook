@@ -11,6 +11,7 @@ from greenbook_assistant_core.execution.invocation import ExecutionResult
 from greenbook_assistant_core.execution.models import StepExecution, StepStatus
 
 from .collector import TraceCollector
+from .context import TraceContext
 from .models import EventType, TraceEvent
 
 
@@ -33,17 +34,33 @@ class AgentTrace:
         execution_id: str = "",
         task_id: str = "",
         user_id: str = "",
+        trace_context: TraceContext | None = None,
     ) -> None:
         self._c = collector
-        self.trace_id = trace_id
-        self.execution_id = execution_id
-        self.task_id = task_id
+        self.context = trace_context or TraceContext(
+            trace_id=trace_id,
+            execution_id=execution_id,
+            task_id=task_id,
+        )
+        self.trace_id = self.context.trace_id
+        self.execution_id = self.context.execution_id
+        self.task_id = self.context.task_id
         # Ensure trace exists
         collector.get_or_create(
-            trace_id,
-            task_id=task_id,
-            execution_id=execution_id,
+            self.trace_id,
+            task_id=self.task_id,
+            execution_id=self.execution_id,
+            trace_context=self.context,
         )
+
+    def bind_context(self, context: TraceContext) -> None:
+        """Bind execution-scoped identifiers after the Execution is created."""
+
+        self.context = context
+        self.trace_id = context.trace_id
+        self.execution_id = context.execution_id
+        self.task_id = context.task_id
+        self._c.bind_context(context.trace_id, context)
 
     # ── lifecycle events ─────────────────────────────────────────
 
@@ -197,6 +214,10 @@ class AgentTrace:
         step_id: str = "",
         capability: str = "",
         payload: dict | None = None,
+        invocation_id: str = "",
+        tool_call_id: str = "",
+        operation_id: str = "",
+        trace_context: TraceContext | None = None,
     ) -> TraceEvent:
         """Emit by string event type (used by ToolRuntime)."""
         from .models import EventType as ET
@@ -204,6 +225,12 @@ class AgentTrace:
             et = ET(event_type_str)
         except ValueError:
             et = ET.TOOL_INVOKED
+        context = self._event_context(
+            invocation_id=invocation_id,
+            tool_call_id=tool_call_id,
+            operation_id=operation_id,
+            trace_context=trace_context,
+        )
         return self._c.emit_event(
             trace_id=self.trace_id,
             event_type=et,
@@ -212,6 +239,7 @@ class AgentTrace:
             tool_name=tool_name,
             capability=capability,
             payload=payload or {},
+            trace_context=context,
         )
 
     def _emit(
@@ -223,7 +251,17 @@ class AgentTrace:
         capability: str = "",
         artifact_type: str = "",
         payload: dict | None = None,
+        invocation_id: str = "",
+        tool_call_id: str = "",
+        operation_id: str = "",
+        trace_context: TraceContext | None = None,
     ) -> TraceEvent:
+        context = self._event_context(
+            invocation_id=invocation_id,
+            tool_call_id=tool_call_id,
+            operation_id=operation_id,
+            trace_context=trace_context,
+        )
         return self._c.emit_event(
             trace_id=self.trace_id,
             event_type=event_type,
@@ -233,4 +271,25 @@ class AgentTrace:
             capability=capability,
             artifact_type=artifact_type,
             payload=payload or {},
+            trace_context=context,
+        )
+
+    def _event_context(
+        self,
+        *,
+        invocation_id: str = "",
+        tool_call_id: str = "",
+        operation_id: str = "",
+        trace_context: TraceContext | None = None,
+    ) -> TraceContext:
+        base = trace_context or self.context
+        if invocation_id:
+            return base.for_invocation(
+                invocation_id,
+                tool_call_id=tool_call_id or None,
+                operation_id=operation_id or None,
+            )
+        return base.with_updates(
+            tool_call_id=tool_call_id or None,
+            operation_id=operation_id or None,
         )

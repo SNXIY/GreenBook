@@ -18,6 +18,11 @@ from greenbook_assistant_core.execution.repository import ExecutionRepository
 from greenbook_assistant_core.task.models import TaskIntent
 
 
+@pytest.fixture(autouse=True)
+def clear_runtime_repository() -> None:
+    ExecutionRepository.clear()
+
+
 @pytest.mark.asyncio
 async def test_queued_runtime_is_consumed_against_existing_execution() -> None:
     repository = ExecutionRepository()

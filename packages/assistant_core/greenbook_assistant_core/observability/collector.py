@@ -6,6 +6,7 @@ ArtifactStore to emit events at key lifecycle points.
 
 from __future__ import annotations
 
+from .context import TraceContext
 from .models import EventType, Trace, TraceEvent
 
 
@@ -23,12 +24,14 @@ class TraceCollector:
         task_id: str = "",
         execution_id: str = "",
         user_id: str = "",
+        trace_context: TraceContext | None = None,
     ) -> Trace:
         trace = Trace(
             trace_id=trace_id,
             task_id=task_id,
             execution_id=execution_id,
             user_id=user_id,
+            trace_context=trace_context,
         )
         self._traces[trace.trace_id] = trace
         return trace
@@ -38,13 +41,18 @@ class TraceCollector:
         trace_id: str,
         task_id: str = "",
         execution_id: str = "",
+        trace_context: TraceContext | None = None,
     ) -> Trace:
         if trace_id in self._traces:
-            return self._traces[trace_id]
+            trace = self._traces[trace_id]
+            if trace_context is not None:
+                trace.trace_context = trace_context
+            return trace
         return self.create_trace(
             trace_id=trace_id,
             task_id=task_id,
             execution_id=execution_id,
+            trace_context=trace_context,
         )
 
     # ── emit ─────────────────────────────────────────────────────
@@ -54,8 +62,25 @@ class TraceCollector:
         trace = self._traces.get(event.trace_id)
         if trace is None:
             trace = self.create_trace(trace_id=event.trace_id)
+        if event.trace_context is None and trace.trace_context is not None:
+            event.trace_context = trace.trace_context
         trace.events.append(event)
         return event
+
+    def bind_context(self, trace_id: str, context: TraceContext) -> Trace:
+        """Apply execution-scoped identifiers to existing trace events."""
+
+        trace = self.get_or_create(trace_id, trace_context=context)
+        trace.trace_context = context
+        for event in trace.events:
+            previous = event.trace_context
+            event.trace_context = context.with_updates(
+                step_id=(previous.step_id if previous is not None else event.step_id) or None,
+                invocation_id=(previous.invocation_id if previous is not None else None) or None,
+                tool_call_id=(previous.tool_call_id if previous is not None else None) or None,
+                operation_id=(previous.operation_id if previous is not None else None) or None,
+            )
+        return trace
 
     def emit_event(
         self,
@@ -68,6 +93,7 @@ class TraceCollector:
         capability: str = "",
         artifact_type: str = "",
         payload: dict | None = None,
+        trace_context: TraceContext | None = None,
     ) -> TraceEvent:
         """Convenience: create + emit a TraceEvent in one call."""
         return self.emit(TraceEvent(
@@ -79,6 +105,7 @@ class TraceCollector:
             capability=capability,
             artifact_type=artifact_type,
             payload=payload or {},
+            trace_context=trace_context,
         ))
 
     # ── queries ──────────────────────────────────────────────────

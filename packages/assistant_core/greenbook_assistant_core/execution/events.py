@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from greenbook_assistant_core.observability.context import TraceContext
+
 
 class EventType(StrEnum):
     EXECUTION_CREATED = "EXECUTION_CREATED"
@@ -39,6 +41,7 @@ class ExecutionEvent(BaseModel):
     step_id: str | None = None
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     payload: dict[str, Any] = Field(default_factory=dict)
+    trace_context: TraceContext | None = None
 
 
 __all__ = ["EventType", "ExecutionEvent"]

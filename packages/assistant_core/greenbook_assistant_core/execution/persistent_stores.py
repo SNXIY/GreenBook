@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from .checkpoint import ExecutionCheckpoint
 from .events import ExecutionEvent, EventType
 from .operation_tracking import ExternalOperationRecord, OperationStatus
+from greenbook_assistant_core.observability.context import TraceContext
 from .persistence import (
     checkpoints,
     execution_events,
@@ -26,12 +27,18 @@ class PostgresExecutionEventStore:
 
     def append(self, event: ExecutionEvent) -> ExecutionEvent:
         with self._bind.begin() as conn:
+            payload = dict(event.payload)
+            if event.trace_context is not None:
+                payload.setdefault(
+                    "trace_context",
+                    event.trace_context.model_dump(mode="json"),
+                )
             conn.execute(sa.insert(execution_events).values(
                 event_id=event.event_id,
                 execution_id=event.execution_id,
                 event_type=event.event_type.value,
                 step_id=event.step_id,
-                payload=event.payload,
+                payload=payload,
                 created_at=event.timestamp,
             ))
         return event
@@ -43,14 +50,26 @@ class PostgresExecutionEventStore:
                 .where(execution_events.c.execution_id == execution_id)
                 .order_by(execution_events.c.created_at, execution_events.c.event_id)
             ).mappings().all()
-        return [ExecutionEvent(
-            event_id=row["event_id"],
-            execution_id=row["execution_id"],
-            event_type=EventType(row["event_type"]),
-            step_id=row["step_id"],
-            timestamp=row["created_at"],
-            payload=row["payload"] or {},
-        ) for row in rows]
+        events: list[ExecutionEvent] = []
+        for row in rows:
+            payload = row["payload"] or {}
+            raw_context = payload.get("trace_context") if isinstance(payload, dict) else None
+            trace_context = None
+            if raw_context is not None:
+                try:
+                    trace_context = TraceContext.model_validate(raw_context)
+                except (TypeError, ValueError):
+                    trace_context = None
+            events.append(ExecutionEvent(
+                event_id=row["event_id"],
+                execution_id=row["execution_id"],
+                event_type=EventType(row["event_type"]),
+                step_id=row["step_id"],
+                timestamp=row["created_at"],
+                payload=payload,
+                trace_context=trace_context,
+            ))
+        return events
 
     def clear(self, execution_id: str) -> None:
         with self._bind.begin() as conn:

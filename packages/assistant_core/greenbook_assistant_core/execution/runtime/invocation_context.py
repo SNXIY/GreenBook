@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ...observability.context import TraceContext
+
 
 class ToolInvocationContext(BaseModel):
     """Complete context for a single MCP tool invocation."""
@@ -35,6 +37,7 @@ class ToolInvocationContext(BaseModel):
 
     # ── timing ──
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    trace_context: TraceContext = Field(default_factory=TraceContext)
 
     @classmethod
     def build(
@@ -48,6 +51,7 @@ class ToolInvocationContext(BaseModel):
         tool_args: dict[str, Any] | None = None,
         user_id: str = "",
         timeout_seconds: float = 60.0,
+        trace_context: TraceContext | None = None,
     ) -> ToolInvocationContext:
         """Factory that auto-generates a stable idempotency key."""
         args = tool_args or {}
@@ -58,7 +62,7 @@ class ToolInvocationContext(BaseModel):
             tool_name or "unknown",
         ])
         digest = hashlib.sha256(material.encode()).hexdigest()[:32]
-        return cls(
+        invocation = cls(
             task_id=task_id,
             execution_id=execution_id,
             step_id=step_id,
@@ -68,4 +72,17 @@ class ToolInvocationContext(BaseModel):
             user_id=user_id,
             timeout_seconds=timeout_seconds,
             idempotency_key=f"invoke:{tool_name}:{digest}",
+            trace_context=trace_context or TraceContext(),
         )
+        invocation.trace_context = invocation.trace_context.with_updates(
+            task_id=task_id,
+            step_id=step_id,
+            invocation_id=invocation.invocation_id,
+            trace_id=(trace_context.trace_id if trace_context is not None else None),
+            execution_id=(
+                execution_id
+                if execution_id
+                else (trace_context.execution_id if trace_context is not None else None)
+            ),
+        )
+        return invocation

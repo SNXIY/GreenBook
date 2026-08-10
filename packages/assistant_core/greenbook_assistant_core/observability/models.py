@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .context import TraceContext
+
 
 class EventType(StrEnum):
     TASK_CREATED = "TASK_CREATED"
@@ -55,6 +57,7 @@ class TraceEvent(BaseModel):
 
     # ── payload ──
     payload: dict[str, Any] = {}
+    trace_context: TraceContext | None = None
 
     # ── timing ──
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
@@ -68,6 +71,7 @@ class Trace(BaseModel):
     execution_id: str = ""
     user_id: str = ""
     events: list[TraceEvent] = []
+    trace_context: TraceContext | None = None
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     completed_at: str = ""
 

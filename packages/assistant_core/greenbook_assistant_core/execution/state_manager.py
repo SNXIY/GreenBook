@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from greenbook_assistant_core.orchestration.models import TaskPlan
 from greenbook_assistant_core.planning.models import ExecutablePlan
+from greenbook_assistant_core.observability.context import TraceContext
 
 from .models import (
     ArtifactHandle,
@@ -35,10 +36,40 @@ class ExecutionStateManager:
     ) -> None:
         self._repo = repository or ExecutionRepository()
         self._event_store = event_store or _default_event_store
+        self._trace_contexts: dict[str, TraceContext] = {}
 
     @property
     def event_store(self) -> ExecutionEventStore:
         return self._event_store
+
+    def bind_trace_context(
+        self,
+        execution_id: str,
+        context: TraceContext,
+    ) -> None:
+        """Associate observability metadata without changing Execution state."""
+
+        self._trace_contexts[execution_id] = context.for_execution(execution_id)
+
+    def trace_context(self, execution_id: str) -> TraceContext | None:
+        """Return local context or recover it from a prior durable event."""
+
+        context = self._trace_contexts.get(execution_id)
+        if context is not None:
+            return context
+        for event in reversed(self._event_store.list_events(execution_id)):
+            if event.trace_context is not None:
+                self._trace_contexts[execution_id] = event.trace_context
+                return event.trace_context
+            raw_context = (event.payload or {}).get("trace_context")
+            if raw_context is not None:
+                try:
+                    context = TraceContext.model_validate(raw_context)
+                except (TypeError, ValueError):
+                    continue
+                self._trace_contexts[execution_id] = context
+                return context
+        return None
 
     # ── initialisation ───────────────────────────────────────────
 
@@ -569,12 +600,21 @@ class ExecutionStateManager:
         step_id: str | None = None,
         payload: dict[str, object] | None = None,
     ) -> None:
+        context = self.trace_context(execution_id)
+        event_context = context.for_step(step_id) if context and step_id else context
+        event_payload = dict(payload or {})
+        if event_context is not None:
+            event_payload.setdefault(
+                "trace_context",
+                event_context.model_dump(mode="json"),
+            )
         self._event_store.append(
             ExecutionEvent(
                 execution_id=execution_id,
                 event_type=event_type,
                 step_id=step_id,
-                payload=payload or {},
+                payload=event_payload,
+                trace_context=event_context,
             )
         )
 

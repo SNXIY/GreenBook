@@ -41,6 +41,7 @@ from greenbook_assistant_core.execution.runtime.ledger import ToolExecutionLedge
 from greenbook_assistant_core.execution.runtime.tool_runtime import ToolRuntime
 from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
 from greenbook_assistant_core.observability.collector import TraceCollector
+from greenbook_assistant_core.observability.context import TraceContext
 from greenbook_assistant_core.observability.trace import AgentTrace
 from greenbook_assistant_core.orchestration.context import PlanningContext
 from greenbook_assistant_core.orchestration.models import TaskPlan
@@ -323,8 +324,16 @@ class RuntimeAgentService:
 
         # ── 4. Observability ────────────────────────────────
         collector = TraceCollector()
-        trace = AgentTrace(collector, trace_id=ctx.trace_id,
-                           execution_id="", task_id=task_id)
+        trace_context = TraceContext(
+            conversation_id=ctx.conversation_id,
+            run_id=ctx.run_id,
+            trace_id=ctx.trace_id,
+            task_id=task_id,
+        )
+        trace = AgentTrace(
+            collector,
+            trace_context=trace_context,
+        )
         trace.task_created(goal=ctx.user_message, category=gc)
         trace.plan_created(template=plan.template_name, step_count=len(plan.steps))
 
@@ -529,6 +538,10 @@ class RuntimeAgentService:
         ctx.execution_id = execution.execution_id
         trace.execution_id = execution.execution_id
         executor._execution_id = execution.execution_id
+        trace_context = trace_context.for_execution(execution.execution_id)
+        trace.bind_context(trace_context)
+        executor.bind_trace_context(trace_context)
+        worker.bind_trace_context(trace_context)
         if self._dispatch_mode == "queue" and not existing_execution_id:
             if self._execution_queue is None:
                 return self._fail(
@@ -1284,6 +1297,13 @@ def _execution_dispatch_payload(
     for secret_name in ("raw_access_token", "access_token", "refresh_token"):
         auth_payload.pop(secret_name, None)
     task_context = ctx.task_context
+    trace_context = TraceContext(
+        conversation_id=ctx.conversation_id,
+        run_id=ctx.run_id,
+        trace_id=ctx.trace_id,
+        task_id=ctx.task_id,
+        execution_id=ctx.execution_id,
+    )
     return {
         "run_id": ctx.run_id,
         "trace_id": ctx.trace_id,
@@ -1314,6 +1334,7 @@ def _execution_dispatch_payload(
         "executable_plan": _safe_model_payload(executable),
         "session": _safe_model_payload(ctx.session),
         "auth_context": auth_payload,
+        "trace_context": trace_context.model_dump(mode="json"),
     }
 
 
@@ -1344,6 +1365,10 @@ def _events(collector: TraceCollector, trace_id: str, run_id: str) -> list[dict]
             "capability": e.capability,
             "tool_name": e.tool_name,
             "payload": e.payload,
+            "trace_context": (
+                e.trace_context.model_dump(mode="json")
+                if e.trace_context is not None else None
+            ),
         }}
         for e in collector.timeline(trace_id)
     ]

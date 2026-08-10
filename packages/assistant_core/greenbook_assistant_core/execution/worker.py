@@ -12,6 +12,7 @@ from typing import Any
 
 from greenbook_assistant_core.orchestration.models import PlanStep, TaskPlan
 from greenbook_assistant_core.planning.models import ExecutablePlan
+from greenbook_assistant_core.observability.context import TraceContext
 
 from .capability_executor import CapabilityExecutor
 from .events import EventType, ExecutionEvent
@@ -72,6 +73,7 @@ class ExecutionWorker:
         checkpoint_store: Any = None,
         failure_decision_engine: FailureDecisionEngine | None = None,
         operation_tracker: ExternalOperationTracker | None = None,
+        trace_context: TraceContext | None = None,
     ) -> None:
         self._executor = executor
         self._repo = repository or ExecutionRepository()
@@ -96,6 +98,63 @@ class ExecutionWorker:
         self._operation_tracker = operation_tracker or ExternalOperationTracker()
         self._scheduler = StepScheduler()
         self._trace = trace
+        self._trace_context = trace_context
+
+    def bind_trace_context(self, context: TraceContext) -> None:
+        """Bind correlation metadata after the canonical Execution exists."""
+
+        self._trace_context = context
+        self._state.bind_trace_context(context.execution_id, context)
+        binder = getattr(self._executor, "bind_trace_context", None)
+        if callable(binder):
+            binder(context)
+
+    def _append_event(
+        self,
+        event_type: EventType,
+        *,
+        execution_id: str,
+        step_id: str | None = None,
+        payload: dict[str, Any] | None = None,
+        evidence: ExecutionEvidence | None = None,
+        operation_id: str = "",
+    ) -> None:
+        context = self._trace_context or self._state.trace_context(execution_id)
+        if context is not None:
+            context = context.for_execution(execution_id)
+            if step_id:
+                context = context.for_step(step_id)
+            if evidence is not None:
+                if evidence.invocation_id:
+                    context = context.for_invocation(
+                        evidence.invocation_id,
+                        tool_call_id=evidence.tool_call_id,
+                        operation_id=operation_id or evidence.operation_id,
+                    )
+                else:
+                    context = context.with_updates(
+                        tool_call_id=evidence.tool_call_id,
+                        operation_id=operation_id or evidence.operation_id,
+                    )
+            elif operation_id:
+                context = context.for_operation(operation_id)
+        event_payload = dict(payload or {})
+        if evidence is not None:
+            event_payload.setdefault("evidence", self._evidence_payload(evidence))
+        if context is not None:
+            event_payload.setdefault(
+                "trace_context",
+                context.model_dump(mode="json"),
+            )
+        self._state.event_store.append(
+            ExecutionEvent(
+                execution_id=execution_id,
+                event_type=event_type,
+                step_id=step_id,
+                payload=event_payload,
+                trace_context=context,
+            )
+        )
 
     # ── main entry ───────────────────────────────────────────────
 
@@ -190,13 +249,11 @@ class ExecutionWorker:
         elif step_ex.status != StepStatus.RUNNING:
             return RunOutcome.WAITING_ASYNC
 
-        self._state.event_store.append(
-            ExecutionEvent(
-                execution_id=execution_id,
-                event_type=EventType.STEP_STARTED,
-                step_id=step_ex.step_id,
-                payload={"step_execution_id": sid},
-            )
+        self._append_event(
+            EventType.STEP_STARTED,
+            execution_id=execution_id,
+            step_id=step_ex.step_id,
+            payload={"step_execution_id": sid},
         )
 
         # Trace: STEP_STARTED
@@ -263,32 +320,37 @@ class ExecutionWorker:
                 execution_id=execution_id,
                 step_id=step_ex.step_id,
             )
+            operation = None
             if evidence is not None:
-                self._operation_tracker.observe_success(
+                operation = self._operation_tracker.observe_success(
                     execution_id=execution_id,
                     step_id=step_ex.step_id,
                     tool_name=result.tool_name,
                     evidence=evidence,
                 )
             if step_ex.retry_count > 0:
-                self._state.event_store.append(
-                    ExecutionEvent(
-                        execution_id=execution_id,
-                        event_type=EventType.STEP_RETRY_COMPLETED,
-                        step_id=step_ex.step_id,
-                        payload={
-                            "step_execution_id": sid,
-                            "retry_count": step_ex.retry_count,
-                        },
-                    )
-                )
-            self._state.event_store.append(
-                ExecutionEvent(
+                self._append_event(
+                    EventType.STEP_RETRY_COMPLETED,
                     execution_id=execution_id,
-                    event_type=EventType.STEP_COMPLETED,
                     step_id=step_ex.step_id,
-                    payload={"step_execution_id": sid},
+                    payload={
+                        "step_execution_id": sid,
+                        "retry_count": step_ex.retry_count,
+                        "tool_name": result.tool_name,
+                    },
+                    evidence=evidence,
+                    operation_id=operation.operation_id if operation is not None else "",
                 )
+            self._append_event(
+                EventType.STEP_COMPLETED,
+                execution_id=execution_id,
+                step_id=step_ex.step_id,
+                payload={
+                    "step_execution_id": sid,
+                    "tool_name": result.tool_name,
+                },
+                evidence=evidence,
+                operation_id=operation.operation_id if operation is not None else "",
             )
             self._state.complete_step(
                 execution_id, sid,
@@ -327,8 +389,9 @@ class ExecutionWorker:
                 execution_id=execution_id,
                 step_id=step_ex.step_id,
             )
+            operation = None
             if evidence is not None:
-                self._operation_tracker.observe_failure(
+                operation = self._operation_tracker.observe_failure(
                     execution_id=execution_id,
                     step_id=step_ex.step_id,
                     tool_name=result.tool_name,
@@ -347,23 +410,23 @@ class ExecutionWorker:
                 return RunOutcome.PAUSED
 
             if retry_decision.allowed:
-                self._state.event_store.append(
-                    ExecutionEvent(
-                        execution_id=execution_id,
-                        event_type=EventType.STEP_FAILED,
-                        step_id=step_ex.step_id,
-                        payload={
-                            "step_execution_id": sid,
-                            "retryable": True,
-                            "error_code": result.error_code,
-                            "error_message": result.error_message,
-                            "failure_category": decision.category.value,
-                            "recovery_action": decision.action.value,
-                            "recovery_reason": decision.reason,
-                            "evidence": self._evidence_payload(evidence),
-                            "retry_decision": retry_decision.model_dump(mode="json"),
-                        },
-                    )
+                self._append_event(
+                    EventType.STEP_FAILED,
+                    execution_id=execution_id,
+                    step_id=step_ex.step_id,
+                    payload={
+                        "step_execution_id": sid,
+                        "retryable": True,
+                        "error_code": result.error_code,
+                        "error_message": result.error_message,
+                        "failure_category": decision.category.value,
+                        "recovery_action": decision.action.value,
+                        "recovery_reason": decision.reason,
+                        "retry_decision": retry_decision.model_dump(mode="json"),
+                        "tool_name": result.tool_name,
+                    },
+                    evidence=evidence,
+                    operation_id=operation.operation_id if operation is not None else "",
                 )
                 failed_step = self._state.fail_step(
                     execution_id, sid,
@@ -371,39 +434,40 @@ class ExecutionWorker:
                     error_message=result.error_message,
                 )
                 if failed_step.status == StepStatus.FAILED:
-                    self._state.event_store.append(
-                        ExecutionEvent(
-                            execution_id=execution_id,
-                            event_type=EventType.STEP_RETRY_EXHAUSTED,
-                            step_id=step_ex.step_id,
-                            payload={
-                                "step_execution_id": sid,
-                                "retry_count": failed_step.retry_count,
-                                "reason": result.error_code,
-                            },
-                        )
+                    self._append_event(
+                        EventType.STEP_RETRY_EXHAUSTED,
+                        execution_id=execution_id,
+                        step_id=step_ex.step_id,
+                        payload={
+                            "step_execution_id": sid,
+                            "retry_count": failed_step.retry_count,
+                            "reason": result.error_code,
+                            "tool_name": result.tool_name,
+                        },
+                        evidence=evidence,
+                        operation_id=operation.operation_id if operation is not None else "",
                     )
             else:
                 # Permanent failure - mark downstream SKIPPED.
                 if self._trace is not None:
                     self._trace.step_failed(step_ex, result.error_message)
-                self._state.event_store.append(
-                    ExecutionEvent(
-                        execution_id=execution_id,
-                        event_type=EventType.STEP_FAILED,
-                        step_id=step_ex.step_id,
-                        payload={
-                            "step_execution_id": sid,
-                            "retryable": False,
-                            "error_code": result.error_code,
-                            "error_message": result.error_message,
-                            "failure_category": decision.category.value,
-                            "recovery_action": decision.action.value,
-                            "recovery_reason": decision.reason,
-                            "evidence": self._evidence_payload(evidence),
-                            "retry_decision": retry_decision.model_dump(mode="json"),
-                        },
-                    )
+                self._append_event(
+                    EventType.STEP_FAILED,
+                    execution_id=execution_id,
+                    step_id=step_ex.step_id,
+                    payload={
+                        "step_execution_id": sid,
+                        "retryable": False,
+                        "error_code": result.error_code,
+                        "error_message": result.error_message,
+                        "failure_category": decision.category.value,
+                        "recovery_action": decision.action.value,
+                        "recovery_reason": decision.reason,
+                        "retry_decision": retry_decision.model_dump(mode="json"),
+                        "tool_name": result.tool_name,
+                    },
+                    evidence=evidence,
+                    operation_id=operation.operation_id if operation is not None else "",
                 )
                 self._state.fail_step(
                     execution_id, sid,

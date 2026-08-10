@@ -155,15 +155,25 @@ class ExecutionEvidence(BaseModel):
     ) -> ExecutionEvidence:
         """Create the pre-handler evidence from a ToolInvocationContext."""
 
+        trace_context = getattr(context, "trace_context", None)
         tool_name = str(getattr(context, "tool_name", "") or "")
         capability = str(getattr(context, "capability", "") or "")
         tool_args = getattr(context, "tool_args", {}) or {}
         if not isinstance(tool_args, Mapping):
             tool_args = {}
         return cls(
-            execution_id=_string_or_none(getattr(context, "execution_id", None)),
-            step_id=_string_or_none(getattr(context, "step_id", None)),
-            invocation_id=_string_or_none(getattr(context, "invocation_id", None)),
+            execution_id=_string_or_none(
+                getattr(context, "execution_id", None)
+                or getattr(trace_context, "execution_id", None)
+            ),
+            step_id=_string_or_none(
+                getattr(context, "step_id", None)
+                or getattr(trace_context, "step_id", None)
+            ),
+            invocation_id=_string_or_none(
+                getattr(context, "invocation_id", None)
+                or getattr(trace_context, "invocation_id", None)
+            ),
             request_hash=_request_hash(
                 tool_name=tool_name,
                 capability=capability,
@@ -175,6 +185,8 @@ class ExecutionEvidence(BaseModel):
             runtime_idempotency_key=_string_or_none(
                 getattr(context, "idempotency_key", None)
             ),
+            operation_id=_string_or_none(getattr(trace_context, "operation_id", None)),
+            trace_id=_string_or_none(getattr(trace_context, "trace_id", None)),
         )
 
     @classmethod

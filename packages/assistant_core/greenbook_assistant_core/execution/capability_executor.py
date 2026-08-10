@@ -15,6 +15,7 @@ from greenbook_assistant_core.execution.argument_binder import ArgumentBinder
 from greenbook_assistant_core.orchestration.context import PlanningContext
 from greenbook_assistant_core.orchestration.models import PlanStep
 from greenbook_assistant_core.task.intent_models import IntentSpec
+from greenbook_assistant_core.observability.context import TraceContext
 
 from .failure_decision import normalize_failure_payload
 from .invocation import ExecutionResult
@@ -53,6 +54,7 @@ class CapabilityExecutor:
         timezone: str = "Asia/Shanghai",
         active_draft_id: str | None = None,
         active_schedule_id: str | None = None,
+        trace_context: TraceContext | None = None,
     ) -> None:
         self._registry = registry
         self._tool_handler = tool_handler
@@ -66,6 +68,12 @@ class CapabilityExecutor:
         self._timezone = timezone
         self._active_draft_id = active_draft_id
         self._active_schedule_id = active_schedule_id
+        self._trace_context = trace_context or TraceContext()
+
+    def bind_trace_context(self, context: TraceContext) -> None:
+        """Update correlation metadata after the Execution id is allocated."""
+
+        self._trace_context = context
 
     # ── main entry ───────────────────────────────────────────────
 
@@ -123,6 +131,7 @@ class CapabilityExecutor:
                     tool_name=tool_name,
                     tool_args=tool_args,
                     timeout_seconds=120.0,
+                    trace_context=self._trace_context.for_step(step.step_id),
                 )
                 result = await self._invoke_fn(ctx)
             elif self._tool_handler is not None:
