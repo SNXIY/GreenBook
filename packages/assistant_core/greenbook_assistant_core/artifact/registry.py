@@ -6,6 +6,8 @@ from collections.abc import Sequence
 
 from .models import Artifact, ArtifactLifecycle, ArtifactReference
 from .repository import ArtifactRepository
+from .lifecycle import ArtifactLifecycleError, ArtifactLifecycleValidator
+from .store import ArtifactStore, ArtifactStorePort, MemoryArtifactStore
 
 
 class ArtifactRegistryError(ValueError):
@@ -15,8 +17,21 @@ class ArtifactRegistryError(ValueError):
 class ArtifactRegistry:
     """Artifact identity/lifecycle boundary, separate from execution state."""
 
-    def __init__(self, repository: ArtifactRepository | None = None) -> None:
-        self._repository = repository or ArtifactRepository()
+    def __init__(
+        self,
+        store: ArtifactStorePort | ArtifactRepository | None = None,
+        *,
+        repository: ArtifactRepository | None = None,
+    ) -> None:
+        # ``repository=`` and positional ArtifactRepository preserve Phase15-D
+        # compatibility; new callers inject a Store implementation instead.
+        selected = repository or store
+        if isinstance(selected, ArtifactRepository):
+            self._store: ArtifactStorePort = MemoryArtifactStore(selected)
+        elif selected is None:
+            self._store = ArtifactStore()
+        else:
+            self._store = selected  # type: ignore[assignment]
 
     def register(self, artifact: Artifact) -> Artifact:
         normalized = artifact.model_copy(deep=True)
@@ -24,12 +39,12 @@ class ArtifactRegistry:
             raise ArtifactRegistryError("ARTIFACT_ID_AND_TYPE_REQUIRED")
         normalized.owner_task_id = normalized.owner_task_id or normalized.task_id
         normalized.owner_execution_id = normalized.owner_execution_id or normalized.execution_id
-        existing = self._repository.find_by_id(normalized.artifact_id)
+        existing = self._store.get(normalized.artifact_id)
         if existing is not None:
             if existing.model_dump(mode="json") != normalized.model_dump(mode="json"):
                 raise ArtifactRegistryError("ARTIFACT_ID_CONFLICT")
             return existing
-        return self._repository.save(normalized)
+        return self._store.create(normalized)
 
     def register_reference(
         self,
@@ -54,7 +69,7 @@ class ArtifactRegistry:
         ))
 
     def get(self, artifact_id: str) -> Artifact | None:
-        return self._repository.find_by_id(artifact_id)
+        return self._store.get(artifact_id)
 
     def require(self, artifact_id: str) -> Artifact:
         artifact = self.get(artifact_id)
@@ -63,7 +78,7 @@ class ArtifactRegistry:
         return artifact
 
     def find_by_task(self, task_id: str) -> list[Artifact]:
-        return self._repository.find_by_task(task_id)
+        return self._store.find_by_task(task_id)
 
     def find_by_ids(self, artifact_ids: Sequence[str]) -> list[Artifact]:
         return [artifact for artifact_id in artifact_ids if (artifact := self.get(artifact_id))]
@@ -73,12 +88,19 @@ class ArtifactRegistry:
 
     def mark_consumed(self, artifact_id: str, *, consumer_task_id: str = "") -> Artifact:
         artifact = self.require(artifact_id)
-        if artifact.lifecycle not in {ArtifactLifecycle.CREATED, ArtifactLifecycle.AVAILABLE}:
-            raise ArtifactRegistryError("ARTIFACT_NOT_CONSUMABLE")
+        if artifact.lifecycle == ArtifactLifecycle.ARCHIVED:
+            raise ArtifactRegistryError("ARTIFACT_ALREADY_ARCHIVED")
+        try:
+            ArtifactLifecycleValidator.validate_input(artifact)
+            ArtifactLifecycleValidator.validate_transition(
+                artifact.lifecycle, ArtifactLifecycle.CONSUMED,
+            )
+        except ArtifactLifecycleError as exc:
+            raise ArtifactRegistryError(str(exc)) from exc
         if consumer_task_id and consumer_task_id not in artifact.consumed_by_task_ids:
             artifact.consumed_by_task_ids.append(consumer_task_id)
         artifact.lifecycle = ArtifactLifecycle.CONSUMED
-        return self._repository.save(artifact)
+        return self._store.mark_consumed(artifact_id, consumer_task_id)
 
     def archive(self, artifact_id: str) -> Artifact:
         return self._transition(artifact_id, ArtifactLifecycle.ARCHIVED)
@@ -90,8 +112,11 @@ class ArtifactRegistry:
         artifact = self.require(artifact_id)
         if artifact.lifecycle == ArtifactLifecycle.ARCHIVED:
             raise ArtifactRegistryError("ARTIFACT_ALREADY_ARCHIVED")
-        artifact.lifecycle = lifecycle
-        return self._repository.save(artifact)
+        try:
+            ArtifactLifecycleValidator.validate_transition(artifact.lifecycle, lifecycle)
+        except ArtifactLifecycleError as exc:
+            raise ArtifactRegistryError(str(exc)) from exc
+        return self._store.update_status(artifact_id, lifecycle)
 
 
 __all__ = ["ArtifactRegistry", "ArtifactRegistryError"]

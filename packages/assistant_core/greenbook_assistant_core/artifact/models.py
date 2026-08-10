@@ -69,6 +69,7 @@ class Artifact(BaseModel):
 
     # ── provenance ──
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_reference(self) -> ArtifactReference:
         return ArtifactReference(

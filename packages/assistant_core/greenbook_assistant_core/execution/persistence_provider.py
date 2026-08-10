@@ -57,6 +57,7 @@ class RuntimePersistence:
     retry_task_store: RetryTaskStoreProtocol
     execution_queue: ExecutionQueueProtocol
     lease_manager: Any
+    artifact_store: Any
     bind: Any | None = None
     owns_bind: bool = False
 
@@ -117,6 +118,7 @@ class RuntimePersistenceFactory:
 
     @classmethod
     def _memory(cls) -> RuntimePersistence:
+        from ..artifact.store import MemoryArtifactStore
         return RuntimePersistence(
             storage=cls.MEMORY,
             execution_repository=ExecutionRepository(),
@@ -126,6 +128,7 @@ class RuntimePersistenceFactory:
             retry_task_store=RetryTaskStore(),
             execution_queue=ExecutionQueue(),
             lease_manager=ExecutionLeaseManager(),
+            artifact_store=MemoryArtifactStore(),
         )
 
     @classmethod
@@ -136,6 +139,7 @@ class RuntimePersistenceFactory:
         create_tables: bool,
         owns_bind: bool,
     ) -> RuntimePersistence:
+        from ..artifact.store import PostgresArtifactStore
         return RuntimePersistence(
             storage=cls.POSTGRES,
             execution_repository=PostgresExecutionRepository(
@@ -166,6 +170,7 @@ class RuntimePersistenceFactory:
                 bind,
                 create_tables=create_tables,
             ),
+            artifact_store=PostgresArtifactStore(bind, create_tables=create_tables),
             bind=bind,
             owns_bind=owns_bind,
         )
