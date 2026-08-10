@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test:execution": "esbuild tests/execution_api_contract.test.ts --bundle --platform=node --format=esm --define:import.meta.env.VITE_ASSISTANT_AGENT_URL=undefined | node --input-type=module",
     "preview": "vite preview",
     "lint": "tsc --noEmit"
   },

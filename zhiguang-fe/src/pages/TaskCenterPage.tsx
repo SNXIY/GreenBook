@@ -15,9 +15,11 @@ import {
 } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
 import { assistantService } from "@/services/assistantService";
+import { executionService } from "@/services/executionService";
 import { creatorTaskService } from "@/services/creatorTaskService";
 import { knowpostService } from "@/services/knowpostService";
 import type { AssistantRun, AssistantRunListItem, AssistantScheduledAction } from "@/types/assistant";
+import type { Execution } from "@/types/execution";
 import type { CreatorTaskListItem, PostTaskItem } from "@/types/task";
 import styles from "./TaskCenterPage.module.css";
 
@@ -37,7 +39,7 @@ type UnifiedTask = {
   updatedAt: string;
   createdAt: string;
   progress?: number;
-  raw: AssistantRunListItem | CreatorTaskListItem | AssistantScheduledAction | PostTaskItem;
+  raw: Execution | CreatorTaskListItem | AssistantScheduledAction | PostTaskItem;
 };
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
@@ -66,6 +68,27 @@ const assistantStatus = (status: AssistantRun["status"]): [string, TaskGroup] =>
     CANCELLED: ["已终止", "completed"]
   };
   return statuses[status];
+};
+
+const executionStatus = (status: Execution["status"]): [string, TaskGroup] => {
+  switch (status) {
+    case "PENDING":
+    case "RUNNING":
+      return ["Runtime running", "active"];
+    case "WAITING_APPROVAL":
+    case "WAITING_HUMAN":
+      return ["Waiting for approval", "attention"];
+    case "PAUSED":
+      return ["Paused", "attention"];
+    case "FAILED":
+      return ["Execution failed", "attention"];
+    case "CANCELLED":
+      return ["Cancelled", "completed"];
+    case "COMPLETED":
+      return ["Completed", "completed"];
+    default:
+      return [status, "active"];
+  }
 };
 
 const creatorStatus = (status: CreatorTaskListItem["status"]): [string, TaskGroup] => {
@@ -126,43 +149,31 @@ const sourceIcon = (source: TaskSource) => {
   }
 };
 
-const referencedCreatorTasks = (runs: AssistantRunListItem[]) => {
-  const ids = new Set<string>();
-  runs.forEach(run => {
-    run.creator_task_ids.forEach(id => ids.add(id));
-  });
-  return ids;
-};
-
 const toUnifiedTasks = (
-  runs: AssistantRunListItem[],
+  executions: Execution[],
   creatorTasks: CreatorTaskListItem[],
   schedules: AssistantScheduledAction[],
   posts: PostTaskItem[]
 ): UnifiedTask[] => {
-  const delegatedCreatorTasks = referencedCreatorTasks(runs);
-  const assistantTasks = runs.map<UnifiedTask>(run => {
-    const [statusLabel, group] = assistantStatus(run.status);
-    const completedSteps = run.steps.filter(step => step.status === "COMPLETED").length;
+  const assistantTasks = executions.map<UnifiedTask>(execution => {
+    const [statusLabel, group] = executionStatus(execution.status);
     return {
-      key: `assistant:${run.run_id}`,
+      key: `execution:${execution.execution_id}`,
       source: "assistant",
       sourceLabel: "助手任务",
-      title: run.goal || run.summary || "社区助手任务",
-      description: run.summary || run.error || "助手正在理解并执行你的目标。",
-      status: run.status,
+      title: execution.current_step || execution.task_id || "Assistant execution",
+      description: `execution_id ${execution.execution_id}`,
+      status: execution.status,
       statusLabel,
       group,
-      updatedAt: run.updated_at,
-      createdAt: run.created_at,
-      progress: run.steps.length ? Math.round((completedSteps / run.steps.length) * 100) : undefined,
-      raw: run
+      updatedAt: execution.updated_at,
+      createdAt: execution.created_at,
+      progress: Math.round(execution.progress * 100),
+      raw: execution
     };
   });
 
-  const independentCreatorTasks = creatorTasks
-    .filter(task => !delegatedCreatorTasks.has(task.task_id))
-    .map<UnifiedTask>(task => {
+  const independentCreatorTasks = creatorTasks.map<UnifiedTask>(task => {
       const [statusLabel, group] = creatorStatus(task.status);
       return {
         key: `creator:${task.task_id}`,
@@ -228,7 +239,7 @@ const TaskCenterPage = () => {
     : "all";
   const requestedPage = Number(searchParams.get("page") ?? "1");
 
-  const [runs, setRuns] = useState<AssistantRunListItem[]>([]);
+  const [executions, setExecutions] = useState<Execution[]>([]);
   const [creatorTasks, setCreatorTasks] = useState<CreatorTaskListItem[]>([]);
   const [schedules, setSchedules] = useState<AssistantScheduledAction[]>([]);
   const [posts, setPosts] = useState<PostTaskItem[]>([]);
@@ -244,14 +255,14 @@ const TaskCenterPage = () => {
     else setLoading(true);
 
     const results = await Promise.allSettled([
-      assistantService.listRuns(tokens.accessToken),
+      executionService.list(tokens.accessToken),
       creatorTaskService.list(tokens.accessToken),
       assistantService.scheduledActions(tokens.accessToken),
       knowpostService.taskItems(tokens.accessToken)
     ]);
     const errors: string[] = [];
 
-    if (results[0].status === "fulfilled") setRuns(results[0].value);
+    if (results[0].status === "fulfilled") setExecutions(results[0].value.items ?? []);
     else errors.push("助手 Agent");
 
     if (results[1].status === "fulfilled") setCreatorTasks(results[1].value.items ?? []);
@@ -273,8 +284,8 @@ const TaskCenterPage = () => {
   }, [loadTasks]);
 
   const tasks = useMemo(
-    () => toUnifiedTasks(runs, creatorTasks, schedules, posts),
-    [runs, creatorTasks, schedules, posts]
+    () => toUnifiedTasks(executions, creatorTasks, schedules, posts),
+    [executions, creatorTasks, schedules, posts]
   );
   const hasRunningTasks = tasks.some(task => task.group === "active");
 
@@ -352,7 +363,70 @@ const TaskCenterPage = () => {
   const renderActions = (task: UnifiedTask) => {
     const isBusy = busyKey === task.key;
     if (task.source === "assistant") {
-      const run = task.raw as AssistantRunListItem;
+      const execution = task.raw as Execution;
+      if (execution.status === "FAILED") {
+        return (
+          <button
+            type="button"
+            className={styles.primaryAction}
+            disabled={isBusy || !execution.current_step}
+            onClick={() => execute(task.key, "Runtime execution queued for retry", () =>
+              executionService.retryStep(tokens.accessToken, execution.execution_id, execution.current_step)
+            )}
+          >
+            {isBusy ? "Retrying" : "Retry step"}
+          </button>
+        );
+      }
+      if (execution.status === "PAUSED") {
+        return (
+          <button
+            type="button"
+            className={styles.primaryAction}
+            disabled={isBusy}
+            onClick={() => execute(task.key, "Runtime execution resumed", () =>
+              executionService.resume(tokens.accessToken, execution.execution_id)
+            )}
+          >
+            {isBusy ? "Resuming" : "Resume"}
+          </button>
+        );
+      }
+      if (["PENDING", "RUNNING", "WAITING_HUMAN", "WAITING_APPROVAL"].includes(execution.status)) {
+        return (
+          <>
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              disabled={isBusy}
+              onClick={() => execute(task.key, "Runtime execution paused", () =>
+                executionService.pause(tokens.accessToken, execution.execution_id)
+              )}
+            >
+              {isBusy ? "Pausing" : "Pause"}
+            </button>
+            <button
+              type="button"
+              className={styles.dangerAction}
+              disabled={isBusy}
+              onClick={() => {
+                if (window.confirm("Cancel this Runtime execution?")) {
+                  void execute(task.key, "Runtime execution cancelled", () =>
+                    executionService.cancel(tokens.accessToken, execution.execution_id)
+                  );
+                }
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        );
+      }
+      return null;
+    }
+
+    if ((task.source as string) === "assistant") {
+      const run = task.raw as unknown as AssistantRunListItem;
       if (run.status === "WAITING_APPROVAL" && run.approval) {
         return (
           <>
@@ -530,7 +604,22 @@ const TaskCenterPage = () => {
 
   const renderDetails = (task: UnifiedTask) => {
     if (task.source === "assistant") {
-      const run = task.raw as AssistantRunListItem;
+      const execution = task.raw as Execution;
+      return (
+        <details className={styles.details}>
+          <summary>Runtime execution details</summary>
+          <div className={styles.detailBody}>
+            <p className={styles.trace}>execution_id {execution.execution_id}</p>
+            {execution.task_id ? <p>task_id {execution.task_id}</p> : null}
+            {execution.plan_id ? <p>plan_id {execution.plan_id}</p> : null}
+            <p>current step {execution.current_step || "-"}</p>
+            <p>progress {Math.round(execution.progress * 100)}% ({execution.completed_steps}/{execution.total_steps})</p>
+          </div>
+        </details>
+      );
+    }
+    if ((task.source as string) === "assistant") {
+      const run = task.raw as unknown as AssistantRunListItem;
       return (
         <details className={styles.details}>
           <summary>运行详情</summary>

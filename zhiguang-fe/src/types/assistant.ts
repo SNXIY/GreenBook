@@ -12,6 +12,7 @@ export type AssistantMessage = {
   content: string;
   parts: AssistantToolPart[];
   run_id?: string | null;
+  execution_id?: string | null;
   created_at: string;
 };
 
@@ -26,6 +27,10 @@ export type AssistantRunAccepted = {
   conversation_id: string;
   status: string;
   events_url: string;
+  execution_id?: string | null;
+  execution_events_url?: string | null;
+  error_code?: string | null;
+  error?: string | null;
   replayed: boolean;
 };
 
@@ -50,6 +55,7 @@ export type AssistantRunStep = {
 
 export type AssistantRun = {
   run_id: string;
+  execution_id?: string | null;
   conversation_id: string;
   goal: string;
   status: "QUEUED" | "RUNNING" | "RETRYING" | "WAITING_DEPENDENCY" | "WAITING_LANE" | "WAITING_APPROVAL" | "PAUSED" | "COMPLETED" | "FAILED" | "CANCELLED";
@@ -94,6 +100,7 @@ export type AssistantRun = {
 
 export type AssistantRunListItem = {
   run_id: string;
+  execution_id?: string | null;
   conversation_id: string;
   goal: string;
   status: AssistantRun["status"];

@@ -5,7 +5,9 @@ import { commentService } from "@/services/commentService";
 import type { CommentItem } from "@/types/comment";
 import { AssistantIcon, CheckIcon } from "@/components/icons/Icon";
 import { assistantService, waitForAssistantRun } from "@/services/assistantService";
+import { waitForExecution } from "@/services/executionService";
 import type { AssistantRun } from "@/types/assistant";
+import type { Execution } from "@/types/execution";
 import styles from "./CommentSection.module.css";
 
 type Props = {
@@ -33,6 +35,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
   const [loadingReplies, setLoadingReplies] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [assistantRun, setAssistantRun] = useState<AssistantRun | null>(null);
+  const [assistantExecution, setAssistantExecution] = useState<Execution | null>(null);
   const [assistantBusy, setAssistantBusy] = useState(false);
   const [assistantExpanded, setAssistantExpanded] = useState(true);
   const [assistantTargetCommentId, setAssistantTargetCommentId] = useState<string | null>(null);
@@ -103,6 +106,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
     if (!accessToken || authLoading) return;
     setAssistantBusy(true);
     setAssistantRun(null);
+    setAssistantExecution(null);
     setAssistantExpanded(true);
     setAssistantTargetCommentId(commentId);
     setError(null);
@@ -119,6 +123,30 @@ const CommentSection = ({ postId, authorId }: Props) => {
         postId,
         commentId
       );
+      if (accepted.execution_id) {
+        const completed = await waitForExecution(
+          accessToken,
+          accepted.execution_id,
+          setAssistantExecution
+        );
+        if (completed.status === "FAILED") {
+          const failedStep = completed.steps?.find(step => step.error_message);
+          throw new Error(failedStep?.error_message || "Runtime execution failed");
+        }
+        if (["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(completed.status)) {
+          try {
+            setAssistantRun(await assistantService.getRun(accessToken, accepted.run_id));
+          } catch {
+            // Keep the Runtime execution card if the compatibility projection is unavailable.
+          }
+          return;
+        }
+        await load(null);
+        setAssistantExecution(null);
+        setAssistantExpanded(false);
+        setAssistantTargetCommentId(null);
+        return;
+      }
       const completed = await waitForAssistantRun(accessToken, accepted.run_id, setAssistantRun);
       await finishAssistantRun(completed, commentId);
     } catch (err) {
@@ -352,7 +380,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
           </button>
         </div>
       </div>
-      {assistantBusy || assistantRun ? (
+      {assistantBusy || assistantRun || assistantExecution ? (
         <aside className={styles.assistantReply} aria-live="polite">
           <button
             className={styles.assistantReplyHeader}
@@ -372,6 +400,19 @@ const CommentSection = ({ postId, authorId }: Props) => {
           </button>
           {assistantExpanded ? (
             <div className={styles.assistantReplyBody}>
+              {assistantExecution ? (
+                <div className={styles.assistantSteps} data-execution-id={assistantExecution.execution_id}>
+                  <span>Runtime {assistantExecution.status}</span>
+                  <span>Progress {Math.round(assistantExecution.progress * 100)}%</span>
+                  {assistantExecution.steps?.map(step => (
+                    <span key={step.step_execution_id || step.step_id}>
+                      {step.status === "COMPLETED" ? <CheckIcon width={13} height={13} aria-hidden="true" /> : <i aria-hidden="true" />}
+                      {step.capability || step.step_id} · {step.status}
+                    </span>
+                  ))}
+                  <small>execution_id {assistantExecution.execution_id} · events {assistantExecution.events?.length ?? 0}</small>
+                </div>
+              ) : null}
               {assistantRun?.steps.length ? (
                 <div className={styles.assistantSteps}>
                   {assistantRun.steps.map(step => (

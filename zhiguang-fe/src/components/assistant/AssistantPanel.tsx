@@ -11,6 +11,7 @@ import {
   SendIcon
 } from "@/components/icons/Icon";
 import { assistantService, waitForAssistantRun } from "@/services/assistantService";
+import { executionService, waitForExecution } from "@/services/executionService";
 import type {
   AssistantConversation,
   AssistantEpisode,
@@ -20,6 +21,7 @@ import type {
   AssistantRun,
   AssistantToolPart
 } from "@/types/assistant";
+import type { Execution } from "@/types/execution";
 import styles from "./AssistantPanel.module.css";
 
 type Props = {
@@ -51,6 +53,7 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [content, setContent] = useState("");
   const [run, setRun] = useState<AssistantRun | null>(null);
+  const [execution, setExecution] = useState<Execution | null>(null);
   const [memories, setMemories] = useState<AssistantMemory[]>([]);
   const [episodes, setEpisodes] = useState<AssistantEpisode[]>([]);
   const [memoryProfile, setMemoryProfile] = useState<AssistantMemoryProfile | null>(null);
@@ -120,7 +123,7 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, run?.steps.length, run?.status]);
+  }, [execution?.events?.length, execution?.steps?.length, execution?.status, messages, run?.steps.length, run?.status]);
 
   const send = async (suggestion?: string) => {
     const prompt = (suggestion ?? content).trim();
@@ -135,6 +138,7 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
     setMessages(previous => [...previous, optimistic]);
     setContent("");
     setRun(null);
+    setExecution(null);
     setError(null);
     setLoading(true);
     runControllerRef.current?.abort();
@@ -147,6 +151,33 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
         prompt,
         contextPostId
       );
+      if (accepted.execution_id) {
+        const completed = await waitForExecution(
+          token,
+          accepted.execution_id,
+          setExecution,
+          undefined,
+          controller.signal
+        );
+        const failedStep = completed.steps?.find(step =>
+          step.status === "FAILED" || step.status === "FAILED_RETRYABLE"
+        );
+        if (completed.status === "FAILED") {
+          throw new Error(failedStep?.error_message || completed.error_message || "Runtime execution failed");
+        }
+        if (["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(completed.status)) {
+          try {
+            setRun(await assistantService.getRun(token, accepted.run_id, controller.signal));
+          } catch {
+            // Keep the Runtime card when the compatibility projection is unavailable.
+          }
+          return;
+        }
+        setMessages(await assistantService.listMessages(token, conversation.conversation_id));
+        setRun(null);
+        setExecution(null);
+        return;
+      }
       const completed = await waitForAssistantRun(
         token,
         accepted.run_id,
@@ -187,18 +218,33 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
       if (decision === "APPROVE") {
         const controller = new AbortController();
         runControllerRef.current = controller;
-        const completed = await waitForAssistantRun(
-          token,
-          run.run_id,
-          setRun,
-          controller.signal
-        );
-        if (completed.status === "FAILED") {
-          throw new Error(completed.error || "发布失败");
+        if (execution) {
+          const completed = await waitForExecution(
+            token,
+            execution.execution_id,
+            setExecution,
+            undefined,
+            controller.signal
+          );
+          if (completed.status === "FAILED") {
+            const failedStep = completed.steps?.find(step => step.error_message);
+            throw new Error(failedStep?.error_message || "Runtime publish failed");
+          }
+        } else {
+          const completed = await waitForAssistantRun(
+            token,
+            run.run_id,
+            setRun,
+            controller.signal
+          );
+          if (completed.status === "FAILED") {
+            throw new Error(completed.error || "发布失败");
+          }
         }
       }
       setMessages(await assistantService.listMessages(token, run.conversation_id));
       setRun(null);
+      setExecution(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "审批操作失败");
     } finally {
@@ -207,6 +253,20 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
   };
 
   const cancelRun = async () => {
+    if (token && execution) {
+      runControllerRef.current?.abort();
+      setLoading(true);
+      setError(null);
+      try {
+        const updated = await executionService.cancel(token, execution.execution_id);
+        setExecution(previous => previous ? { ...previous, ...updated } : updated);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Runtime cancel failed");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     if (!token || !run || ["COMPLETED", "FAILED", "CANCELLED"].includes(run.status)) return;
     runControllerRef.current?.abort();
     setLoading(true);
@@ -221,6 +281,15 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
   };
 
   const interruptRun = async () => {
+    if (token && execution) {
+      try {
+        const updated = await executionService.pause(token, execution.execution_id);
+        setExecution(previous => previous ? { ...previous, ...updated } : updated);
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "Runtime pause failed");
+      }
+      return;
+    }
     if (!token || !run || !["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY", "WAITING_LANE"].includes(run.status)) return;
     runControllerRef.current?.abort();
     setError(null);
@@ -234,6 +303,47 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
   };
 
   const continueRun = async (mode: "resume" | "retry") => {
+    if (token && execution) {
+      setLoading(true);
+      setError(null);
+      try {
+        if (mode === "resume") {
+          const updated = await executionService.resume(token, execution.execution_id);
+          setExecution(previous => previous ? { ...previous, ...updated } : updated);
+        } else {
+          const failedStep = execution.steps?.find(step =>
+            step.status === "FAILED" || step.status === "FAILED_RETRYABLE"
+          );
+          if (!failedStep) throw new Error("No retryable Runtime step");
+          await executionService.retryStep(token, execution.execution_id, failedStep.step_id);
+        }
+        const controller = new AbortController();
+        runControllerRef.current = controller;
+        const completed = await waitForExecution(
+          token,
+          execution.execution_id,
+          setExecution,
+          undefined,
+          controller.signal
+        );
+        if (completed.status === "FAILED") {
+          const failedStep = completed.steps?.find(step => step.error_message);
+          throw new Error(failedStep?.error_message || "Runtime execution failed");
+        }
+        if (["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(completed.status)) return;
+        if (conversation) {
+          setMessages(await assistantService.listMessages(token, conversation.conversation_id));
+        }
+        setExecution(null);
+      } catch (caught) {
+        if ((caught as DOMException)?.name !== "AbortError") {
+          setError(caught instanceof Error ? caught.message : "Runtime resume failed");
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     if (!token || !run) return;
     setLoading(true);
     setError(null);
@@ -523,6 +633,63 @@ const AssistantPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Prop
                   ) : null}
                 </article>
               ))}
+
+              {execution ? (
+                <article className={styles.runCard} data-execution-id={execution.execution_id}>
+                  <div className={styles.runHeading}>
+                    <span className={execution.status === "CANCELLED" ? styles.stopped : styles.pulse} aria-hidden="true" />
+                    <strong>Runtime execution · {execution.status}</strong>
+                    {(["PENDING", "RUNNING", "WAITING_HUMAN", "WAITING_APPROVAL"].includes(execution.status)) ? (
+                      <button className={styles.cancelRun} type="button" onClick={() => void interruptRun()}>
+                        Pause
+                      </button>
+                    ) : null}
+                    {execution.status === "PAUSED" ? (
+                      <button className={styles.cancelRun} type="button" onClick={() => void continueRun("resume")}>
+                        Resume
+                      </button>
+                    ) : null}
+                    {execution.status === "FAILED" ? (
+                      <button className={styles.cancelRun} type="button" onClick={() => void continueRun("retry")}>
+                        Retry
+                      </button>
+                    ) : null}
+                    {!["COMPLETED", "FAILED", "CANCELLED"].includes(execution.status) ? (
+                      <button className={styles.cancelRun} type="button" onClick={() => void cancelRun()}>
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className={styles.steps}>
+                    {execution.steps?.map(step => (
+                      <div className={styles.step} key={step.step_execution_id || step.step_id}>
+                        <span className={styles.stepIcon} aria-hidden="true">
+                          {step.status === "COMPLETED"
+                            ? <CheckIcon width={15} height={15} />
+                            : step.capability?.includes("schedule")
+                              ? <ClockIcon width={15} height={15} />
+                              : <SearchIcon width={15} height={15} />}
+                        </span>
+                        <span>{step.capability || step.step_id}</span>
+                        <small>{step.status}</small>
+                      </div>
+                    ))}
+                  </div>
+                  {execution.status === "FAILED" ? (
+                    <p className={styles.detailError}>
+                      {execution.steps?.find(step => step.error_message)?.error_message || "Runtime execution failed"}
+                    </p>
+                  ) : null}
+                  <details className={styles.runMeta}>
+                    <summary>Execution details</summary>
+                    <span>execution_id {execution.execution_id}</span>
+                    {execution.task_id ? <span>task_id {execution.task_id}</span> : null}
+                    {execution.plan_id ? <span>plan_id {execution.plan_id}</span> : null}
+                    <span>progress {Math.round(execution.progress * 100)}% ({execution.completed_steps}/{execution.total_steps})</span>
+                    <span>events {execution.events?.length ?? 0}</span>
+                  </details>
+                </article>
+              ) : null}
 
               {run ? (
                 <article className={styles.runCard}>

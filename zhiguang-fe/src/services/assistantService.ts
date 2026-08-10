@@ -64,10 +64,10 @@ export const assistantService = {
 
   listConversations: (token: string, contextPostId?: string, signal?: AbortSignal) => {
     const query = contextPostId ? `?context_post_id=${encodeURIComponent(contextPostId)}` : "";
-    return request<AssistantConversation[]>(
+    return request<AssistantConversation[] | { items: AssistantConversation[] }>(
       `/api/v1/assistant/conversations${query}`,
       { token, signal }
-    );
+    ).then(result => Array.isArray(result) ? result : result.items);
   },
 
   listMessages: (token: string, conversationId: string, signal?: AbortSignal) =>
