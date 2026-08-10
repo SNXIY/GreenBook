@@ -27,7 +27,12 @@ from .operation_tracking import (
     OperationStatus,
 )
 from .persistent_stores import PostgresExternalOperationStore
-from .reconciliation import ReconciliationService
+from .reconciliation import (
+    ReconciliationAction,
+    ReconciliationRecoveryService,
+    ReconciliationResult,
+    ReconciliationService,
+)
 from .retry_scheduler import RetryScheduler, RetryTask, RetryTaskStatus
 from .retry_task_store import (
     PostgresRetryTaskStore,
@@ -60,6 +65,9 @@ __all__ = [
     "OperationStatus",
     "PostgresExternalOperationStore",
     "ReconciliationService",
+    "ReconciliationAction",
+    "ReconciliationRecoveryService",
+    "ReconciliationResult",
     "RetryScheduler",
     "RetryTask",
     "RetryTaskStatus",

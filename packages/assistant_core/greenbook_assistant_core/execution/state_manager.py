@@ -104,6 +104,100 @@ class ExecutionStateManager:
         self._update_execution_status(execution_id)
         return result
 
+    def reconcile_step_succeeded(
+        self,
+        execution_id: str,
+        step_execution_id: str,
+        *,
+        operation_id: str = "",
+    ) -> StepExecution:
+        """Mark an externally confirmed operation as completed.
+
+        This is intentionally separate from ``complete_step``: reconciliation
+        proves an external side effect after Runtime uncertainty, so it must
+        not pretend that the local Worker just executed the tool.
+        """
+
+        step = self._require_step(execution_id, step_execution_id)
+        if step.status == StepStatus.COMPLETED:
+            return step
+        if step.status == StepStatus.SKIPPED:
+            raise _invalid_transition(step, "non-SKIPPED", StepStatus.COMPLETED)
+        result = self._update_and_return(
+            execution_id,
+            step_execution_id,
+            status=StepStatus.COMPLETED,
+            error_code="",
+            error_message="",
+            completed_at=_now(),
+        )
+        self._update_execution_status(execution_id)
+        self._emit(
+            execution_id,
+            EventType.STEP_RECONCILIATION_SUCCEEDED,
+            step_id=step.step_id,
+            payload={"operation_id": operation_id},
+        )
+        return result
+
+    def reconcile_step_failed(
+        self,
+        execution_id: str,
+        step_execution_id: str,
+        *,
+        error_code: str,
+        error_message: str,
+        operation_id: str = "",
+    ) -> StepExecution:
+        """Record a confirmed external failure without scheduling a retry."""
+
+        step = self._require_step(execution_id, step_execution_id)
+        if step.status == StepStatus.COMPLETED:
+            return step
+        result = self._update_and_return(
+            execution_id,
+            step_execution_id,
+            status=StepStatus.FAILED,
+            error_code=error_code,
+            error_message=error_message,
+            completed_at=_now(),
+        )
+        self._update_execution_status(execution_id)
+        self._emit(
+            execution_id,
+            EventType.STEP_RECONCILIATION_FAILED,
+            step_id=step.step_id,
+            payload={
+                "operation_id": operation_id,
+                "error_code": error_code,
+                "error_message": error_message,
+            },
+        )
+        return result
+
+    def mark_reconciliation_required(
+        self,
+        execution_id: str,
+        step_execution_id: str,
+        *,
+        operation_id: str = "",
+    ) -> PlanExecution:
+        """Keep the step fact unchanged and route the execution to a human."""
+
+        ex = self._require_execution(execution_id)
+        if ex.status in (ExecutionStatus.COMPLETED, ExecutionStatus.CANCELLED):
+            return ex
+        ex.status = ExecutionStatus.WAITING_HUMAN
+        ex.updated_at = _now()
+        result = self._repo.save(ex)
+        self._emit(
+            execution_id,
+            EventType.EXECUTION_RECONCILIATION_REQUIRED,
+            step_id=self._require_step(execution_id, step_execution_id).step_id,
+            payload={"operation_id": operation_id},
+        )
+        return result
+
     def fail_step(
         self,
         execution_id: str,
