@@ -47,6 +47,9 @@ class ArtifactStore:
         artifact = Artifact(
             task_id=task_id,
             execution_id=execution_id,
+            owner_task_id=task_id,
+            owner_execution_id=execution_id,
+            created_by_agent=result.capability or result.tool_name,
             step_id=step_id,
             artifact_type=result.artifact.artifact_type,
             resource_id=result.artifact.resource_id,
@@ -57,6 +60,7 @@ class ArtifactStore:
                 "capability": result.capability,
                 "tool_result": result.tool_result.get("data") if result.tool_result else None,
             },
+            metadata_schema="greenbook.tool_result.v1",
         )
         return self._repo.save(artifact)
 
