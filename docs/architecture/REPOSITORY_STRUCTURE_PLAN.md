@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook Repository Structure Plan
 
 Phase 8.0 read-only structure audit. No files were moved, deleted, or

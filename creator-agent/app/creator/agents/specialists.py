@@ -10,30 +10,31 @@ from app.creator.agents.schemas import (
     CreatorProfileDocument,
     CritiqueDocument,
     CritiqueVerdict,
+    DataAvailability,
     DraftDocument,
     EvaluationDocument,
     EvaluationMetricDocument,
     EvidenceItem,
     EvidencePackDocument,
-    DataAvailability,
     TopicOptionsDocument,
     TopicRecommendation,
     UsedAngleDocument,
 )
+from app.creator.evaluation.ports import CreatorRuntimeEvaluator
+from app.creator.evaluation.runtime import CreatorRuntimeContextEvaluator
 from app.creator.memory.angles import (
     angles_conflict,
     extract_used_angles,
     normalize_angle_key,
     used_angles_as_dicts,
 )
-from app.creator.evaluation.ports import CreatorRuntimeEvaluator
-from app.creator.evaluation.runtime import CreatorRuntimeContextEvaluator
 from app.creator.memory.models import (
     CreatorMemoryBundle,
     CreatorMemoryQuery,
     MemorySourceStatus,
 )
 from app.creator.memory.ports import CreatorMemoryReader
+from app.creator.privacy import CreatorPrivacySanitizer
 from app.creator.providers.models import (
     CommunityAccessScope,
     CommunityCommentSort,
@@ -41,7 +42,6 @@ from app.creator.providers.models import (
     CommunitySearchResult,
 )
 from app.creator.providers.ports import CreatorCommunityProvider
-from app.creator.privacy import CreatorPrivacySanitizer
 from app.creator.retrieval.models import (
     CreatorRetrievalRequest,
     CreatorRetrievalResult,
@@ -65,7 +65,6 @@ from app.creator.runtime.ports import (
     CreatorModelRequest,
     OutputModelT,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -196,11 +195,9 @@ class MemoryAgent(_ModelSpecialist):
         limitations = list(_memory_limitations(memory_context, chinese=chinese))
         if community_profile_error:
             limitations.append(
-                (
                     "已配置的社区创作者画像当前不可用。"
                     if chinese
                     else "The configured community creator profile was unavailable."
-                )
             )
         updates: dict[str, Any] = {
             "creator_id": context.identity.creator_id,
@@ -856,6 +853,26 @@ class WriterAgent(_ModelSpecialist):
             },
             output_type=DraftDocument,
         )
+        revision_scope = str(
+            context.goal.constraints.get("revision_scope", "FULL_REVISION")
+        ).upper()
+        if revision_scope == "TITLE_ONLY":
+            document = document.model_copy(
+                update={
+                    "title": str(
+                        context.goal.constraints.get("requested_title")
+                        or document.title
+                        or draft.title
+                    ).strip(),
+                    "body_markdown": draft.body_markdown,
+                    "evidence_ids": draft.evidence_ids,
+                    "unsupported_claims": draft.unsupported_claims,
+                    "citations": draft.citations,
+                    "revision_note": document.revision_note,
+                }
+            )
+        elif revision_scope in {"CONTENT_ONLY", "STYLE_ONLY", "STRUCTURE_ONLY"}:
+            document = document.model_copy(update={"title": draft.title})
         document = _ground_draft_citations(document, evidence_context)
         parents = [draft_artifact.id]
         if critique_artifact is not None:
@@ -869,6 +886,11 @@ class WriterAgent(_ModelSpecialist):
                 chinese="已根据质量评审和人工分段批注修订草稿。",
                 english="Draft revised from critic and/or human section notes.",
             ),
+            metadata={
+                "revision_scope": revision_scope,
+                "source_artifact_id": draft_artifact.id,
+                "title_only_body_preserved": revision_scope == "TITLE_ONLY",
+            },
         )
 
 
@@ -1465,7 +1487,7 @@ async def _load_memory(
         )
     except Exception as exc:
         logger.warning(
-            "Creator Agent memory load failed agent_task_id=%s run_id=%s error=%s",
+            "Creator Service memory load failed agent_task_id=%s run_id=%s error=%s",
             context.identity.task_id,
             context.identity.run_id,
             type(exc).__name__,
@@ -1599,6 +1621,7 @@ def _draft_result(
     *,
     parents: tuple[str, ...],
     summary: str,
+    metadata: dict[str, Any] | None = None,
 ) -> AgentResult:
     word_count = len(document.body_markdown.split())
     return AgentResult(
@@ -1611,6 +1634,7 @@ def _draft_result(
                     "word_count": word_count,
                     "unsupported_claim_count": len(document.unsupported_claims),
                     "citation_count": len(document.citations),
+                    **(metadata or {}),
                 },
                 confidence=0.78,
             ),
@@ -1652,6 +1676,9 @@ def _draft_revision_instructions(
     constraints: dict[str, Any],
 ) -> tuple[str, ...]:
     instructions: list[str] = []
+    revision_instruction = str(constraints.get("revision_instruction") or "").strip()
+    if revision_instruction:
+        instructions.append(revision_instruction)
     if critique_artifact is not None:
         critique = CritiqueDocument.model_validate(critique_artifact.content)
         if critique.reviewed_artifact_id == draft_artifact_id:

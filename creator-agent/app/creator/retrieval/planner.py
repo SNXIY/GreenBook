@@ -17,7 +17,6 @@ from app.creator.retrieval.models import (
     RetrievalIntent,
 )
 
-
 _CHANNEL_ALIASES = {
     "VECTOR": RetrievalChannel.QDRANT,
     "SEMANTIC": RetrievalChannel.QDRANT,

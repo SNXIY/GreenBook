@@ -8,7 +8,7 @@ import run_p0_e2e as harness
 
 def test_timeout_budgets_are_derived_from_creator_configuration() -> None:
     assert harness.DEFAULT_CREATOR_HARD_TIMEOUT == 2460
-    assert harness.DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT == 3060
+    assert harness.DEFAULT_GREENBOOK_AGENT_RUN_HARD_TIMEOUT == 3060
     assert harness.DEFAULT_STALL_TIMEOUT == 180
 
 
@@ -81,7 +81,7 @@ def test_manifest_sanitizes_nested_evidence(tmp_path) -> None:
 
 def test_terminal_failed_run_is_not_success() -> None:
     assert harness.TERMINAL >= {"COMPLETED", "FAILED", "CANCELLED"}
-    # The assistant polling path must treat only COMPLETED as a successful result.
+    # The agent polling path must treat only COMPLETED as a successful result.
     source = open(harness.__file__, encoding="utf-8").read()
     assert 'if view.get("status") != "COMPLETED"' in source
 
@@ -97,7 +97,7 @@ def test_business_ids_are_collected_from_nested_evidence(tmp_path) -> None:
         "user_id": None,
         "conversation_id": None,
         "goal_ids": ["goal-1"],
-        "assistant_run_ids": [],
+        "agent_run_ids": [],
         "creator_task_ids": ["task-1"],
         "creator_run_ids": ["run-1"],
         "scheduled_action_ids": ["schedule-1"],

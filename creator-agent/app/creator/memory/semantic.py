@@ -16,7 +16,6 @@ from app.creator.memory.models import (
 )
 from app.creator.memory.ports import CreatorTextEmbedder
 
-
 logger = logging.getLogger(__name__)
 
 _POINT_NAMESPACE = uuid.UUID("b178f2f4-74cc-4e17-9b65-c15ce8a45177")

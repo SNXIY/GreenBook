@@ -5,7 +5,7 @@ import logging
 import re
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -51,7 +51,7 @@ class CreatorPublicationHandoffService:
         self._drafts = drafts
         self._draft_loader = draft_loader
         self._id_factory = id_factory or (lambda: str(uuid.uuid4()))
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
         self._java_base_url = (java_base_url or "").rstrip("/")
         self._java_shared_secret = java_shared_secret or ""
         self._java_timeout_seconds = java_timeout_seconds

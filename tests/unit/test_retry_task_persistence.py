@@ -7,10 +7,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
-from greenbook_assistant_core.execution.persistence import execution_metadata
-from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
-from greenbook_assistant_core.execution.retry_task import RetryTask, RetryTaskStatus
-from greenbook_assistant_core.execution.retry_task_store import PostgresRetryTaskStore
+from greenbook_agent_core.execution.persistence import execution_metadata
+from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
+from greenbook_agent_core.execution.retry_task import RetryTask, RetryTaskStatus
+from greenbook_agent_core.execution.retry_task_store import PostgresRetryTaskStore
 
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)

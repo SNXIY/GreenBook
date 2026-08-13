@@ -6,7 +6,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.creator.application.harness import CreatorAgentHarness
@@ -17,7 +17,6 @@ from app.creator.domain.errors import (
     CreatorRunLeaseConflictError,
 )
 from app.creator.domain.models import CreatorOutboxMessage
-
 
 logger = logging.getLogger(__name__)
 
@@ -177,30 +176,29 @@ class CreatorOutboxWorker:
             message.payload.get("creator_id")
             or f"unknown:{message.aggregate_id}"
         )
-        async with self._tenant_semaphore(tenant_id):
-            async with self._user_semaphore(creator_id):
-                try:
-                    await self._execute_with_heartbeat(message)
-                except asyncio.CancelledError:
-                    raise
-                except CreatorOutboxLeaseLostError:
-                    logger.warning(
-                        "Creator outbox lease lost message_id=%s worker_id=%s",
-                        message.id,
-                        self.worker_id,
-                    )
-                    return
-                except Exception as exc:
-                    await self._record_failure(message, exc)
-                    return
-                try:
-                    await self._mark_completed(message)
-                except CreatorOutboxLeaseLostError:
-                    logger.warning(
-                        "Creator outbox completion lost lease message_id=%s worker_id=%s",
-                        message.id,
-                        self.worker_id,
-                    )
+        async with self._tenant_semaphore(tenant_id), self._user_semaphore(creator_id):
+            try:
+                await self._execute_with_heartbeat(message)
+            except asyncio.CancelledError:
+                raise
+            except CreatorOutboxLeaseLostError:
+                logger.warning(
+                    "Creator outbox lease lost message_id=%s worker_id=%s",
+                    message.id,
+                    self.worker_id,
+                )
+                return
+            except Exception as exc:
+                await self._record_failure(message, exc)
+                return
+            try:
+                await self._mark_completed(message)
+            except CreatorOutboxLeaseLostError:
+                logger.warning(
+                    "Creator outbox completion lost lease message_id=%s worker_id=%s",
+                    message.id,
+                    self.worker_id,
+                )
 
     async def _execute_with_heartbeat(
         self,
@@ -426,4 +424,4 @@ def _required_payload_id(message: CreatorOutboxMessage, key: str) -> str:
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

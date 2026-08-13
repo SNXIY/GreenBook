@@ -8,7 +8,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock
 
 import pytest
-from greenbook_assistant_core.context import SessionContext
+from greenbook_agent_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_contracts.tool_result import ToolResult
 

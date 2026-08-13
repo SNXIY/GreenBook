@@ -5,7 +5,7 @@
 !**/.env.example
 privatecredentials/
 **/privatecredentials/
-zhiguang-be/src/main/resources/keys/*.pem
+apps/backend/src/main/resources/keys/*.pem
 
 # Python
 **/.venv/
@@ -44,6 +44,7 @@ Thumbs.db
 **/temp/
 **/generated/
 .p0-e2e-runs/
+.runtime/
 data/
 var/
 backups/

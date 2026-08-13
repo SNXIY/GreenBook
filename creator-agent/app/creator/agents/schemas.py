@@ -95,7 +95,7 @@ class TopicOptionsDocument(AgentDocument):
     recommendation_reason: str
 
     @model_validator(mode="after")
-    def validate_recommendation(self) -> "TopicOptionsDocument":
+    def validate_recommendation(self) -> TopicOptionsDocument:
         option_ids = {option.id for option in self.options}
         if self.recommended_option_id not in option_ids:
             raise ValueError("recommended_option_id must identify an option")
@@ -139,6 +139,7 @@ class DraftCitationDocument(AgentDocument):
 class DraftDocument(AgentDocument):
     title: str
     body_markdown: str = Field(min_length=1)
+    source_artifact_id: str | None = None
     evidence_ids: tuple[str, ...] = ()
     unsupported_claims: tuple[str, ...] = ()
     citations: tuple[DraftCitationDocument, ...] = ()

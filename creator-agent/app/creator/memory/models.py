@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -10,7 +10,7 @@ from app.creator.domain.models import CreatorRunStatus, CreatorTaskStatus
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class MemoryTier(str, Enum):
@@ -78,7 +78,7 @@ class CreatorLongTermProfile(MemoryModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
     @model_validator(mode="after")
-    def reject_sensitive_preference_fields(self) -> "CreatorLongTermProfile":
+    def reject_sensitive_preference_fields(self) -> CreatorLongTermProfile:
         sensitive = _sensitive_keys(
             {
                 "explicit_preferences": self.explicit_preferences,
@@ -119,7 +119,7 @@ class CreatorHistoricalPost(MemoryModel):
     source_revision: str | None = Field(default=None, max_length=128)
 
     @model_validator(mode="after")
-    def require_searchable_text(self) -> "CreatorHistoricalPost":
+    def require_searchable_text(self) -> CreatorHistoricalPost:
         if not (self.body.strip() or self.description.strip()):
             raise ValueError("Historical post requires body or description")
         return self

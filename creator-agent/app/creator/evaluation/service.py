@@ -36,7 +36,6 @@ from app.creator.evaluation.ports import (
     CreatorGenerationJudge,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

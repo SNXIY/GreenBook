@@ -8,7 +8,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
 
@@ -31,7 +31,6 @@ from app.creator.tools.models import (
     CreatorToolRisk,
 )
 from app.creator.tools.ports import CreatorToolAuditStore, CreatorToolHandler
-
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +106,7 @@ class CreatorToolGateway:
         self._timeout_seconds = timeout_seconds
         self._max_result_bytes = max_result_bytes
         self._id_factory = id_factory or (lambda: str(uuid.uuid4()))
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     @property
     def tool_names(self) -> tuple[str, ...]:
@@ -215,7 +214,7 @@ class CreatorToolGateway:
                 )
             )
             raise
-        except asyncio.TimeoutError as exc:
+        except TimeoutError as exc:
             timeout_error = CreatorToolTimeoutError(
                 "Tool execution timed out",
                 call_id=call_id,

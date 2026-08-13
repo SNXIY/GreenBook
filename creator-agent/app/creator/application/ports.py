@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from app.creator.domain.models import (
-    CreatorIdempotencyRecord,
     CreatorHumanDecision,
+    CreatorIdempotencyRecord,
     CreatorOutboxMessage,
     CreatorRun,
     CreatorRunEvent,
@@ -155,7 +155,7 @@ class CreatorUnitOfWork(Protocol):
     @property
     def decisions(self) -> CreatorDecisionRepository: ...
 
-    async def __aenter__(self) -> "CreatorUnitOfWork": ...
+    async def __aenter__(self) -> CreatorUnitOfWork: ...
 
     async def __aexit__(self, exc_type, exc, traceback) -> None: ...
 

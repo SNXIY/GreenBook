@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from apps.assistant_api.greenbook_assistant_api.models.runtime_result import RuntimeResult
-from apps.assistant_api.greenbook_assistant_api.services.execution_projection_adapter import (
+from apps.agent_api.greenbook_agent_api.models.runtime_result import RuntimeResult
+from apps.agent_api.greenbook_agent_api.services.execution_projection_adapter import (
     ExecutionProjectionAdapter,
 )
 

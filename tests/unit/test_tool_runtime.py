@@ -6,14 +6,14 @@ import asyncio
 from typing import Any
 
 import pytest
-from greenbook_assistant_core.execution.runtime.invocation_context import (
+from greenbook_agent_core.execution.runtime.invocation_context import (
     ToolInvocationContext,
 )
-from greenbook_assistant_core.execution.runtime.ledger import (
+from greenbook_agent_core.execution.runtime.ledger import (
     InvocationStatus,
     ToolExecutionLedger,
 )
-from greenbook_assistant_core.execution.runtime.tool_runtime import (
+from greenbook_agent_core.execution.runtime.tool_runtime import (
     InvocationResult,
     ToolRuntime,
 )

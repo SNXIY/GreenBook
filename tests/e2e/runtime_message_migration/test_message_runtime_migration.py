@@ -8,11 +8,11 @@ import pytest
 from greenbook_contracts.identity import AuthContext
 from starlette.testclient import TestClient
 
-from apps.assistant_api.greenbook_assistant_api.main import create_app
-from apps.assistant_api.greenbook_assistant_api.models.runtime_result import (
+from apps.agent_api.greenbook_agent_api.main import create_app
+from apps.agent_api.greenbook_agent_api.models.runtime_result import (
     RuntimeResult,
 )
-from greenbook_assistant_core.compatibility.history import RunExecutionAdapter
+from greenbook_agent_core.compatibility.history import RunExecutionAdapter
 
 
 class _RecordingRuntimeAdapter:
@@ -46,7 +46,7 @@ def _make_client(
 
 def _create_conversation(client: TestClient, *, active_task_id: str | None = None) -> str:
     response = client.post(
-        "/api/v1/assistant/conversations",
+        "/api/v1/agent/conversations",
         json={"title": "runtime migration"},
         headers={"Authorization": "Bearer test-token"},
     )
@@ -68,14 +68,13 @@ def test_create_content_message_uses_runtime_and_returns_execution_id(message: s
             plan_id="plan-create",
             execution_id="execution-create",
             execution_path="runtime",
-            intent_spec={"goal": message, "actions": [{"action": "CREATE"}]},
         )
 
     client, adapter = _make_client(result_factory)
     conversation_id = _create_conversation(client)
 
     response = client.post(
-        f"/api/v1/assistant/conversations/{conversation_id}/messages",
+        f"/api/v1/agent/conversations/{conversation_id}/messages",
         json={"content": message},
         headers={"Authorization": "Bearer test-token"},
     )
@@ -106,7 +105,7 @@ def test_update_message_keeps_existing_task_binding_in_runtime_request() -> None
     conversation_id = _create_conversation(client, active_task_id="task-existing")
 
     response = client.post(
-        f"/api/v1/assistant/conversations/{conversation_id}/messages",
+        f"/api/v1/agent/conversations/{conversation_id}/messages",
         json={"content": "把刚才的帖子改短一点"},
         headers={"Authorization": "Bearer test-token"},
     )
@@ -133,7 +132,7 @@ def test_runtime_failure_keeps_error_code_and_execution_id() -> None:
     conversation_id = _create_conversation(client)
 
     response = client.post(
-        f"/api/v1/assistant/conversations/{conversation_id}/messages",
+        f"/api/v1/agent/conversations/{conversation_id}/messages",
         json={"content": "写一篇文章"},
         headers={"Authorization": "Bearer test-token"},
     )

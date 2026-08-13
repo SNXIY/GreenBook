@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
-from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.invocation import ExecutionResult
+from greenbook_agent_core.execution.models import ExecutionStatus, StepStatus
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
+from greenbook_agent_core.execution.worker import ExecutionWorker, RunOutcome
+from tests.plan_factory import GoalPlanFactory
+from greenbook_agent_core.planning.validation import PlanValidator
 
 
 class _Executor:
@@ -34,7 +34,7 @@ def clear_execution_store() -> None:
 
 def _worker() -> tuple[ExecutionWorker, ExecutionStateManager, str, _Executor]:
     registry = CapabilityRegistry()
-    plan = TaskOrchestrator(registry).generate_plan(
+    plan = GoalPlanFactory(registry).generate_plan(
         task_id="guard-task",
         goal_category="CREATE_CONTENT",
         requirements=[{"type": "CREATE"}],

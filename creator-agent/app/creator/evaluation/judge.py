@@ -19,7 +19,6 @@ from app.creator.evaluation.models import (
     JudgeMetricScore,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -46,7 +45,7 @@ class _RawJudgeAssessment(BaseModel):
     limitations: tuple[str, ...] = Field(default=(), max_length=50)
 
     @model_validator(mode="after")
-    def require_assessment(self) -> "_RawJudgeAssessment":
+    def require_assessment(self) -> _RawJudgeAssessment:
         if not (
             self.faithfulness or self.relevance or self.style_consistency or self.claims
         ):

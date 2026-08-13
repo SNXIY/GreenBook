@@ -14,7 +14,6 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 from langgraph.types import Send, interrupt
-
 from pydantic import ValidationError
 
 from app.creator.agents.schemas import (
@@ -61,7 +60,6 @@ from app.creator.runtime.models import (
 from app.creator.runtime.ports import CreatorArtifactStore
 from app.creator.runtime.registry import AgentRegistryError, CreatorAgentRegistry
 from app.creator.runtime.supervisor import CreatorSupervisorAgent, execution_id
-
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -244,6 +242,13 @@ class CreatorRuntimeGraph:
             produced = []
             for payload in result.artifacts:
                 revision = next_artifact_revision(existing_refs, payload.kind)
+                parent_revisions = [
+                    ref.revision
+                    for ref in existing_refs
+                    if ref.id in payload.parent_ids
+                ]
+                if parent_revisions:
+                    revision = max(revision, max(parent_revisions) + 1)
                 artifact = build_artifact(
                     identity=run_identity,
                     step_id=execution_key,

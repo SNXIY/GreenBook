@@ -25,7 +25,6 @@ from app.creator.retrieval.rerank import (
 )
 from app.creator.retrieval.service import CreatorAgenticRetriever
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -12,7 +12,7 @@ from app.creator.tools.models import CreatorToolCallStatus
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class EvaluationModel(BaseModel):
@@ -89,7 +89,7 @@ class ToolExpectation(EvaluationModel):
     max_calls: int | None = Field(default=None, ge=1, le=20)
 
     @model_validator(mode="after")
-    def validate_call_range(self) -> "ToolExpectation":
+    def validate_call_range(self) -> ToolExpectation:
         if self.max_calls is not None and self.max_calls < self.min_calls:
             raise ValueError("max_calls cannot be smaller than min_calls")
         return self
@@ -105,7 +105,7 @@ class StyleCriteria(EvaluationModel):
     max_chars: int | None = Field(default=None, ge=1, le=500_000)
 
     @model_validator(mode="after")
-    def validate_style_rules(self) -> "StyleCriteria":
+    def validate_style_rules(self) -> StyleCriteria:
         values = (
             *self.instructions,
             *self.required_terms,
@@ -148,7 +148,7 @@ class EvaluationCriteria(EvaluationModel):
     thresholds: EvaluationThresholds = Field(default_factory=EvaluationThresholds)
 
     @model_validator(mode="after")
-    def validate_criteria(self) -> "EvaluationCriteria":
+    def validate_criteria(self) -> EvaluationCriteria:
         collections = (
             self.relevant_document_ids,
             self.expected_capabilities,
@@ -188,7 +188,7 @@ class EvaluationDataset(EvaluationModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_cases(self) -> "EvaluationDataset":
+    def validate_cases(self) -> EvaluationDataset:
         case_ids = [case.id for case in self.cases]
         if len(case_ids) != len(set(case_ids)):
             raise ValueError("Evaluation case IDs must be unique")
@@ -216,7 +216,7 @@ class ObservedPlan(EvaluationModel):
     steps: tuple[ObservedPlanStep, ...] = Field(default=(), max_length=100)
 
     @model_validator(mode="after")
-    def validate_step_ids(self) -> "ObservedPlan":
+    def validate_step_ids(self) -> ObservedPlan:
         step_ids = [step.step_id for step in self.steps]
         if len(step_ids) != len(set(step_ids)):
             raise ValueError("Observed plan step IDs must be unique")
@@ -248,7 +248,7 @@ class ClaimAssessment(EvaluationModel):
     reason: str = Field(default="", max_length=2_000)
 
     @model_validator(mode="after")
-    def validate_support(self) -> "ClaimAssessment":
+    def validate_support(self) -> ClaimAssessment:
         if len(self.supporting_evidence_ids) != len(set(self.supporting_evidence_ids)):
             raise ValueError("Supporting evidence IDs must be unique")
         if self.verdict == ClaimVerdict.SUPPORTED and not self.supporting_evidence_ids:
@@ -289,7 +289,7 @@ class CreatorEvaluationObservation(EvaluationModel):
     captured_at: datetime = Field(default_factory=utc_now)
 
     @model_validator(mode="after")
-    def validate_observation(self) -> "CreatorEvaluationObservation":
+    def validate_observation(self) -> CreatorEvaluationObservation:
         evidence_ids = [item.evidence_id for item in self.evidence]
         ranks = [item.rank for item in self.evidence]
         if len(evidence_ids) != len(set(evidence_ids)):
@@ -318,7 +318,7 @@ class EvaluationObservationSet(EvaluationModel):
     )
 
     @model_validator(mode="after")
-    def validate_case_ids(self) -> "EvaluationObservationSet":
+    def validate_case_ids(self) -> EvaluationObservationSet:
         case_ids = [observation.case_id for observation in self.observations]
         if len(case_ids) != len(set(case_ids)):
             raise ValueError("Observation case IDs must be unique")
@@ -340,7 +340,7 @@ class GenerationJudgeAssessment(EvaluationModel):
     limitations: tuple[str, ...] = Field(default=(), max_length=50)
 
     @model_validator(mode="after")
-    def validate_faithfulness_claims(self) -> "GenerationJudgeAssessment":
+    def validate_faithfulness_claims(self) -> GenerationJudgeAssessment:
         if self.faithfulness is not None and not self.claims:
             raise ValueError("Faithfulness assessment requires claim-level verdicts")
         return self
@@ -359,7 +359,7 @@ class EvaluationMetricResult(EvaluationModel):
     sample_size: int = Field(default=1, ge=0)
 
     @model_validator(mode="after")
-    def validate_result(self) -> "EvaluationMetricResult":
+    def validate_result(self) -> EvaluationMetricResult:
         if self.status == EvaluationMetricStatus.SCORED:
             if self.score is None or self.passed is None:
                 raise ValueError("Scored metrics require score and passed")
@@ -384,7 +384,7 @@ class EvaluationCaseReport(EvaluationModel):
     limitations: tuple[str, ...] = ()
 
     @model_validator(mode="after")
-    def validate_metrics(self) -> "EvaluationCaseReport":
+    def validate_metrics(self) -> EvaluationCaseReport:
         names = [metric.metric for metric in self.metrics]
         if len(names) != len(set(names)):
             raise ValueError("Case report metrics must be unique")
@@ -418,7 +418,7 @@ class EvaluationRunReport(EvaluationModel):
     completed_at: datetime
 
     @model_validator(mode="after")
-    def validate_report(self) -> "EvaluationRunReport":
+    def validate_report(self) -> EvaluationRunReport:
         case_ids = [case.case_id for case in self.cases]
         if len(case_ids) != len(set(case_ids)):
             raise ValueError("Evaluation report case IDs must be unique")

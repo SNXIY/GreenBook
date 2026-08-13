@@ -46,7 +46,7 @@ public class AgentFacadeService {
         } else if (normalizedQuery.length() > 100) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "搜索关键词不能超过100字");
         }
-        rows = knowPostMapper.searchPublicForAssistant(normalizedQuery, Math.min(boundedSize * 3, 150));
+        rows = knowPostMapper.searchPublicForAgent(normalizedQuery, Math.min(boundedSize * 3, 150));
 
         List<SearchPostItem> items = rows.stream()
                 .map(row -> {
@@ -153,8 +153,7 @@ public class AgentFacadeService {
     @Transactional
     public DraftResponse createDraft(long userId, AgentDraftCreateRequest request) {
         // Agent-created content is already produced by the trusted Creator
-        // flow, so scheduled/immediate publication must bypass the legacy
-        // moderation path.  Keep the provenance on the Java source of truth.
+        // flow and is submitted through the canonical Agent publication API.
         long id = knowPostService.createDraft(userId, "AI_ASSISTED");
 
         String objectKey = "knowposts/" + id + "/content.md";
@@ -186,7 +185,7 @@ public class AgentFacadeService {
 
     @Transactional(readOnly = true)
     public List<DraftResponse> getMyDrafts(long userId) {
-        return knowPostMapper.listOwnPostsForAssistant(userId, 50, 0)
+        return knowPostMapper.listOwnPostsForAgent(userId, 50, 0)
                 .stream()
                 .filter(p -> "draft".equals(p.getStatus()))
                 .map(p -> toDraftResponse(p, ""))

@@ -40,6 +40,7 @@ class CreatorApiPrincipal(CreatorApiModel):
 class CreatorSourceDraftRequest(CreatorApiModel):
     title: str = Field(min_length=1, max_length=512)
     body_markdown: str = Field(min_length=1, max_length=500_000)
+    source_artifact_id: str | None = Field(default=None, max_length=128)
 
 
 class CreatorTaskConstraintsRequest(CreatorApiModel):
@@ -53,6 +54,16 @@ class CreatorTaskConstraintsRequest(CreatorApiModel):
     key_points: tuple[str, ...] = Field(default=(), max_length=20)
     reference_notes: str = Field(default="", max_length=12_000)
     draft: CreatorSourceDraftRequest | None = None
+    revision_scope: Literal[
+        "TITLE_ONLY",
+        "CONTENT_ONLY",
+        "STYLE_ONLY",
+        "STRUCTURE_ONLY",
+        "FULL_REVISION",
+    ] = "FULL_REVISION"
+    requested_title: str | None = Field(default=None, max_length=512)
+    revision_instruction: str = Field(default="", max_length=4_000)
+    source_artifact_id: str | None = Field(default=None, max_length=128)
 
     def runtime_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {
@@ -70,6 +81,13 @@ class CreatorTaskConstraintsRequest(CreatorApiModel):
             values["key_points"] = self.key_points
         if self.reference_notes:
             values["reference_notes"] = self.reference_notes
+        values["revision_scope"] = self.revision_scope
+        if self.requested_title:
+            values["requested_title"] = self.requested_title
+        if self.revision_instruction:
+            values["revision_instruction"] = self.revision_instruction
+        if self.source_artifact_id:
+            values["source_artifact_id"] = self.source_artifact_id
         if self.draft is not None:
             values["draft"] = self.draft.model_dump(mode="json")
         return values
@@ -100,7 +118,7 @@ class CreatorTaskCreateRequest(CreatorApiModel):
     material_ids: tuple[str, ...] = Field(default=(), max_length=20)
 
     @model_validator(mode="after")
-    def validate_task_input(self) -> "CreatorTaskCreateRequest":
+    def validate_task_input(self) -> CreatorTaskCreateRequest:
         if (
             self.kind == CreatorTaskKind.IMPROVE_DRAFT
             and self.constraints.draft is None
@@ -126,7 +144,7 @@ class CreatorDecisionResponseRequest(CreatorApiModel):
     expected_task_version: int = Field(ge=1)
 
     @model_validator(mode="after")
-    def validate_action_payload(self) -> "CreatorDecisionResponseRequest":
+    def validate_action_payload(self) -> CreatorDecisionResponseRequest:
         if self.action == CreatorDecisionAction.SELECT and not self.selected_option_id:
             raise ValueError("SELECT requires selected_option_id")
         if (
@@ -190,7 +208,7 @@ class CreatorSuggestionRejectRequest(CreatorApiModel):
 
 class CreatorSuggestionApplyResponse(CreatorApiModel):
     suggestion: CreatorSuggestion
-    draft: "CreatorDraftView"
+    draft: CreatorDraftView
 
 
 class CreatorBranchCreateRequest(CreatorApiModel):
@@ -200,7 +218,7 @@ class CreatorBranchCreateRequest(CreatorApiModel):
 
 class CreatorBranchCreateResponse(CreatorApiModel):
     branch: CreatorBranch
-    draft: "CreatorDraftView"
+    draft: CreatorDraftView
 
 
 class CreatorChannelVariantCreateRequest(CreatorApiModel):
@@ -447,7 +465,7 @@ class CreatorTargetLengthCatalog(CreatorApiModel):
     step: int = Field(ge=1)
 
     @model_validator(mode="after")
-    def validate_range(self) -> "CreatorTargetLengthCatalog":
+    def validate_range(self) -> CreatorTargetLengthCatalog:
         if self.minimum > self.default or self.default > self.maximum:
             raise ValueError("Target length default must be within the range")
         return self

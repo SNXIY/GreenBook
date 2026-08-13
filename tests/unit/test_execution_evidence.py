@@ -4,15 +4,15 @@ import asyncio
 from typing import Any
 
 import pytest
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.execution.runtime.invocation_context import (
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.invocation import ExecutionResult
+from greenbook_agent_core.execution.runtime.invocation_context import (
     ToolInvocationContext,
 )
-from greenbook_assistant_core.execution.runtime.tool_runtime import ToolRuntime
-from greenbook_assistant_core.orchestration.models import PlanStep
+from greenbook_agent_core.execution.runtime.tool_runtime import ToolRuntime
+from greenbook_agent_core.planning.contracts import PlanStep
 from greenbook_contracts import SideEffectState, ToolResult, normalize_external_failure
 
 

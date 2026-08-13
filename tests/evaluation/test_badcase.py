@@ -7,12 +7,11 @@ from greenbook_evaluation.badcase import BadCase, FailureType
 from greenbook_evaluation.metrics import MetricsCalculator
 from greenbook_evaluation.models import EvalCheck, EvalResult
 
-
 # ── BadCase model ─────────────────────────────────────────────────
 
 def test_badcase_model() -> None:
     bc = BadCase(
-        case_id="test-1", category="INTENT",
+         case_id="test-1", category="COMMAND",
         failure_type=FailureType.WRONG_CATEGORY,
         failure_reason="expected CREATE_CONTENT, got QUERY_INFO",
     )
@@ -29,15 +28,15 @@ def test_failure_type_enum_values() -> None:
 
 # ── FailureAnalyzer classification ────────────────────────────────
 
-def test_intent_wrong_category() -> None:
+def test_command_wrong_type() -> None:
     """Goal category mismatch → WRONG_CATEGORY."""
     result = EvalResult(
-        case_id="i1", category="INTENT", passed=False,
+        case_id="i1", category="COMMAND", passed=False,
         checks=[
-            EvalCheck(check="intent.goal_category",
-                      expected="CREATE_CONTENT", actual="QUERY_INFO", ok=False),
-            EvalCheck(check="intent.relation",
-                      expected="NEW_TASK", actual="NEW_TASK", ok=True),
+            EvalCheck(check="command.type",
+                      expected="CREATE", actual="QUERY", ok=False),
+            EvalCheck(check="command.action",
+                      expected="NEW", actual="NEW", ok=True),
         ],
     )
     bad_cases = FailureAnalyzer.analyze(result)
@@ -45,13 +44,13 @@ def test_intent_wrong_category() -> None:
     assert any(bc.failure_type == FailureType.WRONG_CATEGORY for bc in bad_cases)
 
 
-def test_intent_wrong_relation() -> None:
+def test_command_wrong_action() -> None:
     """Relation mismatch → WRONG_RELATION."""
     result = EvalResult(
-        case_id="i2", category="INTENT", passed=False,
+        case_id="i2", category="COMMAND", passed=False,
         checks=[
-            EvalCheck(check="intent.relation",
-                      expected="NEW_TASK", actual="MODIFY_TASK", ok=False),
+            EvalCheck(check="command.action",
+                      expected="NEW", actual="MODIFY", ok=False),
         ],
     )
     bad_cases = FailureAnalyzer.analyze(result)
@@ -110,7 +109,7 @@ def test_execution_wrong_tool() -> None:
 
 
 def test_passed_result_no_badcases() -> None:
-    result = EvalResult(case_id="p1", category="INTENT", passed=True)
+    result = EvalResult(case_id="p1", category="COMMAND", passed=True)
     bad_cases = FailureAnalyzer.analyze(result)
     assert len(bad_cases) == 0
 
@@ -119,10 +118,10 @@ def test_passed_result_no_badcases() -> None:
 
 def test_failure_summary() -> None:
     bad_cases = [
-        BadCase(case_id="a", category="INTENT",
+        BadCase(case_id="a", category="COMMAND",
                 failure_type=FailureType.WRONG_CATEGORY,
                 failure_reason="x"),
-        BadCase(case_id="b", category="INTENT",
+        BadCase(case_id="b", category="COMMAND",
                 failure_type=FailureType.WRONG_CATEGORY,
                 failure_reason="y"),
         BadCase(case_id="c", category="DECOMPOSITION",
@@ -138,7 +137,7 @@ def test_failure_summary() -> None:
 
 def test_report_includes_bad_cases() -> None:
     results = [
-        EvalResult(case_id="ok", category="INTENT", passed=True),
+        EvalResult(case_id="ok", category="COMMAND", passed=True),
         EvalResult(case_id="fail", category="DECOMPOSITION", passed=False,
                    checks=[
                        EvalCheck(check="sub_task_count",
@@ -154,8 +153,8 @@ def test_report_includes_bad_cases() -> None:
 
 def test_all_passed_report_no_badcases() -> None:
     results = [
-        EvalResult(case_id="a", category="INTENT", passed=True),
-        EvalResult(case_id="b", category="INTENT", passed=True),
+        EvalResult(case_id="a", category="COMMAND", passed=True),
+        EvalResult(case_id="b", category="COMMAND", passed=True),
     ]
     report = MetricsCalculator.compute(results, "test")
     assert len(report.bad_cases) == 0

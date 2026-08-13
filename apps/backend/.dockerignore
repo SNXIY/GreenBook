@@ -1,0 +1,15 @@
+target/
+.git/
+.idea/
+*.iml
+*.log
+logs/
+*.md
+docs/
+db/
+*.csv
+*.txt
+!user.txt
+evil.data
+node_modules/
+.vscode/

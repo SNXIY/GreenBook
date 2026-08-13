@@ -253,7 +253,6 @@ public class CommentServiceImpl implements CommentService {
                 likeCount,
                 liked,
                 Boolean.TRUE.equals(row.getAssistant()),
-                row.getAssistantRunId(),
                 row.getCreateTime()
         );
     }

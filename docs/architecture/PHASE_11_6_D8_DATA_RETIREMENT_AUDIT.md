@@ -1,6 +1,14 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # Phase 11.6-D8 Data Layer Retirement Audit
 
 ## Scope
+
+> **Superseded by Phase 4.5:** the historical `assistant_task_intents` rows and
+> `TaskIntentRepository` path were drained and removed from the current Task
+> registry. The remaining `assistant_runs`/`run_execution_link` notes below
+> concern legacy history compatibility only; they are not Agent intelligence
+> dependencies.
 
 This is a read-only audit. No database, schema, migration, Worker, Planner,
 ToolRuntime, ExecutionStateManager, or PlanExecution changes were made.

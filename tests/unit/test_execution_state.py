@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import pytest
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.models import (
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.models import (
     ArtifactHandle,
     ExecutionStatus,
     PlanExecution,
-    StepExecution,
     StepStatus,
 )
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
+from greenbook_agent_core.planning.validation import PlanValidator
+
+from tests.plan_factory import GoalPlanFactory
 
 
 @pytest.fixture(autouse=True)
@@ -28,8 +28,8 @@ def registry() -> CapabilityRegistry:
 
 
 @pytest.fixture
-def orchestrator(registry: CapabilityRegistry) -> TaskOrchestrator:
-    return TaskOrchestrator(registry)
+def orchestrator(registry: CapabilityRegistry) -> GoalPlanFactory:
+    return GoalPlanFactory(registry)
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def mgr(repo: ExecutionRepository) -> ExecutionStateManager:
 # ── helpers ──────────────────────────────────────────────────────
 
 def _init_full_pipeline(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
     task_id: str = "t1",
@@ -71,13 +71,13 @@ def _init_full_pipeline(
 # ── Scenario 1: complete plan initialises execution ──────────────
 
 def test_full_pipeline_init(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
     ex = _init_full_pipeline(orchestrator, validator, mgr)
     assert ex.status == ExecutionStatus.PENDING
-    assert ex.total_step_count == 5
+    assert ex.total_step_count == 4
     assert ex.completed_step_count == 0
     assert ex.failed_step_count == 0
     for s in ex.steps:
@@ -87,18 +87,18 @@ def test_full_pipeline_init(
 
 
 def test_step_ordinals_match_plan(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
     ex = _init_full_pipeline(orchestrator, validator, mgr)
-    assert [s.ordinal for s in ex.steps] == [1, 2, 3, 4, 5]
+    assert [s.ordinal for s in ex.steps] == [1, 2, 3, 4]
 
 
 # ── Scenario 2: step 1 success, step 2 fails ────────────────────
 
 def test_step1_success_step2_fails(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -139,7 +139,7 @@ def test_step1_success_step2_fails(
 
 
 def test_step_exhausts_retries_becomes_failed(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -164,7 +164,7 @@ def test_step_exhausts_retries_becomes_failed(
 # ── Scenario 3: resume skips completed step ─────────────────────
 
 def test_resume_skips_completed_steps(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -191,7 +191,7 @@ def test_resume_skips_completed_steps(
 
 
 def test_resume_after_crash_resets_running_steps(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -207,10 +207,31 @@ def test_resume_after_crash_resets_running_steps(
     assert resumed.steps[0].status == StepStatus.PENDING  # reset
 
 
+def test_resume_does_not_bypass_waiting_human_reconciliation(
+    orchestrator: GoalPlanFactory,
+    validator: PlanValidator,
+    mgr: ExecutionStateManager,
+) -> None:
+    ex = _init_full_pipeline(orchestrator, validator, mgr)
+    mgr.start_execution(ex.execution_id)
+    mgr.wait_for_human(
+        ex.execution_id,
+        step_execution_id=ex.steps[0].step_execution_id,
+        reason="External operation evidence is ambiguous",
+    )
+
+    with pytest.raises(ValueError, match="waiting for human reconciliation"):
+        mgr.resume_execution(ex.execution_id)
+
+    current = mgr.get_execution(ex.execution_id)
+    assert current.status == ExecutionStatus.WAITING_HUMAN
+    assert current.steps[0].status == StepStatus.PENDING
+
+
 # ── Scenario 4: approval pause and resume ───────────────────────
 
 def test_approval_pause(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -227,7 +248,7 @@ def test_approval_pause(
 
 
 def test_approval_resume(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -240,14 +261,14 @@ def test_approval_resume(
     mgr.approve_and_resume(ex.execution_id, s3.step_execution_id)
 
     ex2 = mgr._require_execution(ex.execution_id)
-    assert ex2.steps[2].status == StepStatus.RUNNING
+    assert ex2.steps[2].status == StepStatus.PENDING
     assert ex2.status == ExecutionStatus.RUNNING
 
 
 # ── edge cases ────────────────────────────────────────────────────
 
 def test_cannot_start_non_pending_step(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -262,7 +283,7 @@ def test_cannot_start_non_pending_step(
 
 
 def test_cannot_complete_non_running_step(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -273,7 +294,7 @@ def test_cannot_complete_non_running_step(
 
 
 def test_inject_artifact_to_step(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -297,7 +318,7 @@ def test_inject_artifact_to_step(
 
 
 def test_cancel_execution(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -310,7 +331,7 @@ def test_cancel_execution(
 
 
 def test_complete_all_steps_sets_completed(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     mgr: ExecutionStateManager,
 ) -> None:
@@ -324,4 +345,4 @@ def test_complete_all_steps_sets_completed(
     ex2 = mgr._require_execution(ex.execution_id)
     assert ex2.status == ExecutionStatus.COMPLETED
     assert ex2.completed_at != ""
-    assert ex2.completed_step_count == 5
+    assert ex2.completed_step_count == 4

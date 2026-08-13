@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from greenbook_assistant_core.db.schema_guard import (
+from greenbook_agent_core.db.schema_guard import (
     RUNTIME_SCHEMA_MISMATCH,
     verify_runtime_projection_schema,
 )

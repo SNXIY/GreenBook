@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.creator.memory.errors import CreatorMemoryConflictError
 from app.creator.memory.models import CreatorLongTermProfile, CreatorTaskMemory
@@ -44,7 +44,7 @@ class InMemoryCreatorShortTermMemoryStore:
             stored = memory.model_copy(
                 update={
                     "version": actual_version + 1,
-                    "updated_at": datetime.now(timezone.utc),
+                    "updated_at": datetime.now(UTC),
                 }
             )
             self._items[key] = stored
@@ -89,7 +89,7 @@ class InMemoryCreatorLongTermProfileStore:
                         "actual_version": actual_version,
                     },
                 )
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stored = profile.model_copy(
                 update={
                     "version": actual_version + 1,

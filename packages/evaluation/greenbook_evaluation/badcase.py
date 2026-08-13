@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class FailureType(StrEnum):
-    # Intent
+    # Command understanding
     WRONG_CATEGORY = "WRONG_CATEGORY"
     WRONG_RELATION = "WRONG_RELATION"
 
@@ -34,7 +34,7 @@ class BadCase(BaseModel):
     """One failure from an evaluation run."""
 
     case_id: str = ""
-    category: str = ""               # INTENT | DECOMPOSITION | …
+    category: str = ""               # COMMAND | GOAL | REFERENCE | EXECUTION
     description: str = ""
     failure_type: FailureType = FailureType.UNKNOWN
     failure_reason: str = ""         # human-readable explanation
@@ -44,11 +44,11 @@ class BadCase(BaseModel):
     actual: dict = Field(default_factory=dict)
 
     trace_checks: list[dict] = Field(default_factory=list)
-    # [{check: "intent.goal_category", expected: "CREATE_CONTENT", actual: "QUERY_INFO"}]
+    # [{check: "command.type", expected: "CREATE", actual: "QUERY"}]
 
     # Phase 6.11 runtime regression snapshot fields.
     user_input: str = ""
-    intent_spec: dict | None = None
+    understanding_snapshot: dict | None = None
     task_plan: dict | None = None
     execution_trace: object | None = None
     expected_behavior: dict = Field(default_factory=dict)

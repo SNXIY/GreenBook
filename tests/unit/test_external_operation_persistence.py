@@ -7,13 +7,13 @@ from typing import Any
 import sqlalchemy as sa
 import pytest
 
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.operation_tracking import OperationStatus
-from greenbook_assistant_core.execution.persistence import execution_metadata
-from greenbook_assistant_core.execution.persistent_stores import (
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.operation_tracking import OperationStatus
+from greenbook_agent_core.execution.persistence import execution_metadata
+from greenbook_agent_core.execution.persistent_stores import (
     PostgresExternalOperationStore,
 )
-from greenbook_assistant_core.execution.operation_tracking import ExternalOperationRecord
+from greenbook_agent_core.execution.operation_tracking import ExternalOperationRecord
 
 
 @pytest.fixture

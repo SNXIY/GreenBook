@@ -1,8 +1,0 @@
-{
-    "python_version": "3.12",
-    "dependencies": ["./src"],
-    "graphs": {
-        "moderation_agent": "./src/agents/moderation/graph.py:moderation_agent"
-    },
-    "env": "./.env"
-}

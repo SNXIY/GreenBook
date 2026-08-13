@@ -1,9 +1,31 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook Agent Runtime Deprecation Status
+
+## Current canonical status (Phase 4.5)
+
+The authoritative production path is now:
+
+```text
+Command -> GoalTree -> TaskManager -> AgentLoop
+  -> DynamicPlanner / ToolSelector / ToolPolicyGate
+  -> ExecutionSubmissionService -> Queue / Worker -> ToolRuntime / MCP
+```
+
+`TaskUnderstanding`, `IntentSpecProvider`, `intent_compat.py`, the old
+`TaskCommand`, `TaskGraphBuilder`, and `compatibility/intent/` source modules
+are retired. `IntentSpec`/`TaskIntent` may only appear as execution-input
+compatibility snapshots while queue payloads and direct execution callers are
+migrated. See `docs/migration/PHASE4_5_CANONICAL_RUNTIME_CUTOVER.md` for the
+current caller inventory and removal conditions.
+
+The status sections below are historical Phase 7.3-A material and are not an
+active dependency allow-list.
 
 > Phase 7.3-A。本文记录 Legacy 和 Compatibility 的当前边界。
 > 本阶段不删除文件，不改变业务逻辑，不修改 Planner、Worker 或 Execution Runtime。
 
-## ACTIVE
+## Historical ACTIVE snapshot (superseded)
 
 当前正式生产路径：
 

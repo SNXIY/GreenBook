@@ -11,7 +11,7 @@ without requiring live infrastructure.
 from __future__ import annotations
 
 import pytest
-from greenbook_assistant_core.context import SessionContext
+from greenbook_agent_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_contracts.tool_result import ToolResult
 
@@ -168,7 +168,7 @@ class TestErrorHandling:
         """Creator不可用时错误可读且可安全重试."""
         from greenbook_contracts.tool_result import ToolResult
 
-        r = ToolResult.dependency_unavailable("Creator Agent unreachable")
+        r = ToolResult.dependency_unavailable("Creator Service unreachable")
         assert r.retryable is True
         assert r.request_sent is False
         assert r.code == "DEPENDENCY_UNAVAILABLE"
@@ -199,7 +199,7 @@ class TestErrorHandling:
 
     async def test_logs_never_contain_secrets(self) -> None:
         """日志不出现密码、JWT、API Key、Authorization Header."""
-        from greenbook_assistant_core.middleware import sanitize_headers
+        from greenbook_agent_core.middleware import sanitize_headers
 
         headers = {
             "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",

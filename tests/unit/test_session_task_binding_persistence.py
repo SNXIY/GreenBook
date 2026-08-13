@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from greenbook_assistant_core.context import SessionContext
+from greenbook_agent_core.context import SessionContext
 
 
 def test_task_and_artifact_binding_round_trip() -> None:

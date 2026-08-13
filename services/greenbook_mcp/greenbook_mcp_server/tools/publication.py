@@ -49,9 +49,10 @@ _MODIFIABLE_STATUSES = {ScheduleStatus.SCHEDULED.value}
 
 async def schedule(
     ctx: ToolContext,
-    draft_id: str | None,
     run_at: str,
+    draft_id: str | None = None,
     timezone: str = "Asia/Shanghai",
+    requires_approval: bool = False,
 ) -> ToolResult[Any]:
     """Schedule a draft for publication."""
     resolved_draft = draft_id or ctx.session.active_draft_id
@@ -62,6 +63,16 @@ async def schedule(
                 "No draft specified for scheduling.",
                 user_message="请指定要定时发布的草稿。",
             )
+
+    # This is a request-level safety constraint, not a second policy catalog:
+    # ordinary future scheduling remains available, while an explicit user
+    # request for confirmation never crosses the Java write boundary first.
+    if requires_approval and not ctx.approval_granted:
+        return ToolResult.failure(
+            "APPROVAL_REQUIRED",
+            "The user requested approval before creating this publication schedule.",
+            user_message="创建发布排期前需要你的确认。",
+        )
 
     idempotency_key = ctx.idempotency_key(
         "schedule",
@@ -448,8 +459,12 @@ async def publish_now(
                 user_message="审批资源与原请求不匹配，请重新确认。",
             )
 
-    # Require explicit approval flag (controlled by the assistant)
-    return ToolResult.business_rejected(
+    if ctx.approval_granted:
+        return await publish_now_execute(ctx, resolved_draft)
+
+    # Require explicit approval flag (controlled by the Agent Runtime)
+    return ToolResult.failure(
+        "APPROVAL_REQUIRED",
         "publish_now requires explicit user approval",
         user_message=(
             "立即发布需要用户确认。请确认是否发布该草稿。"
@@ -475,11 +490,26 @@ async def publish_now_execute(
         tool_call_id=ctx.tool_call_id,
     )
     if result.ok and result.data:
+        data = (
+            result.data.model_dump(mode="json")
+            if hasattr(result.data, "model_dump")
+            else dict(result.data)
+        )
+        if result.receipt_id:
+            data.setdefault("external_operation_id", result.receipt_id)
+            data.setdefault("receipt_id", result.receipt_id)
+        post_id = str(data.get("post_id") or "").strip()
+        resource_refs = [
+            ResourceRef(ref=f"draft:{draft_id}", kind="DRAFT", resource_id=draft_id),
+        ]
+        if post_id:
+            resource_refs.append(
+                ResourceRef(ref=f"post:{post_id}", kind="POST", resource_id=post_id)
+            )
         return ToolResult.success(
-            result.data.model_dump(mode="json") if hasattr(result.data, "model_dump") else result.data,
+            data,
             trace_id=ctx.trace_id,
-            resource_refs=[
-                ResourceRef(ref=f"draft:{draft_id}", kind="DRAFT", resource_id=draft_id),
-            ],
+            receipt_id=result.receipt_id,
+            resource_refs=resource_refs,
         )
     return result

@@ -1,57 +1,43 @@
-"""Risk-based execution policy for tool operations.
-
-Determines whether a tool requires approval before execution.
-"""
+"""Security projection over the canonical ToolMetadata policy catalog."""
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
+
+from greenbook_contracts.tool_contract import TOOL_POLICY_CATALOG
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
 
 
-# Read-only operations: auto-execute
-LOW_RISK_TOOLS: set[str] = {
-    "community.search_public_posts",
-    "community.get_post",
-    "community.list_own_posts",
-    "content.get_draft",
-    "content.list_drafts",
-    "publication.get_status",
-    "interaction.list_comments",
-    "analytics.get_post_performance",
-    "analytics.get_account_summary",
-}
+class SecurityPolicy:
+    """Small injectable facade used by the Runtime composition root."""
 
-# Idempotent write operations: auto-execute with idempotency
-MEDIUM_RISK_TOOLS: set[str] = {
-    "content.create_draft",
-    "content.revise_draft",
-    "publication.schedule",
-    "publication.update_schedule",
-    "publication.cancel_schedule",
-}
+    def risk_level(self, tool_name: str) -> RiskLevel:
+        return tool_risk_level(tool_name)
 
-# Destructive or irreversible operations: require approval
-HIGH_RISK_TOOLS: set[str] = {
-    "publication.publish_now",
-    "interaction.send_reply",
-}
+    def requires_approval(self, tool_name: str) -> bool:
+        return requires_approval(tool_name)
 
 
 def tool_risk_level(tool_name: str) -> RiskLevel:
-    if tool_name in LOW_RISK_TOOLS:
-        return RiskLevel.LOW
-    if tool_name in MEDIUM_RISK_TOOLS:
-        return RiskLevel.MEDIUM
-    if tool_name in HIGH_RISK_TOOLS:
+    """Project canonical contract risk into the security enum."""
+
+    policy = TOOL_POLICY_CATALOG.get(tool_name)
+    if policy is None:
         return RiskLevel.HIGH
-    return RiskLevel.HIGH
+    return {
+        "READ": RiskLevel.LOW,
+        "IDEMPOTENT_WRITE": RiskLevel.MEDIUM,
+        "DESTRUCTIVE_WRITE": RiskLevel.HIGH,
+    }.get(policy.risk_level, RiskLevel.HIGH)
 
 
 def requires_approval(tool_name: str) -> bool:
-    return tool_risk_level(tool_name) == RiskLevel.HIGH
+    policy = TOOL_POLICY_CATALOG.get(tool_name)
+    # Unknown tools remain fail-closed until their canonical contract is
+    # registered with an explicit policy.
+    return True if policy is None else policy.requires_approval

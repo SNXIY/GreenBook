@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import pytest
-from greenbook_assistant_core.capability.mapper import CapabilityMapper
-from greenbook_assistant_core.capability.models import (
+from greenbook_agent_core.capability.mapper import CapabilityMapper
+from greenbook_agent_core.capability.models import (
     Capability,
     CapabilityCategory,
     CapabilityMatch,
-    RiskLevel,
 )
-from greenbook_assistant_core.capability.registry import (
+from greenbook_contracts.tool_contract import TOOL_POLICY_CATALOG
+from greenbook_agent_core.capability.registry import (
     CapabilityRegistry,
     get_capability_registry,
 )
@@ -92,11 +92,13 @@ def test_create_content_maps_to_generate_content(mapper: CapabilityMapper) -> No
 def test_generate_content_has_correct_metadata(registry: CapabilityRegistry) -> None:
     cap = registry.get_required("GENERATE_CONTENT")
     assert cap.category == CapabilityCategory.CREATE
-    assert cap.side_effect is True
-    assert cap.risk_level == RiskLevel.IDEMPOTENT_WRITE
+    assert "risk_level" not in type(cap).model_fields
+    assert "requires_approval" not in type(cap).model_fields
+    assert "side_effect" not in type(cap).model_fields
     assert cap.output_artifact_type == "DRAFT"
     assert "title" in cap.inputs.required
-    assert "content" in cap.inputs.required
+    assert "instruction" in cap.inputs.required
+    assert "content" not in cap.inputs.required
 
 
 # ── Scenario 2: IMPROVE_CONTENT → content.revise_draft ────────────
@@ -106,7 +108,7 @@ def test_improve_content_maps_correctly(mapper: CapabilityMapper) -> None:
     assert match.capability is not None
     assert match.capability.name == "IMPROVE_CONTENT"
     assert "content.revise_draft" in match.capability.tools
-    assert match.capability.side_effect is True
+    assert "side_effect" not in type(match.capability).model_fields
 
 
 def test_improve_content_requires_draft_id(registry: CapabilityRegistry) -> None:
@@ -205,7 +207,7 @@ def test_analyze_patterns_is_llm_step(registry: CapabilityRegistry) -> None:
     cap = registry.get_required("ANALYZE_CONTENT_PATTERNS")
     assert cap.is_llm_step is True
     assert cap.tools == []
-    assert cap.side_effect is False
+    assert "side_effect" not in type(cap).model_fields
     assert cap.output_artifact_type == "ANALYSIS_REPORT"
 
 
@@ -219,21 +221,19 @@ def test_validate_quality_is_llm_step(registry: CapabilityRegistry) -> None:
 # ── Risk levels ──────────────────────────────────────────────────
 
 def test_publish_now_requires_approval(registry: CapabilityRegistry) -> None:
-    cap = registry.get_required("PUBLISH_NOW")
-    assert cap.requires_approval is True
-    assert cap.risk_level == RiskLevel.DESTRUCTIVE_WRITE
+    assert TOOL_POLICY_CATALOG["publication.publish_now"].requires_approval is True
+    assert TOOL_POLICY_CATALOG["publication.publish_now"].risk_level == "DESTRUCTIVE_WRITE"
 
 
 def test_reply_user_requires_approval(registry: CapabilityRegistry) -> None:
-    cap = registry.get_required("REPLY_USER")
-    assert cap.requires_approval is True
-    assert cap.risk_level == RiskLevel.DESTRUCTIVE_WRITE
+    assert TOOL_POLICY_CATALOG["interaction.send_reply"].requires_approval is True
+    assert TOOL_POLICY_CATALOG["interaction.send_reply"].risk_level == "DESTRUCTIVE_WRITE"
 
 
 def test_read_capability_no_side_effect(registry: CapabilityRegistry) -> None:
     cap = registry.get_required("SEARCH_COMMUNITY")
-    assert cap.side_effect is False
-    assert cap.risk_level == RiskLevel.READ
+    assert "side_effect" not in type(cap).model_fields
+    assert TOOL_POLICY_CATALOG["community.search_public_posts"].risk_level == "READ"
 
 
 # ── Singleton ────────────────────────────────────────────────────

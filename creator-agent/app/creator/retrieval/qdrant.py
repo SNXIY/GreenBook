@@ -17,7 +17,6 @@ from app.creator.retrieval.models import (
 )
 from app.creator.retrieval.scoring import query_sha256
 
-
 logger = logging.getLogger(__name__)
 
 _POINT_NAMESPACE = uuid.UUID("7d862284-cff8-48d4-887a-7b13b07927d7")

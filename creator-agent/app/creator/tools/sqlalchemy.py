@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -65,25 +65,24 @@ class SqlAlchemyCreatorToolAuditStore:
         self._sessions = sessions
 
     async def start(self, audit: CreatorToolCallAudit) -> None:
-        async with self._sessions() as session:
-            async with session.begin():
-                session.add(
-                    CreatorToolCallRow(
-                        call_id=audit.call_id,
-                        trace_id=audit.trace_id,
-                        task_id=audit.task_id,
-                        run_id=audit.run_id,
-                        tenant_id=audit.tenant_id,
-                        creator_id=audit.creator_id,
-                        actor_id=audit.actor_id,
-                        caller=audit.caller,
-                        tool_name=audit.tool_name,
-                        risk=audit.risk.value,
-                        arguments_sha256=audit.arguments_sha256,
-                        status=audit.status.value,
-                        started_at=audit.started_at,
-                    )
+        async with self._sessions() as session, session.begin():
+            session.add(
+                CreatorToolCallRow(
+                    call_id=audit.call_id,
+                    trace_id=audit.trace_id,
+                    task_id=audit.task_id,
+                    run_id=audit.run_id,
+                    tenant_id=audit.tenant_id,
+                    creator_id=audit.creator_id,
+                    actor_id=audit.actor_id,
+                    caller=audit.caller,
+                    tool_name=audit.tool_name,
+                    risk=audit.risk.value,
+                    arguments_sha256=audit.arguments_sha256,
+                    status=audit.status.value,
+                    started_at=audit.started_at,
                 )
+            )
 
     async def finish(
         self,
@@ -96,29 +95,28 @@ class SqlAlchemyCreatorToolAuditStore:
         result_size_bytes: int | None,
         error_code: str | None,
     ) -> None:
-        async with self._sessions() as session:
-            async with session.begin():
-                result = await session.execute(
-                    update(CreatorToolCallRow)
-                    .where(
-                        CreatorToolCallRow.call_id == call_id,
-                        CreatorToolCallRow.status
-                        == CreatorToolCallStatus.RUNNING.value,
-                    )
-                    .values(
-                        status=status.value,
-                        finished_at=finished_at,
-                        latency_ms=latency_ms,
-                        result_sha256=result_sha256,
-                        result_size_bytes=result_size_bytes,
-                        error_code=error_code,
-                    )
+        async with self._sessions() as session, session.begin():
+            result = await session.execute(
+                update(CreatorToolCallRow)
+                .where(
+                    CreatorToolCallRow.call_id == call_id,
+                    CreatorToolCallRow.status
+                    == CreatorToolCallStatus.RUNNING.value,
                 )
-                if result.rowcount != 1:
-                    raise CreatorToolAuditError(
-                        f"Tool audit {call_id} could not be finalized",
-                        call_id=call_id,
-                    )
+                .values(
+                    status=status.value,
+                    finished_at=finished_at,
+                    latency_ms=latency_ms,
+                    result_sha256=result_sha256,
+                    result_size_bytes=result_size_bytes,
+                    error_code=error_code,
+                )
+            )
+            if result.rowcount != 1:
+                raise CreatorToolAuditError(
+                    f"Tool audit {call_id} could not be finalized",
+                    call_id=call_id,
+                )
 
     async def get(self, call_id: str) -> CreatorToolCallAudit | None:
         async with self._sessions() as session:
@@ -151,5 +149,5 @@ def _from_row(row: CreatorToolCallRow) -> CreatorToolCallAudit:
 
 def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

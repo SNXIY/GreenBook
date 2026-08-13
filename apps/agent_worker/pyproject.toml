@@ -1,0 +1,22 @@
+[project]
+name = "greenbook-agent-worker"
+version = "0.1.0"
+description = "GreenBook Agent Worker - durable queue consumer and scheduled jobs"
+requires-python = ">=3.12"
+dependencies = [
+    "greenbook-contracts",
+    "greenbook-agent-core",
+    "greenbook-agent-api",
+    "greenbook-creator-client",
+    "greenbook-java-client",
+    "greenbook-mcp-server",
+    "aiokafka>=0.12",
+    "openai>=1.80",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["greenbook_agent_worker"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

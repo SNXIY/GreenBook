@@ -13,11 +13,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_runtime_projection_insert_keeps_status_null() -> None:
-    database_url = os.getenv("ASSISTANT_PROJECTION_TEST_DATABASE_URL")
+    database_url = os.getenv("GREENBOOK_AGENT_PROJECTION_TEST_DATABASE_URL")
     if not database_url:
-        pytest.skip("ASSISTANT_PROJECTION_TEST_DATABASE_URL is not configured")
+        pytest.skip("GREENBOOK_AGENT_PROJECTION_TEST_DATABASE_URL is not configured")
     if not database_url.startswith("postgresql+"):
-        pytest.fail("ASSISTANT_PROJECTION_TEST_DATABASE_URL must use a PostgreSQL async driver")
+        pytest.fail("GREENBOOK_AGENT_PROJECTION_TEST_DATABASE_URL must use a PostgreSQL async driver")
 
     engine = create_async_engine(database_url)
     conversation_id = uuid4()

@@ -37,10 +37,10 @@ GREENBOOK_E2E_PASSWORD=<测试账号密码>
 CreatorDraft 场景只删除本次运行创建的测试草稿；删除失败时会输出草稿 ID，供手工清理。
 脚本不会打印密码、access token 或服务密钥。
 
-生成真实 Assistant 运行聚合：
+运行行为评测：
 
 ```powershell
-.\scripts\runtime-report.ps1 -Days 30
+uv run pytest -q tests/unit/test_agent_evaluation_runtime.py tests/evaluation
 ```
 
 ## 人工产品验收
@@ -51,8 +51,7 @@ CreatorDraft 场景只删除本次运行创建的测试草稿；删除失败时�
 - [ ] AI 草稿标题、摘要、正文和内容指纹与 Creator 最终版本一致。
 - [ ] AI 草稿被编辑后，旧人工确认或定时发布授权失效。
 - [ ] 手动创作上传正文和图片后可以预览，刷新后图片仍然存在。
-- [ ] 手动创作提交真实审核，页面正确展示 `published`、`rejected` 或待人工复核。
-- [ ] 管理员登录进入审核台，普通用户不能访问管理员接口。
+- [ ] 手动创作发布后页面正确展示 `published`、`rejected` 或 `deleted`。
 - [ ] 主页一次加载20条帖子，滚动到底后继续加载下一页。
 - [ ] Assistant 对话框可使用键盘打开、关闭和循环焦点。
 - [ ] 简单问题使用 DIRECT，单只读工具使用 TOOL，创作任务使用 CREATOR。
@@ -69,6 +68,5 @@ CreatorDraft 场景只删除本次运行创建的测试草稿；删除失败时�
 | --- | --- |
 | Java | `http://127.0.0.1:8080/actuator/health` |
 | Creator | `http://127.0.0.1:8092/actuator/health/ready` |
-| Moderation | `http://127.0.0.1:8088/health` |
-| Assistant | `http://127.0.0.1:8094/actuator/health` |
+| Assistant API | `http://127.0.0.1:8094/health` |
 | Frontend | `http://127.0.0.1:5173` |

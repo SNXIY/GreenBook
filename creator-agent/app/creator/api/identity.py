@@ -18,7 +18,6 @@ from jwt.exceptions import PyJWKClientError, PyJWTError
 
 from app.creator.api.models import CreatorApiPrincipal
 
-
 logger = logging.getLogger(__name__)
 
 _ASYMMETRIC_ALGORITHMS = frozenset(
@@ -254,13 +253,13 @@ def validate_creator_identity_settings(
         return
     if mode == "trusted_proxy":
         required_values = {
-            "CREATOR_TRUSTED_PROXY_SHARED_SECRET": (
+            "GREENBOOK_CREATOR_TRUSTED_PROXY_SHARED_SECRET": (
                 settings.creator_trusted_proxy_shared_secret
             ),
-            "CREATOR_TRUSTED_PROXY_ALLOWED_SERVICE": (
+            "GREENBOOK_CREATOR_TRUSTED_PROXY_ALLOWED_SERVICE": (
                 settings.creator_trusted_proxy_allowed_service
             ),
-            "CREATOR_TRUSTED_PROXY_TENANT_ID": (
+            "GREENBOOK_CREATOR_TRUSTED_PROXY_TENANT_ID": (
                 settings.creator_trusted_proxy_tenant_id
             ),
         }
@@ -277,12 +276,12 @@ def validate_creator_identity_settings(
             raise ValueError("Trusted proxy nonce lifetime must be positive")
         return
     required_values = {
-        "CREATOR_IDENTITY_ISSUER": settings.creator_identity_issuer,
-        "CREATOR_IDENTITY_AUDIENCE": settings.creator_identity_audience,
-        "CREATOR_IDENTITY_JWKS_URL": settings.creator_identity_jwks_url,
-        "CREATOR_IDENTITY_TENANT_CLAIM": (settings.creator_identity_tenant_claim),
-        "CREATOR_IDENTITY_CREATOR_CLAIM": (settings.creator_identity_creator_claim),
-        "CREATOR_IDENTITY_ROLES_CLAIM": settings.creator_identity_roles_claim,
+        "GREENBOOK_CREATOR_IDENTITY_ISSUER": settings.creator_identity_issuer,
+        "GREENBOOK_CREATOR_IDENTITY_AUDIENCE": settings.creator_identity_audience,
+        "GREENBOOK_CREATOR_IDENTITY_JWKS_URL": settings.creator_identity_jwks_url,
+        "GREENBOOK_CREATOR_IDENTITY_TENANT_CLAIM": (settings.creator_identity_tenant_claim),
+        "GREENBOOK_CREATOR_IDENTITY_CREATOR_CLAIM": (settings.creator_identity_creator_claim),
+        "GREENBOOK_CREATOR_IDENTITY_ROLES_CLAIM": settings.creator_identity_roles_claim,
     }
     missing = sorted(
         name for name, value in required_values.items() if not value.strip()
@@ -291,8 +290,8 @@ def validate_creator_identity_settings(
         raise ValueError("OIDC Creator identity is missing: " + ", ".join(missing))
     _configured_algorithms(settings)
     for name, value in (
-        ("CREATOR_IDENTITY_ISSUER", settings.creator_identity_issuer),
-        ("CREATOR_IDENTITY_JWKS_URL", settings.creator_identity_jwks_url),
+        ("GREENBOOK_CREATOR_IDENTITY_ISSUER", settings.creator_identity_issuer),
+        ("GREENBOOK_CREATOR_IDENTITY_JWKS_URL", settings.creator_identity_jwks_url),
     ):
         parsed = urlparse(value)
         secure = parsed.scheme == "https" and bool(parsed.netloc)

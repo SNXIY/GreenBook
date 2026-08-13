@@ -1,8 +1,16 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const envDir = fileURLToPath(new URL("../", import.meta.url));
+  const env = loadEnv(mode, envDir, "");
+  const agentTarget =
+    env.VITE_GREENBOOK_AGENT_PROXY_TARGET || "http://127.0.0.1:8094";
+
+  console.info(`[vite] GreenBook Agent proxy target: ${agentTarget}`);
+
+  return {
   plugins: [react()],
   server: {
     port: 5173,
@@ -11,15 +19,15 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true
       },
-      "/creator-agent": {
+      "/creator-api": {
         target: "http://127.0.0.1:8092",
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/creator-agent/, "")
+        rewrite: path => path.replace(/^\/creator-api/, "")
       },
-      "/assistant-agent": {
-        target: "http://127.0.0.1:8094",
+      "/agent-api": {
+        target: agentTarget,
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/assistant-agent/, "")
+        rewrite: path => path.replace(/^\/agent-api/, "")
       }
     }
   },
@@ -28,4 +36,5 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url))
     }
   }
+  };
 });

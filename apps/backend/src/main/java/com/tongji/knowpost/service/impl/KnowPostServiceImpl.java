@@ -229,26 +229,19 @@ public class KnowPostServiceImpl implements KnowPostService {
         if (post == null || post.getCreatorId() == null || !post.getCreatorId().equals(creatorId)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "内容不存在或无权限");
         }
-        return new PublishStatusResponse(
-                String.valueOf(id),
-                post.getStatus(),
-                post.getModerationTaskId(),
-                post.getModerationReason()
-        );
+        return new PublishStatusResponse(String.valueOf(id), post.getStatus());
     }
 
     @Override
     public List<PostTaskItemResponse> listTaskItems(long creatorId, int limit) {
         int boundedLimit = Math.min(Math.max(limit, 1), 50);
-        return mapper.listOwnPostsForAssistant(creatorId, boundedLimit, 0)
+        return mapper.listOwnPostsForAgent(creatorId, boundedLimit, 0)
                 .stream()
                 .map(post -> new PostTaskItemResponse(
                         String.valueOf(post.getId()),
                         post.getTitle(),
                         post.getStatus(),
                         post.getContentOrigin(),
-                        post.getModerationTaskId(),
-                        post.getModerationReason(),
                         post.getCreateTime(),
                         post.getUpdateTime(),
                         post.getPublishTime()

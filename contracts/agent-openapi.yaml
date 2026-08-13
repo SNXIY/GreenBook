@@ -1,0 +1,292 @@
+openapi: 3.1.0
+info:
+  title: GreenBook Agent API
+  version: 2.0.0
+paths:
+  /api/v1/agent/conversations:
+    get:
+      summary: List the authenticated user's conversations
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Owned conversations only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationListResponse'
+    post:
+      summary: Create a conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationCreateRequest'
+      responses:
+        '200':
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationSummary'
+  /api/v1/agent/conversations/{conversation_id}/messages:
+    parameters:
+      - $ref: '#/components/parameters/ConversationId'
+    get:
+      summary: List public messages in an owned conversation
+      responses:
+        '200':
+          description: User and assistant messages; no reasoning content
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageView'
+    post:
+      summary: Create and execute a run for a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreateRequest'
+      responses:
+        '202':
+          description: Run completed or is waiting for approval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunAcceptedResponse'
+        '502':
+          description: Model or tool execution failed; the failed run is persisted
+  /api/v1/agent/runs:
+    get:
+      summary: List owned runs
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 30, minimum: 1 }
+      responses:
+        '200':
+          description: Owned runs only
+  /api/v1/agent/runs/{run_id}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Get an owned run
+      responses:
+        '200':
+          description: Run state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResponse'
+        '404': { description: Missing or foreign run }
+  /api/v1/agent/runs/{run_id}/events:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Replay owned run events as SSE
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream: { schema: { type: string } }
+  /api/v1/agent/runs/{run_id}/events/stream:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      summary: Stream owned run events as SSE
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream: { schema: { type: string } }
+  /api/v1/agent/runs/{run_id}/cancel:
+    post:
+      summary: Cancel an owned run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200': { description: Updated run }
+  /api/v1/agent/runs/{run_id}/interrupt:
+    post:
+      summary: Interrupt an owned run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200': { description: Updated run }
+  /api/v1/agent/memory/settings:
+    get:
+      summary: Get memory settings
+      responses:
+        '200':
+          description: Current settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemorySettings' }
+  /api/v1/agent/memories:
+    get:
+      summary: List memories for the authenticated user
+      responses:
+        '200':
+          description: Memory list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+  /api/v1/agent/memory/episodes:
+    get:
+      summary: List episodic memories for the authenticated user
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        '200':
+          description: Episode list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  episodes:
+                    type: array
+                    items: { type: object, additionalProperties: true }
+  /api/v1/agent/approvals/{approval_id}/approve:
+    post:
+      summary: Approve an owned operation
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApprovalDecisionRequest' }
+      responses:
+        '200': { description: Approval state }
+        '404': { description: Missing or foreign approval }
+  /api/v1/agent/approvals/{approval_id}/reject:
+    post:
+      summary: Reject an owned operation
+      parameters:
+        - $ref: '#/components/parameters/ApprovalId'
+      responses:
+        '200': { description: Approval state }
+        '404': { description: Missing or foreign approval }
+  /health:
+    get:
+      summary: Assistant health
+      responses:
+        '200': { description: Service is running }
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1, minimum: 1 }
+    Size:
+      name: size
+      in: query
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+    ConversationId:
+      name: conversation_id
+      in: path
+      required: true
+      schema: { type: string }
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema: { type: string }
+    ApprovalId:
+      name: approval_id
+      in: path
+      required: true
+      schema: { type: string }
+  schemas:
+    ConversationCreateRequest:
+      type: object
+      properties:
+        title: { type: [string, 'null'], maxLength: 120 }
+    ConversationSummary:
+      type: object
+      required: [conversation_id, created_at, updated_at]
+      properties:
+        conversation_id: { type: string }
+        title: { type: [string, 'null'] }
+        active_draft_id: { type: [string, 'null'] }
+        active_schedule_id: { type: [string, 'null'] }
+        created_at: { type: string }
+        updated_at: { type: string }
+    ConversationListResponse:
+      type: object
+      required: [items, page, size, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ConversationSummary' } }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer }
+    MessageCreateRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 10000 }
+        timezone: { type: string, maxLength: 64, default: Asia/Shanghai }
+    MessageView:
+      type: object
+      required: [role, content, created_at]
+      properties:
+        role: { type: string }
+        content: { type: string }
+        trace_id: { type: [string, 'null'] }
+        created_at: { type: string }
+    RunAcceptedResponse:
+      type: object
+      required: [run_id, conversation_id, status, events_url]
+      properties:
+        run_id: { type: string }
+        conversation_id: { type: string }
+        status: { type: string }
+        events_url: { type: string }
+        replayed: { type: boolean, default: false }
+    RunResponse:
+      type: object
+      required: [run_id, conversation_id, status]
+      properties:
+        run_id: { type: string }
+        conversation_id: { type: string }
+        goal: { type: string }
+        status: { type: string }
+        final_response: { type: [string, 'null'] }
+        error_code: { type: [string, 'null'] }
+        error: { type: [string, 'null'] }
+        trace_id: { type: [string, 'null'] }
+        budget: { type: object, additionalProperties: true }
+        timing: { type: object, additionalProperties: true }
+        steps: { type: array, items: { type: object, additionalProperties: true } }
+        approval: { type: [object, 'null'], additionalProperties: true }
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [APPROVE, REJECT] }
+    MemorySettings:
+      type: object
+      properties:
+        episodic_enabled: { type: boolean }
+        semantic_enabled: { type: boolean }
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []

@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # Phase 8.1-B Archive Report
 
 本报告记录 Phase 8.1-B 的历史目录归档结果。此次操作只处理已完成审计、且不属于 ACTIVE Runtime 的目录；未修改 ACTIVE Runtime、Planner、Worker、Execution Runtime、ToolRuntime、pyproject、uv、Docker 或 CI 配置。

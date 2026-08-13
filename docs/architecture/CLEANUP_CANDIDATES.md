@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook Agent Runtime Cleanup Candidates
 
 > Phase 7.3-B/C。本文记录清理候选及删除条件。

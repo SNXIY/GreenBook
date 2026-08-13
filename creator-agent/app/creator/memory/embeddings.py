@@ -9,7 +9,6 @@ import httpx
 
 from app.creator.memory.errors import CreatorMemoryIntegrityError
 
-
 _TOKEN_PATTERN = re.compile(r"[a-z0-9_]+|[\u3400-\u4dbf\u4e00-\u9fff]", re.IGNORECASE)
 
 

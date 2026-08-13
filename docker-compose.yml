@@ -1,8 +1,8 @@
 name: greenbook
 
 # Development Compose intentionally contains infrastructure only.
-# Run Java, Vite, Creator Agent and Moderation Agent on the host so their logs,
-# breakpoints and hot reload remain visible during development.
+# Run Java, Vite, Creator Service and Agent API/Worker on the host so their
+# logs, breakpoints and hot reload remain visible during development.
 
 x-restart: &restart
   restart: unless-stopped
@@ -19,10 +19,9 @@ services:
       MYSQL_DATABASE: ${ZHIGUANG_MYSQL_DB:-zhiguang}
     volumes:
       - zhiguang-mysql-data:/var/lib/mysql
-      - ./zhiguang-be/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./zhiguang-be/db/comments_migration.sql:/docker-entrypoint-initdb.d/02-comments.sql:ro
-      - ./zhiguang-be/db/assistant_comment_migration.sql:/docker-entrypoint-initdb.d/03-assistant-comments.sql:ro
-      - ./zhiguang-be/db/assistant_capability_migration.sql:/docker-entrypoint-initdb.d/04-assistant-capabilities.sql:ro
+      - ./apps/backend/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./apps/backend/db/comments_migration.sql:/docker-entrypoint-initdb.d/02-comments.sql:ro
+      - ./apps/backend/db/notifications_migration.sql:/docker-entrypoint-initdb.d/03-notifications.sql:ro
     command:
       - --default-authentication-plugin=mysql_native_password
       - --character-set-server=utf8mb4
@@ -60,19 +59,17 @@ services:
 
   creator-postgres:
     <<: *restart
-    # Shared PostgreSQL instance: Creator/Assistant use mindflow_creator;
-    # Moderation uses content_moderation.
+    # Shared PostgreSQL instance: Creator Service and Agent Runtime use mindflow_creator.
     container_name: greenbook-postgres
     image: postgres:17-alpine
     ports:
       - "127.0.0.1:${GREENBOOK_POSTGRES_HOST_PORT:-25432}:5432"
     environment:
-      POSTGRES_DB: ${CREATOR_POSTGRES_DB:-mindflow_creator}
+      POSTGRES_DB: ${GREENBOOK_CREATOR_POSTGRES_DB:-mindflow_creator}
       POSTGRES_USER: ${GREENBOOK_POSTGRES_USER:-mindflow}
       POSTGRES_PASSWORD: ${GREENBOOK_POSTGRES_PASSWORD:-mindflow}
     volumes:
       - creator-postgres-data:/var/lib/postgresql/data
-      - ./infra/postgres/01-create-databases.sql:/docker-entrypoint-initdb.d/01-create-databases.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -81,7 +78,7 @@ services:
 
   creator-redis:
     <<: *restart
-    # Shared Redis instance: Creator/Assistant DB0, Java DB1, Moderation DB2.
+    # Shared Redis instance: Creator Service/Agent Runtime DB0 and Java DB1.
     container_name: greenbook-redis
     image: redis:8.0-alpine
     ports:

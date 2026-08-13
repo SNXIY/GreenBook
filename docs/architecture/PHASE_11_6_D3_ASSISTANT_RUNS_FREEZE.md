@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # Phase 11.6-D3 assistant_runs Freeze
 
 ## 1. Freeze Boundary

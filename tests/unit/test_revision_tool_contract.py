@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from greenbook_assistant_core.context import SessionContext
+from greenbook_agent_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_contracts.tool_result import ToolResult
 from greenbook_java_client.models import (
@@ -43,6 +43,7 @@ def test_revision_schema_and_handler_are_single_source() -> None:
         "draft_id",
         "revision_instruction",
         "title",
+        "revision_scope",
         "expected_version",
     }
     assert schema["required"] == ["draft_id", "revision_instruction"]
@@ -76,6 +77,7 @@ async def test_unknown_revision_content_is_rejected_before_handler() -> None:
         "downstream_called": False,
         "side_effect_started": False,
         "safe_to_retry": True,
+        "missing_required_reference": "revision_instruction",
     }
 
 
@@ -197,6 +199,7 @@ async def test_update_schedule_conflict_is_pre_execution_and_java_is_not_called(
         "downstream_called": False,
         "side_effect_started": False,
         "safe_to_retry": True,
+        "missing_required_reference": "",
     }
     java.get_schedule.assert_not_called()
     java.update_schedule.assert_not_called()
@@ -226,7 +229,11 @@ async def test_creator_revision_maps_final_content_to_java_update_once() -> None
     )
     java = SimpleNamespace(
         get_draft=AsyncMock(
-            side_effect=[ToolResult.success(current), ToolResult.success(updated)]
+            side_effect=[
+                ToolResult.success(current),
+                ToolResult.success(current),
+                ToolResult.success(updated),
+            ]
         ),
         update_draft=AsyncMock(return_value=ToolResult.success(updated)),
         get_schedule=AsyncMock(
@@ -277,16 +284,23 @@ async def test_creator_revision_maps_final_content_to_java_update_once() -> None
         context,
         draft_id="draft-1",
         revision_instruction="增加实战经验",
+        expected_version="2026-08-06T14:40:00.123456+00:00",
     )
 
     assert result.ok is True
     creator.create_task.assert_awaited_once()
     creator.get_artifact.assert_awaited_once()
     java.update_draft.assert_awaited_once()
+    assert java.get_draft.await_count == 3
     request = java.update_draft.await_args.args[1]
     assert request.content == "完整的新正文，包含实战经验"
     assert request.expected_version == "2026-08-06T14:40:00+00:00"
     assert result.data["draft_id"] == "draft-1"
+    assert [ref.ref for ref in result.resource_refs] == [
+        "draft:draft-1",
+        "task:task-1",
+        "artifact:artifact-1",
+    ]
 
 
 @pytest.mark.asyncio

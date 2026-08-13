@@ -7,24 +7,24 @@ from datetime import UTC, datetime
 
 import pytest
 
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.execution.models import (
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
+from greenbook_agent_core.execution.events import EventType, ExecutionEvent
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.invocation import ExecutionResult
+from greenbook_agent_core.execution.models import (
     ExecutionStatus,
     StepStatus,
 )
-from greenbook_assistant_core.execution.recovery import RecoveryPolicy
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.retry_manager import RetryManager
-from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
-from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
-from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.execution.recovery import RecoveryPolicy
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.retry_manager import RetryManager
+from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
+from greenbook_agent_core.execution.runtime_manager import RuntimeManager
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
+from greenbook_agent_core.execution.worker import ExecutionWorker, RunOutcome
+from tests.plan_factory import GoalPlanFactory
+from greenbook_agent_core.planning.validation import PlanValidator
 from greenbook_contracts import SideEffectState
 
 
@@ -34,7 +34,7 @@ def clear_store() -> None:
 
 
 def _plan(registry: CapabilityRegistry, requirements: list[str]):
-    return TaskOrchestrator(registry).generate_plan(
+    return GoalPlanFactory(registry).generate_plan(
         task_id="retry-task",
         goal_category="CREATE_CONTENT",
         requirements=[{"type": value} for value in requirements],

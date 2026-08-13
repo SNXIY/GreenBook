@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .analyzer import FailureAnalyzer
 from .badcase import BadCase
-from .models import CategoryMetrics, EvalResult, EvaluationReport
+from .models import AgentEvaluationMetrics, CategoryMetrics, EvalResult, EvaluationReport
 
 
 class ExecutionMetrics:
@@ -87,3 +87,41 @@ class MetricsCalculator:
             bad_cases=all_bad_cases,
             failure_summary=failure_summary,
         )
+
+
+class EvaluationMetricsCalculator:
+    """Aggregate behavioral metrics from ``EvaluationRunner`` results."""
+
+    @staticmethod
+    def compute(results: list[EvalResult]) -> AgentEvaluationMetrics:
+        if not results:
+            return AgentEvaluationMetrics()
+
+        def rate(name: str, *, default: float = 0.0) -> float:
+            values = [result.metrics.get(name, default) for result in results]
+            return sum(values) / len(values) if values else 0.0
+
+        return AgentEvaluationMetrics(
+            command_accuracy=rate("command"),
+            target_resolution_accuracy=rate("target"),
+            goal_decomposition_accuracy=rate("goals"),
+            tool_selection_accuracy=rate("tools"),
+            task_success_rate=rate("task_success", default=rate("task_state")),
+            task_completion_rate=rate("task_state"),
+            plan_quality=rate("plan_quality", default=rate("plan_success", default=rate("task_state"))),
+            plan_success_rate=rate("plan_success", default=rate("task_state")),
+            recovery_success=rate("recovery_success", default=rate("replan_recovery", default=1.0)),
+            replan_recovery_rate=rate("replan_recovery", default=1.0),
+            multi_task_accuracy=rate("multi_task", default=rate("goals")),
+            long_conversation_consistency=rate("long_conversation_consistency", default=rate("context_continuity", default=1.0)),
+            clarification_precision=rate("clarification", default=1.0),
+            side_effect_safety=rate("side_effects", default=1.0),
+            idempotent_recovery=rate("idempotent_recovery", default=1.0),
+            memory_retrieval_precision=rate("memory_retrieval_precision", default=1.0),
+            context_continuity=rate("context_continuity", default=1.0),
+            average_latency_ms=rate("latency_ms"),
+            average_tool_call_count=rate("tool_call_count"),
+        )
+
+
+AgentMetricsCalculator = EvaluationMetricsCalculator

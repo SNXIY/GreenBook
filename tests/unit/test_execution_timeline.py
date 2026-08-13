@@ -6,18 +6,18 @@ from types import SimpleNamespace
 
 import pytest
 
-from greenbook_assistant_core.execution.event_store import ExecutionEventStore
-from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
-from greenbook_assistant_core.execution.operation_tracking import (
+from greenbook_agent_core.execution.event_store import ExecutionEventStore
+from greenbook_agent_core.execution.events import EventType, ExecutionEvent
+from greenbook_agent_core.execution.operation_tracking import (
     ExternalOperationRecord,
     ExternalOperationStore,
     OperationStatus,
 )
-from greenbook_assistant_core.execution.timeline import (
+from greenbook_agent_core.execution.timeline import (
     ExecutionTimelineService,
     TimelineItemKind,
 )
-from greenbook_assistant_core.observability.context import TraceContext
+from greenbook_agent_core.observability.context import TraceContext
 
 
 def test_timeline_preserves_trace_ids_and_categorizes_runtime_facts() -> None:
@@ -106,7 +106,7 @@ def test_timeline_is_empty_for_an_eventless_execution() -> None:
 
 @pytest.mark.asyncio
 async def test_timeline_api_uses_existing_authorization_boundary() -> None:
-    from apps.assistant_api.greenbook_assistant_api.api.runtime_routes import (
+    from apps.agent_api.greenbook_agent_api.api.runtime_routes import (
         get_execution_timeline,
     )
 

@@ -6,12 +6,13 @@ import asyncio
 from typing import Any
 
 import pytest
-from greenbook_assistant_core.execution.runtime.invocation_context import (
+from greenbook_agent_core.execution.runtime.invocation_context import (
     ToolInvocationContext,
 )
-from greenbook_assistant_core.execution.runtime.ledger import InvocationStatus
-from greenbook_assistant_core.execution.runtime.tool_runtime import (
+from greenbook_agent_core.execution.runtime.ledger import InvocationStatus
+from greenbook_agent_core.execution.runtime.tool_runtime import (
     AsyncTaskHandle,
+    InvocationResult,
     ToolRuntime,
 )
 
@@ -25,6 +26,17 @@ def _context(timeout_seconds: float = 0.1) -> ToolInvocationContext:
         tool_name="content.create_draft",
         timeout_seconds=timeout_seconds,
     )
+
+
+def test_tool_result_preserves_collection_data() -> None:
+    result = InvocationResult.from_tool_result(
+        "invocation-read",
+        "community.list_own_posts",
+        {"ok": True, "data": [{"post_id": "post-1"}]},
+        1.0,
+    )
+
+    assert result.data == [{"post_id": "post-1"}]
 
 
 @pytest.mark.asyncio

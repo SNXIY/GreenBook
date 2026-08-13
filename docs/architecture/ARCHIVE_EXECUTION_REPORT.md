@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # Phase 7.10 Safe Archive Report
 
 This report records the low-risk archive actions executed from `FINAL_CLEANUP_CANDIDATES.md`. No production Runtime, IntentSpec, Planner, Worker, ToolRuntime, Legacy Agent, or active `creator-agent` implementation was deleted or modified.

@@ -60,10 +60,10 @@ class FailureAnalyzer:
         """Map a check name + category to a FailureType."""
         check_name = check.check
 
-        # Intent failures
-        if check_name == "intent.goal_category":
+        # Command understanding failures
+        if check_name == "command.type":
             return FailureType.WRONG_CATEGORY
-        if check_name == "intent.relation":
+        if check_name == "command.action":
             return FailureType.WRONG_RELATION
 
         # Decomposition failures

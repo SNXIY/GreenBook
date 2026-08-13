@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse
 
 from app.creator.api.composition import CreatorApiRuntime
 
-
 router = APIRouter()
 
 

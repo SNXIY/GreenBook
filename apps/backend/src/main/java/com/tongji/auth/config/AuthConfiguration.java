@@ -59,8 +59,7 @@ public class AuthConfiguration {
         OAuth2TokenValidator<Jwt> defaultWithIssuer =
                 JwtValidators.createDefaultWithIssuer(jwtProps.getIssuer());
         OAuth2TokenValidator<Jwt> audienceValidator = new AgentJwtValidator(
-                List.of("zhiguang-api", "greenbook-assistant-runtime", "creator-agent",
-                        "zhiguang-assistant-tools"));
+                List.of("zhiguang-api", "greenbook-agent-runtime", "creator-agent"));
 
         decoder.setJwtValidator(
                 new DelegatingOAuth2TokenValidator<>(defaultWithIssuer, audienceValidator));

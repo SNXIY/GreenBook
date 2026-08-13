@@ -11,15 +11,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $jwtSecret = Get-GreenBookEnvValue -Name "JWT_SECRET" -DefaultValue ""
-$moderationSecret = Get-GreenBookEnvValue -Name "MODERATION_AGENT_AUTH_SECRET" -DefaultValue ""
-$creatorHandoffSecret = Get-GreenBookEnvValue -Name "CREATOR_HANDOFF_SHARED_SECRET" -DefaultValue ""
-$creatorAgentSecret = Get-GreenBookEnvValue -Name "CREATOR_AGENT_SHARED_SECRET" -DefaultValue ""
-$assistantSecret = Get-GreenBookEnvValue -Name "ASSISTANT_SERVICE_SHARED_SECRET" -DefaultValue ""
+$creatorHandoffSecret = Get-GreenBookEnvValue -Name "GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET" -DefaultValue ""
+$creatorAgentSecret = Get-GreenBookEnvValue -Name "GREENBOOK_CREATOR_AGENT_SHARED_SECRET" -DefaultValue ""
+$agentSecret = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" -DefaultValue ""
 Assert-GreenBookSecret -Name "JWT_SECRET" -Value $jwtSecret -ForbiddenValues @("change-me-to-a-long-random-string")
-Assert-GreenBookSecret -Name "MODERATION_AGENT_AUTH_SECRET" -Value $moderationSecret -ForbiddenValues @("change-me-moderation-secret")
-Assert-GreenBookSecret -Name "CREATOR_HANDOFF_SHARED_SECRET" -Value $creatorHandoffSecret -ForbiddenValues @("change-me-creator-handoff")
-Assert-GreenBookSecret -Name "CREATOR_AGENT_SHARED_SECRET" -Value $creatorAgentSecret -ForbiddenValues @("change-me-creator-proxy")
-Assert-GreenBookSecret -Name "ASSISTANT_SERVICE_SHARED_SECRET" -Value $assistantSecret -ForbiddenValues @("change-me-assistant-service")
+Assert-GreenBookSecret -Name "GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET" -Value $creatorHandoffSecret -ForbiddenValues @("change-me-creator-handoff")
+Assert-GreenBookSecret -Name "GREENBOOK_CREATOR_AGENT_SHARED_SECRET" -Value $creatorAgentSecret -ForbiddenValues @("change-me-creator-proxy")
+Assert-GreenBookSecret -Name "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" -Value $agentSecret -ForbiddenValues @("change-me-agent-service")
 
 $env:SPRING_PROFILES_ACTIVE = ""
 $env:MYSQL_HOST = "127.0.0.1"
@@ -35,19 +33,17 @@ $env:KAFKA_HOST = "127.0.0.1"
 $env:KAFKA_PORT = Get-GreenBookEnvValue -Name "ZHIGUANG_KAFKA_HOST_PORT" -DefaultValue "39092"
 $env:CANAL_ENABLED = Get-GreenBookEnvValue -Name "CANAL_ENABLED" -DefaultValue "false"
 $env:JWT_ISSUER = Get-GreenBookEnvValue -Name "JWT_ISSUER" -DefaultValue "http://127.0.0.1:8080"
-$env:LOCAL_STORAGE_PUBLIC_BASE_URL = Get-GreenBookEnvValue -Name "JAVA_PUBLIC_BASE_URL" -DefaultValue "http://127.0.0.1:8080"
-$env:MODERATION_AGENT_BASE_URL = Get-GreenBookEnvValue -Name "MODERATION_AGENT_BASE_URL" -DefaultValue "http://127.0.0.1:8088"
+$env:LOCAL_STORAGE_PUBLIC_BASE_URL = Get-GreenBookEnvValue -Name "GREENBOOK_JAVA_PUBLIC_BASE_URL" -DefaultValue "http://127.0.0.1:8080"
 $env:JWT_SECRET = $jwtSecret
-$env:MODERATION_AGENT_AUTH_SECRET = $moderationSecret
-$env:CREATOR_HANDOFF_SHARED_SECRET = $creatorHandoffSecret
-$env:CREATOR_AGENT_SHARED_SECRET = $creatorAgentSecret
-$env:ASSISTANT_SERVICE_SHARED_SECRET = $assistantSecret
+$env:GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET = $creatorHandoffSecret
+$env:GREENBOOK_CREATOR_AGENT_SHARED_SECRET = $creatorAgentSecret
+$env:GREENBOOK_AGENT_SERVICE_SHARED_SECRET = $agentSecret
 
 if (-not (Get-Command mvn -ErrorAction SilentlyContinue)) {
   throw "Maven was not found. Install Maven 3.9+ and ensure 'mvn' is available in PATH."
 }
 
-Set-Location "$Root\zhiguang-be"
+Set-Location "$Root\apps\backend"
 Write-Host "Starting Java backend at http://127.0.0.1:8080"
 Write-Host "Press Ctrl+C to stop it. Logs remain in this terminal."
 & mvn spring-boot:run

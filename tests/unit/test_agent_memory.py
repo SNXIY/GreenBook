@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from greenbook_assistant_core.agent_memory.manager import MemoryManager
-from greenbook_assistant_core.agent_memory.models import (
+from greenbook_agent_core.memory.manager import MemoryManager
+from greenbook_agent_core.memory.models import (
     MemoryQuery,
     MemoryRecord,
     MemoryType,
 )
-from greenbook_assistant_core.agent_memory.store import MemoryStore
-
+from greenbook_agent_core.memory.repository import InMemoryMemoryRepository
 
 # ── Model tests ─────────────────────────────────────────────────
 
@@ -31,7 +30,7 @@ def test_query_defaults() -> None:
 # ── Store: save + find ──────────────────────────────────────────
 
 def test_store_save_and_find() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     r = MemoryRecord(user_id="u1", type=MemoryType.EPISODIC,
                      content="Created Java article")
     store.save(r)
@@ -42,7 +41,7 @@ def test_store_save_and_find() -> None:
 # ── Store: search by type ───────────────────────────────────────
 
 def test_store_search_by_type() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     store.save(MemoryRecord(user_id="u1", type=MemoryType.EPISODIC,
                             content="Task A"))
     store.save(MemoryRecord(user_id="u1", type=MemoryType.SEMANTIC,
@@ -55,7 +54,7 @@ def test_store_search_by_type() -> None:
 # ── Store: keyword search ───────────────────────────────────────
 
 def test_store_keyword_search() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     store.save(MemoryRecord(user_id="u1", content="Created Java article"))
     store.save(MemoryRecord(user_id="u1", content="Created Python article"))
     results = store.search(MemoryQuery(user_id="u1", keywords=["Java"]))
@@ -66,7 +65,7 @@ def test_store_keyword_search() -> None:
 # ── Store: importance sort ──────────────────────────────────────
 
 def test_store_importance_sort() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     store.save(MemoryRecord(user_id="u1", content="Low", importance=0.2))
     store.save(MemoryRecord(user_id="u1", content="High", importance=0.9))
     store.save(MemoryRecord(user_id="u1", content="Mid", importance=0.5))
@@ -78,7 +77,7 @@ def test_store_importance_sort() -> None:
 # ── Store: metadata filter ──────────────────────────────────────
 
 def test_store_metadata_filter() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     store.save(MemoryRecord(user_id="u1", content="A",
                             metadata={"task_id": "t1"}))
     store.save(MemoryRecord(user_id="u1", content="B",
@@ -93,7 +92,7 @@ def test_store_metadata_filter() -> None:
 # ── Store: min_importance filter ────────────────────────────────
 
 def test_store_min_importance() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     store.save(MemoryRecord(user_id="u1", content="Low", importance=0.2))
     store.save(MemoryRecord(user_id="u1", content="High", importance=0.8))
     results = store.search(MemoryQuery(user_id="u1", min_importance=0.5))
@@ -104,7 +103,7 @@ def test_store_min_importance() -> None:
 # ── Store: update ───────────────────────────────────────────────
 
 def test_store_update() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     r = MemoryRecord(user_id="u1", content="Original")
     store.save(r)
     updated = store.update(r.memory_id, content="Updated", importance=0.9)
@@ -116,7 +115,7 @@ def test_store_update() -> None:
 # ── Store: delete ───────────────────────────────────────────────
 
 def test_store_delete() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     r = MemoryRecord(user_id="u1")
     store.save(r)
     assert store.count() == 1
@@ -127,7 +126,7 @@ def test_store_delete() -> None:
 # ── Store: expire ───────────────────────────────────────────────
 
 def test_store_expire() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     r = MemoryRecord(user_id="u1", content="Ephemeral",
                      expires_at=(datetime.now(UTC) - timedelta(minutes=1)).isoformat())
     store.save(r)
@@ -137,7 +136,7 @@ def test_store_expire() -> None:
 
 
 def test_store_not_expired_found() -> None:
-    store = MemoryStore()
+    store = InMemoryMemoryRepository()
     r = MemoryRecord(user_id="u1", content="Valid",
                      expires_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat())
     store.save(r)

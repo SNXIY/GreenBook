@@ -1,7 +1,7 @@
 [project]
 name = "greenbook-creator-client"
 version = "0.1.0"
-description = "GreenBook async client for Creator Agent Task API"
+description = "GreenBook async client for Creator Service Task API"
 requires-python = ">=3.12"
 dependencies = [
     "greenbook-contracts",

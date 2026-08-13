@@ -7,14 +7,14 @@ from datetime import UTC, datetime
 import sqlalchemy as sa
 import pytest
 
-from greenbook_assistant_core.execution.execution_queue import (
+from greenbook_agent_core.execution.execution_queue import (
     ExecutionQueue,
     ExecutionQueueMessage,
     ExecutionQueueStatus,
     PostgresExecutionQueue,
 )
-from greenbook_assistant_core.execution.execution_queue_worker import ExecutionQueueWorker
-from greenbook_assistant_core.execution.lease import ExecutionLeaseManager
+from greenbook_agent_core.execution.execution_queue_worker import ExecutionQueueWorker
+from greenbook_agent_core.execution.lease import ExecutionLeaseManager
 
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.operation_tracking import (
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.operation_tracking import (
     ExternalOperationStore,
     ExternalOperationTracker,
     OperationStatus,

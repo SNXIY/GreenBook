@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Annotated, Any, TypedDict
 
@@ -16,7 +16,7 @@ from app.creator.domain.models import (
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class RuntimeModel(BaseModel):
@@ -81,7 +81,7 @@ class RunIdentity(RuntimeModel):
     execution_attempt: int = Field(ge=1)
 
     @classmethod
-    def from_request(cls, request: RuntimeStartRequest) -> "RunIdentity":
+    def from_request(cls, request: RuntimeStartRequest) -> RunIdentity:
         return cls(
             task_id=request.task_id,
             run_id=request.run_id,
@@ -120,7 +120,7 @@ class CreatorArtifact(RuntimeModel):
     content_sha256: str = Field(min_length=64, max_length=64)
     created_at: datetime
 
-    def as_ref(self) -> "ArtifactRef":
+    def as_ref(self) -> ArtifactRef:
         return ArtifactRef(
             id=self.id,
             kind=self.kind,
@@ -159,7 +159,7 @@ class PlanStep(RuntimeModel):
     max_attempts: int = Field(default=2, ge=1, le=5)
 
     @model_validator(mode="after")
-    def validate_dependencies(self) -> "PlanStep":
+    def validate_dependencies(self) -> PlanStep:
         if self.id in self.dependencies:
             raise ValueError("A plan step cannot depend on itself")
         if len(set(self.dependencies)) != len(self.dependencies):
@@ -174,7 +174,7 @@ class PlanSnapshot(RuntimeModel):
     created_at: datetime = Field(default_factory=utc_now)
 
     @model_validator(mode="after")
-    def validate_steps(self) -> "PlanSnapshot":
+    def validate_steps(self) -> PlanSnapshot:
         step_ids = [step.id for step in self.steps]
         if len(step_ids) != len(set(step_ids)):
             raise ValueError("Plan step IDs must be unique")
@@ -294,7 +294,7 @@ class SupervisorDecision(RuntimeModel):
     finalization_metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_action_payload(self) -> "SupervisorDecision":
+    def validate_action_payload(self) -> SupervisorDecision:
         if self.action == SupervisorAction.DISPATCH and not self.dispatch_step_ids:
             raise ValueError("DISPATCH requires at least one step")
         if self.action == SupervisorAction.REQUEST_HUMAN and self.human_request is None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -10,7 +10,7 @@ from app.creator.domain.errors import CreatorInvalidTransitionError
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class CreatorTaskKind(str, Enum):
@@ -133,7 +133,7 @@ class SubmitCreatorDecisionCommand(FrozenModel):
     idempotency_key: str = Field(min_length=1, max_length=128)
 
     @model_validator(mode="after")
-    def validate_action(self) -> "SubmitCreatorDecisionCommand":
+    def validate_action(self) -> SubmitCreatorDecisionCommand:
         _validate_decision_values(
             self.action,
             selected_option_id=self.selected_option_id,
@@ -228,7 +228,7 @@ class CreatorTask(FrozenModel):
         error_message: str | None = None,
         active_run_id: str | None = None,
         pending_decision_id: str | None = None,
-    ) -> "CreatorTask":
+    ) -> CreatorTask:
         if target == self.status:
             return self
         if target not in _TASK_TRANSITIONS[self.status]:
@@ -253,7 +253,7 @@ class CreatorTask(FrozenModel):
             }
         )
 
-    def mark_cancel_requested(self, *, now: datetime) -> "CreatorTask":
+    def mark_cancel_requested(self, *, now: datetime) -> CreatorTask:
         if self.cancel_requested:
             return self
         return self.model_copy(
@@ -298,7 +298,7 @@ class CreatorRun(FrozenModel):
         worker_id: str,
         now: datetime,
         lease_expires_at: datetime,
-    ) -> "CreatorRun":
+    ) -> CreatorRun:
         if self.status not in {
             CreatorRunStatus.QUEUED,
             CreatorRunStatus.RETRYING,
@@ -332,7 +332,7 @@ class CreatorRun(FrozenModel):
         worker_id: str,
         now: datetime,
         lease_expires_at: datetime,
-    ) -> "CreatorRun":
+    ) -> CreatorRun:
         if self.status != CreatorRunStatus.RUNNING or self.lease_owner != worker_id:
             raise CreatorInvalidTransitionError(
                 f"Worker {worker_id} does not own running lease for {self.id}",
@@ -356,7 +356,7 @@ class CreatorRun(FrozenModel):
         error_message: str | None = None,
         retryable: bool = False,
         pending_decision_id: str | None = None,
-    ) -> "CreatorRun":
+    ) -> CreatorRun:
         if target == self.status:
             return self
         if target not in _RUN_TRANSITIONS[self.status]:
@@ -455,7 +455,7 @@ class RuntimeHumanDecision(FrozenModel):
     submitted_at: datetime
 
     @model_validator(mode="after")
-    def validate_action(self) -> "RuntimeHumanDecision":
+    def validate_action(self) -> RuntimeHumanDecision:
         _validate_decision_values(
             self.action,
             selected_option_id=self.selected_option_id,
@@ -495,7 +495,7 @@ class CreatorHumanDecision(FrozenModel):
         *,
         submission_hash: str,
         idempotency_key_hash: str,
-    ) -> "CreatorHumanDecision":
+    ) -> CreatorHumanDecision:
         if self.status != CreatorDecisionStatus.PENDING:
             raise CreatorInvalidTransitionError(
                 f"Decision {self.id} cannot be submitted from {self.status.value}",
@@ -545,7 +545,7 @@ class CreatorHumanDecision(FrozenModel):
             }
         )
 
-    def mark_applied(self, *, now: datetime) -> "CreatorHumanDecision":
+    def mark_applied(self, *, now: datetime) -> CreatorHumanDecision:
         if self.status != CreatorDecisionStatus.SUBMITTED:
             raise CreatorInvalidTransitionError(
                 f"Decision {self.id} cannot be applied from {self.status.value}",
@@ -611,7 +611,7 @@ class RuntimeOutcome(FrozenModel):
     state_summary: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_contract(self) -> "RuntimeOutcome":
+    def validate_contract(self) -> RuntimeOutcome:
         if self.status == RuntimeOutcomeStatus.COMPLETED and not self.final_artifact_id:
             raise ValueError("COMPLETED runtime outcome requires final_artifact_id")
         if self.status == RuntimeOutcomeStatus.WAITING_HUMAN:

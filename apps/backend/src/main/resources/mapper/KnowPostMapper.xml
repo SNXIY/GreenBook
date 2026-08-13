@@ -21,8 +21,6 @@
         <result property="videoUrl" column="video_url" />
         <result property="status" column="status" />
         <result property="contentOrigin" column="content_origin" />
-        <result property="moderationTaskId" column="moderation_task_id" />
-        <result property="moderationReason" column="moderation_reason" />
         <result property="createTime" column="create_time" />
         <result property="updateTime" column="update_time" />
         <result property="publishTime" column="publish_time" />
@@ -74,7 +72,7 @@
         UPDATE know_posts
         SET status = 'published', publish_time = NOW(), update_time = NOW()
         WHERE id = #{id} AND creator_id = #{creatorId}
-          AND status IN ('draft', 'reviewing')
+          AND status = 'draft'
     </update>
 
     <!-- 设置置顶 -->
@@ -212,10 +210,10 @@
     </select>
 
     <!--
-      Assistant retrieval intentionally uses MySQL because Elasticsearch was removed.
+      Agent retrieval intentionally uses MySQL because Elasticsearch was removed.
       The query is bounded, public-only, parameterized and ordered by relevance hints.
     -->
-    <select id="searchPublicForAssistant" resultType="com.tongji.knowpost.model.KnowPostDetailRow">
+    <select id="searchPublicForAgent" resultType="com.tongji.knowpost.model.KnowPostDetailRow">
         SELECT
             p.id,
             p.creator_id AS creatorId,
@@ -251,7 +249,7 @@
         LIMIT #{limit}
     </select>
 
-    <select id="listOwnPostsForAssistant" resultMap="KnowPostResultMap">
+    <select id="listOwnPostsForAgent" resultMap="KnowPostResultMap">
         SELECT *
         FROM know_posts
         WHERE creator_id = #{creatorId}
@@ -260,7 +258,7 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
-    <select id="analyzeEngagementForAssistant" resultType="map">
+    <select id="analyzeEngagementForAgent" resultType="map">
         SELECT
             COUNT(DISTINCT p.id) AS publishedPostCount,
             COUNT(DISTINCT c.id) AS commentCount,
@@ -282,7 +280,7 @@
           )
     </select>
 
-    <select id="listTopEngagementPostsForAssistant" resultType="map">
+    <select id="listTopEngagementPostsForAgent" resultType="map">
         SELECT
             p.id,
             p.title,
@@ -311,7 +309,7 @@
         LIMIT #{limit}
     </select>
 
-    <select id="listTopContributorsForAssistant" resultType="map">
+    <select id="listTopContributorsForAgent" resultType="map">
         SELECT
             c.user_id AS userId,
             u.nickname,

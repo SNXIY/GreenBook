@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import logging
 import time
 import uuid
-from typing import Annotated, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -36,6 +38,9 @@ from app.creator.api.models import (
     CreatorApiStatusResponse,
     CreatorArtifactDetail,
     CreatorArtifactSummary,
+    CreatorBranchCreateRequest,
+    CreatorBranchCreateResponse,
+    CreatorChannelVariantCreateRequest,
     CreatorDecisionResponseRequest,
     CreatorDecisionView,
     CreatorDraftCreateRequest,
@@ -43,11 +48,8 @@ from app.creator.api.models import (
     CreatorDraftUpdateRequest,
     CreatorDraftVersionView,
     CreatorDraftView,
-    CreatorBranchCreateRequest,
-    CreatorBranchCreateResponse,
-    CreatorChannelVariantCreateRequest,
-    CreatorMaterialCreateRequest,
     CreatorLocalSessionResponse,
+    CreatorMaterialCreateRequest,
     CreatorProjectCreateRequest,
     CreatorPublicationHandoffRequest,
     CreatorPublicationHandoffView,
@@ -99,6 +101,8 @@ from app.creator.studio.models import (
     CreatorSuggestion,
 )
 from app.creator.studio.service import CreatorStudioService
+
+logger = logging.getLogger(__name__)
 
 
 creator_router = APIRouter(prefix="/api/v1/creator", tags=["creator"])
@@ -918,6 +922,12 @@ def install_creator_api_handlers(app: FastAPI) -> None:
                 for item in exc.errors()[:20]
             ]
         }
+        logger.warning(
+            "Creator request validation failed path=%s errors=%s body=%s",
+            request.url.path,
+            exc.errors(),
+            exc.body,
+        )
         api_error = CreatorApiError(
             "Creator API request validation failed",
             details=details,

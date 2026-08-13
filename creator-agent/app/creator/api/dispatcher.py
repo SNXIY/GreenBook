@@ -4,12 +4,11 @@ import asyncio
 import logging
 import traceback
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Protocol
 
 from app.creator.application.harness import CreatorAgentHarness
 from app.creator.domain.models import CreatorRunStatus
-
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -71,7 +70,7 @@ class CreatorLocalRunDispatcher:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._closing = False
         self.dispatcher_instance_id = f"{worker_prefix}:{uuid.uuid4().hex[:12]}"
-        self.dispatcher_started_at = datetime.now(timezone.utc)
+        self.dispatcher_started_at = datetime.now(UTC)
         self.dispatcher_last_heartbeat = self.dispatcher_started_at
         self.dispatcher_last_claim_at: datetime | None = None
         self.dispatcher_last_error: str | None = None
@@ -102,7 +101,7 @@ class CreatorLocalRunDispatcher:
 
     def _task_done(self, run_id: str, task: asyncio.Task[None]) -> None:
         self._tasks.pop(run_id, None)
-        self.dispatcher_last_heartbeat = datetime.now(timezone.utc)
+        self.dispatcher_last_heartbeat = datetime.now(UTC)
         if task.cancelled():
             logger.info(
                 "Creator dispatcher task_cancelled instance_id=%s run_id=%s",
@@ -128,7 +127,7 @@ class CreatorLocalRunDispatcher:
 
     def diagnostics(self) -> dict[str, object]:
         self.dispatcher_loop_iteration += 1
-        self.dispatcher_last_heartbeat = datetime.now(timezone.utc)
+        self.dispatcher_last_heartbeat = datetime.now(UTC)
         active_stacks: dict[str, str] = {}
         for run_id, task in self._tasks.items():
             if task.done():
@@ -169,7 +168,7 @@ class CreatorLocalRunDispatcher:
 
     async def aclose(self) -> None:
         self._closing = True
-        self.dispatcher_stopped_at = datetime.now(timezone.utc)
+        self.dispatcher_stopped_at = datetime.now(UTC)
         logger.info(
             "Creator dispatcher stopping instance_id=%s active=%s",
             self.dispatcher_instance_id,
@@ -224,7 +223,7 @@ class CreatorLocalRunDispatcher:
                     async with self._user_semaphore(creator_id):
                         while not self._closing:
                             self.dispatcher_loop_iteration += 1
-                            self.dispatcher_last_heartbeat = datetime.now(timezone.utc)
+                            self.dispatcher_last_heartbeat = datetime.now(UTC)
                             logger.info(
                                 "Creator dispatcher task_claim_attempt instance_id=%s run_id=%s worker_id=%s attempt=%s",
                                 self.dispatcher_instance_id,
@@ -236,7 +235,7 @@ class CreatorLocalRunDispatcher:
                                 run_id,
                                 worker_id=worker_id,
                             )
-                            self.dispatcher_last_claim_at = datetime.now(timezone.utc)
+                            self.dispatcher_last_claim_at = datetime.now(UTC)
                             logger.info(
                                 "Creator dispatcher task_claimed instance_id=%s run_id=%s status=%s",
                                 self.dispatcher_instance_id,

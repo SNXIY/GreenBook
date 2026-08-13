@@ -83,14 +83,12 @@ export type KnowpostDetailResponse = {
   type: "image_text" | string;
   publishTime?: string;
   contentOrigin?: "MANUAL" | "AI_ASSISTED";
-  status?: "draft" | "reviewing" | "published" | "rejected";
+  status?: "draft" | "published" | "rejected" | "deleted";
 };
 
 export type PublishStatusResponse = {
   id: string;
-  status: "draft" | "reviewing" | "published" | "rejected";
-  moderationTaskId?: string;
-  reason?: string;
+  status: "draft" | "published" | "rejected" | "deleted";
 };
 
 export type PostTaskItem = import("./task").PostTaskItem;

@@ -5,21 +5,21 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.events import EventType
-from greenbook_assistant_core.execution.failure_decision import (
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
+from greenbook_agent_core.execution.events import EventType
+from greenbook_agent_core.execution.failure_decision import (
     FailureCategory,
     FailureClassifier,
     FailureDecisionEngine,
     FailurePolicyContext,
     RecoveryAction,
 )
-from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
-from greenbook_assistant_core.orchestration.models import PlanStep
-from greenbook_assistant_core.planning.models import ExecutablePlan
+from greenbook_agent_core.execution.models import ExecutionStatus, StepStatus
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.worker import ExecutionWorker, RunOutcome
+from greenbook_agent_core.planning.contracts import PlanStep
+from greenbook_agent_core.planning.models import ExecutablePlan
 from greenbook_contracts import ToolResult, normalize_external_failure
 
 

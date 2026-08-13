@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook Agent Runtime Legacy Dependency Audit
 
 > Phase 7.2-A。本文是只读架构审计报告。审计期间不删除、不移动、不修改代码。

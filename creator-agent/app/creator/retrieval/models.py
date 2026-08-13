@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -11,7 +11,7 @@ from app.creator.memory.models import CreatorEngagementMetrics
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class RetrievalModel(BaseModel):
@@ -58,7 +58,7 @@ class CreatorRetrievalFilters(RetrievalModel):
     published_before: datetime | None = None
 
     @model_validator(mode="after")
-    def validate_time_window(self) -> "CreatorRetrievalFilters":
+    def validate_time_window(self) -> CreatorRetrievalFilters:
         values = (*self.tags, *self.creator_ids, *self.content_types)
         if any(not value.strip() or len(value) > 128 for value in values):
             raise ValueError("Retrieval filter values must contain 1-128 characters")
@@ -94,7 +94,7 @@ class CreatorRetrievalPlan(RetrievalModel):
     reason: str = Field(min_length=1, max_length=2_000)
 
     @model_validator(mode="after")
-    def validate_plan(self) -> "CreatorRetrievalPlan":
+    def validate_plan(self) -> CreatorRetrievalPlan:
         if self.intent == RetrievalIntent.SKIP:
             if self.queries or self.channels:
                 raise ValueError("SKIP plan cannot contain queries or channels")
@@ -136,7 +136,7 @@ class CreatorCorpusDocument(RetrievalModel):
     source_revision: str | None = Field(default=None, max_length=128)
 
     @model_validator(mode="after")
-    def require_searchable_text(self) -> "CreatorCorpusDocument":
+    def require_searchable_text(self) -> CreatorCorpusDocument:
         if not (self.body.strip() or self.description.strip()):
             raise ValueError("Creator corpus document requires body or description")
         return self
@@ -258,7 +258,7 @@ class CreatorRerankBatch(RetrievalModel):
     error_code: str | None = Field(default=None, max_length=128)
 
     @model_validator(mode="after")
-    def validate_scores(self) -> "CreatorRerankBatch":
+    def validate_scores(self) -> CreatorRerankBatch:
         if any(score < 0.0 or score > 1.0 for score in self.scores.values()):
             raise ValueError("Reranker scores must be between zero and one")
         return self
@@ -287,7 +287,7 @@ class CreatorFusionWeights(RetrievalModel):
     reranker: float = Field(default=0.35, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
-    def require_fusion_weight(self) -> "CreatorFusionWeights":
+    def require_fusion_weight(self) -> CreatorFusionWeights:
         if (
             self.bm25
             + self.vector
@@ -314,7 +314,7 @@ class CreatorRetrievalConfig(RetrievalModel):
     weights: CreatorFusionWeights = Field(default_factory=CreatorFusionWeights)
 
     @model_validator(mode="after")
-    def validate_limits(self) -> "CreatorRetrievalConfig":
+    def validate_limits(self) -> CreatorRetrievalConfig:
         if self.final_top_k > self.candidate_top_k:
             raise ValueError("final_top_k cannot exceed candidate_top_k")
         if self.min_evidence > self.final_top_k:

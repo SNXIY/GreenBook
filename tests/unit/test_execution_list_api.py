@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 from starlette.requests import Request
-from greenbook_assistant_api.api.runtime_routes import list_executions
-from greenbook_assistant_core.execution.models import PlanExecution, StepExecution
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
+from greenbook_agent_api.api.runtime_routes import list_executions
+from greenbook_agent_core.execution.models import PlanExecution, StepExecution
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
 from greenbook_contracts.identity import AuthContext
 
 

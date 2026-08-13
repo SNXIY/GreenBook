@@ -22,7 +22,7 @@ public interface KnowPostService {
 
     void updateMetadata(long creatorId, long id, String title, Long tagId, List<String> tags, List<String> imgUrls, String visible, Boolean isTop, String description);
 
-    /** @return reviewing | published */
+    /** @return published */
     String publish(long creatorId, long id);
 
     PublishStatusResponse getPublishStatus(long creatorId, long id);

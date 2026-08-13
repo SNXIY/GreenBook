@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import AssistantMarkdown from "@/components/content/AssistantMarkdown";
+import AgentMarkdown from "@/components/content/AgentMarkdown";
 import { commentService } from "@/services/commentService";
 import type { CommentItem } from "@/types/comment";
-import { AssistantIcon, CheckIcon } from "@/components/icons/Icon";
-import { assistantService, waitForAssistantRun } from "@/services/assistantService";
+import { AgentIcon, CheckIcon } from "@/components/icons/Icon";
+import { agentService, waitForAgentRun } from "@/services/agentService";
 import { waitForExecution } from "@/services/executionService";
-import type { AssistantRun } from "@/types/assistant";
+import {
+  runtimeExecutionMetaLabels,
+  runtimeExecutionStatusLabel,
+  runtimeStepLabel,
+  runtimeStepStatusLabel
+} from "@/services/runtimeExecutionLabels";
+import type { AgentRun } from "@/types/agent";
 import type { Execution } from "@/types/execution";
 import styles from "./CommentSection.module.css";
 
@@ -34,11 +40,11 @@ const CommentSection = ({ postId, authorId }: Props) => {
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const [loadingReplies, setLoadingReplies] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
-  const [assistantRun, setAssistantRun] = useState<AssistantRun | null>(null);
-  const [assistantExecution, setAssistantExecution] = useState<Execution | null>(null);
-  const [assistantBusy, setAssistantBusy] = useState(false);
-  const [assistantExpanded, setAssistantExpanded] = useState(true);
-  const [assistantTargetCommentId, setAssistantTargetCommentId] = useState<string | null>(null);
+  const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
+  const [agentExecution, setAgentExecution] = useState<Execution | null>(null);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentExpanded, setAgentExpanded] = useState(true);
+  const [agentTargetCommentId, setAgentTargetCommentId] = useState<string | null>(null);
 
   const accessToken = tokens?.accessToken;
   const canManageTop = !!user?.id && String(user.id) === String(authorId ?? "");
@@ -74,19 +80,19 @@ const CommentSection = ({ postId, authorId }: Props) => {
     void loadHot();
   }, [load, loadHot]);
 
-  const finishAssistantRun = async (result: AssistantRun, targetCommentId: string | null) => {
-    setAssistantRun(result);
+  const finishAgentRun = async (result: AgentRun, targetCommentId: string | null) => {
+    setAgentRun(result);
     if (result.status === "FAILED") {
-      throw new Error(result.error || "助手任务执行失败");
+      throw new Error(result.error || "Agent任务执行失败");
     }
     if (result.status === "WAITING_APPROVAL") {
-      setAssistantExpanded(true);
+      setAgentExpanded(true);
       return;
     }
     if (result.status === "CANCELLED") {
-      setAssistantRun(null);
-      setAssistantExpanded(false);
-      setAssistantTargetCommentId(null);
+      setAgentRun(null);
+      setAgentExpanded(false);
+      setAgentTargetCommentId(null);
       return;
     }
     if (result.status !== "COMPLETED") return;
@@ -97,26 +103,26 @@ const CommentSection = ({ postId, authorId }: Props) => {
       setReplies(previous => ({ ...previous, [targetCommentId]: response.items }));
       setExpandedReplies(previous => ({ ...previous, [targetCommentId]: true }));
     }
-    setAssistantRun(null);
-    setAssistantExpanded(false);
-    setAssistantTargetCommentId(null);
+    setAgentRun(null);
+    setAgentExpanded(false);
+    setAgentTargetCommentId(null);
   };
 
-  const askAssistant = async (prompt: string, commentId: string) => {
+  const askAgent = async (prompt: string, commentId: string) => {
     if (!accessToken || authLoading) return;
-    setAssistantBusy(true);
-    setAssistantRun(null);
-    setAssistantExecution(null);
-    setAssistantExpanded(true);
-    setAssistantTargetCommentId(commentId);
+    setAgentBusy(true);
+    setAgentRun(null);
+    setAgentExecution(null);
+    setAgentExpanded(true);
+    setAgentTargetCommentId(commentId);
     setError(null);
     try {
-      const conversations = await assistantService.listConversations(accessToken, postId);
-      const conversation = conversations[0] ?? await assistantService.createConversation(accessToken, {
+      const conversations = await agentService.listConversations(accessToken, postId);
+      const conversation = conversations[0] ?? await agentService.createConversation(accessToken, {
         context_post_id: postId,
         surface: "COMMENT"
       });
-      const accepted = await assistantService.send(
+      const accepted = await agentService.send(
         accessToken,
         conversation.conversation_id,
         prompt,
@@ -127,7 +133,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
         const completed = await waitForExecution(
           accessToken,
           accepted.execution_id,
-          setAssistantExecution
+          setAgentExecution
         );
         if (completed.status === "FAILED") {
           const failedStep = completed.steps?.find(step => step.error_message);
@@ -135,66 +141,66 @@ const CommentSection = ({ postId, authorId }: Props) => {
         }
         if (["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(completed.status)) {
           try {
-            setAssistantRun(await assistantService.getRun(accessToken, accepted.run_id));
+            setAgentRun(await agentService.getRun(accessToken, accepted.run_id));
           } catch {
             // Keep the Runtime execution card if the compatibility projection is unavailable.
           }
           return;
         }
         await load(null);
-        setAssistantExecution(null);
-        setAssistantExpanded(false);
-        setAssistantTargetCommentId(null);
+        setAgentExecution(null);
+        setAgentExpanded(false);
+        setAgentTargetCommentId(null);
         return;
       }
-      const completed = await waitForAssistantRun(accessToken, accepted.run_id, setAssistantRun);
-      await finishAssistantRun(completed, commentId);
+      const completed = await waitForAgentRun(accessToken, accepted.run_id, setAgentRun);
+      await finishAgentRun(completed, commentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "助手回复失败");
+      setError(err instanceof Error ? err.message : "Agent回复失败");
     } finally {
-      setAssistantBusy(false);
+      setAgentBusy(false);
     }
   };
 
-  const decideAssistantApproval = async (decision: "APPROVE" | "REJECT") => {
-    if (!accessToken || !assistantRun?.approval || assistantBusy) return;
-    const currentRun = assistantRun;
-    const approval = assistantRun.approval;
-    setAssistantBusy(true);
+  const decideAgentApproval = async (decision: "APPROVE" | "REJECT") => {
+    if (!accessToken || !agentRun?.approval || agentBusy) return;
+    const currentRun = agentRun;
+    const approval = agentRun.approval;
+    setAgentBusy(true);
     setError(null);
     try {
-      const updated = await assistantService.decideApproval(
+      const updated = await agentService.decideApproval(
         accessToken,
         currentRun.run_id,
         approval.approval_id,
         decision,
         approval.expected_run_version
       );
-      setAssistantRun(updated);
+      setAgentRun(updated);
       if (decision === "REJECT") {
-        await finishAssistantRun(updated, assistantTargetCommentId);
+        await finishAgentRun(updated, agentTargetCommentId);
         return;
       }
-      const completed = await waitForAssistantRun(
+      const completed = await waitForAgentRun(
         accessToken,
         currentRun.run_id,
-        setAssistantRun
+        setAgentRun
       );
-      await finishAssistantRun(completed, assistantTargetCommentId);
+      await finishAgentRun(completed, agentTargetCommentId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "发布确认失败");
     } finally {
-      setAssistantBusy(false);
+      setAgentBusy(false);
     }
   };
 
   const submit = async () => {
     const text = content.trim();
     if (!text || !accessToken || authLoading) return;
-    const mentionsAssistant = /(?:^|\s)@(?:(?:知光|GREEN-BOOK)\s*)?助手(?:\s|[，,：:]|$)/i.test(text);
-    if (mentionsAssistant && assistantRun?.status === "WAITING_APPROVAL") {
-      setError("请先确认或取消上一项发布任务，再交给助手新的任务");
-      setAssistantExpanded(true);
+    const mentionsAgent = /(?:^|\s)@(?:(?:知光|GreenBook)\s*)?Agent(?:\s|[，,：:]|$)/i.test(text);
+    if (mentionsAgent && agentRun?.status === "WAITING_APPROVAL") {
+      setError("请先确认或取消上一项发布任务，再交给Agent新的任务");
+      setAgentExpanded(true);
       return;
     }
     setSubmitting(true);
@@ -218,8 +224,8 @@ const CommentSection = ({ postId, authorId }: Props) => {
       setContent("");
       setReplyTo(null);
       void loadHot();
-      if (mentionsAssistant) {
-        void askAssistant(text, created.id);
+      if (mentionsAgent) {
+        void askAgent(text, created.id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "评论发布失败");
@@ -299,12 +305,12 @@ const CommentSection = ({ postId, authorId }: Props) => {
         <div className={styles.body}>
           <div className={styles.meta}>
             <span className={styles.author}>{comment.authorNickname}</span>
-            {comment.assistant ? <span className={styles.assistantBadge}><AssistantIcon width={12} height={12} aria-hidden="true" /> AI 助手</span> : null}
+            {comment.assistant ? <span className={styles.agentBadge}><AgentIcon width={12} height={12} aria-hidden="true" /> AI Agent</span> : null}
             {comment.top ? <span className={styles.badge}>置顶</span> : null}
             <span>{formatTime(comment.createTime)}</span>
           </div>
           {comment.assistant ? (
-            <AssistantMarkdown content={comment.content} />
+            <AgentMarkdown content={comment.content} />
           ) : (
             <div className={styles.content}>{comment.content}</div>
           )}
@@ -355,7 +361,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
         {replyTo ? <div className={styles.muted}>回复 {replyTo.authorNickname} <button className={styles.tool} type="button" onClick={() => setReplyTo(null)}>取消</button></div> : null}
         <textarea
           className={styles.textarea}
-          placeholder={accessToken ? "例如：@助手 参照本帖创作一篇同主题帖子并发布…" : "登录后参与评论…"}
+          placeholder={accessToken ? "例如：@Agent 参照本帖创作一篇同主题帖子并发布…" : "登录后参与评论…"}
           name="comment-content"
           aria-label="评论内容"
           autoComplete="off"
@@ -368,11 +374,11 @@ const CommentSection = ({ postId, authorId }: Props) => {
             <button
               className={styles.mentionButton}
               type="button"
-              disabled={authLoading || submitting || assistantBusy || assistantRun?.status === "WAITING_APPROVAL"}
-              onClick={() => setContent(previous => previous.includes("@助手") ? previous : `@助手 ${previous}`)}
+              disabled={authLoading || submitting || agentBusy || agentRun?.status === "WAITING_APPROVAL"}
+              onClick={() => setContent(previous => previous.includes("@Agent") ? previous : `@Agent ${previous}`)}
             >
-              <AssistantIcon width={16} height={16} aria-hidden="true" />
-              @助手
+              <AgentIcon width={16} height={16} aria-hidden="true" />
+              @Agent
             </button>
           ) : null}
           <button className={`${styles.button} ${styles.primary}`} type="button" disabled={!accessToken || authLoading || submitting || !content.trim()} onClick={submit}>
@@ -380,42 +386,42 @@ const CommentSection = ({ postId, authorId }: Props) => {
           </button>
         </div>
       </div>
-      {assistantBusy || assistantRun || assistantExecution ? (
-        <aside className={styles.assistantReply} aria-live="polite">
+      {agentBusy || agentRun || agentExecution ? (
+        <aside className={styles.agentReply} aria-live="polite">
           <button
-            className={styles.assistantReplyHeader}
+            className={styles.agentReplyHeader}
             type="button"
-            aria-expanded={assistantExpanded}
-            onClick={() => setAssistantExpanded(previous => !previous)}
+            aria-expanded={agentExpanded}
+            onClick={() => setAgentExpanded(previous => !previous)}
           >
-            <span><AssistantIcon width={17} height={17} aria-hidden="true" /> GREEN-BOOK 助手</span>
+            <span><AgentIcon width={17} height={17} aria-hidden="true" /> GreenBook Agent</span>
             <small>
-              {assistantRun?.status === "WAITING_APPROVAL"
+              {agentRun?.status === "WAITING_APPROVAL"
                 ? "等待你的确认"
-                : assistantBusy
+                : agentBusy
                   ? "正在阅读并处理"
                   : "查看执行进度"}
-              <span aria-hidden="true">{assistantExpanded ? "收起" : "展开"}</span>
+              <span aria-hidden="true">{agentExpanded ? "收起" : "展开"}</span>
             </small>
           </button>
-          {assistantExpanded ? (
-            <div className={styles.assistantReplyBody}>
-              {assistantExecution ? (
-                <div className={styles.assistantSteps} data-execution-id={assistantExecution.execution_id}>
-                  <span>Runtime {assistantExecution.status}</span>
-                  <span>Progress {Math.round(assistantExecution.progress * 100)}%</span>
-                  {assistantExecution.steps?.map(step => (
+          {agentExpanded ? (
+            <div className={styles.agentReplyBody}>
+              {agentExecution ? (
+                <div className={styles.agentSteps} data-execution-id={agentExecution.execution_id}>
+                  <span>Runtime 执行 · {runtimeExecutionStatusLabel(agentExecution.status)}</span>
+                  <span>{runtimeExecutionMetaLabels.progress}：{Math.round(agentExecution.progress * 100)}%</span>
+                  {agentExecution.steps?.map(step => (
                     <span key={step.step_execution_id || step.step_id}>
                       {step.status === "COMPLETED" ? <CheckIcon width={13} height={13} aria-hidden="true" /> : <i aria-hidden="true" />}
-                      {step.capability || step.step_id} · {step.status}
+                      {runtimeStepLabel(step.capability || step.step_id)} · {runtimeStepStatusLabel(step.status)}
                     </span>
                   ))}
-                  <small>execution_id {assistantExecution.execution_id} · events {assistantExecution.events?.length ?? 0}</small>
+                  <small>{runtimeExecutionMetaLabels.executionId}：{agentExecution.execution_id} · {runtimeExecutionMetaLabels.events}：{agentExecution.events?.length ?? 0}</small>
                 </div>
               ) : null}
-              {assistantRun?.steps.length ? (
-                <div className={styles.assistantSteps}>
-                  {assistantRun.steps.map(step => (
+              {agentRun?.steps.length ? (
+                <div className={styles.agentSteps}>
+                  {agentRun.steps.map(step => (
                     <span key={step.step_id}>
                       {step.status === "COMPLETED" ? <CheckIcon width={13} height={13} aria-hidden="true" /> : <i aria-hidden="true" />}
                       {step.label}
@@ -423,18 +429,18 @@ const CommentSection = ({ postId, authorId }: Props) => {
                   ))}
                 </div>
               ) : null}
-              {assistantBusy && !assistantRun?.steps.length ? <p className={styles.muted}>正在建立任务…</p> : null}
-              {assistantRun?.approval ? (
-                <div className={styles.assistantApproval}>
+              {agentBusy && !agentRun?.steps.length ? <p className={styles.muted}>正在建立任务…</p> : null}
+              {agentRun?.approval ? (
+                <div className={styles.agentApproval}>
                   <div>
                     <strong>公开发布前需要你确认</strong>
-                    <p>{assistantRun.approval.description}</p>
+                    <p>{agentRun.approval.description}</p>
                   </div>
                   <div className={styles.approvalActions}>
-                    <button type="button" disabled={assistantBusy} onClick={() => void decideAssistantApproval("REJECT")}>
+                    <button type="button" disabled={agentBusy} onClick={() => void decideAgentApproval("REJECT")}>
                       取消任务
                     </button>
-                    <button type="button" disabled={assistantBusy} onClick={() => void decideAssistantApproval("APPROVE")}>
+                    <button type="button" disabled={agentBusy} onClick={() => void decideAgentApproval("APPROVE")}>
                       确认发布
                     </button>
                   </div>

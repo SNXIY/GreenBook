@@ -5,7 +5,7 @@ description = "GreenBook E2E and contract test harness"
 requires-python = ">=3.12"
 dependencies = [
     "greenbook-contracts",
-    "greenbook-assistant-core",
+    "greenbook-agent-core",
     "greenbook-mcp-server",
     "greenbook-java-client",
     "pytest>=8.3",

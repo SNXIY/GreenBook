@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import pytest
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.orchestration.models import PlanStep, TaskPlan
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
+from greenbook_agent_core.planning.validation import PlanValidator
+
+from tests.plan_factory import GoalPlanFactory
 
 
 @pytest.fixture
@@ -15,8 +16,8 @@ def registry() -> CapabilityRegistry:
 
 
 @pytest.fixture
-def orchestrator(registry: CapabilityRegistry) -> TaskOrchestrator:
-    return TaskOrchestrator(registry)
+def orchestrator(registry: CapabilityRegistry) -> GoalPlanFactory:
+    return GoalPlanFactory(registry)
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def validator(registry: CapabilityRegistry) -> PlanValidator:
 # ── helpers ──────────────────────────────────────────────────────
 
 def _make_plan(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     task_id: str,
     goal_category: str,
     requirements: list[dict[str, str]],
@@ -42,7 +43,7 @@ def _make_plan(
 # ── Scenario 1: valid CREATE_WITH_RESEARCH passes ─────────────────
 
 def test_valid_create_with_research_passes_all_checks(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
 ) -> None:
     task_plan = _make_plan(
@@ -65,11 +66,11 @@ def test_valid_create_with_research_passes_all_checks(
     assert result.cycles_checked is True
     assert result.has_side_effects is True  # GENERATE_CONTENT has side effect
     assert result.requires_approval is False
-    assert result.template_name == "CREATE_WITH_RESEARCH"
+    assert result.plan_source == "GOAL_RUNTIME"
 
 
 def test_valid_full_pipeline_passes(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
 ) -> None:
     task_plan = _make_plan(
@@ -87,7 +88,7 @@ def test_valid_full_pipeline_passes(
 # ── Scenario 2: artifact flow broken → validation fails ──────────
 
 def test_missing_input_artifact_fails(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
 ) -> None:
     """ANALYZE step needs SEARCH_RESULT but upstream produces nothing."""
@@ -114,7 +115,7 @@ def test_missing_input_artifact_fails(
 
 
 def test_missing_dependency_fails(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
 ) -> None:
     """A step references a dependency that doesn't exist."""
@@ -152,8 +153,8 @@ def test_publish_now_requires_approval_flag(validator: PlanValidator) -> None:
         ],
     )
     # Fix dependencies
-    from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-    task_plan = TaskOrchestrator._fix_dependencies(task_plan)
+    from tests.plan_factory import GoalPlanFactory
+    task_plan = GoalPlanFactory._fix_dependencies(task_plan)
 
     result = validator.validate(task_plan)
     assert result.requires_approval is True
@@ -304,7 +305,7 @@ def test_llm_step_without_tools_passes(validator: PlanValidator) -> None:
 
 
 def test_valid_plan_preserves_all_step_metadata(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
 ) -> None:
     task_plan = _make_plan(
@@ -316,7 +317,7 @@ def test_valid_plan_preserves_all_step_metadata(
     )
     result = validator.validate(task_plan)
     assert len(result.steps) == len(task_plan.steps)
-    for orig, validated in zip(task_plan.steps, result.steps):
+    for orig, validated in zip(task_plan.steps, result.steps, strict=True):
         assert validated.capability == orig.capability
         assert validated.ordinal == orig.ordinal
         assert validated.depends_on == orig.depends_on

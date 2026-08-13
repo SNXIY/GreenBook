@@ -26,15 +26,15 @@ const CreateHubPage = () => {
           <span className={styles.icon}><CreateIcon aria-hidden="true" /></span>
           <span className={styles.eyebrow}>自主表达</span>
           <h2>自己写</h2>
-          <p>按步骤完成正文、配图和可见范围，最终内容会交给审核 Agent。</p>
+          <p>按步骤完成正文、配图和可见范围，最终内容会进入 GreenBook Agent 发布流程。</p>
           <span className={styles.cardAction}>开始写作 <ArrowRightIcon aria-hidden="true" /></span>
         </Link>
         <Link to="/create/ai" className={`${styles.card} ${styles.aiCard}`}>
           <span className={styles.icon}><SparkIcon aria-hidden="true" /></span>
           <span className={styles.eyebrow}>AI 协作</span>
           <h2>和 AI 一起写</h2>
-          <p>由创作 Agent 研究、搭结构并生成初稿，再回到同一发布向导补图确认。</p>
-          <span className={styles.cardAction}>打开创作助手 <ArrowRightIcon aria-hidden="true" /></span>
+          <p>由Creator Service 研究、搭结构并生成初稿，再回到同一发布向导补图确认。</p>
+          <span className={styles.cardAction}>打开创作Agent <ArrowRightIcon aria-hidden="true" /></span>
         </Link>
       </div>
       <section className={styles.flow}>
@@ -49,7 +49,7 @@ const CreateHubPage = () => {
           <li><span>1</span><strong>完成内容</strong><small>自己写或 AI 协作</small></li>
           <li><span>2</span><strong>补充配图</strong><small>OSS / 本地对象存储</small></li>
           <li><span>3</span><strong>确认设置</strong><small>预览与可见范围</small></li>
-          <li><span>4</span><strong>正式发布</strong><small>手写内容进入真实审核</small></li>
+          <li><span>4</span><strong>正式发布</strong><small>确认后进入可靠执行流程</small></li>
         </ol>
       </section>
     </AppLayout>

@@ -5,11 +5,17 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from greenbook_contracts.tool_result import ToolResult
+from greenbook_contracts.tool_result import DataProvenance, ToolResult
 
 from ..context import ToolContext
 
 logger = logging.getLogger(__name__)
+
+
+def _mark_source(result: ToolResult[Any], source: DataProvenance) -> ToolResult[Any]:
+    if not result.ok:
+        return result
+    return result.model_copy(update={"provenance": [source]})
 
 
 async def get_post_performance(
@@ -26,8 +32,9 @@ async def get_post_performance(
         return ToolResult.success(
             result.data.model_dump(mode="json"),
             trace_id=result.trace_id,
+            provenance=[DataProvenance.PERSONAL_DATA],
         )
-    return result
+    return _mark_source(result, DataProvenance.PERSONAL_DATA)
 
 
 async def get_account_summary(
@@ -43,5 +50,6 @@ async def get_account_summary(
         return ToolResult.success(
             result.data.model_dump(mode="json"),
             trace_id=result.trace_id,
+            provenance=[DataProvenance.PERSONAL_DATA],
         )
-    return result
+    return _mark_source(result, DataProvenance.PERSONAL_DATA)

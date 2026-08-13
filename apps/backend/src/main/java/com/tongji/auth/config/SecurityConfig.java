@@ -51,7 +51,6 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/storage/files/**").permitAll()
                         .requestMatchers("/api/v1/knowposts/feed", "/api/v1/knowposts/feed/recommend").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/knowposts/ai-drafts").permitAll()
-                        .requestMatchers("/api/v1/assistant-tools/**").permitAll()
 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/knowposts/detail/*").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/comments", "/api/v1/comments/hot").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

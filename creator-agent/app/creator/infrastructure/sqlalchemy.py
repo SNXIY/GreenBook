@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, overload
 
 from sqlalchemy import (
@@ -695,7 +695,7 @@ class SqlAlchemyCreatorUnitOfWork:
         self._session: AsyncSession | None = None
         self._committed = False
 
-    async def __aenter__(self) -> "SqlAlchemyCreatorUnitOfWork":
+    async def __aenter__(self) -> SqlAlchemyCreatorUnitOfWork:
         self._session = self._session_factory()
         self.tasks = SqlAlchemyCreatorTaskRepository(self._session)
         self.runs = SqlAlchemyCreatorRunRepository(self._session)
@@ -1111,8 +1111,8 @@ def _as_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _constraint_name(exc: IntegrityError) -> str:

@@ -5,9 +5,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-from greenbook_assistant_core.execution.retry_decision import RetryDecision
-from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler, RetryTask
-from greenbook_assistant_core.execution.failure_decision import FailureCategory
+from greenbook_agent_core.execution.retry_decision import RetryDecision
+from greenbook_agent_core.execution.retry_scheduler import RetryScheduler, RetryTask
+from greenbook_agent_core.execution.failure_decision import FailureCategory
 
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)

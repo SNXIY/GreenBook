@@ -89,7 +89,7 @@ class JwtValidationTest {
     @Test
     void audienceMissingRuntime_whenOnlyRuntimeRequired_shouldReject() {
         // Validate audience against a narrow requirement
-        OAuth2TokenValidator<Jwt> narrow = new AgentJwtValidator(List.of("greenbook-assistant-runtime"));
+        OAuth2TokenValidator<Jwt> narrow = new AgentJwtValidator(List.of("greenbook-agent-runtime"));
         NimbusJwtDecoder narrowDecoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
         narrowDecoder.setJwtValidator(narrow);
 
@@ -102,12 +102,12 @@ class JwtValidationTest {
 
     @Test
     void audienceContainsRuntime_shouldPass() {
-        OAuth2TokenValidator<Jwt> agentValidator = new AgentJwtValidator(List.of("greenbook-assistant-runtime"));
+        OAuth2TokenValidator<Jwt> agentValidator = new AgentJwtValidator(List.of("greenbook-agent-runtime"));
         NimbusJwtDecoder agentDecoder = NimbusJwtDecoder.withPublicKey(publicKey).build();
         agentDecoder.setJwtValidator(agentValidator);
 
         String token = createToken(privateKey, "zhiguang-test",
-                List.of("greenbook-assistant-runtime"), "access", Instant.now().plusSeconds(300));
+                List.of("greenbook-agent-runtime"), "access", Instant.now().plusSeconds(300));
         Jwt jwt = agentDecoder.decode(token);
         assertThat(jwt).isNotNull();
     }
@@ -142,10 +142,10 @@ class JwtValidationTest {
 
     @Test
     void audienceValidator_acceptsMatchingAudience() {
-        OAuth2TokenValidator<Jwt> v = new AgentJwtValidator(List.of("greenbook-assistant-runtime"));
+        OAuth2TokenValidator<Jwt> v = new AgentJwtValidator(List.of("greenbook-agent-runtime"));
         Jwt jwt = new Jwt("token-value", Instant.now(), Instant.now().plusSeconds(300),
                 Map.of("alg", "RS256"),
-                Map.of("sub", "123", "token_type", "access", "iss", "zhiguang-test", "aud", List.of("greenbook-assistant-runtime")));
+                Map.of("sub", "123", "token_type", "access", "iss", "zhiguang-test", "aud", List.of("greenbook-agent-runtime")));
         OAuth2TokenValidatorResult r = v.validate(jwt);
         assertThat(r.hasErrors()).isFalse();
     }

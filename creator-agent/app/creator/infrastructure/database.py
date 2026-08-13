@@ -12,15 +12,15 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.creator.infrastructure.sqlalchemy import (
-    SqlAlchemyCreatorArtifactStore,
-    SqlAlchemyCreatorUnitOfWorkFactory,
-    create_creator_schema,
-)
 from app.creator.drafts.sqlalchemy import SqlAlchemyCreatorDraftStore
 from app.creator.evaluation.sqlalchemy import (
     SqlAlchemyCreatorEvaluationSnapshotReader,
     SqlAlchemyCreatorEvaluationStore,
+)
+from app.creator.infrastructure.sqlalchemy import (
+    SqlAlchemyCreatorArtifactStore,
+    SqlAlchemyCreatorUnitOfWorkFactory,
+    create_creator_schema,
 )
 from app.creator.memory.sqlalchemy import SqlAlchemyCreatorLongTermProfileStore
 from app.creator.publication.sqlalchemy import (
@@ -60,7 +60,7 @@ class CreatorDatabase:
         echo: bool = False,
         pool_size: int = 5,
         max_overflow: int = 10,
-    ) -> "CreatorDatabase":
+    ) -> CreatorDatabase:
         engine_options: dict = {
             "echo": echo,
             "pool_pre_ping": True,
@@ -105,7 +105,7 @@ class CreatorDatabase:
         )
 
     @classmethod
-    def from_settings(cls, settings: CreatorDatabaseSettings) -> "CreatorDatabase":
+    def from_settings(cls, settings: CreatorDatabaseSettings) -> CreatorDatabase:
         return cls.from_url(
             settings.creator_database_url,
             echo=settings.creator_database_echo,

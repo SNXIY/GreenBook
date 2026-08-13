@@ -36,11 +36,10 @@ from app.creator.runtime.models import (
     CreatorArtifact,
     CreatorGraphState,
     HumanInterruptPayload,
-    RuntimeControlStatus,
     RunIdentity,
+    RuntimeControlStatus,
 )
 from app.creator.runtime.ports import CreatorArtifactStore
-
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -286,7 +285,7 @@ class LangGraphCreatorRuntime:
                 if events:
                     try:
                         await asyncio.wait_for(on_events(events), timeout=30.0)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         logger.exception(
                             "Creator runtime event publication timed out; continuing graph run_id=%s event_count=%s",
                             config.get("configurable", {}).get("thread_id"),
@@ -320,7 +319,7 @@ class LangGraphCreatorRuntime:
         raw_state: dict[str, Any],
         *,
         config: dict[str, Any],
-        previous: "_EventCursor",
+        previous: _EventCursor,
         expected_applied_decision_id: str | None = None,
     ) -> RuntimeOutcome:
         snapshot = await self._graph.compiled.aget_state(config)
@@ -347,7 +346,7 @@ class LangGraphCreatorRuntime:
         state: CreatorGraphState,
         interrupt_value: Interrupt,
         checkpoint_id: str,
-        previous: "_EventCursor | None" = None,
+        previous: _EventCursor | None = None,
         expected_applied_decision_id: str | None = None,
     ) -> RuntimeOutcome:
         payload = HumanInterruptPayload.model_validate(interrupt_value.value)
@@ -431,7 +430,24 @@ class LangGraphCreatorRuntime:
             payload=ArtifactPayload(
                 kind=ArtifactKind.SOURCE_DRAFT,
                 content=document.model_dump(mode="json"),
-                metadata={"source": "task.constraints.draft"},
+                parent_ids=tuple(
+                    value
+                    for value in (
+                        document.source_artifact_id,
+                        request.goal.constraints.get("source_artifact_id"),
+                    )
+                    if value
+                ),
+                metadata={
+                    "source": "task.constraints.draft",
+                    "source_artifact_id": (
+                        document.source_artifact_id
+                        or request.goal.constraints.get("source_artifact_id")
+                    ),
+                    "revision_scope": request.goal.constraints.get(
+                        "revision_scope", "FULL_REVISION"
+                    ),
+                },
             ),
         )
         await self._artifacts.put(artifact)
@@ -441,7 +457,7 @@ class LangGraphCreatorRuntime:
         state: CreatorGraphState,
         *,
         checkpoint_id: str,
-        previous: "_EventCursor | None" = None,
+        previous: _EventCursor | None = None,
         expected_applied_decision_id: str | None = None,
     ) -> RuntimeOutcome:
         status = state["control_status"]

@@ -4,28 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
-from greenbook_assistant_core.execution.models import (
+from greenbook_agent_core.execution.events import EventType, ExecutionEvent
+from greenbook_agent_core.execution.models import (
     ExecutionStatus,
     PlanExecution,
     StepExecution,
     StepStatus,
 )
-from greenbook_assistant_core.orchestration.models import PlanStep, TaskPlan
-from greenbook_assistant_core.task.intent_models import (
-    ActionType,
-    ConstraintType,
-    IntentAction,
-    IntentConstraint,
-    IntentSpec,
-    ResourceType,
-)
-from greenbook_assistant_core.observability.models import EventType as TraceEventType
-from greenbook_assistant_core.observability.models import Trace, TraceEvent
-
+from greenbook_agent_core.observability.models import EventType as TraceEventType
+from greenbook_agent_core.observability.models import Trace, TraceEvent
 from greenbook_evaluation.badcase import BadCase, BadCaseStore, FailureType
 from greenbook_evaluation.metrics import ExecutionMetricsCalculator
-from greenbook_evaluation.planner_evaluator import PlannerEvaluator
 from greenbook_evaluation.runtime_evaluator import (
     ExecutionEvaluator,
     ExecutionRecord,
@@ -106,47 +95,6 @@ def test_failed_execution_and_retry_evaluation() -> None:
     assert metrics.human_approval_rate == 1.0
 
 
-def test_planner_evaluation_checks_actions_resources_order_and_constraints() -> None:
-    spec = IntentSpec(
-        actions=[
-            IntentAction(action=ActionType.SEARCH, resource=ResourceType.CONTENT),
-            IntentAction(action=ActionType.CREATE, resource=ResourceType.DRAFT),
-            IntentAction(action=ActionType.PUBLISH, resource=ResourceType.SCHEDULE),
-        ],
-        constraints=[IntentConstraint(type=ConstraintType.TIME, value="tomorrow")],
-    )
-    plan = TaskPlan(steps=[
-        PlanStep(
-            step_id="search",
-            ordinal=1,
-            capability="SEARCH_COMMUNITY",
-            output_artifact_type="SEARCH_RESULT",
-        ),
-        PlanStep(
-            step_id="create",
-            ordinal=2,
-            capability="GENERATE_CONTENT",
-            depends_on=["search"],
-            output_artifact_type="DRAFT",
-        ),
-        PlanStep(
-            step_id="publish",
-            ordinal=3,
-            capability="SCHEDULE_PUBLISH",
-            depends_on=["create"],
-            input_artifact_types=["DRAFT"],
-            output_artifact_type="SCHEDULE",
-            constraints={"time": "tomorrow"},
-        ),
-    ])
-    result = PlannerEvaluator().evaluate(spec, plan)
-    assert result.passed is True
-    assert result.action_coverage == 1.0
-    assert result.resource_match is True
-    assert result.order_reasonable is True
-    assert result.constraints_forwarded is True
-
-
 def test_badcase_store_preserves_regression_snapshot() -> None:
     store = BadCaseStore()
     case = BadCase(
@@ -154,7 +102,7 @@ def test_badcase_store_preserves_regression_snapshot() -> None:
         category="EXECUTION",
         failure_type=FailureType.RECOVERY_FAILED,
         user_input="publish the article",
-        intent_spec={"actions": ["PUBLISH"]},
+        understanding_snapshot={"command": "PUBLISH"},
         task_plan={"steps": ["PUBLISH"]},
         execution_trace={"events": ["STEP_FAILED"]},
         failure_reason="publish step failed",
@@ -165,3 +113,38 @@ def test_badcase_store_preserves_regression_snapshot() -> None:
     assert len(saved) == 1
     assert saved[0].user_input == case.user_input
     assert saved[0].expected_behavior["status"] == "COMPLETED"
+
+
+def test_behavioral_evaluation_runner_reports_runtime_metrics() -> None:
+    from greenbook_evaluation.models import EvalCase
+    from greenbook_evaluation.runner import EvaluationRunner
+
+    case = EvalCase(
+        case_id="phase55-create",
+        category="COMMAND",
+        conversation_turns=[{"role": "user", "content": "写一篇Java学习路线文章"}],
+        expected_command="CREATE",
+        expected_tools=["content.create_draft"],
+        expected_task_state="COMPLETED",
+    )
+    actual = {
+        "command": "CREATE",
+        "tools": ["content.create_draft"],
+        "task_state": "COMPLETED",
+        "trace": {
+            "conversation_id": "conv-1",
+            "task_id": "task-1",
+            "goal_id": "goal-1",
+            "plan_version": 1,
+            "events": [{"name": "TOOL_INVOKED"}],
+        },
+        "tool_call_count": 1,
+    }
+    report = EvaluationRunner().run_sync(
+        [case],
+        handler=lambda _case: actual,
+    )
+
+    assert report.total_passed == 1
+    assert report.metrics["command_accuracy"] == 1.0
+    assert report.results[0].trace["task_id"] == "task-1"

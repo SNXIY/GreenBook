@@ -73,3 +73,35 @@ function Assert-GreenBookSecret {
     throw "$Name still uses a known development placeholder. Run .\scripts\rotate-dev-secrets.ps1, then restart the applications."
   }
 }
+
+function Assert-GreenBookJwtNotExpired {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Name,
+    [Parameter(Mandatory = $true)]
+    [string]$Token
+  )
+
+  $parts = $Token.Split('.')
+  if ($parts.Length -ne 3) {
+    throw "$Name must be a JWT issued for the Runtime worker."
+  }
+  try {
+    $payload = $parts[1].Replace('-', '+').Replace('_', '/')
+    while (($payload.Length % 4) -ne 0) { $payload += '=' }
+    $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload))
+    $claims = $json | ConvertFrom-Json
+    if ($null -eq $claims.exp) {
+      throw "$Name has no exp claim."
+    }
+    $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    if ([long]$claims.exp -le ($now + 30)) {
+      throw "$Name is expired. Configure a fresh service JWT for the greenbook-agent-runtime audience."
+    }
+  }
+  catch {
+    if ($_.Exception.Message -like "$Name*") { throw }
+    throw "$Name cannot be decoded as a JWT."
+  }
+}

@@ -85,7 +85,7 @@
   font-size: 13px;
 }
 
-.assistantTrigger {
+.agentTrigger {
   position: fixed;
   right: clamp(18px, 3vw, 42px);
   bottom: clamp(18px, 3vw, 36px);
@@ -104,7 +104,7 @@
   transition: background-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), transform 120ms var(--ease-out);
 }
 
-.assistantTrigger > span:first-child {
+.agentTrigger > span:first-child {
   width: 40px;
   height: 40px;
   display: grid;
@@ -114,30 +114,30 @@
   background: var(--color-inverse-raised);
 }
 
-.assistantLabel {
+.agentLabel {
   display: grid;
   text-align: left;
   line-height: 1.25;
 }
 
-.assistantLabel strong {
+.agentLabel strong {
   color: inherit;
   font-size: 14px;
 }
 
-.assistantLabel small {
+.agentLabel small {
   margin-top: 3px;
   color: var(--color-on-inverse-muted);
   font-size: 11px;
   font-weight: 500;
 }
 
-.assistantTrigger:active {
+.agentTrigger:active {
   transform: scale(0.97);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .assistantTrigger:hover {
+  .agentTrigger:hover {
     background: var(--color-inverse-raised);
     box-shadow: 0 20px 50px rgba(17, 48, 37, 0.3);
     transform: translateY(-2px);
@@ -151,7 +151,7 @@
 @media (max-width: 700px) {
   .masonry { column-count: 1; }
 
-  .assistantTrigger {
+  .agentTrigger {
     right: 14px;
     bottom: calc(80px + env(safe-area-inset-bottom));
     min-height: 52px;
@@ -159,12 +159,12 @@
     border-radius: 16px;
   }
 
-  .assistantTrigger > span:first-child {
+  .agentTrigger > span:first-child {
     width: 40px;
     height: 40px;
   }
 
-  .assistantLabel {
+  .agentLabel {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -174,7 +174,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .assistantTrigger {
+  .agentTrigger {
     transition: none;
   }
 }

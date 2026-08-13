@@ -13,7 +13,6 @@ from sqlalchemy.pool import NullPool
 from app.core.config import Settings, get_settings
 from app.creator.runtime.checkpoints import open_creator_checkpointer
 
-
 logger = logging.getLogger(__name__)
 
 if sys.platform == "win32":

@@ -134,11 +134,11 @@
         </foreach>
     </select>
 
-    <insert id="ensureAssistantUser">
+    <insert id="ensureAgentUser">
         INSERT INTO users (
             nickname, bio, zg_id, role, created_at, updated_at
         ) VALUES (
-            '知光助手', '知光社区的官方 AI 助手', 'zhiguang-assistant',
+            'GreenBook Agent', 'GreenBook community Agent', 'zhiguang-assistant',
             'USER', NOW(), NOW()
         )
         ON DUPLICATE KEY UPDATE

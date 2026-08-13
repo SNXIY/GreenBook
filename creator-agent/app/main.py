@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -19,7 +19,6 @@ from app.creator.observability import (
     instrument_creator_fastapi,
     shutdown_creator_telemetry,
 )
-
 
 _TRACE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 logger = logging.getLogger(__name__)

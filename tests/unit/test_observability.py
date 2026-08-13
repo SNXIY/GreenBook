@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import pytest
-from greenbook_assistant_core.artifact.models import Artifact
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.execution.models import (
+from greenbook_agent_core.artifact.models import Artifact
+from greenbook_agent_core.execution.invocation import ExecutionResult
+from greenbook_agent_core.execution.models import (
     ArtifactHandle,
     StepExecution,
     StepStatus,
 )
-from greenbook_assistant_core.observability.collector import TraceCollector
-from greenbook_assistant_core.observability.models import EventType, Trace
-from greenbook_assistant_core.observability.trace import AgentTrace
+from greenbook_agent_core.observability.collector import TraceCollector
+from greenbook_agent_core.observability.models import EventType
+from greenbook_agent_core.observability.trace import AgentTrace
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_complete_create_flow_timeline(collector: TraceCollector) -> None:
     t = AgentTrace(collector, trace_id="t-1", execution_id="e-1", task_id="task-1")
 
     t.task_created(goal="Create Java article", category="CREATE_CONTENT")
-    t.plan_created(template="FULL_PIPELINE", step_count=3)
+    t.plan_created(plan_source="GOAL_RUNTIME", step_count=3)
     t.execution_started()
 
     # Step 1: SEARCH

@@ -6,7 +6,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from greenbook_assistant_core.context import SessionContext
+from greenbook_agent_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_java_client.client import JavaClient
 
@@ -24,6 +24,7 @@ class ToolContext:
     conversation_id: str | None = None
     agent_run_id: str | None = None
     tool_call_id: str | None = None
+    approval_granted: bool = False
 
     def idempotency_key(self, operation: str, scope: str = "") -> str:
         """Return a retry-stable key scoped to the logical business request.

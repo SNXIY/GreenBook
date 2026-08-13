@@ -21,7 +21,7 @@ const steps = [
   { title: "内容", description: "标题与正文" },
   { title: "配图", description: "图片与标签" },
   { title: "设置", description: "可见范围" },
-  { title: "发布", description: "审核并提交" }
+  { title: "发布", description: "确认并提交" }
 ];
 
 const MAX_IMAGES = 15;
@@ -76,7 +76,7 @@ const ManualCreatePage = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [contentOrigin, setContentOrigin] = useState<ContentOrigin>("MANUAL");
   const [published, setPublished] = useState(false);
-  const [reviewState, setReviewState] = useState<"idle" | "uploading" | "reviewing" | "done">("idle");
+  const [publishState, setPublishState] = useState<"idle" | "uploading" | "done">("idle");
   const [uploadedImgUrls, setUploadedImgUrls] = useState<string[]>([]);
   const [imageUploading, setImageUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -283,7 +283,7 @@ const ManualCreatePage = () => {
     setPublished(false);
     setError(null);
     setMessage(null);
-    setReviewState("uploading");
+    setPublishState("uploading");
     try {
       const id = await ensureDraft();
       const contentFile = new File([content], "content.md", { type: "text/markdown" });
@@ -321,40 +321,20 @@ const ManualCreatePage = () => {
       });
 
       const result = await knowpostService.publish(id);
-      if (result.status === "reviewing") {
-        setReviewState("reviewing");
-        setMessage("最终内容已交给审核 Agent，正在等待真实审核结果…");
-        let finalStatus = result;
-        for (
-          let attempt = 0;
-          attempt < 80 && finalStatus.status === "reviewing";
-          attempt += 1
-        ) {
-          await new Promise(resolve => window.setTimeout(resolve, 1500));
-          finalStatus = await knowpostService.publishStatus(id);
-        }
-        if (finalStatus.status === "rejected") {
-          setReviewState("idle");
-          setError(finalStatus.reason || "内容未通过审核，请修改后重新提交");
-          setMessage(null);
-          return;
-        }
-        if (finalStatus.status !== "published") {
-          setMessage("审核仍在进行，草稿已安全保存，可以稍后返回查看。");
-          return;
-        }
+      if (result.status !== "published") {
+        throw new Error("发布未完成，请稍后查看任务状态");
       }
 
-      setReviewState("done");
+      setPublishState("done");
       setPublished(true);
       setMessage(
         contentOrigin === "AI_ASSISTED"
           ? "AI 成稿已通过 Java 发布流程正式发布。"
-          : "审核通过，内容已正式发布。"
+          : "内容已正式发布。"
       );
       localStorage.removeItem(LOCAL_DRAFT_KEY);
     } catch (cause) {
-      setReviewState("idle");
+      setPublishState("idle");
       setError(cause instanceof Error ? cause.message : "发布失败，请稍后重试");
     } finally {
       setSubmitting(false);
@@ -540,7 +520,7 @@ const ManualCreatePage = () => {
             {uploadedImgUrls[0] ? (
               <img src={uploadedImgUrls[0]} alt="" width="640" height="480" />
             ) : (
-              <div className={styles.previewPlaceholder}>GREEN-BOOK</div>
+              <div className={styles.previewPlaceholder}>GreenBook</div>
             )}
             <div>
               <h3>{title || "还没有标题"}</h3>
@@ -561,16 +541,16 @@ const ManualCreatePage = () => {
             <p>提交的是上一步预览过的最终内容。</p>
           </div>
         </div>
-        <article className={styles.reviewCard}>
-          <span className={styles.reviewIcon}><ShieldIcon aria-hidden="true" /></span>
+        <article className={styles.publicationCard}>
+          <span className={styles.publicationIcon}><ShieldIcon aria-hidden="true" /></span>
           <div>
             <h3>
-              {contentOrigin === "AI_ASSISTED" ? "AI 成稿直接发布" : "提交审核 Agent"}
+              {contentOrigin === "AI_ASSISTED" ? "AI 成稿直接发布" : "确认发布"}
             </h3>
             <p>
               {contentOrigin === "AI_ASSISTED"
-                ? "来源由创作 Agent 与 Java 服务间签名确认。你补充的图片和设置会一起进入正式发布流程，不再重复审核。"
-                : "审核 Agent 将检查标题、摘要、标签和正文原文。通过后自动发布；存在风险时会给出原因或进入管理员复审。"}
+                ? "来源由Creator Service 与 Java 服务间签名确认。你补充的图片和设置会一起进入正式发布流程。"
+                : "标题、摘要、标签和正文会按当前发布策略校验，确认后进入可靠发布流程。"}
             </p>
           </div>
         </article>
@@ -580,16 +560,14 @@ const ManualCreatePage = () => {
           <div><dt>标签</dt><dd>{tags.length ? tags.join("、") : "未添加"}</dd></div>
           <div><dt>可见范围</dt><dd>{visiblePublic ? "公开" : "私密"}</dd></div>
         </dl>
-        {reviewState !== "idle" ? (
+        {publishState !== "idle" ? (
           <div className={styles.progress} role="status" aria-live="polite">
-            <span className={reviewState === "done" ? styles.progressDone : styles.spinner} />
+            <span className={publishState === "done" ? styles.progressDone : styles.spinner} />
             <div>
               <strong>
-                {reviewState === "uploading"
+                {publishState === "uploading"
                   ? "正在写入内容存储"
-                  : reviewState === "reviewing"
-                    ? "审核 Agent 正在判断"
-                    : "发布完成"}
+                  : "发布完成"}
               </strong>
               <small>请勿重复提交，当前页面会自动更新结果。</small>
             </div>
@@ -607,7 +585,7 @@ const ManualCreatePage = () => {
               ? "已发布"
               : contentOrigin === "AI_ASSISTED"
                 ? "确认发布"
-                : "提交审核并发布"}
+                : "确认发布"}
         </button>
         {published && postId ? (
           <Link className={styles.viewPost} to={`/post/${postId}`}>查看已发布内容</Link>

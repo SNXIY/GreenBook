@@ -5,11 +5,17 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from greenbook_contracts.tool_result import ToolResult
+from greenbook_contracts.tool_result import DataProvenance, ToolResult
 
 from ..context import ToolContext
 
 logger = logging.getLogger(__name__)
+
+
+def _mark_source(result: ToolResult[Any], source: DataProvenance) -> ToolResult[Any]:
+    if not result.ok:
+        return result
+    return result.model_copy(update={"provenance": [source]})
 
 
 async def search_public_posts(
@@ -20,7 +26,7 @@ async def search_public_posts(
     size: int = 20,
 ) -> ToolResult[Any]:
     """Search public posts in the GreenBook community."""
-    return await ctx.java.search_posts(
+    result = await ctx.java.search_posts(
         query=query,
         sort=sort,
         page=page,
@@ -29,6 +35,7 @@ async def search_public_posts(
         trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
     )
+    return _mark_source(result, DataProvenance.COMMUNITY_DATA)
 
 
 async def get_post(
@@ -46,8 +53,9 @@ async def get_post(
         return ToolResult.success(
             result.data.model_dump(mode="json"),
             trace_id=result.trace_id,
+            provenance=[DataProvenance.COMMUNITY_DATA],
         )
-    return result
+    return _mark_source(result, DataProvenance.COMMUNITY_DATA)
 
 
 async def list_own_posts(
@@ -65,5 +73,9 @@ async def list_own_posts(
     )
     if result.ok and result.data:
         items = [item.model_dump(mode="json") for item in result.data]
-        return ToolResult.success(items, trace_id=result.trace_id)
-    return result
+        return ToolResult.success(
+            items,
+            trace_id=result.trace_id,
+            provenance=[DataProvenance.PERSONAL_DATA],
+        )
+    return _mark_source(result, DataProvenance.PERSONAL_DATA)

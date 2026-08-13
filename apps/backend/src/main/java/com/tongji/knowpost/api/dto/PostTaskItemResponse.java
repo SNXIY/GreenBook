@@ -7,8 +7,6 @@ public record PostTaskItemResponse(
         String title,
         String status,
         String contentOrigin,
-        String moderationTaskId,
-        String reason,
         Instant createdAt,
         Instant updatedAt,
         Instant publishedAt

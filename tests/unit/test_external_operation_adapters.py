@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from greenbook_assistant_core.execution.external_adapters import (
+from greenbook_agent_core.execution.external_adapters import (
     CreatorAdapter,
     JavaCommunityAdapter,
     MockExternalOperationAdapter,
 )
-from greenbook_assistant_core.execution.operation_tracking import (
+from greenbook_agent_core.execution.operation_tracking import (
     ExternalOperationRecord,
     ExternalOperationStore,
     OperationStatus,
 )
-from greenbook_assistant_core.execution.reconciliation import ReconciliationService
+from greenbook_agent_core.execution.reconciliation import ReconciliationService
 
 
 def _operation() -> ExternalOperationRecord:

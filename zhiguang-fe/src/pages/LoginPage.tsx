@@ -24,7 +24,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (!isLoading && user) {
-      navigate(user.role === "ADMIN" ? "/admin/moderation" : from, { replace: true });
+      navigate(from, { replace: true });
     }
   }, [isLoading, user, navigate, from]);
 
@@ -79,7 +79,7 @@ const LoginPage = () => {
       <div className={styles.card}>
         <div className={styles.titleBlock}>
           <h1 className={styles.title}>欢迎回来</h1>
-          <p className={styles.subtitle}>登录 GREEN-BOOK，让知识自然生长</p>
+          <p className={styles.subtitle}>登录 GreenBook，让知识自然生长</p>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>

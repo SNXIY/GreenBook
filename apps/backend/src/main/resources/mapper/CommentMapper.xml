@@ -18,7 +18,6 @@
         <result column="author_nickname" property="authorNickname"/>
         <result column="author_avatar" property="authorAvatar"/>
         <result column="is_assistant" property="assistant"/>
-        <result column="assistant_run_id" property="assistantRunId"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.tongji.comment.model.Comment">
@@ -33,11 +32,9 @@
 
     <select id="findById" resultMap="CommentRowMap">
         SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
-               (acp.comment_id IS NOT NULL) AS is_assistant,
-               acp.assistant_run_id
+               0 AS is_assistant
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
         WHERE c.id = #{id}
         LIMIT 1
     </select>
@@ -88,11 +85,9 @@
 
     <select id="listTopLevel" resultMap="CommentRowMap">
         SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
-               (acp.comment_id IS NOT NULL) AS is_assistant,
-               acp.assistant_run_id
+               0 AS is_assistant
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
         WHERE c.post_id = #{postId}
           AND c.parent_id IS NULL
           AND c.status = 'published'
@@ -105,11 +100,9 @@
 
     <select id="listReplies" resultMap="CommentRowMap">
         SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
-               (acp.comment_id IS NOT NULL) AS is_assistant,
-               acp.assistant_run_id
+               0 AS is_assistant
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
         WHERE c.parent_id = #{parentId}
           AND c.status = 'published'
         <if test="cursor != null">
@@ -121,11 +114,9 @@
 
     <select id="listByIds" resultMap="CommentRowMap">
         SELECT c.*, u.nickname AS author_nickname, u.avatar AS author_avatar,
-               (acp.comment_id IS NOT NULL) AS is_assistant,
-               acp.assistant_run_id
+               0 AS is_assistant
         FROM comments c
         JOIN users u ON c.user_id = u.id
-        LEFT JOIN assistant_comment_provenance acp ON acp.comment_id = c.id
         WHERE c.status = 'published'
           AND c.id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">

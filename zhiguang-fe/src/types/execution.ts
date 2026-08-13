@@ -8,6 +8,13 @@ export type ExecutionStatus =
   | "FAILED"
   | "CANCELLED";
 
+export type ExecutionControlState =
+  | "RUNNING"
+  | "PAUSING"
+  | "PAUSED"
+  | "RESUMING"
+  | "CANCELLED";
+
 export type ExecutionStepStatus =
   | "PENDING"
   | "RUNNING"
@@ -50,11 +57,24 @@ export type Execution = {
   completed_steps: number;
   created_at: string;
   updated_at: string;
+  control_state: ExecutionControlState | string;
+  control_reason?: string;
+  control_requested_at?: string;
   steps?: ExecutionStep[];
   events?: ExecutionEvent[];
   run_id?: string | null;
   error_code?: string | null;
   error_message?: string | null;
+};
+
+export type ExecutionControl = {
+  execution_id: string;
+  state: ExecutionControlState | string;
+  reason: string;
+  requested_at: string;
+  updated_at: string;
+  execution_status: ExecutionStatus | string;
+  current_step: string;
 };
 
 export type ExecutionListResponse = {

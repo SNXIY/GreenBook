@@ -76,16 +76,16 @@ class CreatorWorkspaceService:
         constraints["_runtime_metadata"] = {
             "api_instance_id": self._worker_prefix,
             "worker_instance_id": self._worker_prefix,
-            "api_build_commit": os.getenv("CREATOR_BUILD_COMMIT", "8efb91c"),
-            "worker_build_commit": os.getenv("CREATOR_BUILD_COMMIT", "8efb91c"),
+            "api_build_commit": os.getenv("GREENBOOK_CREATOR_BUILD_COMMIT", "8efb91c"),
+            "worker_build_commit": os.getenv("GREENBOOK_CREATOR_BUILD_COMMIT", "8efb91c"),
             "queue_namespace": os.getenv(
-                "CREATOR_QUEUE_NAMESPACE", "creator-p0"
+                "GREENBOOK_CREATOR_QUEUE_NAMESPACE", "creator-p0"
             ),
             "database_identifier": os.getenv(
-                "CREATOR_DATABASE_IDENTIFIER", "configured"
+                "GREENBOOK_CREATOR_DATABASE_IDENTIFIER", "configured"
             ),
             "effective_revision_budget": int(
-                os.getenv("CREATOR_MAX_WRITER_REVISIONS", "4")
+                os.getenv("GREENBOOK_CREATOR_MAX_WRITER_REVISIONS", "4")
             ),
         }
         if self._studio is not None:

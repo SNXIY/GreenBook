@@ -13,7 +13,6 @@ from app.creator.evaluation.models import (
     EvaluationObservationSet,
 )
 
-
 _SENSITIVE_KEYS = {
     "access_token",
     "api_key",

@@ -6,18 +6,18 @@ from typing import Any
 
 import pytest
 
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.event_store import ExecutionEventStore
-from greenbook_assistant_core.execution.events import EventType
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.execution.models import ExecutionStatus
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
-from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
+from greenbook_agent_core.execution.event_store import ExecutionEventStore
+from greenbook_agent_core.execution.events import EventType
+from greenbook_agent_core.execution.invocation import ExecutionResult
+from greenbook_agent_core.execution.models import ExecutionStatus
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.runtime_manager import RuntimeManager
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
+from greenbook_agent_core.execution.worker import ExecutionWorker, RunOutcome
+from tests.plan_factory import GoalPlanFactory
+from greenbook_agent_core.planning.validation import PlanValidator
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +27,7 @@ def clear_stores() -> None:
 
 def _runtime() -> tuple[RuntimeManager, str]:
     registry = CapabilityRegistry()
-    plan = TaskOrchestrator(registry).generate_plan(
+    plan = GoalPlanFactory(registry).generate_plan(
         task_id="event-task",
         goal_category="CREATE_CONTENT",
         requirements=[{"type": "CREATE"}],
@@ -45,13 +45,17 @@ def test_execution_lifecycle_events() -> None:
     ]
     manager.start_execution(execution_id)
     manager.pause_execution(execution_id)
+    manager._state.confirm_pause(execution_id)
     manager.resume_execution(execution_id)
+    manager._state.confirm_resume(execution_id)
     manager.cancel_execution(execution_id)
 
     assert [event.event_type for event in manager.list_events(execution_id)] == [
         EventType.EXECUTION_CREATED,
         EventType.EXECUTION_STARTED,
+        EventType.EXECUTION_PAUSE_REQUESTED,
         EventType.EXECUTION_PAUSED,
+        EventType.EXECUTION_RESUME_REQUESTED,
         EventType.EXECUTION_RESUMED,
         EventType.EXECUTION_CANCELLED,
     ]
@@ -65,7 +69,7 @@ async def test_worker_emits_step_started_and_completed() -> None:
         return {"ok": True, "code": "", "data": {"draft_id": "d1"}}
 
     worker = ExecutionWorker(CapabilityExecutor(registry, handler))
-    plan = TaskOrchestrator(registry).generate_plan(
+    plan = GoalPlanFactory(registry).generate_plan(
         task_id="event-worker-task",
         goal_category="CREATE_CONTENT",
         requirements=[{"type": "CREATE"}],

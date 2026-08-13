@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.creator.memory.models import CreatorLongTermProfile
-
 
 USED_CONTENT_ANGLES_KEY = "used_content_angles"
 _MAX_ANGLES = 40
@@ -84,7 +83,7 @@ def append_used_angle(
     return profile.model_copy(
         update={
             "inferred_preferences": preferences,
-            "updated_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(UTC),
         }
     )
 

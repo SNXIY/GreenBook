@@ -19,5 +19,4 @@ public class CommentRow {
     private String authorNickname;
     private String authorAvatar;
     private Boolean assistant;
-    private String assistantRunId;
 }

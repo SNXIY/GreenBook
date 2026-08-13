@@ -97,22 +97,22 @@ def _probe_http(name: str, base_url: str, paths: tuple[str, ...], *, config_only
 
 def _check_worker(*, config_only: bool, timeout: float) -> Check:
     health_file_value = os.getenv(
-        "ASSISTANT_WORKER_HEALTH_FILE",
-        ".runtime/assistant-worker-health.json",
+        "GREENBOOK_AGENT_WORKER_HEALTH_FILE",
+        ".runtime/agent-worker-health.json",
     ).strip()
     path = Path(health_file_value)
     if config_only:
-        return Check("Assistant Worker", True, f"heartbeat configured at {path}")
+        return Check("Agent Worker", True, f"heartbeat configured at {path}")
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         updated = datetime.fromisoformat(str(payload["updated_at"])).astimezone(UTC)
-        max_age = float(os.getenv("ASSISTANT_WORKER_HEALTH_MAX_AGE_SECONDS", "90"))
+        max_age = float(os.getenv("GREENBOOK_AGENT_WORKER_HEALTH_MAX_AGE_SECONDS", "90"))
         age = (datetime.now(UTC) - updated).total_seconds()
         if payload.get("status") == "READY" and age <= max_age:
-            return Check("Assistant Worker", True, f"heartbeat age={age:.1f}s")
-        return Check("Assistant Worker", False, f"status={payload.get('status')} age={age:.1f}s")
+            return Check("Agent Worker", True, f"heartbeat age={age:.1f}s")
+        return Check("Agent Worker", False, f"status={payload.get('status')} age={age:.1f}s")
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
-        return Check("Assistant Worker", False, f"heartbeat unavailable ({type(exc).__name__})")
+        return Check("Agent Worker", False, f"heartbeat unavailable ({type(exc).__name__})")
 
 
 def main() -> int:
@@ -126,13 +126,11 @@ def main() -> int:
 
     _load_dotenv(args.env_file)
     database_url = _env_first(
-        "ASSISTANT_RUNTIME_DATABASE_URL",
-        "ASSISTANT_DATABASE_URL",
-        "ASSISTANT_DB_URL",
-        "GREENBOOK_DB_URL",
+        "GREENBOOK_AGENT_RUNTIME_DATABASE_URL",
+        "GREENBOOK_AGENT_DATABASE_URL",
         default="",
     )
-    storage = os.getenv("ASSISTANT_RUNTIME_STORAGE", "").strip().lower()
+    storage = os.getenv("GREENBOOK_AGENT_RUNTIME_STORAGE", "").strip().lower()
     if not storage and database_url:
         # Match RuntimePersistenceFactory: an explicit database URL selects
         # the durable profile even when the storage flag is omitted.
@@ -142,8 +140,8 @@ def main() -> int:
         if storage == "postgres"
         else Check("PostgreSQL", False, f"runtime storage is {storage or 'not configured'}"),
         _probe_http(
-            "Assistant API",
-            _env_first("ASSISTANT_API_BASE_URL", default="http://127.0.0.1:8094"),
+            "Agent API",
+            f"http://127.0.0.1:{_env_first('GREENBOOK_AGENT_API_PORT', default='8094')}",
             ("/health",),
             config_only=args.config_only,
             timeout=args.timeout,
@@ -151,14 +149,14 @@ def main() -> int:
         _check_worker(config_only=args.config_only, timeout=args.timeout),
         _probe_http(
             "Creator",
-            _env_first("ASSISTANT_CREATOR_BASE_URL", "GREENBOOK_CREATOR_BASE_URL", default="http://127.0.0.1:8092"),
+            _env_first("GREENBOOK_CREATOR_BASE_URL", default="http://127.0.0.1:8092"),
             ("/actuator/health/ready", "/actuator/health"),
             config_only=args.config_only,
             timeout=args.timeout,
         ),
         _probe_http(
             "Java Backend",
-            _env_first("ASSISTANT_JAVA_BASE_URL", "GREENBOOK_JAVA_BASE_URL", default="http://127.0.0.1:8080"),
+            _env_first("GREENBOOK_JAVA_BASE_URL", default="http://127.0.0.1:8080"),
             ("/actuator/health",),
             config_only=args.config_only,
             timeout=args.timeout,

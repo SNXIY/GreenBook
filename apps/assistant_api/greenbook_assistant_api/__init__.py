@@ -1,1 +1,0 @@
-"""GreenBook Community Assistant API."""

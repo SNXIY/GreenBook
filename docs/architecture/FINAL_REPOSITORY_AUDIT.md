@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # Final Repository Audit
 
 本审计基于当前 import、CI、脚本、测试和目录引用完成。结论区分 ACTIVE、COMPATIBILITY、ARCHIVE 和 DELETE_CANDIDATE；未执行代码删除。

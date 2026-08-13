@@ -126,7 +126,7 @@ export const ArrowLeftIcon = createIcon(
   </>
 );
 
-export const AssistantIcon = createIcon(
+export const AgentIcon = createIcon(
   <>
     <path d="M12 3.2a7.8 7.8 0 0 0-7.8 7.8v5.6A2.4 2.4 0 0 0 6.6 19h1.1" />
     <path d="M12 3.2a7.8 7.8 0 0 1 7.8 7.8v5.6a2.4 2.4 0 0 1-2.4 2.4h-1.1" />

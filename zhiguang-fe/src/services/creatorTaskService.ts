@@ -1,8 +1,8 @@
 import type { CreatorTaskPage } from "@/types/task";
 
 const baseUrl = (
-  (import.meta.env.VITE_CREATOR_AGENT_URL as string | undefined)
-  ?? "/creator-agent"
+  (import.meta.env.VITE_GREENBOOK_CREATOR_URL as string | undefined)
+  ?? "/creator-api"
 ).replace(/\/$/, "");
 
 type CreatorRequestOptions = {

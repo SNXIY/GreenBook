@@ -7,16 +7,15 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-
 from greenbook_creator_client.client import CreatorClient
 from greenbook_java_client.client import JavaClient
 
 
 @pytest.mark.asyncio
 async def test_java_client_reads_real_runtime_configuration(monkeypatch) -> None:
-    monkeypatch.setenv("ASSISTANT_JAVA_CONNECT_TIMEOUT_SECONDS", "1.25")
-    monkeypatch.setenv("ASSISTANT_JAVA_READ_TIMEOUT_SECONDS", "7")
-    monkeypatch.setenv("ASSISTANT_JAVA_VERIFY_TLS", "false")
+    monkeypatch.setenv("GREENBOOK_JAVA_CONNECT_TIMEOUT_SECONDS", "1.25")
+    monkeypatch.setenv("GREENBOOK_JAVA_READ_TIMEOUT_SECONDS", "7")
+    monkeypatch.setenv("GREENBOOK_JAVA_VERIFY_TLS", "false")
 
     client = JavaClient.from_env(base_url="https://java.example")
 
@@ -27,13 +26,15 @@ async def test_java_client_reads_real_runtime_configuration(monkeypatch) -> None
 
 
 def test_creator_client_reads_real_runtime_configuration(monkeypatch) -> None:
-    monkeypatch.setenv("ASSISTANT_CREATOR_TIMEOUT_SECONDS", "18")
-    monkeypatch.setenv("ASSISTANT_CREATOR_POLL_INTERVAL_SECONDS", "0.5")
+    monkeypatch.setenv("GREENBOOK_AGENT_CREATOR_TIMEOUT_SECONDS", "18")
+    monkeypatch.setenv("GREENBOOK_AGENT_CREATOR_POLL_INTERVAL_SECONDS", "0.5")
+    monkeypatch.setenv("GREENBOOK_AGENT_CREATOR_COMPLETION_DEADLINE_SECONDS", "360")
 
     client = CreatorClient.from_env(base_url="https://creator.example")
 
     assert client._base_url == "https://creator.example"
     assert client._poll_interval == 0.5
+    assert client._completion_deadline_seconds == 360.0
     assert client.http.timeout.read == 18.0
 
 

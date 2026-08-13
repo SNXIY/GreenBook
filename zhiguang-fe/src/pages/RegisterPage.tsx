@@ -94,7 +94,7 @@ const RegisterPage = () => {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.titleBlock}>
-          <h1 className={styles.title}>加入 GREEN-BOOK</h1>
+          <h1 className={styles.title}>加入 GreenBook</h1>
           <p className={styles.subtitle}>完成注册，与更多人分享你的知识</p>
         </div>
 

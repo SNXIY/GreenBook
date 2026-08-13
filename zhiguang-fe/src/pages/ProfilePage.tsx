@@ -14,7 +14,7 @@ import RelationCounters from "@/components/common/RelationCounters";
 
 const ProfilePage = () => {
   const { user, tokens } = useAuth();
-  const displayName = user?.nickname ?? user?.phone ?? user?.email ?? "GREEN-BOOK 用户";
+  const displayName = user?.nickname ?? user?.phone ?? user?.email ?? "GreenBook 用户";
   const avatarInitial = displayName.trim().charAt(0) || "知";
 
   // 领域标签展示：仅解析 tagJson
@@ -82,7 +82,7 @@ const ProfilePage = () => {
     <AppLayout
       header={
         <MainHeader
-          headline="我的 GREEN-BOOK 主页"
+          headline="我的 GreenBook 主页"
           subtitle="完善个人信息，积累你的知识资产"
           rightSlot={<AuthStatus />}
         />

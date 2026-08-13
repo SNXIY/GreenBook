@@ -11,7 +11,6 @@ from app.creator.evaluation.models import (
     JudgeMetricScore,
 )
 
-
 _ASCII_TERM = re.compile(r"[a-z0-9][a-z0-9_+#.-]*", re.IGNORECASE)
 _CJK_RUN = re.compile(r"[\u3400-\u9fff]+")
 _SENTENCE_BOUNDARY = re.compile(r"[。！？.!?；;\n]+")

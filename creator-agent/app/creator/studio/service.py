@@ -4,7 +4,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -80,7 +80,7 @@ class CreatorStudioService:
         self._model_provider = model_provider
         self._model_name = model_name
         self._id_factory = id_factory or (lambda: str(uuid.uuid4()))
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     async def create_project(
         self,
@@ -102,9 +102,8 @@ class CreatorStudioService:
             updated_at=now,
         )
         try:
-            async with self._sessions() as session:
-                async with session.begin():
-                    session.add(row)
+            async with self._sessions() as session, session.begin():
+                session.add(row)
         except IntegrityError as exc:
             raise CreatorStudioConflictError(
                 "同名项目已经存在",
@@ -190,33 +189,32 @@ class CreatorStudioService:
     ) -> CreatorMaterial:
         normalized_content = content_text.strip()
         now = self._clock()
-        async with self._sessions() as session:
-            async with session.begin():
-                if project_id:
-                    project = await session.get(CreatorProjectRow, project_id)
-                    project = _require_project_scope(
-                        project,
-                        tenant_id=tenant_id,
-                        creator_id=creator_id,
-                    )
-                    project.updated_at = now
-                row = CreatorMaterialRow(
-                    id=self._id_factory(),
+        async with self._sessions() as session, session.begin():
+            if project_id:
+                project = await session.get(CreatorProjectRow, project_id)
+                project = _require_project_scope(
+                    project,
                     tenant_id=tenant_id,
                     creator_id=creator_id,
-                    project_id=project_id,
-                    title=title.strip(),
-                    kind=kind.value,
-                    source_url=source_url.strip() if source_url else None,
-                    content_text=normalized_content,
-                    content_sha256=_hash_text(normalized_content),
-                    status=CreatorMaterialStatus.READY.value,
-                    chunk_count=max(1, (len(normalized_content) + 1_199) // 1_200),
-                    tags_json=list(dict.fromkeys(tag.strip() for tag in tags if tag.strip())),
-                    created_at=now,
-                    updated_at=now,
                 )
-                session.add(row)
+                project.updated_at = now
+            row = CreatorMaterialRow(
+                id=self._id_factory(),
+                tenant_id=tenant_id,
+                creator_id=creator_id,
+                project_id=project_id,
+                title=title.strip(),
+                kind=kind.value,
+                source_url=source_url.strip() if source_url else None,
+                content_text=normalized_content,
+                content_sha256=_hash_text(normalized_content),
+                status=CreatorMaterialStatus.READY.value,
+                chunk_count=max(1, (len(normalized_content) + 1_199) // 1_200),
+                tags_json=list(dict.fromkeys(tag.strip() for tag in tags if tag.strip())),
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(row)
         return _material_from_row(row)
 
     async def list_materials(
@@ -337,68 +335,67 @@ class CreatorStudioService:
         material_ids: tuple[str, ...],
     ) -> None:
         now = self._clock()
-        async with self._sessions() as session:
-            async with session.begin():
-                task = await session.get(CreatorTaskRow, task_id)
-                if task is None:
+        async with self._sessions() as session, session.begin():
+            task = await session.get(CreatorTaskRow, task_id)
+            if task is None:
+                raise CreatorStudioNotFoundError(
+                    "创作任务不存在",
+                    details={"task_id": task_id},
+                )
+            if task.tenant_id != tenant_id or task.creator_id != creator_id:
+                raise CreatorStudioScopeError("创作任务不属于当前用户")
+            if project_id:
+                project = await session.get(CreatorProjectRow, project_id)
+                project = _require_project_scope(
+                    project,
+                    tenant_id=tenant_id,
+                    creator_id=creator_id,
+                )
+                key = {"project_id": project_id, "task_id": task_id}
+                if await session.get(CreatorProjectTaskRow, key) is None:
+                    session.add(
+                        CreatorProjectTaskRow(
+                            project_id=project_id,
+                            task_id=task_id,
+                            tenant_id=tenant_id,
+                            creator_id=creator_id,
+                            created_at=now,
+                        )
+                    )
+                project.updated_at = now
+            if material_ids:
+                materials = (
+                    await session.scalars(
+                        select(CreatorMaterialRow).where(
+                            CreatorMaterialRow.id.in_(material_ids),
+                            CreatorMaterialRow.tenant_id == tenant_id,
+                            CreatorMaterialRow.creator_id == creator_id,
+                        )
+                    )
+                ).all()
+                by_id = {row.id: row for row in materials}
+                missing = [
+                    material_id
+                    for material_id in material_ids
+                    if material_id not in by_id
+                ]
+                if missing:
                     raise CreatorStudioNotFoundError(
-                        "创作任务不存在",
-                        details={"task_id": task_id},
+                        "部分素材不存在",
+                        details={"material_ids": missing},
                     )
-                if task.tenant_id != tenant_id or task.creator_id != creator_id:
-                    raise CreatorStudioScopeError("创作任务不属于当前用户")
-                if project_id:
-                    project = await session.get(CreatorProjectRow, project_id)
-                    project = _require_project_scope(
-                        project,
-                        tenant_id=tenant_id,
-                        creator_id=creator_id,
-                    )
-                    key = {"project_id": project_id, "task_id": task_id}
-                    if await session.get(CreatorProjectTaskRow, key) is None:
+                for material_id in material_ids:
+                    key = {"task_id": task_id, "material_id": material_id}
+                    if await session.get(CreatorTaskMaterialRow, key) is None:
                         session.add(
-                            CreatorProjectTaskRow(
-                                project_id=project_id,
+                            CreatorTaskMaterialRow(
                                 task_id=task_id,
+                                material_id=material_id,
                                 tenant_id=tenant_id,
                                 creator_id=creator_id,
                                 created_at=now,
                             )
                         )
-                    project.updated_at = now
-                if material_ids:
-                    materials = (
-                        await session.scalars(
-                            select(CreatorMaterialRow).where(
-                                CreatorMaterialRow.id.in_(material_ids),
-                                CreatorMaterialRow.tenant_id == tenant_id,
-                                CreatorMaterialRow.creator_id == creator_id,
-                            )
-                        )
-                    ).all()
-                    by_id = {row.id: row for row in materials}
-                    missing = [
-                        material_id
-                        for material_id in material_ids
-                        if material_id not in by_id
-                    ]
-                    if missing:
-                        raise CreatorStudioNotFoundError(
-                            "部分素材不存在",
-                            details={"material_ids": missing},
-                        )
-                    for material_id in material_ids:
-                        key = {"task_id": task_id, "material_id": material_id}
-                        if await session.get(CreatorTaskMaterialRow, key) is None:
-                            session.add(
-                                CreatorTaskMaterialRow(
-                                    task_id=task_id,
-                                    material_id=material_id,
-                                    tenant_id=tenant_id,
-                                    creator_id=creator_id,
-                                    created_at=now,
-                                )
-                            )
 
     async def create_suggestion(
         self,
@@ -525,9 +522,8 @@ class CreatorStudioService:
             created_at=now,
         )
         try:
-            async with self._sessions() as session:
-                async with session.begin():
-                    session.add(row)
+            async with self._sessions() as session, session.begin():
+                session.add(row)
         except IntegrityError:
             replay = await self._find_suggestion_by_key(
                 tenant_id=tenant_id,
@@ -640,37 +636,36 @@ class CreatorStudioService:
             idempotency_key=f"suggestion:{suggestion_id}:{idempotency_key}",
         )
         now = self._clock()
-        async with self._sessions() as session:
-            async with session.begin():
-                row = await session.get(
-                    CreatorSuggestionRow,
-                    suggestion_id,
-                    with_for_update=True,
+        async with self._sessions() as session, session.begin():
+            row = await session.get(
+                CreatorSuggestionRow,
+                suggestion_id,
+                with_for_update=True,
+            )
+            if row is None:
+                raise CreatorStudioNotFoundError("AI 建议不存在")
+            row.status = CreatorSuggestionStatus.ACCEPTED.value
+            row.applied_version = result.draft.current_version
+            row.resolved_at = now
+            session.add(
+                CreatorFeedbackRow(
+                    id=self._id_factory(),
+                    tenant_id=tenant_id,
+                    creator_id=creator_id,
+                    task_id=row.task_id,
+                    draft_id=row.draft_id,
+                    suggestion_id=row.id,
+                    kind=CreatorFeedbackKind.SUGGESTION_ACCEPTED.value,
+                    score=1.0,
+                    reason="",
+                    metadata_json={
+                        "kind": row.kind,
+                        "base_version": row.base_version,
+                        "applied_version": result.draft.current_version,
+                    },
+                    created_at=now,
                 )
-                if row is None:
-                    raise CreatorStudioNotFoundError("AI 建议不存在")
-                row.status = CreatorSuggestionStatus.ACCEPTED.value
-                row.applied_version = result.draft.current_version
-                row.resolved_at = now
-                session.add(
-                    CreatorFeedbackRow(
-                        id=self._id_factory(),
-                        tenant_id=tenant_id,
-                        creator_id=creator_id,
-                        task_id=row.task_id,
-                        draft_id=row.draft_id,
-                        suggestion_id=row.id,
-                        kind=CreatorFeedbackKind.SUGGESTION_ACCEPTED.value,
-                        score=1.0,
-                        reason="",
-                        metadata_json={
-                            "kind": row.kind,
-                            "base_version": row.base_version,
-                            "applied_version": result.draft.current_version,
-                        },
-                        created_at=now,
-                    )
-                )
+            )
         return (
             (await self._load_suggestion(
                 tenant_id=tenant_id,
@@ -689,42 +684,41 @@ class CreatorStudioService:
         reason: str,
     ) -> CreatorSuggestion:
         now = self._clock()
-        async with self._sessions() as session:
-            async with session.begin():
-                row = await session.get(
-                    CreatorSuggestionRow,
-                    suggestion_id,
-                    with_for_update=True,
+        async with self._sessions() as session, session.begin():
+            row = await session.get(
+                CreatorSuggestionRow,
+                suggestion_id,
+                with_for_update=True,
+            )
+            row = _require_suggestion_scope(
+                row,
+                tenant_id=tenant_id,
+                creator_id=creator_id,
+            )
+            if row.status == CreatorSuggestionStatus.REJECTED.value:
+                return _suggestion_from_row(row)
+            if row.status != CreatorSuggestionStatus.PENDING.value:
+                raise CreatorStudioConflictError(
+                    "该建议已处理，不能再次拒绝",
+                    details={"status": row.status},
                 )
-                row = _require_suggestion_scope(
-                    row,
+            row.status = CreatorSuggestionStatus.REJECTED.value
+            row.resolved_at = now
+            session.add(
+                CreatorFeedbackRow(
+                    id=self._id_factory(),
                     tenant_id=tenant_id,
                     creator_id=creator_id,
+                    task_id=row.task_id,
+                    draft_id=row.draft_id,
+                    suggestion_id=row.id,
+                    kind=CreatorFeedbackKind.SUGGESTION_REJECTED.value,
+                    score=0.0,
+                    reason=reason.strip(),
+                    metadata_json={"kind": row.kind},
+                    created_at=now,
                 )
-                if row.status == CreatorSuggestionStatus.REJECTED.value:
-                    return _suggestion_from_row(row)
-                if row.status != CreatorSuggestionStatus.PENDING.value:
-                    raise CreatorStudioConflictError(
-                        "该建议已处理，不能再次拒绝",
-                        details={"status": row.status},
-                    )
-                row.status = CreatorSuggestionStatus.REJECTED.value
-                row.resolved_at = now
-                session.add(
-                    CreatorFeedbackRow(
-                        id=self._id_factory(),
-                        tenant_id=tenant_id,
-                        creator_id=creator_id,
-                        task_id=row.task_id,
-                        draft_id=row.draft_id,
-                        suggestion_id=row.id,
-                        kind=CreatorFeedbackKind.SUGGESTION_REJECTED.value,
-                        score=0.0,
-                        reason=reason.strip(),
-                        metadata_json={"kind": row.kind},
-                        created_at=now,
-                    )
-                )
+            )
         return _suggestion_from_row(row)
 
     async def record_manual_edit(
@@ -738,25 +732,24 @@ class CreatorStudioService:
         to_version: int,
         changed_chars: int,
     ) -> None:
-        async with self._sessions() as session:
-            async with session.begin():
-                session.add(
-                    CreatorFeedbackRow(
-                        id=self._id_factory(),
-                        tenant_id=tenant_id,
-                        creator_id=creator_id,
-                        task_id=task_id,
-                        draft_id=draft_id,
-                        kind=CreatorFeedbackKind.MANUAL_EDIT.value,
-                        reason="",
-                        metadata_json={
-                            "from_version": from_version,
-                            "to_version": to_version,
-                            "changed_chars": changed_chars,
-                        },
-                        created_at=self._clock(),
-                    )
+        async with self._sessions() as session, session.begin():
+            session.add(
+                CreatorFeedbackRow(
+                    id=self._id_factory(),
+                    tenant_id=tenant_id,
+                    creator_id=creator_id,
+                    task_id=task_id,
+                    draft_id=draft_id,
+                    kind=CreatorFeedbackKind.MANUAL_EDIT.value,
+                    reason="",
+                    metadata_json={
+                        "from_version": from_version,
+                        "to_version": to_version,
+                        "changed_chars": changed_chars,
+                    },
+                    created_at=self._clock(),
                 )
+            )
 
     async def create_branch(
         self,
@@ -830,9 +823,8 @@ class CreatorStudioService:
                 },
                 created_at=now,
             )
-            async with self._sessions() as session:
-                async with session.begin():
-                    session.add_all((row, feedback))
+            async with self._sessions() as session, session.begin():
+                session.add_all((row, feedback))
         else:
             row = existing
         return _branch_from_row(row), result
@@ -950,25 +942,24 @@ class CreatorStudioService:
             updated_at=now,
         )
         try:
-            async with self._sessions() as session:
-                async with session.begin():
-                    session.add(row)
-                    session.add(
-                        CreatorFeedbackRow(
-                            id=self._id_factory(),
-                            tenant_id=tenant_id,
-                            creator_id=creator_id,
-                            task_id=current.draft.task_id,
-                            draft_id=draft_id,
-                            kind=CreatorFeedbackKind.CHANNEL_VARIANT_CREATED.value,
-                            reason="",
-                            metadata_json={
-                                "channel": channel.value,
-                                "draft_version": expected_version,
-                            },
-                            created_at=now,
-                        )
+            async with self._sessions() as session, session.begin():
+                session.add(row)
+                session.add(
+                    CreatorFeedbackRow(
+                        id=self._id_factory(),
+                        tenant_id=tenant_id,
+                        creator_id=creator_id,
+                        task_id=current.draft.task_id,
+                        draft_id=draft_id,
+                        kind=CreatorFeedbackKind.CHANNEL_VARIANT_CREATED.value,
+                        reason="",
+                        metadata_json={
+                            "channel": channel.value,
+                            "draft_version": expected_version,
+                        },
+                        created_at=now,
                     )
+                )
         except IntegrityError:
             replay = await self._find_channel_variant_by_key(
                 tenant_id=tenant_id,
@@ -1040,9 +1031,8 @@ class CreatorStudioService:
             metadata_json={},
             created_at=self._clock(),
         )
-        async with self._sessions() as session:
-            async with session.begin():
-                session.add(row)
+        async with self._sessions() as session, session.begin():
+            session.add(row)
         return _feedback_from_row(row)
 
     async def feedback_summary(
@@ -1160,16 +1150,15 @@ class CreatorStudioService:
         return _channel_variant_from_row(row)
 
     async def _mark_suggestion_stale(self, suggestion_id: str) -> None:
-        async with self._sessions() as session:
-            async with session.begin():
-                row = await session.get(
-                    CreatorSuggestionRow,
-                    suggestion_id,
-                    with_for_update=True,
-                )
-                if row is not None and row.status == CreatorSuggestionStatus.PENDING.value:
-                    row.status = CreatorSuggestionStatus.STALE.value
-                    row.resolved_at = self._clock()
+        async with self._sessions() as session, session.begin():
+            row = await session.get(
+                CreatorSuggestionRow,
+                suggestion_id,
+                with_for_update=True,
+            )
+            if row is not None and row.status == CreatorSuggestionStatus.PENDING.value:
+                row.status = CreatorSuggestionStatus.STALE.value
+                row.resolved_at = self._clock()
 
     async def _task_evidence_context(
         self,
@@ -1458,5 +1447,5 @@ def _hash_text(value: str) -> str:
 
 def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

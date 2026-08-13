@@ -2,10 +2,10 @@
 
 import pytest
 
-from greenbook_assistant_api.models.runtime_context import RuntimeContext
-from greenbook_assistant_api.models.runtime_result import RuntimeResult
-from greenbook_assistant_api.services.runtime_linking import bind_runtime_result
-from greenbook_assistant_core.compatibility.history import (
+from greenbook_agent_api.models.runtime_context import RuntimeContext
+from greenbook_agent_api.models.runtime_result import RuntimeResult
+from greenbook_agent_api.services.runtime_linking import bind_runtime_result
+from greenbook_agent_core.compatibility.history import (
     DuplicateRunExecutionBindingError,
     RunExecutionAdapter,
 )

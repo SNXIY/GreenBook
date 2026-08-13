@@ -25,16 +25,6 @@ public class KnowPostSchemaCompatibilityMigration implements ApplicationRunner {
                 "ALTER TABLE know_posts ADD COLUMN content_origin VARCHAR(32) NOT NULL "
                         + "DEFAULT 'MANUAL' COMMENT 'MANUAL | AI_ASSISTED' AFTER status"
         );
-        addColumnIfMissing(
-                "moderation_task_id",
-                "ALTER TABLE know_posts ADD COLUMN moderation_task_id VARCHAR(64) NULL "
-                        + "COMMENT 'external moderation agent task id' AFTER content_origin"
-        );
-        addColumnIfMissing(
-                "moderation_reason",
-                "ALTER TABLE know_posts ADD COLUMN moderation_reason VARCHAR(512) NULL "
-                        + "COMMENT 'latest moderation decision reason' AFTER moderation_task_id"
-        );
     }
 
     private void addColumnIfMissing(String column, String ddl) {

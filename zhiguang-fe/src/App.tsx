@@ -10,21 +10,8 @@ import CourseDetailPage from "./pages/CourseDetailPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import NotificationsPage from "./pages/NotificationsPage";
-import AdminModerationPage from "./pages/AdminModerationPage";
-import { useAuth } from "./context/AuthContext";
 
 function App() {
-  const { user, isLoading } = useAuth();
-
-  if (!isLoading && user?.role === "ADMIN") {
-    return (
-      <Routes>
-        <Route path="/admin/moderation" element={<AdminModerationPage />} />
-        <Route path="*" element={<Navigate to="/admin/moderation" replace />} />
-      </Routes>
-    );
-  }
-
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />

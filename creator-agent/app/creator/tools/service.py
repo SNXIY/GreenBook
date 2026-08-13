@@ -46,7 +46,6 @@ from app.creator.tools.models import (
 )
 from app.creator.tools.ports import CreatorToolHandler
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -624,7 +623,7 @@ def _editor_type(context: CreatorToolCallContext) -> str:
 
 
 def _tool_runtime_id(prefix: str, context: CreatorToolCallContext) -> str:
-    digest = hashlib.sha256(f"{context.trace_id}:{prefix}".encode("utf-8")).hexdigest()[
+    digest = hashlib.sha256(f"{context.trace_id}:{prefix}".encode()).hexdigest()[
         :32
     ]
     return f"{prefix}-{digest}"

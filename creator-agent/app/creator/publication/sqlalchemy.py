@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -81,25 +81,24 @@ class SqlAlchemyCreatorPublicationHandoffStore:
             return _from_row(row) if row is not None else None
 
     async def add(self, handoff: PublicationHandoff) -> None:
-        async with self._sessions() as session:
-            async with session.begin():
-                session.add(
-                    CreatorPublicationHandoffRow(
-                        id=handoff.id,
-                        tenant_id=handoff.tenant_id,
-                        creator_id=handoff.creator_id,
-                        task_id=handoff.task_id,
-                        draft_id=handoff.draft_id,
-                        content_origin=handoff.content_origin.value,
-                        source_artifact_id=handoff.source_artifact_id,
-                        source_artifact_revision=handoff.source_artifact_revision,
-                        source_content_sha256=handoff.source_content_sha256,
-                        external_draft_id=handoff.external_draft_id,
-                        title=handoff.title,
-                        status=handoff.status.value,
-                        created_at=handoff.created_at,
-                    )
+        async with self._sessions() as session, session.begin():
+            session.add(
+                CreatorPublicationHandoffRow(
+                    id=handoff.id,
+                    tenant_id=handoff.tenant_id,
+                    creator_id=handoff.creator_id,
+                    task_id=handoff.task_id,
+                    draft_id=handoff.draft_id,
+                    content_origin=handoff.content_origin.value,
+                    source_artifact_id=handoff.source_artifact_id,
+                    source_artifact_revision=handoff.source_artifact_revision,
+                    source_content_sha256=handoff.source_content_sha256,
+                    external_draft_id=handoff.external_draft_id,
+                    title=handoff.title,
+                    status=handoff.status.value,
+                    created_at=handoff.created_at,
                 )
+            )
 
     async def list_for_task(
         self,
@@ -126,7 +125,7 @@ class SqlAlchemyCreatorPublicationHandoffStore:
 def _from_row(row: CreatorPublicationHandoffRow) -> PublicationHandoff:
     created = row.created_at
     if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
+        created = created.replace(tzinfo=UTC)
     return PublicationHandoff(
         id=row.id,
         tenant_id=row.tenant_id,

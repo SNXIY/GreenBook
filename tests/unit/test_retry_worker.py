@@ -7,10 +7,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from greenbook_assistant_core.execution.retry_scheduler import RetryScheduler
-from greenbook_assistant_core.execution.retry_task import RetryTask, RetryTaskStatus
-from greenbook_assistant_core.execution.retry_worker import RetryBackgroundWorker
-from greenbook_assistant_core.execution.execution_queue import (
+from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
+from greenbook_agent_core.execution.retry_task import RetryTask, RetryTaskStatus
+from greenbook_agent_core.execution.retry_worker import RetryBackgroundWorker
+from greenbook_agent_core.execution.execution_queue import (
     ExecutionQueue,
     ExecutionQueueStatus,
 )

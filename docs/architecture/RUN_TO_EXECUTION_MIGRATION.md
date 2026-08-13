@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook `run_id` -> `execution_id` Migration Design
 
 本文件是 Phase 7.8-A 的迁移设计。当前阶段只记录边界、映射和迁移顺序，不修改 `RunRepository`、数据库、Worker、Execution Runtime 或 Planner。

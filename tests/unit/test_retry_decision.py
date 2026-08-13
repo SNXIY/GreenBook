@@ -5,21 +5,21 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.events import EventType
-from greenbook_assistant_core.execution.failure_decision import FailureCategory
-from greenbook_assistant_core.execution.models import StepStatus
-from greenbook_assistant_core.execution.retry_decision import (
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
+from greenbook_agent_core.execution.events import EventType
+from greenbook_agent_core.execution.failure_decision import FailureCategory
+from greenbook_agent_core.execution.models import StepStatus
+from greenbook_agent_core.execution.retry_decision import (
     RetryDecisionEngine,
     RetryContext,
 )
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
-from greenbook_assistant_core.execution.worker import ExecutionWorker
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.orchestration.models import PlanStep
-from greenbook_assistant_core.planning.models import ExecutablePlan
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.runtime_manager import RuntimeManager
+from greenbook_agent_core.execution.worker import ExecutionWorker
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.planning.contracts import PlanStep
+from greenbook_agent_core.planning.models import ExecutablePlan
 from greenbook_contracts import SideEffectState, ToolResult, normalize_external_failure
 
 
@@ -196,7 +196,7 @@ def test_worker_persists_evidence_for_later_retry_decision() -> None:
     assert failed_events[-1].payload["evidence"]["side_effect_state"] == "NONE"
 
     # The later RetryManager path reads the same persisted event snapshot.
-    from greenbook_assistant_core.execution.retry_manager import RetryManager
+    from greenbook_agent_core.execution.retry_manager import RetryManager
 
     pending = RetryManager(
         worker._state,

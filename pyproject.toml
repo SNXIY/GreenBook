@@ -1,31 +1,53 @@
 [project]
 name = "greenbook-agent-platform"
 version = "2.0.0"
-description = "GreenBook Python Agent Monorepo — Community Operations Assistant V2"
+description = "GreenBook Agent Runtime monorepo"
 requires-python = ">=3.12"
 readme = "README.md"
 
 [tool.uv.workspace]
 members = [
-    "packages/assistant_core",
+    "packages/agent_core",
     "packages/contracts",
     "packages/java_client",
     "packages/creator_client",
     "packages/security",
     "packages/observability",
-    "packages/persistence",
     "packages/evaluation",
     "services/greenbook_mcp",
-    "services/creator_agent",
-    "apps/assistant_api",
-    "apps/assistant_worker",
+    "apps/agent_api",
+    "apps/agent_worker",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[tool.uv.sources]
+greenbook-agent-core = { workspace = true }
+greenbook-contracts = { workspace = true }
+greenbook-java-client = { workspace = true }
+greenbook-creator-client = { workspace = true }
+greenbook-security = { workspace = true }
+greenbook-observability = { workspace = true }
+greenbook-evaluation = { workspace = true }
+greenbook-mcp-server = { workspace = true }
+greenbook-agent-api = { workspace = true }
+greenbook-agent-worker = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "greenbook-agent-api",
+    "greenbook-agent-core",
+    "greenbook-agent-worker",
+    "greenbook-contracts",
+    "greenbook-creator-client",
+    "greenbook-evaluation",
+    "greenbook-java-client",
+    "greenbook-mcp-server",
+    "greenbook-observability",
+    "greenbook-security",
+    "asyncpg>=0.31",
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
     "httpx>=0.28",
+    "requests>=2.32",
     "ruff>=0.11",
     "mypy>=1.13",
     "pyjwt>=2.9",
@@ -36,26 +58,28 @@ dev-dependencies = [
     "openai>=1.58",
     "sse-starlette>=2.1",
     "tenacity>=9.0",
+    "pyyaml>=6.0",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-markers = ["e2e: tests that require live external GreenBook services"]
+markers = [
+    "e2e: tests that require live external GreenBook services",
+    "integration: tests that exercise persisted or cross-module integration contracts",
+]
 pythonpath = [
     ".",
-    "packages/assistant_core",
+    "packages/agent_core",
     "packages/contracts",
     "packages/java_client",
     "packages/creator_client",
     "packages/security",
     "packages/observability",
-    "packages/persistence",
     "packages/evaluation",
     "services/greenbook_mcp",
-    "services/creator_agent",
-    "apps/assistant_api",
-    "apps/assistant_worker",
+    "apps/agent_api",
+    "apps/agent_worker",
 ]
 
 [tool.ruff]

@@ -112,7 +112,7 @@ const RelationListModal = ({ open, onClose, userId, mode }: RelationListModalPro
                   ) : (
                     <div className={styles._avatar_1q1ln_69}>{initialChar(p.nickname, p.id)}</div>
                   )}
-                  <div className={styles._name_1q1ln_80}>{p.nickname || "GREEN-BOOK 用户"}</div>
+                  <div className={styles._name_1q1ln_80}>{p.nickname || "GreenBook 用户"}</div>
                 </div>
               ))}
             </div>

@@ -34,7 +34,7 @@ class CreatorMigrationTests(unittest.TestCase):
 
             with patch.dict(
                 os.environ,
-                {"CREATOR_DATABASE_URL": database_url},
+                {"GREENBOOK_CREATOR_DATABASE_URL": database_url},
             ):
                 get_settings.cache_clear()
                 try:

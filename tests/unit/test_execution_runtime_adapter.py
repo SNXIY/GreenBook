@@ -4,18 +4,22 @@ from __future__ import annotations
 
 import pytest
 
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.checkpoint import ExecutionCheckpoint
-from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.runtime_guard import (
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.checkpoint import ExecutionCheckpoint
+from greenbook_agent_core.execution.models import (
+    ExecutionControlState,
+    ExecutionStatus,
+    StepStatus,
+)
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.runtime_guard import (
     ExecutionBlockedError,
     RuntimeGuard,
 )
-from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.execution.runtime_manager import RuntimeManager
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
+from tests.plan_factory import GoalPlanFactory
+from greenbook_agent_core.planning.validation import PlanValidator
 
 
 @pytest.fixture(autouse=True)
@@ -25,7 +29,7 @@ def clear_execution_store() -> None:
 
 def _runtime() -> tuple[RuntimeManager, str]:
     registry = CapabilityRegistry()
-    orchestrator = TaskOrchestrator(registry)
+    orchestrator = GoalPlanFactory(registry)
     plan = orchestrator.generate_plan(
         task_id="task-runtime",
         goal_category="CREATE_CONTENT",
@@ -39,7 +43,7 @@ def _runtime() -> tuple[RuntimeManager, str]:
 
 def _full_runtime() -> tuple[RuntimeManager, str]:
     registry = CapabilityRegistry()
-    orchestrator = TaskOrchestrator(registry)
+    orchestrator = GoalPlanFactory(registry)
     plan = orchestrator.generate_plan(
         task_id="task-runtime-full",
         goal_category="CREATE_CONTENT",
@@ -66,8 +70,12 @@ def test_pause_resume_and_cancel() -> None:
     manager, execution_id = _runtime()
     manager.start_execution(execution_id)
 
-    assert manager.pause_execution(execution_id).status == ExecutionStatus.PAUSED
-    assert manager.resume_execution(execution_id).status == ExecutionStatus.RUNNING
+    requested = manager.pause_execution(execution_id)
+    assert requested.status == ExecutionStatus.RUNNING
+    assert requested.control_state == ExecutionControlState.PAUSING
+    assert manager._state.confirm_pause(execution_id).status == ExecutionStatus.PAUSED
+    assert manager.resume_execution(execution_id).control_state == ExecutionControlState.RESUMING
+    assert manager._state.confirm_resume(execution_id).status == ExecutionStatus.RUNNING
     assert manager.cancel_execution(execution_id).status == ExecutionStatus.CANCELLED
 
 

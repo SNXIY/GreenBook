@@ -63,7 +63,7 @@ class ExternalAgentFailure(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Serialized ExecutionEvidence when the Runtime boundary provided one.
     # The contracts package stores it as a mapping to avoid importing the
-    # assistant-core execution package and creating a dependency cycle.
+    # Agent Runtime execution package and creating a dependency cycle.
     evidence: dict[str, Any] | None = None
 
 
@@ -223,11 +223,7 @@ def normalize_external_failure(
     if evidence_data:
         metadata["evidence"] = evidence_data
 
-    request_sent = (
-        evidence_data["request_sent"]
-        if "request_sent" in evidence_data
-        else result.request_sent
-    )
+    request_sent = evidence_data.get("request_sent", result.request_sent)
     trace_id = (
         evidence_data.get("trace_id")
         if "trace_id" in evidence_data

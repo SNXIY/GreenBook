@@ -1,7 +1,7 @@
 [project]
-name = "greenbook-creator-agent"
+name = "greenbook-creator-service"
 version = "0.1.0"
-description = "GreenBook long-running content creation agent"
+description = "GreenBook Creator Service"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi==0.115.6",
@@ -40,4 +40,5 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 testpaths = ["tests"]

@@ -28,7 +28,7 @@ public interface UserMapper {
 
     List<User> listByIds(@Param("ids") List<Long> ids);
 
-    void ensureAssistantUser();
+    void ensureAgentUser();
 
     User findByZgId(@Param("zgId") String zgId);
 }

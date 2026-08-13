@@ -2,30 +2,30 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from typing import Any
-
 import pytest
 import sqlalchemy as sa
-
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.lease import ExecutionLeaseManager
-from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
-from greenbook_assistant_core.execution.persistence import execution_metadata
-from greenbook_assistant_core.execution.persistent_stores import (
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.events import EventType, ExecutionEvent
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.lease import ExecutionLeaseManager
+from greenbook_agent_core.execution.models import (
+    ExecutionStatus,
+    PlanExecution,
+    StepExecution,
+    StepStatus,
+)
+from greenbook_agent_core.execution.persistence import execution_metadata
+from greenbook_agent_core.execution.persistent_stores import (
     PostgresCheckpointStore,
     PostgresExecutionEventStore,
 )
-from greenbook_assistant_core.execution.postgres_repository import PostgresExecutionRepository
-from greenbook_assistant_core.execution.recovery_service import ExecutionRecoveryService
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.runtime_manager import RuntimeManager
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.execution.postgres_repository import PostgresExecutionRepository
+from greenbook_agent_core.execution.recovery_service import ExecutionRecoveryService
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
+from greenbook_agent_core.planning.validation import PlanValidator
 from greenbook_contracts import SideEffectState
+
+from tests.plan_factory import GoalPlanFactory
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def engine():
 
 def _execution(repo):
     registry = CapabilityRegistry()
-    plan = TaskOrchestrator(registry).generate_plan(
+    plan = GoalPlanFactory(registry).generate_plan(
         task_id="persist-task",
         goal_category="CREATE_CONTENT",
         requirements=[{"type": "SEARCH"}, {"type": "ANALYZE"}, {"type": "CREATE"}],
@@ -71,6 +71,41 @@ def test_save_and_read_execution_and_step(engine) -> None:
     assert restarted.steps[0].error_code == "TIMEOUT"
 
 
+def test_resolved_tool_boundary_survives_repository_restart(engine) -> None:
+    repo = PostgresExecutionRepository(engine)
+    execution = PlanExecution(
+        execution_id="execution-resolved-tool",
+        plan_id="plan-resolved-tool",
+        task_id="task-resolved-tool",
+        steps=[
+            StepExecution(
+                execution_id="execution-resolved-tool",
+                step_id="analyze",
+                capability="ANALYZE_PERFORMANCE",
+                tool_name="analytics.get_account_summary",
+                arguments={"page": 1},
+                idempotency_key="task-resolved-tool:analyze",
+                execution_mode="QUEUE",
+                policy_snapshot={"name": "analytics.get_account_summary"},
+                checkpoint_data={"constraints": {"page": 1}},
+            )
+        ],
+    )
+
+    repo.save(execution)
+    restarted = PostgresExecutionRepository(engine).find_by_id(
+        "execution-resolved-tool"
+    )
+
+    assert restarted is not None
+    step = restarted.steps[0]
+    assert step.tool_name == "analytics.get_account_summary"
+    assert step.arguments == {"page": 1}
+    assert step.idempotency_key == "task-resolved-tool:analyze"
+    assert step.policy_snapshot["name"] == "analytics.get_account_summary"
+    assert step.checkpoint_data == {"constraints": {"page": 1}}
+
+
 def test_event_and_checkpoint_survive_store_recreation(engine) -> None:
     event_store = PostgresExecutionEventStore(engine)
     event = ExecutionEvent(
@@ -83,7 +118,7 @@ def test_event_and_checkpoint_survive_store_recreation(engine) -> None:
     assert PostgresExecutionEventStore(engine).list_events("execution-1")[0].event_id == event.event_id
 
     checkpoint_store = PostgresCheckpointStore(engine)
-    from greenbook_assistant_core.execution.checkpoint import ExecutionCheckpoint
+    from greenbook_agent_core.execution.checkpoint import ExecutionCheckpoint
     checkpoint_store.save(ExecutionCheckpoint(
         execution_id="execution-1",
         completed_steps=["search"],

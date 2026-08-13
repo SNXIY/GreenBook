@@ -67,7 +67,7 @@ const Sidebar = () => {
           <LeafIcon width={25} height={25} aria-hidden="true" />
         </div>
         <div className={styles.brandText}>
-          <strong>GREEN-BOOK</strong>
+          <strong>GreenBook</strong>
           <span>Knowledge grows here</span>
         </div>
       </div>
@@ -91,7 +91,7 @@ const Sidebar = () => {
       </nav>
       <div className={styles.divider} />
       <div className={styles.footer}>
-        <span>GREEN-BOOK</span>
+        <span>GreenBook</span>
         <div>让知识自然生长</div>
       </div>
     </aside>

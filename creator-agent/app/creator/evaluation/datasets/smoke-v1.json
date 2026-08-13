@@ -33,7 +33,7 @@
           "Human-in-the-loop",
           "checkpoint"
         ],
-        "reference_answer": "A production Creator Agent separates orchestration, durable state, human decisions, generation, and evaluation.",
+        "reference_answer": "A production Creator Service separates orchestration, durable state, human decisions, generation, and evaluation.",
         "expected_final_artifact_kind": "FINAL_CONTENT",
         "style": {
           "instructions": [

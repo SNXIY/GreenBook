@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
-from pydantic import BaseModel, Field
-
-from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
-from greenbook_assistant_core.execution.models import (
+from greenbook_agent_core.execution.events import EventType, ExecutionEvent
+from greenbook_agent_core.execution.models import (
     ExecutionStatus,
     PlanExecution,
     StepExecution,
     StepStatus,
 )
-from greenbook_assistant_core.observability.models import Trace, EventType as TraceEventType
+from greenbook_agent_core.observability.models import EventType as TraceEventType
+from greenbook_agent_core.observability.models import Trace
+from pydantic import BaseModel, Field
 
 
 class ExecutionRecord(BaseModel):

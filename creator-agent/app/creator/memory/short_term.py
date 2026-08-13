@@ -12,7 +12,6 @@ from app.creator.memory.errors import (
 )
 from app.creator.memory.models import CreatorTaskMemory
 
-
 _UPSERT_SCRIPT = """
 local current_raw = redis.call('GET', KEYS[1])
 local current_version = 0
@@ -126,5 +125,5 @@ class RedisCreatorShortTermMemoryStore:
 
 
 def _key(tenant_id: str, task_id: str) -> str:
-    digest = hashlib.sha256(f"{tenant_id}:{task_id}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{tenant_id}:{task_id}".encode()).hexdigest()
     return f"mindflow:creator:task-memory:{digest}"

@@ -26,7 +26,6 @@ from app.creator.runtime.models import (
     ArtifactKind,
 )
 
-
 _RUNTIME_DATASET_ID = "creator-runtime-context"
 _RUNTIME_DATASET_VERSION = "1.0.0"
 

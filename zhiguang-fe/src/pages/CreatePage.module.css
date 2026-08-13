@@ -436,7 +436,7 @@
   color: var(--color-primary);
 }
 
-.reviewCard {
+.publicationCard {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 15px;
@@ -446,7 +446,7 @@
   background: var(--color-primary-soft);
 }
 
-.reviewIcon {
+.publicationIcon {
   width: 48px;
   height: 48px;
   display: grid;
@@ -456,15 +456,15 @@
   background: var(--color-primary);
 }
 
-.reviewIcon svg {
+.publicationIcon svg {
   width: 24px;
 }
 
-.reviewCard h3 {
+.publicationCard h3 {
   margin-bottom: 6px;
 }
 
-.reviewCard p {
+.publicationCard p {
   color: var(--color-text-muted);
   line-height: 1.7;
 }
@@ -756,11 +756,11 @@
     grid-template-columns: 1fr;
   }
 
-  .reviewCard {
+  .publicationCard {
     grid-template-columns: 40px minmax(0, 1fr);
   }
 
-  .reviewIcon {
+  .publicationIcon {
     width: 40px;
     height: 40px;
   }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { assistantService } from "../src/services/assistantService";
+import { agentService } from "../src/services/agentService";
 import { executionService, waitForExecution } from "../src/services/executionService";
 
 const executionId = "execution-1";
@@ -57,7 +57,7 @@ globalThis.fetch = async (input, init) => {
       run_id: "run-1",
       conversation_id: "conversation-1",
       status: "RUNNING",
-      events_url: "/api/v1/assistant/runs/run-1/events",
+      events_url: "/api/v1/agent/runs/run-1/events",
       execution_id: executionId,
       execution_events_url: `/api/v1/executions/${executionId}/events`,
       replayed: false
@@ -85,7 +85,7 @@ globalThis.fetch = async (input, init) => {
 };
 
 try {
-  const accepted = await assistantService.send("token", "conversation-1", "写一篇 Runtime 文章");
+  const accepted = await agentService.send("token", "conversation-1", "写一篇 Runtime 文章");
   assert.equal(accepted.execution_id, executionId);
 
   const listed = await executionService.list("token");

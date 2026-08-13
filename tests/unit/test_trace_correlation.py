@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from greenbook_assistant_core.execution.events import EventType, ExecutionEvent
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.persistent_stores import PostgresExecutionEventStore
-from greenbook_assistant_core.execution.runtime.invocation_context import (
+from greenbook_agent_core.execution.events import EventType, ExecutionEvent
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.persistent_stores import PostgresExecutionEventStore
+from greenbook_agent_core.execution.runtime.invocation_context import (
     ToolInvocationContext,
 )
-from greenbook_assistant_core.observability.collector import TraceCollector
-from greenbook_assistant_core.observability.context import TraceContext
-from greenbook_assistant_core.observability.trace import AgentTrace
+from greenbook_agent_core.observability.collector import TraceCollector
+from greenbook_agent_core.observability.context import TraceContext
+from greenbook_agent_core.observability.trace import AgentTrace
 
 
 def _context() -> TraceContext:

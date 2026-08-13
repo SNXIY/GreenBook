@@ -108,10 +108,9 @@ class MindFlowCreatorMcpClient:
             headers=headers,
             timeout=timeout,
             sse_read_timeout=timeout,
-        ) as (read_stream, write_stream, _):
-            async with ClientSession(read_stream, write_stream) as session:
-                await session.initialize()
-                yield session
+        ) as (read_stream, write_stream, _), ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            yield session
 
 
 def _validate_http_url(url: str) -> None:
@@ -154,30 +153,30 @@ def _csv(value: str) -> tuple[str, ...]:
 def _stdio_env(settings: Settings) -> dict[str, str]:
     env = os.environ.copy()
     values = {
-        "CREATOR_DATABASE_URL": settings.creator_database_url,
-        "CREATOR_DATABASE_ECHO": _boolean(settings.creator_database_echo),
-        "CREATOR_RETRIEVAL_ENABLED": _boolean(settings.creator_retrieval_enabled),
-        "CREATOR_RETRIEVAL_SQL_ENABLED": _boolean(
+        "GREENBOOK_CREATOR_DATABASE_URL": settings.creator_database_url,
+        "GREENBOOK_CREATOR_DATABASE_ECHO": _boolean(settings.creator_database_echo),
+        "GREENBOOK_CREATOR_RETRIEVAL_ENABLED": _boolean(settings.creator_retrieval_enabled),
+        "GREENBOOK_CREATOR_RETRIEVAL_SQL_ENABLED": _boolean(
             settings.creator_retrieval_sql_enabled
         ),
-        "CREATOR_RETRIEVAL_QDRANT_ENABLED": _boolean(
+        "GREENBOOK_CREATOR_RETRIEVAL_QDRANT_ENABLED": _boolean(
             settings.creator_retrieval_qdrant_enabled
         ),
-        "CREATOR_COMMUNITY_PROVIDER": settings.creator_community_provider,
-        "CREATOR_COMMUNITY_JAVA_BASE_URL": (settings.creator_community_java_base_url),
-        "CREATOR_COMMUNITY_JAVA_SHARED_SECRET": (
+        "GREENBOOK_CREATOR_COMMUNITY_PROVIDER": settings.creator_community_provider,
+        "GREENBOOK_CREATOR_COMMUNITY_JAVA_BASE_URL": (settings.creator_community_java_base_url),
+        "GREENBOOK_CREATOR_COMMUNITY_JAVA_SHARED_SECRET": (
             settings.creator_community_java_shared_secret
         ),
-        "CREATOR_COMMUNITY_JAVA_SERVICE_NAME": (
+        "GREENBOOK_CREATOR_COMMUNITY_JAVA_SERVICE_NAME": (
             settings.creator_community_java_service_name
         ),
-        "CREATOR_COMMUNITY_JAVA_TENANT_ID": (settings.creator_community_java_tenant_id),
-        "CREATOR_MCP_TRANSPORT": "stdio",
-        "CREATOR_MCP_TENANT_ID": settings.creator_mcp_tenant_id,
-        "CREATOR_MCP_CREATOR_ID": settings.creator_mcp_creator_id,
-        "CREATOR_MCP_ACTOR_ID": settings.creator_mcp_actor_id,
-        "CREATOR_MCP_ROLES": settings.creator_mcp_roles,
-        "CREATOR_MCP_ALLOWED_TOOLS": settings.creator_mcp_allowed_tools,
+        "GREENBOOK_CREATOR_COMMUNITY_JAVA_TENANT_ID": (settings.creator_community_java_tenant_id),
+        "GREENBOOK_CREATOR_MCP_TRANSPORT": "stdio",
+        "GREENBOOK_CREATOR_MCP_TENANT_ID": settings.creator_mcp_tenant_id,
+        "GREENBOOK_CREATOR_MCP_CREATOR_ID": settings.creator_mcp_creator_id,
+        "GREENBOOK_CREATOR_MCP_ACTOR_ID": settings.creator_mcp_actor_id,
+        "GREENBOOK_CREATOR_MCP_ROLES": settings.creator_mcp_roles,
+        "GREENBOOK_CREATOR_MCP_ALLOWED_TOOLS": settings.creator_mcp_allowed_tools,
     }
     env.update(values)
     return env

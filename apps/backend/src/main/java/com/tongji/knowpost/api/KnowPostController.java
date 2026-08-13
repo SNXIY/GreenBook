@@ -119,7 +119,7 @@ public class KnowPostController {
     }
 
     /**
-     * 发布帖子；人工帖可能返回 reviewing，AI 帖直接 published。
+     * 发布草稿并返回 published 状态。
      */
     @PostMapping("/{id}/publish")
     public PublishStatusResponse publish(@PathVariable("id") long id,

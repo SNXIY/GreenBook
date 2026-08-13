@@ -29,10 +29,161 @@ class ReviseDraftArguments(BaseModel):
         max_length=256,
         description="Optional requested title change",
     )
+    revision_scope: str = Field(
+        default="FULL_REVISION",
+        pattern="^(TITLE_ONLY|CONTENT_ONLY|STYLE_ONLY|STRUCTURE_ONLY|FULL_REVISION)$",
+        description="The narrowest intended revision scope",
+    )
     expected_version: str | None = Field(
         default=None,
         description="Optional expected draft updatedAt for optimistic locking",
     )
+
+
+class CreateDraftArguments(BaseModel):
+    """Arguments for creating a draft.
+
+    ``instruction`` is the canonical semantic input consumed by Creator.
+    The old Runtime capability metadata exposed ``content`` here even though
+    the handler has always accepted an instruction; keeping this model next
+    to the handler contract prevents that drift from recurring.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(min_length=1, max_length=256, description="Draft title")
+    instruction: str = Field(
+        min_length=1,
+        max_length=12000,
+        description="Content brief and generation instructions",
+    )
+    references: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Trusted reference posts from the current conversation",
+    )
+    strategy_task_id: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Creator strategy task that supplies the content brief",
+    )
+    strategy_artifact_id: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Creator strategy artifact that supplies the content brief",
+    )
+    summary: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Optional short summary for the draft",
+    )
+
+
+class BuildStrategyArguments(BaseModel):
+    """Arguments for the existing Creator content-strategy task contract."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    instruction: str = Field(
+        min_length=1,
+        max_length=12000,
+        description="The editorial or content-growth strategy brief",
+    )
+    references: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Trusted reference posts and analysis artifacts",
+    )
+    constraints: dict[str, Any] | None = Field(
+        default=None,
+        description="Structured audience, format, and evidence constraints",
+    )
+
+
+class SearchPublicPostsArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    query: str = Field(min_length=1, description="Search keywords or topic")
+    sort: str = Field(default="latest", description="Sort order")
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=20, ge=1, le=100)
+
+
+class GetPostArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    post_id: str = Field(min_length=1)
+
+
+class ListOwnPostsArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=20, ge=1, le=100)
+
+
+class GetDraftArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    draft_id: str | None = Field(default=None, min_length=1)
+
+
+class ListDraftsArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class ScheduleArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    draft_id: str | None = Field(default=None, min_length=1)
+    run_at: str = Field(min_length=1, description="ISO-8601 publication time")
+    timezone: str = Field(default="Asia/Shanghai", min_length=1)
+    requires_approval: bool = Field(
+        default=False,
+        description="Require explicit user confirmation before creating the schedule",
+    )
+
+
+class GetScheduleStatusArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    schedule_id: str | None = Field(default=None, min_length=1)
+
+
+class CancelScheduleArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    schedule_id: str | None = Field(default=None, min_length=1)
+
+
+class PublishNowArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    draft_id: str | None = Field(default=None, min_length=1)
+
+
+class ListCommentsArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    post_id: str = Field(min_length=1)
+    cursor: str | None = Field(default=None, min_length=1)
+    size: int = Field(default=20, ge=1, le=100)
+
+
+class SendReplyArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    post_id: str = Field(min_length=1)
+    parent_comment_id: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=12000)
+
+
+class GetPostPerformanceArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    post_id: str = Field(min_length=1)
+
+
+class GetAccountSummaryArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 class UpdateScheduleArguments(BaseModel):

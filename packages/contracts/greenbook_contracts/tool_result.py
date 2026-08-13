@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
+
+
+class DataProvenance(StrEnum):
+    """Source class carried with tool evidence and downstream projections."""
+
+    PERSONAL_DATA = "PERSONAL_DATA"
+    COMMUNITY_DATA = "COMMUNITY_DATA"
+    CREATOR_RESEARCH = "CREATOR_RESEARCH"
+    MODEL_INFERENCE = "MODEL_INFERENCE"
 
 
 class ResourceRef(BaseModel):
@@ -22,9 +32,14 @@ class ToolResult[T](BaseModel):
     message: str = Field(default="")
     user_message: str = Field(default="")
     retryable: bool = Field(default=False)
-    request_sent: bool = Field(default=False)
+    # ``None`` is reserved for a write whose delivery state is unknown.  The
+    # default remains ``False`` for backwards compatibility with existing
+    # client-side failures; callers that cannot prove whether a request was
+    # sent must pass ``None`` explicitly.
+    request_sent: bool | None = Field(default=False)
     state: dict[str, Any] | None = Field(default=None)
     data: T | None = Field(default=None)
+    provenance: list[DataProvenance] = Field(default_factory=list)
     trace_id: str | None = Field(default=None)
     receipt_id: str | None = Field(default=None)
     resource_refs: list[ResourceRef] = Field(default_factory=list)
@@ -37,7 +52,7 @@ class ToolResult[T](BaseModel):
         user_message: str,
         *,
         retryable: bool = False,
-        request_sent: bool = False,
+        request_sent: bool | None = False,
         trace_id: str | None = None,
     ) -> ToolResult[T]:
         return cls(
@@ -56,7 +71,7 @@ class ToolResult[T](BaseModel):
     ) -> ToolResult[T]:
         return cls.failure(
             "CREATOR_UNAVAILABLE",
-            message or "Creator Agent is unavailable",
+            message or "Creator Service is unavailable",
             "创作服务暂时不可用，尚未保存草稿，可以安全重试。",
             retryable=True,
             trace_id=trace_id,
@@ -96,12 +111,14 @@ class ToolResult[T](BaseModel):
         trace_id: str | None = None,
         receipt_id: str | None = None,
         resource_refs: list[ResourceRef] | None = None,
+        provenance: list[DataProvenance] | None = None,
     ) -> ToolResult[T]:
         return cls(
             ok=True,
             code="OK",
             data=data,
             request_sent=True,
+            provenance=provenance or [],
             trace_id=trace_id,
             receipt_id=receipt_id,
             resource_refs=resource_refs or [],

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from greenbook_assistant_core.execution.evidence import ExecutionEvidence
-from greenbook_assistant_core.execution.operation_tracking import (
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
+from greenbook_agent_core.execution.operation_tracking import (
     ExternalOperationRecord,
     ExternalOperationStore,
     OperationStatus,
 )
-from greenbook_assistant_core.execution.reconciliation import ReconciliationService
+from greenbook_agent_core.execution.reconciliation import ReconciliationService
 
 
 def _operation(**overrides: Any) -> ExternalOperationRecord:

@@ -5,7 +5,7 @@ import MainHeader from "@/components/layout/MainHeader";
 import AuthStatus from "@/features/auth/AuthStatus";
 import {
   AlertIcon,
-  AssistantIcon,
+  AgentIcon,
   CheckIcon,
   ClockIcon,
   CreateIcon,
@@ -14,18 +14,25 @@ import {
   SparkIcon
 } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
-import { assistantService } from "@/services/assistantService";
+import { agentService } from "@/services/agentService";
 import { executionService } from "@/services/executionService";
 import { creatorTaskService } from "@/services/creatorTaskService";
 import { knowpostService } from "@/services/knowpostService";
-import type { AssistantRun, AssistantRunListItem, AssistantScheduledAction } from "@/types/assistant";
+import {
+  runtimeExecutionButtonLabels,
+  runtimeExecutionStatusLabel,
+  runtimeExecutionTitle,
+  runtimeStepLabel,
+  runtimeStepStatusLabel
+} from "@/services/runtimeExecutionLabels";
+import type { AgentRun, AgentRunListItem, AgentScheduledAction } from "@/types/agent";
 import type { Execution } from "@/types/execution";
 import type { CreatorTaskListItem, PostTaskItem } from "@/types/task";
 import styles from "./TaskCenterPage.module.css";
 
 type TaskView = "all" | "active" | "attention" | "completed";
 type TaskGroup = Exclude<TaskView, "all">;
-type TaskSource = "assistant" | "creator" | "schedule" | "publication";
+type TaskSource = "agent" | "creator" | "schedule" | "publication";
 
 type UnifiedTask = {
   key: string;
@@ -39,7 +46,7 @@ type UnifiedTask = {
   updatedAt: string;
   createdAt: string;
   progress?: number;
-  raw: Execution | CreatorTaskListItem | AssistantScheduledAction | PostTaskItem;
+  raw: Execution | CreatorTaskListItem | AgentScheduledAction | PostTaskItem;
 };
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
@@ -54,8 +61,8 @@ const formatDate = (value: string) => {
   return Number.isNaN(parsed.getTime()) ? "时间未知" : dateFormatter.format(parsed);
 };
 
-const assistantStatus = (status: AssistantRun["status"]): [string, TaskGroup] => {
-  const statuses: Record<AssistantRun["status"], [string, TaskGroup]> = {
+const agentStatus = (status: AgentRun["status"]): [string, TaskGroup] => {
+  const statuses: Record<AgentRun["status"], [string, TaskGroup]> = {
     QUEUED: ["排队中", "active"],
     RUNNING: ["执行中", "active"],
     RETRYING: ["重试中", "active"],
@@ -71,21 +78,22 @@ const assistantStatus = (status: AssistantRun["status"]): [string, TaskGroup] =>
 };
 
 const executionStatus = (status: Execution["status"]): [string, TaskGroup] => {
+  const label = runtimeExecutionStatusLabel(status);
   switch (status) {
     case "PENDING":
     case "RUNNING":
-      return ["Runtime running", "active"];
+      return [label, "active"];
     case "WAITING_APPROVAL":
     case "WAITING_HUMAN":
-      return ["Waiting for approval", "attention"];
+      return [label, "attention"];
     case "PAUSED":
-      return ["Paused", "attention"];
+      return [label, "attention"];
     case "FAILED":
-      return ["Execution failed", "attention"];
+      return [label, "attention"];
     case "CANCELLED":
-      return ["Cancelled", "completed"];
+      return [label, "completed"];
     case "COMPLETED":
-      return ["Completed", "completed"];
+      return [label, "completed"];
     default:
       return [status, "active"];
   }
@@ -129,17 +137,17 @@ const scheduleStatus = (status: string): [string, TaskGroup] => {
 const publicationStatus = (status: PostTaskItem["status"]): [string, TaskGroup] => {
   const statuses: Record<PostTaskItem["status"], [string, TaskGroup]> = {
     draft: ["草稿", "attention"],
-    reviewing: ["审核中", "active"],
     published: ["已发布", "completed"],
-    rejected: ["需修改", "attention"]
+    rejected: ["需修改", "attention"],
+    deleted: ["已删除", "completed"]
   };
   return statuses[status];
 };
 
 const sourceIcon = (source: TaskSource) => {
   switch (source) {
-    case "assistant":
-      return <AssistantIcon aria-hidden="true" />;
+    case "agent":
+      return <AgentIcon aria-hidden="true" />;
     case "creator":
       return <SparkIcon aria-hidden="true" />;
     case "schedule":
@@ -152,16 +160,16 @@ const sourceIcon = (source: TaskSource) => {
 const toUnifiedTasks = (
   executions: Execution[],
   creatorTasks: CreatorTaskListItem[],
-  schedules: AssistantScheduledAction[],
+  schedules: AgentScheduledAction[],
   posts: PostTaskItem[]
 ): UnifiedTask[] => {
-  const assistantTasks = executions.map<UnifiedTask>(execution => {
+  const agentTasks = executions.map<UnifiedTask>(execution => {
     const [statusLabel, group] = executionStatus(execution.status);
     return {
       key: `execution:${execution.execution_id}`,
-      source: "assistant",
-      sourceLabel: "助手任务",
-      title: execution.current_step || execution.task_id || "Assistant execution",
+      source: "agent",
+      sourceLabel: "Agent任务",
+      title: runtimeExecutionTitle(execution.current_step, execution.task_id),
       description: `execution_id ${execution.execution_id}`,
       status: execution.status,
       statusLabel,
@@ -180,7 +188,7 @@ const toUnifiedTasks = (
         source: "creator",
         sourceLabel: "AI 创作",
         title: task.goal || "AI 创作任务",
-        description: task.error_code ? `创作未完成：${task.error_code}` : "由创作 Agent 研究、组织并生成内容。",
+        description: task.error_code ? `创作未完成：${task.error_code}` : "由Creator Service 研究、组织并生成内容。",
         status: task.status,
         statusLabel,
         group,
@@ -215,7 +223,7 @@ const toUnifiedTasks = (
       source: "publication",
       sourceLabel: "帖子发布",
       title: post.title?.trim() || "未命名帖子",
-      description: post.reason || `${origin}的发布流程`,
+      description: `${origin}的发布流程`,
       status: post.status,
       statusLabel,
       group,
@@ -225,7 +233,7 @@ const toUnifiedTasks = (
     };
   });
 
-  return [...assistantTasks, ...independentCreatorTasks, ...scheduledTasks, ...publicationTasks]
+  return [...agentTasks, ...independentCreatorTasks, ...scheduledTasks, ...publicationTasks]
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 };
 
@@ -241,7 +249,7 @@ const TaskCenterPage = () => {
 
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [creatorTasks, setCreatorTasks] = useState<CreatorTaskListItem[]>([]);
-  const [schedules, setSchedules] = useState<AssistantScheduledAction[]>([]);
+  const [schedules, setSchedules] = useState<AgentScheduledAction[]>([]);
   const [posts, setPosts] = useState<PostTaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -257,19 +265,19 @@ const TaskCenterPage = () => {
     const results = await Promise.allSettled([
       executionService.list(tokens.accessToken),
       creatorTaskService.list(tokens.accessToken),
-      assistantService.scheduledActions(tokens.accessToken),
+      agentService.scheduledActions(tokens.accessToken),
       knowpostService.taskItems(tokens.accessToken)
     ]);
     const errors: string[] = [];
 
     if (results[0].status === "fulfilled") setExecutions(results[0].value.items ?? []);
-    else errors.push("助手 Agent");
+    else errors.push("Agent Agent");
 
     if (results[1].status === "fulfilled") setCreatorTasks(results[1].value.items ?? []);
-    else errors.push("创作 Agent");
+    else errors.push("Creator Service");
 
     if (results[2].status === "fulfilled") setSchedules(results[2].value);
-    else if (!errors.includes("助手 Agent")) errors.push("定时任务");
+    else if (!errors.includes("Agent Agent")) errors.push("定时任务");
 
     if (results[3].status === "fulfilled") setPosts(results[3].value);
     else errors.push("Java 发布服务");
@@ -362,7 +370,7 @@ const TaskCenterPage = () => {
 
   const renderActions = (task: UnifiedTask) => {
     const isBusy = busyKey === task.key;
-    if (task.source === "assistant") {
+    if (task.source === "agent") {
       const execution = task.raw as Execution;
       if (execution.status === "FAILED") {
         return (
@@ -374,11 +382,11 @@ const TaskCenterPage = () => {
               executionService.retryStep(tokens.accessToken, execution.execution_id, execution.current_step)
             )}
           >
-            {isBusy ? "Retrying" : "Retry step"}
+            {isBusy ? runtimeExecutionButtonLabels.retrying : runtimeExecutionButtonLabels.retry}
           </button>
         );
       }
-      if (execution.status === "PAUSED") {
+      if (execution.control_state === "PAUSED") {
         return (
           <button
             type="button"
@@ -388,11 +396,14 @@ const TaskCenterPage = () => {
               executionService.resume(tokens.accessToken, execution.execution_id)
             )}
           >
-            {isBusy ? "Resuming" : "Resume"}
+            {isBusy ? runtimeExecutionButtonLabels.resuming : runtimeExecutionButtonLabels.resume}
           </button>
         );
       }
-      if (["PENDING", "RUNNING", "WAITING_HUMAN", "WAITING_APPROVAL"].includes(execution.status)) {
+      if (
+        execution.control_state === "RUNNING"
+        && ["PENDING", "RUNNING", "WAITING_HUMAN", "WAITING_APPROVAL"].includes(execution.status)
+      ) {
         return (
           <>
             <button
@@ -403,7 +414,7 @@ const TaskCenterPage = () => {
                 executionService.pause(tokens.accessToken, execution.execution_id)
               )}
             >
-              {isBusy ? "Pausing" : "Pause"}
+              {isBusy ? runtimeExecutionButtonLabels.pausing : runtimeExecutionButtonLabels.pause}
             </button>
             <button
               type="button"
@@ -417,7 +428,7 @@ const TaskCenterPage = () => {
                 }
               }}
             >
-              Cancel
+              {runtimeExecutionButtonLabels.cancel}
             </button>
           </>
         );
@@ -425,8 +436,8 @@ const TaskCenterPage = () => {
       return null;
     }
 
-    if ((task.source as string) === "assistant") {
-      const run = task.raw as unknown as AssistantRunListItem;
+    if ((task.source as string) === "agent") {
+      const run = task.raw as unknown as AgentRunListItem;
       if (run.status === "WAITING_APPROVAL" && run.approval) {
         return (
           <>
@@ -434,8 +445,8 @@ const TaskCenterPage = () => {
               type="button"
               className={styles.primaryAction}
               disabled={isBusy}
-              onClick={() => execute(task.key, "已确认，助手将继续执行。", () =>
-                assistantService.decideApproval(
+              onClick={() => execute(task.key, "已确认，Agent将继续执行。", () =>
+                agentService.decideApproval(
                   tokens.accessToken,
                   run.run_id,
                   run.approval!.approval_id,
@@ -451,7 +462,7 @@ const TaskCenterPage = () => {
               className={styles.secondaryAction}
               disabled={isBusy}
               onClick={() => execute(task.key, "已拒绝本次操作。", () =>
-                assistantService.decideApproval(
+                agentService.decideApproval(
                   tokens.accessToken,
                   run.run_id,
                   run.approval!.approval_id,
@@ -472,7 +483,7 @@ const TaskCenterPage = () => {
             className={styles.primaryAction}
             disabled={isBusy}
             onClick={() => execute(task.key, "任务已重新排队。", () =>
-              assistantService.retryRun(tokens.accessToken, run.run_id)
+              agentService.retryRun(tokens.accessToken, run.run_id)
             )}
           >
             {isBusy ? "重试中…" : "重试任务"}
@@ -486,7 +497,7 @@ const TaskCenterPage = () => {
             className={styles.primaryAction}
             disabled={isBusy}
             onClick={() => execute(task.key, "任务已继续执行。", () =>
-              assistantService.resumeRun(tokens.accessToken, run.run_id)
+              agentService.resumeRun(tokens.accessToken, run.run_id)
             )}
           >
             {isBusy ? "恢复中…" : "继续执行"}
@@ -501,7 +512,7 @@ const TaskCenterPage = () => {
               className={styles.secondaryAction}
               disabled={isBusy}
               onClick={() => execute(task.key, "任务已暂停。", () =>
-                assistantService.interruptRun(tokens.accessToken, run.run_id)
+                agentService.interruptRun(tokens.accessToken, run.run_id)
               )}
             >
               {isBusy ? "处理中…" : "暂停"}
@@ -513,7 +524,7 @@ const TaskCenterPage = () => {
               onClick={() => {
                 if (window.confirm("确定终止这个任务吗？已完成的步骤会保留。")) {
                   void execute(task.key, "任务已终止。", () =>
-                    assistantService.cancelRun(tokens.accessToken, run.run_id)
+                    agentService.cancelRun(tokens.accessToken, run.run_id)
                   );
                 }
               }}
@@ -565,7 +576,7 @@ const TaskCenterPage = () => {
     }
 
     if (task.source === "schedule") {
-      const schedule = task.raw as AssistantScheduledAction;
+      const schedule = task.raw as AgentScheduledAction;
       if (["PENDING", "SCHEDULED", "RETRYING"].includes(schedule.status.toUpperCase())) {
         return (
           <button
@@ -575,7 +586,7 @@ const TaskCenterPage = () => {
             onClick={() => {
               if (window.confirm("确定取消这次定时发布吗？")) {
                 void execute(task.key, "定时发布已取消。", () =>
-                  assistantService.cancelScheduledAction(tokens.accessToken, schedule.action_id)
+                  agentService.cancelScheduledAction(tokens.accessToken, schedule.action_id)
                 );
               }
             }}
@@ -603,23 +614,35 @@ const TaskCenterPage = () => {
   };
 
   const renderDetails = (task: UnifiedTask) => {
-    if (task.source === "assistant") {
+    if (task.source === "agent") {
       const execution = task.raw as Execution;
       return (
         <details className={styles.details}>
-          <summary>Runtime execution details</summary>
+          <summary>Runtime 执行详情</summary>
           <div className={styles.detailBody}>
-            <p className={styles.trace}>execution_id {execution.execution_id}</p>
-            {execution.task_id ? <p>task_id {execution.task_id}</p> : null}
-            {execution.plan_id ? <p>plan_id {execution.plan_id}</p> : null}
-            <p>current step {execution.current_step || "-"}</p>
-            <p>progress {Math.round(execution.progress * 100)}% ({execution.completed_steps}/{execution.total_steps})</p>
+            <p className={styles.trace}>执行 ID：{execution.execution_id}</p>
+            {execution.task_id ? <p>任务 ID：{execution.task_id}</p> : null}
+            {execution.plan_id ? <p>计划 ID：{execution.plan_id}</p> : null}
+            <p>控制状态：{execution.control_state}</p>
+            <p>当前步骤：{runtimeStepLabel(execution.current_step || "-")}</p>
+            {execution.control_reason ? <p>原因：{execution.control_reason}</p> : null}
+            <p>进度：{Math.round(execution.progress * 100)}%（{execution.completed_steps}/{execution.total_steps}）</p>
+            {execution.steps?.length ? (
+              <ol className={styles.stepList} aria-label="Runtime 执行步骤">
+                {execution.steps.map(step => (
+                  <li key={step.step_execution_id}>
+                    <span>{runtimeStepLabel(step.capability)}</span>
+                    <small>{runtimeStepStatusLabel(step.status)}</small>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
           </div>
         </details>
       );
     }
-    if ((task.source as string) === "assistant") {
-      const run = task.raw as unknown as AssistantRunListItem;
+    if ((task.source as string) === "agent") {
+      const run = task.raw as unknown as AgentRunListItem;
       return (
         <details className={styles.details}>
           <summary>运行详情</summary>
@@ -629,7 +652,7 @@ const TaskCenterPage = () => {
                 {run.steps.map(step => (
                   <li key={step.step_id}>
                     <span>{step.label}</span>
-                    <small>{assistantStatus(
+                    <small>{agentStatus(
                       step.status === "PENDING" ? "QUEUED"
                         : step.status === "WAITING_APPROVAL" ? "WAITING_APPROVAL"
                           : step.status === "WAITING_DEPENDENCY" ? "WAITING_DEPENDENCY"
@@ -662,7 +685,7 @@ const TaskCenterPage = () => {
       );
     }
     if (task.source === "schedule") {
-      const schedule = task.raw as AssistantScheduledAction;
+      const schedule = task.raw as AgentScheduledAction;
       return (
         <details className={styles.details}>
           <summary>发布详情</summary>
@@ -674,17 +697,7 @@ const TaskCenterPage = () => {
         </details>
       );
     }
-    const post = task.raw as PostTaskItem;
-    if (!post.moderationTaskId && !post.reason) return null;
-    return (
-      <details className={styles.details}>
-        <summary>审核详情</summary>
-        <div className={styles.detailBody}>
-          {post.reason ? <p>{post.reason}</p> : <p>审核 Agent 正在检查内容。</p>}
-          {post.moderationTaskId ? <p className={styles.trace}>审核任务 {post.moderationTaskId}</p> : null}
-        </div>
-      </details>
-    );
+    return null;
   };
 
   return (
@@ -693,7 +706,7 @@ const TaskCenterPage = () => {
       header={
         <MainHeader
           headline="任务"
-          subtitle="创作、审核与定时发布都在这里持续推进，你只需要处理真正需要确认的节点。"
+          subtitle="创作、发布与定时任务都在这里持续推进，你只需要处理真正需要确认的节点。"
           rightSlot={<AuthStatus />}
           filters={[
             { id: "all", label: "全部", badge: counts.all, active: view === "all", onSelect: selectView },
@@ -796,13 +809,13 @@ const TaskCenterPage = () => {
             <div className={styles.empty}>
               <span className={styles.emptyIcon}><ShieldIcon aria-hidden="true" /></span>
               <h2>{tasks.length ? "这个分类暂时没有任务" : "还没有任务"}</h2>
-              <p>{tasks.length ? "切换到“全部”查看其他进度。" : "让助手执行一个目标，或开始一次 AI 创作，任务会自动出现在这里。"}</p>
+              <p>{tasks.length ? "切换到“全部”查看其他进度。" : "让Agent执行一个目标，或开始一次 AI 创作，任务会自动出现在这里。"}</p>
               <div className={styles.emptyActions}>
                 {tasks.length ? (
                   <button type="button" className={styles.primaryAction} onClick={() => selectView("all")}>查看全部任务</button>
                 ) : (
                   <>
-                    <Link className={styles.primaryAction} to="/">打开社区助手</Link>
+                    <Link className={styles.primaryAction} to="/">打开社区Agent</Link>
                     <Link className={styles.secondaryAction} to="/create/ai">开始 AI 创作</Link>
                   </>
                 )}

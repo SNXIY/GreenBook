@@ -61,7 +61,7 @@ public class JwtService {
                                String sessionId) {
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(properties.getJwt().getIssuer())
-                .audience(List.of("zhiguang-api", "creator-agent", "greenbook-assistant-runtime"))
+                .audience(List.of("zhiguang-api", "creator-agent", "greenbook-agent-runtime"))
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
                 .subject(String.valueOf(user.getId()))

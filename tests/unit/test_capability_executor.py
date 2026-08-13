@@ -5,10 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.orchestration.models import PlanStep
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
+from greenbook_agent_core.planning.contracts import PlanStep
 
 
 @pytest.fixture
@@ -56,6 +55,7 @@ async def test_search_community_calls_search_tool(registry: CapabilityRegistry) 
     assert result.artifact.artifact_type == "SEARCH_RESULT"
     # SEARCH_RESULT is a collection — no single resource_id
     assert result.artifact.summary == "Java 101"
+    assert result.artifact.resource_refs == [{"kind": "POST", "resource_id": "p1"}]
 
 
 @pytest.mark.asyncio

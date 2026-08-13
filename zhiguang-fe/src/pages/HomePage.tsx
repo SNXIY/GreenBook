@@ -5,8 +5,8 @@ import CourseCard from "@/components/cards/CourseCard";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import { knowpostService } from "@/services/knowpostService";
 import AuthStatus from "@/features/auth/AuthStatus";
-import AssistantPanel from "@/components/assistant/AssistantPanel";
-import { AssistantIcon } from "@/components/icons/Icon";
+import AgentPanel from "@/components/agent/AgentPanel";
+import { AgentIcon } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
 import type { FeedItem } from "@/types/knowpost";
 import styles from "./HomePage.module.css";
@@ -21,7 +21,7 @@ const HomePage = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
   const size = 20;
 
   const fetchPage = useCallback(async (currentPage: number) => {
@@ -152,19 +152,19 @@ const HomePage = () => {
       {!hasMore && items.length > 0 ? <p className={styles.end}>已经看到全部内容</p> : null}
       </AppLayout>
       <button
-        className={styles.assistantTrigger}
+        className={styles.agentTrigger}
         type="button"
-        onClick={() => setAssistantOpen(true)}
-        aria-label="打开 GREEN-BOOK 助手"
+        onClick={() => setAgentOpen(true)}
+        aria-label="打开 GreenBook Agent"
         aria-haspopup="dialog"
       >
-        <span><AssistantIcon width={23} height={23} aria-hidden="true" /></span>
-        <span className={styles.assistantLabel}>
-          <strong>GREEN-BOOK 助手</strong>
+        <span><AgentIcon width={23} height={23} aria-hidden="true" /></span>
+        <span className={styles.agentLabel}>
+          <strong>GreenBook Agent</strong>
           <small>帮你找、写、定时发布</small>
         </span>
       </button>
-      <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      <AgentPanel open={agentOpen} onClose={() => setAgentOpen(false)} />
     </>
   );
 };

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-import logging
 
 from app.core.config import Settings
 from app.creator.api.dispatcher import (
@@ -19,6 +19,11 @@ from app.creator.application.ports import (
     CreatorRuntimePort,
     CreatorTaskMemoryPort,
 )
+from app.creator.domain.models import (
+    RuntimeOutcome,
+    RuntimeResumeRequest,
+    RuntimeStartRequest,
+)
 from app.creator.drafts.service import CreatorDraftService
 from app.creator.infrastructure.database import CreatorDatabase
 from app.creator.memory.composition import open_creator_memory
@@ -26,16 +31,9 @@ from app.creator.model_client import CreatorModelClient
 from app.creator.publication.service import CreatorPublicationHandoffService
 from app.creator.retrieval.composition import open_creator_retrieval
 from app.creator.runtime.checkpoints import open_creator_checkpointer
-from app.creator.runtime.composition import build_creator_runtime
-from app.creator.runtime.composition import build_creator_model_gateway
+from app.creator.runtime.composition import build_creator_model_gateway, build_creator_runtime
 from app.creator.studio.service import CreatorStudioService
 from app.creator.tools.composition import build_creator_community_provider
-from app.creator.domain.models import (
-    RuntimeOutcome,
-    RuntimeResumeRequest,
-    RuntimeStartRequest,
-)
-
 
 logger = logging.getLogger("uvicorn.error")
 

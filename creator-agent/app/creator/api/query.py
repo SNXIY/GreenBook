@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, or_, select
@@ -41,6 +41,7 @@ from app.creator.domain.models import (
     CreatorTaskKind,
     CreatorTaskStatus,
 )
+from app.creator.drafts.sqlalchemy import CreatorDraftRow, CreatorDraftVersionRow
 from app.creator.infrastructure.sqlalchemy import (
     CreatorArtifactRow,
     CreatorHumanDecisionRow,
@@ -48,10 +49,8 @@ from app.creator.infrastructure.sqlalchemy import (
     CreatorRunRow,
     CreatorTaskRow,
 )
-from app.creator.drafts.sqlalchemy import CreatorDraftRow, CreatorDraftVersionRow
 from app.creator.runtime.models import ArtifactKind
 from app.creator.studio.sqlalchemy import CreatorProjectTaskRow
-
 
 _PRIVATE_EVENT_KEYS = frozenset(
     {
@@ -461,7 +460,7 @@ class SqlAlchemyCreatorWorkspaceQuery:
         return tuple(_draft_version(row) for row in versions)
 
     async def list_runnable_run_ids(self, *, limit: int = 100) -> tuple[str, ...]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._sessions() as session:
             rows = (
                 await session.scalars(

@@ -4,11 +4,10 @@ import hashlib
 import math
 import re
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.creator.memory.models import CreatorEngagementMetrics
 from app.creator.retrieval.models import CreatorCorpusDocument
-
 
 _TOKEN_PATTERN = re.compile(
     r"[a-zA-Z0-9_]+|[\u3400-\u4dbf\u4e00-\u9fff]",
@@ -21,7 +20,7 @@ def query_sha256(query: str) -> str:
 
 
 def evidence_id(tenant_id: str, document_id: str) -> str:
-    digest = hashlib.sha256(f"{tenant_id}\0{document_id}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{tenant_id}\0{document_id}".encode()).hexdigest()
     return f"evidence-{digest[:24]}"
 
 
@@ -146,10 +145,10 @@ def freshness_score(
         return 0.2
     moment = published_at
     if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=timezone.utc)
+        moment = moment.replace(tzinfo=UTC)
     age_seconds = max(
         0.0,
-        (datetime.now(timezone.utc) - moment).total_seconds(),
+        (datetime.now(UTC) - moment).total_seconds(),
     )
     age_days = age_seconds / 86_400
     return _bounded(math.pow(0.5, age_days / half_life_days))

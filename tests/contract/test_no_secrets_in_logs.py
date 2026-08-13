@@ -1,7 +1,7 @@
 """Contract tests: No secrets in logs or error outputs."""
 from __future__ import annotations
 
-from greenbook_assistant_core.middleware import sanitize_headers
+from greenbook_agent_core.middleware import sanitize_headers
 from greenbook_contracts.tool_result import ToolResult
 
 

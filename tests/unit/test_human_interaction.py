@@ -5,15 +5,15 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from greenbook_assistant_core.execution.models import ExecutionStatus
-from greenbook_assistant_core.human.manager import HumanInteractionManager
-from greenbook_assistant_core.human.models import (
+from greenbook_agent_core.execution.models import ExecutionStatus
+from greenbook_agent_core.human.manager import HumanInteractionManager
+from greenbook_agent_core.human.models import (
     HumanInteractionRequest,
     HumanInteractionResponse,
     InteractionStatus,
     InteractionType,
 )
-from greenbook_assistant_core.human.store import InteractionStore
+from greenbook_agent_core.human.store import InteractionStore
 
 
 # ── Models ──────────────────────────────────────────────────────

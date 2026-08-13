@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # Creator Boundary Audit
 
 本报告记录 GreenBook Agent Runtime 中 Creator、内容生成和发布相关实现的边界。它是架构审计文档，不改变运行时行为，也不代表任何目录已经可以删除。

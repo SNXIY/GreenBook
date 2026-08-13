@@ -48,7 +48,7 @@
   transform: scale(0.97);
 }
 
-.assistantReply {
+.agentReply {
   display: grid;
   border: 1px solid var(--color-primary-border);
   border-radius: 14px;
@@ -57,7 +57,7 @@
   overflow: hidden;
 }
 
-.assistantReplyHeader {
+.agentReplyHeader {
   width: 100%;
   min-height: 52px;
   display: flex;
@@ -73,7 +73,7 @@
   cursor: pointer;
 }
 
-.assistantReplyHeader > span {
+.agentReplyHeader > span {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -81,33 +81,33 @@
   font-weight: 700;
 }
 
-.assistantReplyHeader small {
+.agentReplyHeader small {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   color: var(--color-text-muted);
 }
 
-.assistantReplyHeader small span {
+.agentReplyHeader small span {
   min-width: 2em;
   color: var(--color-primary);
   font-weight: 650;
 }
 
-.assistantReplyBody {
+.agentReplyBody {
   display: grid;
   gap: 12px;
   border-top: 1px solid var(--color-primary-border);
   padding: 12px 14px 14px;
 }
 
-.assistantSteps {
+.agentSteps {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
 }
 
-.assistantSteps span {
+.agentSteps span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -118,15 +118,15 @@
   font-size: 12px;
 }
 
-.assistantSteps i {
+.agentSteps i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--color-primary);
-  animation: assistantPulse 1.2s var(--ease-out) infinite;
+  animation: agentPulse 1.2s var(--ease-out) infinite;
 }
 
-.assistantApproval {
+.agentApproval {
   display: grid;
   gap: 12px;
   max-width: 72ch;
@@ -136,7 +136,7 @@
   background: var(--color-surface);
 }
 
-.assistantApproval p {
+.agentApproval p {
   margin: 5px 0 0;
   color: var(--color-text-muted);
   line-height: 1.6;
@@ -166,7 +166,7 @@
   background: var(--color-primary);
 }
 
-@keyframes assistantPulse {
+@keyframes agentPulse {
   50% { opacity: 0.35; }
 }
 
@@ -178,7 +178,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .assistantSteps i {
+  .agentSteps i {
     animation: none;
   }
 }
@@ -249,7 +249,7 @@
   color: var(--color-primary);
 }
 
-.assistantBadge {
+.agentBadge {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -286,7 +286,7 @@
 .tool:focus-visible,
 .mentionButton:focus-visible,
 .button:focus-visible,
-.assistantReplyHeader:focus-visible,
+.agentReplyHeader:focus-visible,
 .approvalActions button:focus-visible,
 .textarea:focus-visible {
   outline: 3px solid rgba(23, 107, 82, 0.22);
@@ -311,11 +311,11 @@
 }
 
 @media (max-width: 560px) {
-  .assistantReplyHeader {
+  .agentReplyHeader {
     align-items: flex-start;
   }
 
-  .assistantReplyHeader small {
+  .agentReplyHeader small {
     flex-direction: column;
     align-items: flex-end;
     gap: 2px;

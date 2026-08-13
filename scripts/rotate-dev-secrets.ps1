@@ -21,19 +21,17 @@ function New-GreenBookSecret {
 }
 
 $jwtSecret = New-GreenBookSecret
-$moderationSecret = New-GreenBookSecret
 $creatorProxySecret = New-GreenBookSecret
 $creatorHandoffSecret = New-GreenBookSecret
-$assistantSecret = New-GreenBookSecret
+$agentSecret = New-GreenBookSecret
 
 $replacementValues = @{
   "JWT_SECRET" = $jwtSecret
-  "MODERATION_AGENT_AUTH_SECRET" = $moderationSecret
-  "CREATOR_AGENT_SHARED_SECRET" = $creatorProxySecret
-  "CREATOR_COMMUNITY_SHARED_SECRET" = $creatorProxySecret
-  "CREATOR_HANDOFF_SHARED_SECRET" = $creatorHandoffSecret
-  "CREATOR_PUBLICATION_SHARED_SECRET" = $creatorHandoffSecret
-  "ASSISTANT_SERVICE_SHARED_SECRET" = $assistantSecret
+  "GREENBOOK_CREATOR_AGENT_SHARED_SECRET" = $creatorProxySecret
+  "GREENBOOK_CREATOR_COMMUNITY_SHARED_SECRET" = $creatorProxySecret
+  "GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET" = $creatorHandoffSecret
+  "GREENBOOK_CREATOR_PUBLICATION_SHARED_SECRET" = $creatorHandoffSecret
+  "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" = $agentSecret
 }
 
 $seen = @{}

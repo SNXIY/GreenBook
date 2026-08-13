@@ -1,6 +1,0 @@
-ALTER TABLE users
-    ADD COLUMN role VARCHAR(32) NOT NULL DEFAULT 'USER' AFTER tags_json;
-
-UPDATE users
-SET role = 'ADMIN'
-WHERE id = 1;

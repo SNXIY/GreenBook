@@ -3,20 +3,20 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.creator.domain.models import CreatorRun, CreatorTask
-from app.creator.memory.errors import (
-    CreatorMemoryConflictError,
-    CreatorMemoryIntegrityError,
-    CreatorMemoryUnavailableError,
-)
 from app.creator.memory.angles import (
     UsedContentAngle,
     append_used_angle,
     extract_used_angles,
     normalize_angle_key,
+)
+from app.creator.memory.errors import (
+    CreatorMemoryConflictError,
+    CreatorMemoryIntegrityError,
+    CreatorMemoryUnavailableError,
 )
 from app.creator.memory.models import (
     CreatorHistoricalPost,
@@ -35,7 +35,6 @@ from app.creator.memory.ports import (
     CreatorSemanticMemoryStore,
     CreatorShortTermMemoryStore,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +214,7 @@ class CreatorMemoryService:
             angle=angle.strip()[:2_000],
             task_id=task_id,
             artifact_id=artifact_id,
-            used_at=datetime.now(timezone.utc).isoformat(),
+            used_at=datetime.now(UTC).isoformat(),
         )
         if not entry.angle_key:
             return None

@@ -9,7 +9,7 @@ import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 from pydantic import ValidationError
@@ -54,15 +54,14 @@ from app.creator.domain.models import (
     CreatorTaskStatus,
     OutboxStatus,
     RetryCreatorTaskCommand,
-    RuntimeHumanDecision,
     RuntimeErrorInfo,
+    RuntimeHumanDecision,
     RuntimeOutcome,
     RuntimeOutcomeStatus,
     RuntimeResumeRequest,
     RuntimeStartRequest,
     SubmitCreatorDecisionCommand,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +85,7 @@ class CreatorHarnessPolicy:
     max_event_payload_bytes: int = 65_536
 
     @classmethod
-    def from_settings(cls, settings: CreatorHarnessSettings) -> "CreatorHarnessPolicy":
+    def from_settings(cls, settings: CreatorHarnessSettings) -> CreatorHarnessPolicy:
         return cls(
             max_runtime_attempts=settings.creator_runtime_max_attempts,
             run_lease_seconds=settings.creator_run_lease_seconds,
@@ -1124,7 +1123,7 @@ class CreatorAgentHarness:
                 ) from exc
             self._validate_runtime_outcome(outcome)
             return outcome
-        except asyncio.TimeoutError as exc:
+        except TimeoutError:
             logger.error(
                 "Creator runtime timeout task_id=%s run_id=%s timeout_seconds=%s",
                 request.task_id,
@@ -1215,7 +1214,7 @@ class CreatorAgentHarness:
                     "Runtime did not confirm the submitted decision"
                 )
             return outcome
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(
                 "Creator runtime resume timeout task_id=%s run_id=%s timeout_seconds=%s",
                 request.task_id,
@@ -1637,7 +1636,7 @@ class CreatorAgentHarness:
     ) -> None:
         if not events:
             return
-        if os.getenv("CREATOR_DIAGNOSTICS_DISABLE_EVENT_PERSISTENCE", "").lower() in {
+        if os.getenv("GREENBOOK_CREATOR_DIAGNOSTICS_DISABLE_EVENT_PERSISTENCE", "").lower() in {
             "1", "true", "yes"
         }:
             logger.info(
@@ -1931,4 +1930,4 @@ def _hash_text(value: str) -> str:
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

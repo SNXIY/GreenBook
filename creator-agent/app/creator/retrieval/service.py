@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.creator.retrieval.fusion import CreatorRankFusion
 from app.creator.retrieval.models import (
@@ -44,7 +44,6 @@ from app.creator.retrieval.scoring import (
     bounded_score,
     query_sha256,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -706,8 +705,8 @@ def _document_is_in_scope(
 
 def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _report_limitation(report: CreatorSourceReport) -> str:

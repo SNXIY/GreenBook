@@ -4,7 +4,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.creator.drafts.models import (
     CreateDraftRecord,
@@ -24,7 +24,7 @@ class CreatorDraftService:
     ) -> None:
         self._store = store
         self._id_factory = id_factory or (lambda: str(uuid.uuid4()))
-        self._clock = clock or (lambda: datetime.now(timezone.utc))
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     async def save_draft(
         self,

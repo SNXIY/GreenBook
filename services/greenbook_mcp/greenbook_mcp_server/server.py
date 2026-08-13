@@ -1,15 +1,12 @@
-"""GreenBook MCP Server — assembles tools and provides the execution boundary.
-
-Phase 1: In-process tool abstraction (no remote MCP transport required).
-Phase 2: Streamable HTTP MCP Server.
-"""
+"""GreenBook MCP-compatible in-process tool runtime."""
 
 from __future__ import annotations
 
 import logging
 from inspect import Signature, signature
 
-from greenbook_assistant_core.context import SessionContext
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_creator_client.client import CreatorClient
 from greenbook_java_client.client import JavaClient
@@ -23,16 +20,20 @@ logger = logging.getLogger(__name__)
 
 
 class GreenBookMCPServer:
-    """In-process MCP server that dispatches tool calls with Pydantic validation."""
+    """Tool runtime that dispatches registered handlers with validation."""
 
     def __init__(
         self,
         java: JavaClient,
         creator: CreatorClient,
+        *,
+        capability_registry: CapabilityRegistry | None = None,
     ) -> None:
         self.java = java
         self.creator = creator
-        tool_registry.validate_registered_tool_contracts()
+        tool_registry.validate_registered_tool_contracts(
+            capability_registry=capability_registry,
+        )
 
     async def execute_tool(
         self,
@@ -43,6 +44,7 @@ class GreenBookMCPServer:
         trace_id: str | None = None,
         agent_run_id: str | None = None,
         tool_call_id: str | None = None,
+        approval_granted: bool = False,
         **kwargs: object,
     ) -> dict:
         """Execute a named MCP tool with injected context.
@@ -60,7 +62,7 @@ class GreenBookMCPServer:
                 "user_message": f"Tool '{tool_name}' is not available.",
             }
 
-        definition_model = definition.argument_model
+        definition_model = definition.input_schema
         normalized_kwargs: dict[str, object]
         if definition_model is None:
             normalized_kwargs = dict(kwargs)
@@ -81,6 +83,13 @@ class GreenBookMCPServer:
                     if "extra_forbidden" in error_types or time_alias_conflict
                     else "TOOL_ARGUMENT_VALIDATION_FAILED"
                 )
+                missing_required_reference = ""
+                for item in exc.errors():
+                    location = item.get("loc") or ()
+                    field = str(location[-1]) if location else ""
+                    if item.get("type") in {"missing", "value_error.missing"}:
+                        missing_required_reference = field
+                        break
                 logger.warning(
                     "tool_argument_validation_failed tool=%s code=%s fields=%s",
                     tool_name,
@@ -102,11 +111,13 @@ class GreenBookMCPServer:
                     "user_message": user_message,
                     "retryable": True,
                     "request_sent": False,
+                    "missing_required_reference": missing_required_reference,
                     "state": {
                         "phase": "PRE_EXECUTION_VALIDATION_FAILED",
                         "downstream_called": False,
                         "side_effect_started": False,
                         "safe_to_retry": True,
+                        "missing_required_reference": missing_required_reference,
                     },
                     "trace_id": trace_id,
                 }
@@ -128,6 +139,7 @@ class GreenBookMCPServer:
                     conversation_id=session.conversation_id,
                     agent_run_id=agent_run_id,
                     tool_call_id=tool_call_id,
+                    approval_granted=approval_granted,
                 ),
                 **normalized_kwargs,
             )
@@ -158,13 +170,32 @@ class GreenBookMCPServer:
             conversation_id=session.conversation_id,
             agent_run_id=agent_run_id,
             tool_call_id=tool_call_id,
+            approval_granted=approval_granted,
         )
 
         try:
             result = await definition.handler(ctx, **normalized_kwargs)
-            if hasattr(result, "model_dump"):
-                return result.model_dump(mode="json")
-            return result
+            raw_result = result.model_dump(mode="python") if hasattr(result, "model_dump") else result
+            try:
+                validated_result = definition.output_schema.model_validate(raw_result)
+            except ValidationError:
+                logger.exception("tool_output_schema_validation_failed tool=%s", tool_name)
+                return {
+                    "ok": False,
+                    "code": "TOOL_OUTPUT_VALIDATION_FAILED",
+                    "message": "Tool output failed its declared schema",
+                    "user_message": "宸ュ叿杩斿洖缁撴灉鏍￠獙澶辫触锛岃稍后重试。",
+                    "retryable": False,
+                    "request_sent": True,
+                    "state": {
+                        "phase": "POST_EXECUTION_VALIDATION_FAILED",
+                        "downstream_called": True,
+                        "side_effect_started": definition.policy.side_effect.has_side_effect,
+                        "safe_to_retry": False,
+                    },
+                    "trace_id": trace_id,
+                }
+            return validated_result.model_dump(mode="json")
         except Exception:
             logger.exception("Tool '%s' execution failed", tool_name)
             return {
@@ -185,9 +216,14 @@ class GreenBookMCPServer:
                 "name": td.name,
                 "description": td.description,
                 "category": td.category,
-                "risk": td.risk,
+                "risk": td.policy.risk_level,
             }
-            if td.argument_model is not None:
-                item["parameters"] = openai_parameters(td.argument_model)
+            item["capability"] = td.capability
+            item["operations"] = list(td.operations)
+            item["parameters"] = openai_parameters(td.input_schema)
+            item["output_schema"] = td.output_schema.model_json_schema()
+            item["permission"] = td.policy.permission.model_dump(mode="json")
+            item["retry_policy"] = td.policy.retry_policy.model_dump(mode="json")
+            item["side_effect"] = td.policy.side_effect.model_dump(mode="json")
             tools.append(item)
         return tools

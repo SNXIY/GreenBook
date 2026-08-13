@@ -12,7 +12,6 @@ export type CommentItem = {
   likeCount: number;
   liked: boolean;
   assistant: boolean;
-  assistantRunId?: string | null;
   createTime: string;
 };
 

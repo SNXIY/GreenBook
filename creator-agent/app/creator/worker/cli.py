@@ -14,7 +14,6 @@ from app.creator.infrastructure.database import CreatorDatabase
 from app.creator.worker.composition import open_creator_worker_runtime
 from app.creator.worker.operations import replay_dead_outbox
 
-
 logger = logging.getLogger(__name__)
 
 

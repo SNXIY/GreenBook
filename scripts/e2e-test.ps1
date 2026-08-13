@@ -21,8 +21,7 @@ if (Test-Path -LiteralPath $EnvFile) {
 
 $JavaBaseUrl = "http://127.0.0.1:8080"
 $CreatorBaseUrl = "http://127.0.0.1:8092"
-$ModerationBaseUrl = "http://127.0.0.1:8088"
-$AssistantBaseUrl = "http://127.0.0.1:8094"
+$AgentBaseUrl = "http://127.0.0.1:8094"
 $FrontendBaseUrl = "http://127.0.0.1:5173"
 
 function Invoke-JsonRequest {
@@ -67,7 +66,7 @@ function Assert-Health {
   }
 }
 
-function Wait-AssistantRun {
+function Wait-AgentRun {
   param(
     [Parameter(Mandatory = $true)]
     [string]$RunId,
@@ -79,7 +78,7 @@ function Wait-AssistantRun {
   $terminal = @("COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED", "WAITING_APPROVAL")
   do {
     $run = Invoke-JsonRequest -Method GET `
-      -Uri "$AssistantBaseUrl/api/v1/assistant/runs/$RunId" `
+      -Uri "$AgentBaseUrl/api/v1/agent/runs/$RunId" `
       -Headers $Headers
     if ($terminal -contains [string]$run.status) {
       return $run
@@ -87,7 +86,7 @@ function Wait-AssistantRun {
     Start-Sleep -Milliseconds 750
   } while ([DateTimeOffset]::UtcNow -lt $deadline)
 
-  throw "Assistant run $RunId did not finish within $TimeoutSeconds seconds."
+  throw "Agent run $RunId did not finish within $TimeoutSeconds seconds."
 }
 
 function Find-CreatedDraftId {
@@ -109,9 +108,8 @@ function Find-CreatedDraftId {
 
 Write-Host "Checking live GreenBook services..."
 Assert-Health -Name "Java backend" -Uri "$JavaBaseUrl/actuator/health"
-Assert-Health -Name "Creator Agent" -Uri "$CreatorBaseUrl/actuator/health/ready"
-Assert-Health -Name "Moderation Agent" -Uri "$ModerationBaseUrl/health"
-Assert-Health -Name "Community Assistant" -Uri "$AssistantBaseUrl/actuator/health"
+Assert-Health -Name "Creator Service" -Uri "$CreatorBaseUrl/actuator/health/ready"
+Assert-Health -Name "GreenBook Agent API" -Uri "$AgentBaseUrl/health"
 Assert-Health -Name "Frontend" -Uri $FrontendBaseUrl
 
 if ($HealthOnly) {
@@ -167,17 +165,8 @@ if ([string]$creatorStatus.status -ne "READY") {
   throw "Creator did not accept the Java JWT."
 }
 
-$moderationSecret = Get-GreenBookEnvValue `
-  -Name "MODERATION_AGENT_AUTH_SECRET" `
-  -DefaultValue ""
-if (-not [string]::IsNullOrWhiteSpace($moderationSecret)) {
-  $null = Invoke-JsonRequest -Method GET `
-    -Uri "$ModerationBaseUrl/moderation/tasks?limit=1" `
-    -Headers @{ Authorization = "Bearer $moderationSecret" }
-}
-
 $conversation = Invoke-JsonRequest -Method POST `
-  -Uri "$AssistantBaseUrl/api/v1/assistant/conversations" `
+  -Uri "$AgentBaseUrl/api/v1/agent/conversations" `
   -Headers $authHeaders `
   -Body @{
     title = "E2E $Scenario"
@@ -185,7 +174,7 @@ $conversation = Invoke-JsonRequest -Method POST `
   }
 $conversationId = [string]$conversation.conversation_id
 if ([string]::IsNullOrWhiteSpace($conversationId)) {
-  throw "Assistant did not create a conversation."
+  throw "Agent did not create a conversation."
 }
 
 $prompt = if ($Scenario -eq "CreatorDraft") {
@@ -196,7 +185,7 @@ else {
 }
 
 $accepted = Invoke-JsonRequest -Method POST `
-  -Uri "$AssistantBaseUrl/api/v1/assistant/conversations/$conversationId/messages" `
+  -Uri "$AgentBaseUrl/api/v1/agent/conversations/$conversationId/messages" `
   -Headers @{
     Authorization = "Bearer $accessToken"
     "Idempotency-Key" = [guid]::NewGuid().ToString("N")
@@ -207,18 +196,18 @@ $accepted = Invoke-JsonRequest -Method POST `
   }
 $runId = [string]$accepted.run_id
 if ([string]::IsNullOrWhiteSpace($runId)) {
-  throw "Assistant did not accept the E2E run."
+  throw "Agent did not accept the E2E run."
 }
 
 $createdDraftId = ""
 try {
-  Write-Host "Waiting for Assistant run $runId..."
-  $run = Wait-AssistantRun -RunId $runId -Headers $authHeaders
+  Write-Host "Waiting for Agent run $runId..."
+  $run = Wait-AgentRun -RunId $runId -Headers $authHeaders
   if ([string]$run.status -ne "COMPLETED") {
-    throw "Assistant run ended with status $($run.status): $($run.error)"
+    throw "Agent run ended with status $($run.status): $($run.error)"
   }
   if ([string]::IsNullOrWhiteSpace([string]$run.final_response)) {
-    throw "Assistant completed without a final response."
+    throw "Agent completed without a final response."
   }
 
   if ($Scenario -eq "Direct") {

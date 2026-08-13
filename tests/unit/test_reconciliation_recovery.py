@@ -6,23 +6,23 @@ from typing import Any
 
 import pytest
 
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.events import EventType
-from greenbook_assistant_core.execution.models import ExecutionStatus, StepStatus
-from greenbook_assistant_core.execution.operation_tracking import (
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.events import EventType
+from greenbook_agent_core.execution.models import ExecutionStatus, StepStatus
+from greenbook_agent_core.execution.operation_tracking import (
     ExternalOperationRecord,
     ExternalOperationStore,
     OperationStatus,
 )
-from greenbook_assistant_core.execution.reconciliation import (
+from greenbook_agent_core.execution.reconciliation import (
     ReconciliationAction,
     ReconciliationRecoveryService,
     ReconciliationService,
 )
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.state_manager import ExecutionStateManager
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.state_manager import ExecutionStateManager
+from tests.plan_factory import GoalPlanFactory
+from greenbook_agent_core.planning.validation import PlanValidator
 
 
 @pytest.fixture(autouse=True)
@@ -32,7 +32,7 @@ def clear_store() -> None:
 
 def _failed_execution(*, retryable: bool = False):
     registry = CapabilityRegistry()
-    plan = TaskOrchestrator(registry).generate_plan(
+    plan = GoalPlanFactory(registry).generate_plan(
         task_id="reconciliation-task",
         goal_category="CREATE_CONTENT",
         requirements=[{"type": "CREATE"}],

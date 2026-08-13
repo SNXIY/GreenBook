@@ -50,23 +50,23 @@ public interface KnowPostMapper {
     // 详情查询（含作者信息）
     KnowPostDetailRow findDetailById(@Param("id") Long id);
 
-    List<KnowPostDetailRow> searchPublicForAssistant(@Param("query") String query,
+    List<KnowPostDetailRow> searchPublicForAgent(@Param("query") String query,
                                                     @Param("limit") int limit);
 
-    List<KnowPost> listOwnPostsForAssistant(
+    List<KnowPost> listOwnPostsForAgent(
             @Param("creatorId") long creatorId,
             @Param("limit") int limit,
             @Param("offset") int offset);
 
-    Map<String, Object> analyzeEngagementForAssistant(@Param("topic") String topic,
+    Map<String, Object> analyzeEngagementForAgent(@Param("topic") String topic,
                                                       @Param("since") Instant since);
 
-    List<Map<String, Object>> listTopEngagementPostsForAssistant(
+    List<Map<String, Object>> listTopEngagementPostsForAgent(
             @Param("topic") String topic,
             @Param("since") Instant since,
             @Param("limit") int limit);
 
-    List<Map<String, Object>> listTopContributorsForAssistant(
+    List<Map<String, Object>> listTopContributorsForAgent(
             @Param("topic") String topic,
             @Param("since") Instant since,
             @Param("limit") int limit);

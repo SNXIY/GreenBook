@@ -2,7 +2,7 @@ param()
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
-$KeyDirectory = "$Root\zhiguang-be\src\main\resources\keys"
+$KeyDirectory = "$Root\apps\backend\src\main\resources\keys"
 $PrivateKey = "$KeyDirectory\private.pem"
 $PublicKey = "$KeyDirectory\public.pem"
 

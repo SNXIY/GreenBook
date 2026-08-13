@@ -77,7 +77,7 @@ def create_local_basic_session(
     principal = configured_basic_creator(settings)
     credentials = (
         f"{settings.creator_basic_username}:{settings.creator_basic_password}"
-    ).encode("utf-8")
+    ).encode()
     return base64.b64encode(credentials).decode("ascii"), principal
 
 

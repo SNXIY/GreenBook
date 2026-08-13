@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook Final Cleanup Candidates
 
 Phase 7.9-B read-only verification before any deletion. The scan excluded

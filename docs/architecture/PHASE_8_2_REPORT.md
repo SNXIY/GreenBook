@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # Phase 8.2 Workspace Consolidation Report
 
 本阶段将仍处于 ACTIVE/部署边界的应用统一到 `apps/`，只改变目录和路径引用，不改变业务逻辑、包名、数据库或 Agent Runtime。

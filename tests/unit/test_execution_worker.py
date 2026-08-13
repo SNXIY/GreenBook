@@ -5,19 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from greenbook_assistant_core.capability.registry import CapabilityRegistry
-from greenbook_assistant_core.execution.capability_executor import CapabilityExecutor
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.execution.models import (
-    ArtifactHandle,
+from greenbook_agent_core.capability.registry import CapabilityRegistry
+from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
+from greenbook_agent_core.execution.models import (
     ExecutionStatus,
     PlanExecution,
     StepStatus,
 )
-from greenbook_assistant_core.execution.repository import ExecutionRepository
-from greenbook_assistant_core.execution.worker import ExecutionWorker, RunOutcome
-from greenbook_assistant_core.orchestration.orchestrator import TaskOrchestrator
-from greenbook_assistant_core.planning.validation import PlanValidator
+from greenbook_agent_core.execution.repository import ExecutionRepository
+from greenbook_agent_core.execution.worker import ExecutionWorker, RunOutcome
+from greenbook_agent_core.planning.validation import PlanValidator
+
+from tests.plan_factory import GoalPlanFactory
 
 
 @pytest.fixture(autouse=True)
@@ -31,8 +30,8 @@ def registry() -> CapabilityRegistry:
 
 
 @pytest.fixture
-def orchestrator(registry: CapabilityRegistry) -> TaskOrchestrator:
-    return TaskOrchestrator(registry)
+def orchestrator(registry: CapabilityRegistry) -> GoalPlanFactory:
+    return GoalPlanFactory(registry)
 
 
 @pytest.fixture
@@ -62,7 +61,7 @@ def _make_worker(
 
 
 def _init_search_analyze_create(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     worker: ExecutionWorker,
     task_id: str = "t1",
@@ -85,7 +84,7 @@ def _init_search_analyze_create(
 
 @pytest.mark.asyncio
 async def test_full_three_step_execution(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     registry: CapabilityRegistry,
 ) -> None:
@@ -115,11 +114,69 @@ async def test_full_three_step_execution(
     assert "GENERATE_CONTENT" in completed
 
 
+@pytest.mark.asyncio
+async def test_search_resource_reference_binds_dependent_post_detail(
+    registry: CapabilityRegistry,
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def handler(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+        calls.append((tool_name, dict(tool_args)))
+        if tool_name == "community.search_public_posts":
+            return {
+                "ok": True,
+                "code": "",
+                "data": {"items": [{"post_id": "p-search-1", "title": "Agent"}]},
+            }
+        if tool_name == "community.get_post":
+            return {
+                "ok": tool_args.get("post_id") == "p-search-1",
+                "code": "" if tool_args.get("post_id") == "p-search-1" else "INVALID",
+                "data": {"post_id": tool_args.get("post_id")},
+            }
+        return {"ok": False, "code": "UNKNOWN_TOOL"}
+
+    from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
+    from greenbook_agent_core.planning.models import ExecutablePlan
+
+    plan = TaskPlan(
+        task_id="t-search-detail",
+        steps=[
+            PlanStep(
+                step_id="search",
+                ordinal=1,
+                capability="SEARCH_COMMUNITY",
+                output_artifact_type="SEARCH_RESULT",
+            ),
+            PlanStep(
+                step_id="detail",
+                ordinal=2,
+                capability="GET_POST_DETAIL",
+                depends_on=["search"],
+                input_artifact_types=["SEARCH_RESULT"],
+                output_artifact_type="POST_DETAIL",
+            ),
+        ],
+    )
+    executable = ExecutablePlan(
+        plan_id=plan.plan_id,
+        task_id=plan.task_id,
+        steps=plan.steps,
+        is_valid=True,
+    )
+    worker = ExecutionWorker(CapabilityExecutor(registry, handler))
+
+    outcome = await worker.run(worker.init_from_plan(executable, task_id=plan.task_id).execution_id)
+
+    assert outcome == RunOutcome.COMPLETED
+    assert calls[1] == ("community.get_post", {"post_id": "p-search-1"})
+
+
 # ── Scenario 2: Step 2 fails, Step 1 NOT re-executed ─────────────
 
 @pytest.mark.asyncio
 async def test_step2_fails_step1_not_repeated(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     registry: CapabilityRegistry,
 ) -> None:
@@ -151,7 +208,7 @@ async def test_step2_fails_step1_not_repeated(
 
 @pytest.mark.asyncio
 async def test_approval_pauses_execution(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     registry: CapabilityRegistry,
 ) -> None:
@@ -186,7 +243,7 @@ async def test_approval_pauses_execution(
 
 @pytest.mark.asyncio
 async def test_resume_after_approval_completes(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     registry: CapabilityRegistry,
 ) -> None:
@@ -230,7 +287,7 @@ async def test_resume_after_approval_completes(
 
 @pytest.mark.asyncio
 async def test_upstream_failure_skips_downstream(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     registry: CapabilityRegistry,
 ) -> None:
@@ -268,7 +325,7 @@ async def test_single_step_worker(
         },
     })
     # Build a single-step plan manually
-    from greenbook_assistant_core.orchestration.models import PlanStep, TaskPlan
+    from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
     plan = TaskPlan(
         task_id="t-single",
         steps=[PlanStep(
@@ -276,7 +333,7 @@ async def test_single_step_worker(
             output_artifact_type="SEARCH_RESULT",
         )],
     )
-    from greenbook_assistant_core.planning.models import ExecutablePlan
+    from greenbook_agent_core.planning.models import ExecutablePlan
     executable = ExecutablePlan(steps=plan.steps, is_valid=True)
     ex = worker.init_from_plan(executable, task_id="t-single")
 
@@ -286,7 +343,7 @@ async def test_single_step_worker(
 
 @pytest.mark.asyncio
 async def test_retryable_step_stalls(
-    orchestrator: TaskOrchestrator,
+    orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     registry: CapabilityRegistry,
 ) -> None:

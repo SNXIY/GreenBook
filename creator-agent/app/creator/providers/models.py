@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -10,7 +10,7 @@ from app.creator.memory.models import CreatorEngagementMetrics
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class CommunityModel(BaseModel):
@@ -110,7 +110,7 @@ class CommunitySearchRequest(CommunityModel):
     limit: int = Field(default=10, ge=1, le=50)
 
     @model_validator(mode="after")
-    def validate_request(self) -> "CommunitySearchRequest":
+    def validate_request(self) -> CommunitySearchRequest:
         if any(not query.strip() or len(query) > 500 for query in self.queries):
             raise ValueError("Search queries must contain 1-500 characters")
         if (

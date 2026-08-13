@@ -17,7 +17,7 @@ const EditProfilePage = () => {
   const { user, tokens, /* refresh, logout, */ reloadUser } = useAuth();
   const navigate = useNavigate();
   const displayName = useMemo(
-    () => user?.nickname ?? user?.phone ?? user?.email ?? "GREEN-BOOK 用户",
+    () => user?.nickname ?? user?.phone ?? user?.email ?? "GreenBook 用户",
     [user]
   );
 
@@ -194,7 +194,7 @@ const EditProfilePage = () => {
               <input id="phone" className={styles.input} value={phone} onChange={e => setPhone(e.target.value)} placeholder="绑定手机号方便联系" />
             </div>
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="zgId">GREEN-BOOK ID</label>
+              <label className={styles.label} htmlFor="zgId">GreenBook ID</label>
               <input id="zgId" className={styles.input} value={zgId} onChange={e => setZgId(e.target.value)} placeholder="用于个性化主页地址" />
             </div>
             <div className={styles.field}>

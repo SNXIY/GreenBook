@@ -4,27 +4,25 @@ from __future__ import annotations
 
 import pytest
 import sqlalchemy as sa
-
-from greenbook_assistant_core.artifact.events import ArtifactEventType
-from greenbook_assistant_core.artifact.lifecycle import (
+from greenbook_agent_core.artifact.events import ArtifactEventType
+from greenbook_agent_core.artifact.lifecycle import (
     ArtifactLifecycleError,
     ArtifactLifecycleValidator,
 )
-from greenbook_assistant_core.artifact.models import Artifact, ArtifactLifecycle
-from greenbook_assistant_core.artifact.registry import ArtifactRegistry, ArtifactRegistryError
-from greenbook_assistant_core.artifact.schema import (
+from greenbook_agent_core.artifact.models import Artifact, ArtifactLifecycle
+from greenbook_agent_core.artifact.registry import ArtifactRegistry, ArtifactRegistryError
+from greenbook_agent_core.artifact.repository import ArtifactRepository
+from greenbook_agent_core.artifact.schema import (
     ArtifactSchemaRegistry,
     ArtifactSchemaValidationError,
 )
-from greenbook_assistant_core.artifact.store import (
+from greenbook_agent_core.artifact.store import (
     ArtifactStore,
     MemoryArtifactStore,
     PostgresArtifactStore,
 )
-from greenbook_assistant_core.artifact.repository import ArtifactRepository
-from greenbook_assistant_core.execution.event_store import ExecutionEventStore
-from greenbook_assistant_core.execution.timeline import ExecutionTimelineService, TimelineItemKind
-from greenbook_assistant_core.orchestration.agent_registry import AgentRegistry
+from greenbook_agent_core.execution.event_store import ExecutionEventStore
+from greenbook_agent_core.execution.timeline import ExecutionTimelineService, TimelineItemKind
 
 
 def _analysis_artifact() -> Artifact:
@@ -94,18 +92,13 @@ def test_lifecycle_validator_rejects_created_archived_and_duplicate_consumption(
         registry.mark_consumed("analysis-java-1", consumer_task_id="task-publish")
 
 
-def test_schema_validation_and_agent_contracts_fail_before_execution() -> None:
+def test_schema_validation_fails_before_execution() -> None:
     schemas = ArtifactSchemaRegistry()
     schemas.validate(_analysis_artifact())
     invalid = _analysis_artifact().model_copy(update={"metadata": {"posts": []}})
     with pytest.raises(ArtifactSchemaValidationError, match="REQUIRED_FIELDS_MISSING"):
         schemas.validate(invalid)
 
-    agents = AgentRegistry()
-    agents.validate_schema_contract("AnalyticsAgent", "CreatorAgent")
-    agents.validate_schema_contract("CreatorAgent", "PublishAgent")
-    with pytest.raises(Exception, match="PLAN_SCHEMA_CONTRACT"):
-        agents.validate_schema_contract("SearchAgent", "PublishAgent")
 
 
 def test_artifact_events_are_exposed_as_timeline_items() -> None:

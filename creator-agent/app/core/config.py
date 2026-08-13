@@ -6,6 +6,15 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _env_name(field_name: str) -> str:
+    """Map Creator-owned settings to the canonical environment namespace."""
+
+    if field_name.startswith("creator_"):
+        field_name = field_name.removeprefix("creator_")
+        return f"GREENBOOK_CREATOR_{field_name.upper()}"
+    return field_name.upper()
+
+
 class Settings(BaseSettings):
     # A real model provider is mandatory; invalid or missing credentials fail startup.
     ai_provider: str = "deepseek"
@@ -126,7 +135,7 @@ class Settings(BaseSettings):
     creator_worker_create_schema: bool = False
 
     # Creator Memory.
-    redis_url: str = "redis://127.0.0.1:6379/0"
+    creator_redis_url: str = "redis://127.0.0.1:6379/0"
     redis_socket_timeout_seconds: float = 2.0
     creator_memory_enabled: bool = True
     creator_short_memory_enabled: bool = False
@@ -229,6 +238,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        alias_generator=_env_name,
+        populate_by_name=True,
         extra="ignore",
     )
 

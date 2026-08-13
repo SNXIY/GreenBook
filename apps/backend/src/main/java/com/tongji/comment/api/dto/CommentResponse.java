@@ -16,7 +16,6 @@ public record CommentResponse(
         long likeCount,
         boolean liked,
         boolean assistant,
-        String assistantRunId,
         Instant createTime
 ) {
 }

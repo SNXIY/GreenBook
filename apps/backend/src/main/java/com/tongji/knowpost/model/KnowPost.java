@@ -33,8 +33,6 @@ public class KnowPost {
     private String status;
     /** MANUAL | AI_ASSISTED */
     private String contentOrigin;
-    private String moderationTaskId;
-    private String moderationReason;
     private Instant createTime;
     private Instant updateTime;
     private Instant publishTime;

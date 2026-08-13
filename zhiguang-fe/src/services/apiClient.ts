@@ -59,7 +59,7 @@ export async function apiFetch<TResponse>(path: string, options: ApiFetchOptions
     headers: mergedHeaders,
     body: isFormData ? (body as FormData) : body ? JSON.stringify(body) : undefined,
     signal,
-    // GREEN-BOOK API 使用 Bearer JWT，不依赖跨域 Cookie。
+    // GreenBook API 使用 Bearer JWT，不依赖跨域 Cookie。
     credentials: "omit"
   });
 

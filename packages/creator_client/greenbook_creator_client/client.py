@@ -1,4 +1,4 @@
-"""Async client for the Creator Agent Task API."""
+"""Async client for the Creator Service Task API."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class CreatorClient:
-    """Async HTTPX client for the Creator Agent Task API.
+    """Async HTTPX client for the Creator Service Task API.
 
     Creator is responsible for: Research → Outline → Writer → Critic →
     Revision → Finalize → Artifact → Checkpoint.
@@ -29,9 +29,13 @@ class CreatorClient:
         *,
         timeout: float = 240.0,
         poll_interval: float = 1.5,
+        completion_deadline_seconds: float = 600.0,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._poll_interval = poll_interval
+        self._completion_deadline_seconds = _positive_value(
+            "completion_deadline_seconds", completion_deadline_seconds
+        )
         self.http = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=httpx.Timeout(timeout),
@@ -39,17 +43,19 @@ class CreatorClient:
 
     @classmethod
     def from_env(cls, *, base_url: str | None = None) -> CreatorClient:
-        """Build the real Creator client from Assistant deployment config."""
+        """Build the client from the canonical Creator Service config."""
 
         return cls(
             base_url=base_url or _env_first(
-                "ASSISTANT_CREATOR_BASE_URL",
                 "GREENBOOK_CREATOR_BASE_URL",
                 default="http://127.0.0.1:8092",
             ),
-            timeout=_positive_float("ASSISTANT_CREATOR_TIMEOUT_SECONDS", 240.0),
+            timeout=_positive_float("GREENBOOK_AGENT_CREATOR_TIMEOUT_SECONDS", 240.0),
             poll_interval=_positive_float(
-                "ASSISTANT_CREATOR_POLL_INTERVAL_SECONDS", 1.5
+                "GREENBOOK_AGENT_CREATOR_POLL_INTERVAL_SECONDS", 1.5
+            ),
+            completion_deadline_seconds=_positive_float(
+                "GREENBOOK_AGENT_CREATOR_COMPLETION_DEADLINE_SECONDS", 600.0
             ),
         )
 
@@ -106,7 +112,7 @@ class CreatorClient:
             )
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout):
             return ToolResult.creator_unavailable(
-                "Creator Agent is unreachable. No draft was created. You may safely retry.",
+                "Creator Service is unreachable. No draft was created. You may safely retry.",
                 trace_id=trace_id,
             )
         except httpx.WriteTimeout:
@@ -144,7 +150,7 @@ class CreatorClient:
         *,
         bearer_token: str | None = None,
         trace_id: str | None = None,
-        deadline_seconds: float = 240.0,
+        deadline_seconds: float | None = None,
     ) -> ToolResult[dict[str, Any]]:
         """Poll or SSE-wait for Creator task to reach terminal state."""
         headers: dict[str, str] = {}
@@ -153,7 +159,11 @@ class CreatorClient:
         if trace_id:
             headers["X-Trace-ID"] = trace_id
 
-        deadline = asyncio.get_running_loop().time() + deadline_seconds
+        deadline = asyncio.get_running_loop().time() + (
+            deadline_seconds
+            if deadline_seconds is not None
+            else self._completion_deadline_seconds
+        )
 
         while asyncio.get_running_loop().time() < deadline:
             try:
@@ -162,12 +172,12 @@ class CreatorClient:
                 )
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout):
                 return ToolResult.creator_unavailable(
-                    "Creator Agent is unreachable while checking the task.",
+                    "Creator Service is unreachable while checking the task.",
                     trace_id=trace_id,
                 )
             except (httpx.RemoteProtocolError, httpx.NetworkError):
                 return ToolResult.creator_unavailable(
-                    "Creator Agent network error while checking the task.",
+                    "Creator Service network error while checking the task.",
                     trace_id=trace_id,
                 )
             except httpx.TimeoutException:
@@ -215,7 +225,7 @@ class CreatorClient:
             await asyncio.sleep(self._poll_interval)
 
         return ToolResult.timeout(
-            "Creator Agent did not complete in time. No draft was created."
+            "Creator Service did not complete in time. No draft was created."
         )
 
     # ── Get artifact ───────────────────────────────────────────
@@ -241,7 +251,7 @@ class CreatorClient:
             )
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout):
             return ToolResult.creator_unavailable(
-                "Creator Agent is unreachable", trace_id=trace_id
+                "Creator Service is unreachable", trace_id=trace_id
             )
         except httpx.TimeoutException:
             result = ToolResult.timeout("Creator request timed out")
@@ -249,7 +259,7 @@ class CreatorClient:
             return result
         except (httpx.RemoteProtocolError, httpx.NetworkError):
             return ToolResult.creator_unavailable(
-                "Creator Agent network error", trace_id=trace_id
+                "Creator Service network error", trace_id=trace_id
             )
 
         if resp.status_code == 200:
@@ -288,7 +298,7 @@ class CreatorClient:
             )
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout):
             return ToolResult.creator_unavailable(
-                "Creator Agent is unreachable", trace_id=trace_id
+                "Creator Service is unreachable", trace_id=trace_id
             )
         except httpx.WriteTimeout:
             result = ToolResult.request_not_sent("Creator handoff was not sent")
@@ -418,6 +428,12 @@ def _env_first(*names: str, default: str) -> str:
 def _positive_float(name: str, default: float) -> float:
     raw = os.getenv(name)
     value = default if raw is None or not raw.strip() else float(raw)
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
+def _positive_value(name: str, value: float) -> float:
     if value <= 0:
         raise ValueError(f"{name} must be positive")
     return value

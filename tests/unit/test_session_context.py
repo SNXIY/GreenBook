@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from greenbook_assistant_core.context import RecentEntity, SessionContext
+from greenbook_agent_core.context import RecentEntity, SessionContext
 from pydantic import ValidationError
 
 

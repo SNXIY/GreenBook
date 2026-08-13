@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from greenbook_assistant_core.artifact.models import Artifact
-from greenbook_assistant_core.artifact.repository import ArtifactRepository
-from greenbook_assistant_core.artifact.store import ArtifactStore
-from greenbook_assistant_core.execution.invocation import ExecutionResult
-from greenbook_assistant_core.execution.models import ArtifactHandle, StepExecution, StepStatus
+from greenbook_agent_core.artifact.models import Artifact
+from greenbook_agent_core.artifact.repository import ArtifactRepository
+from greenbook_agent_core.artifact.store import ArtifactStore
+from greenbook_agent_core.execution.invocation import ExecutionResult
+from greenbook_agent_core.execution.models import ArtifactHandle, StepExecution, StepStatus
 
 
 @pytest.fixture(autouse=True)
@@ -206,7 +206,7 @@ def test_resolve_returns_most_recent(store: ArtifactStore) -> None:
 
     We manually set created_at to guarantee ordering.
     """
-    from greenbook_assistant_core.artifact.models import Artifact as A
+    from greenbook_agent_core.artifact.models import Artifact as A
 
     repo = store._repo  # type: ignore[union-attr]
     repo.save(A(

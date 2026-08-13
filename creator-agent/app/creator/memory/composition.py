@@ -14,7 +14,6 @@ from app.creator.memory.semantic import QdrantCreatorSemanticMemoryStore
 from app.creator.memory.service import CreatorMemoryService
 from app.creator.memory.short_term import RedisCreatorShortTermMemoryStore
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -74,7 +73,7 @@ async def open_creator_memory(
         if settings.creator_short_memory_enabled:
             try:
                 short_store = RedisCreatorShortTermMemoryStore(
-                    redis_url=settings.redis_url,
+                    redis_url=settings.creator_redis_url,
                     ttl_seconds=settings.creator_short_memory_ttl_seconds,
                     socket_timeout_seconds=settings.redis_socket_timeout_seconds,
                 )

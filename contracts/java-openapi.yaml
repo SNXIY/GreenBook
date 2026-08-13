@@ -8,7 +8,7 @@ info:
 
     ## 鉴权
     - JWKS 公钥端点: `/.well-known/jwks.json` (无需认证)
-    - Token 必须包含 audience: `community-assistant-agent`
+    - Token 必须包含 audience: `greenbook-agent-runtime`
     - token_type 必须为 `access`
     - Python 配置: `GREENBOOK_JAVA_BASE_URL=http://127.0.0.1:8080`
   contact:

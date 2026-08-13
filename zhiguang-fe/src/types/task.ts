@@ -30,10 +30,8 @@ export type CreatorTaskPage = {
 export type PostTaskItem = {
   id: string;
   title?: string | null;
-  status: "draft" | "reviewing" | "published" | "rejected";
+  status: "draft" | "published" | "rejected" | "deleted";
   contentOrigin?: "MANUAL" | "AI_ASSISTED" | null;
-  moderationTaskId?: string | null;
-  reason?: string | null;
   createdAt: string;
   updatedAt: string;
   publishedAt?: string | null;

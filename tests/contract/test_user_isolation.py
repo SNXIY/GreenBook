@@ -6,7 +6,7 @@ import pytest
 from greenbook_contracts.identity import AuthContext
 from starlette.testclient import TestClient
 
-from apps.assistant_api.greenbook_assistant_api.main import create_app
+from apps.agent_api.greenbook_agent_api.main import create_app
 
 
 @pytest.fixture
@@ -58,27 +58,27 @@ def _seed_conversation(store: dict, conv_id: str, user_id: str, tenant_id: str,
 
 class TestUnauthenticatedAccess:
     def test_list_conversations_unauth_returns_401(self, client):
-        resp = client.get("/api/v1/assistant/conversations")
+        resp = client.get("/api/v1/agent/conversations")
         assert resp.status_code == 401
 
     def test_create_conversation_unauth_returns_401(self, client):
-        resp = client.post("/api/v1/assistant/conversations", json={"title": "x"})
+        resp = client.post("/api/v1/agent/conversations", json={"title": "x"})
         assert resp.status_code == 401
 
     def test_send_message_unauth_returns_401(self, client):
-        resp = client.post("/api/v1/assistant/conversations/c1/messages", json={"content": "hi"})
+        resp = client.post("/api/v1/agent/conversations/c1/messages", json={"content": "hi"})
         assert resp.status_code == 401
 
     def test_get_run_unauth_returns_401(self, client):
-        resp = client.get("/api/v1/assistant/runs/r1")
+        resp = client.get("/api/v1/agent/runs/r1")
         assert resp.status_code == 401
 
     def test_approve_unauth_returns_401(self, client):
-        resp = client.post("/api/v1/assistant/approvals/ap1/approve", json={"decision": "APPROVE"})
+        resp = client.post("/api/v1/agent/approvals/ap1/approve", json={"decision": "APPROVE"})
         assert resp.status_code == 401
 
     def test_reject_unauth_returns_401(self, client):
-        resp = client.post("/api/v1/assistant/approvals/ap1/reject")
+        resp = client.post("/api/v1/agent/approvals/ap1/reject")
         assert resp.status_code == 401
 
 
@@ -86,7 +86,7 @@ class TestUnauthenticatedAccess:
 
 class TestConversationOwnership:
     def test_empty_list_for_new_user(self, client):
-        resp = client.get("/api/v1/assistant/conversations", headers=_make_headers())
+        resp = client.get("/api/v1/agent/conversations", headers=_make_headers())
         assert resp.status_code == 200
         data = resp.json()
         assert data["items"] == []
@@ -97,7 +97,7 @@ class TestConversationOwnership:
         _seed_conversation(store, "c-a", "user-a", "t1", "A")
         _seed_conversation(store, "c-b", "user-b", "t1", "B")
 
-        resp = client.get("/api/v1/assistant/conversations",
+        resp = client.get("/api/v1/agent/conversations",
                           headers=_make_headers(_make_auth("user-a", "t1")))
         assert resp.status_code == 200
         ids = {c["conversation_id"] for c in resp.json()["items"]}
@@ -109,7 +109,7 @@ class TestConversationOwnership:
         _seed_conversation(store, "c-a", "user-a", "t1", "A")
         _seed_conversation(store, "c-b", "user-b", "t1", "B")
 
-        resp = client.get("/api/v1/assistant/conversations",
+        resp = client.get("/api/v1/agent/conversations",
                           headers=_make_headers(_make_auth("user-b", "t1")))
         assert resp.status_code == 200
         ids = {c["conversation_id"] for c in resp.json()["items"]}
@@ -120,7 +120,7 @@ class TestConversationOwnership:
         store = client.app.state.conversation_store
         _seed_conversation(store, "c-t1", "user-a", "t1", "T1")
 
-        resp = client.get("/api/v1/assistant/conversations",
+        resp = client.get("/api/v1/agent/conversations",
                           headers=_make_headers(_make_auth("user-a", "t2")))
         assert resp.status_code == 200
         assert resp.json()["total"] == 0
@@ -131,7 +131,7 @@ class TestConversationResponseSanitization:
         store = client.app.state.conversation_store
         _seed_conversation(store, "c-1", "user-a", "t1", "Chat")
 
-        resp = client.get("/api/v1/assistant/conversations", headers=_make_headers())
+        resp = client.get("/api/v1/agent/conversations", headers=_make_headers())
         assert resp.status_code == 200
         item = resp.json()["items"][0]
         for forbidden in ("raw_access_token", "token", "password", "api_key",
@@ -139,20 +139,20 @@ class TestConversationResponseSanitization:
             assert forbidden not in item, f"{forbidden} leaked in response"
 
     def test_created_conversation_visible_to_owner(self, client):
-        resp = client.post("/api/v1/assistant/conversations",
+        resp = client.post("/api/v1/agent/conversations",
                            json={"title": "My Chat"}, headers=_make_headers())
         assert resp.status_code == 200
         conv_id = resp.json()["conversation_id"]
 
-        resp2 = client.get("/api/v1/assistant/conversations", headers=_make_headers())
+        resp2 = client.get("/api/v1/agent/conversations", headers=_make_headers())
         assert conv_id in [c["conversation_id"] for c in resp2.json()["items"]]
 
     def test_other_user_does_not_see(self, client):
-        resp = client.post("/api/v1/assistant/conversations",
+        resp = client.post("/api/v1/agent/conversations",
                            json={"title": "A"}, headers=_make_headers(_make_auth("u-a")))
         assert resp.status_code == 200
 
-        resp2 = client.get("/api/v1/assistant/conversations",
+        resp2 = client.get("/api/v1/agent/conversations",
                            headers=_make_headers(_make_auth("u-b")))
         assert resp2.json()["total"] == 0
 
@@ -164,7 +164,7 @@ class TestConversationPagination:
             _seed_conversation(store, f"c-{i:02d}", "user-a", "t1",
                                updated_at=f"2026-08-{i:02d}T00:00:00Z")
 
-        resp = client.get("/api/v1/assistant/conversations?page=1&size=10",
+        resp = client.get("/api/v1/agent/conversations?page=1&size=10",
                           headers=_make_headers())
         assert resp.status_code == 200
         data = resp.json()
@@ -182,7 +182,7 @@ class TestRunOwnership:
             "status": "COMPLETED", "content": "ok",
             "trace_id": "t1", "tool_rounds": 0, "events": [],
         }
-        resp = client.get("/api/v1/assistant/runs/r-1", headers=_make_headers(_make_auth("user-a")))
+        resp = client.get("/api/v1/agent/runs/r-1", headers=_make_headers(_make_auth("user-a")))
         assert resp.status_code == 200
 
     def test_other_user_gets_404(self, client):
@@ -192,11 +192,11 @@ class TestRunOwnership:
             "status": "COMPLETED", "content": "ok",
             "trace_id": "t1", "tool_rounds": 0, "events": [],
         }
-        resp = client.get("/api/v1/assistant/runs/r-1", headers=_make_headers(_make_auth("user-b")))
+        resp = client.get("/api/v1/agent/runs/r-1", headers=_make_headers(_make_auth("user-b")))
         assert resp.status_code == 404
 
     def test_nonexistent_returns_404(self, client):
-        resp = client.get("/api/v1/assistant/runs/nope", headers=_make_headers())
+        resp = client.get("/api/v1/agent/runs/nope", headers=_make_headers())
         assert resp.status_code == 404
 
 
@@ -208,7 +208,7 @@ class TestApprovalOwnership:
             "operation": "publication.publish_now",
             "status": "PENDING",
         }
-        resp = client.post("/api/v1/assistant/approvals/ap-1/approve",
+        resp = client.post("/api/v1/agent/approvals/ap-1/approve",
                            json={"decision": "APPROVE"},
                            headers=_make_headers(_make_auth("user-a")))
         assert resp.status_code == 200
@@ -220,7 +220,7 @@ class TestApprovalOwnership:
             "operation": "publication.publish_now",
             "status": "PENDING",
         }
-        resp = client.post("/api/v1/assistant/approvals/ap-1/approve",
+        resp = client.post("/api/v1/agent/approvals/ap-1/approve",
                            json={"decision": "APPROVE"},
                            headers=_make_headers(_make_auth("user-b")))
         assert resp.status_code == 404

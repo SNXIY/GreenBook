@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook Agent Runtime Final Cleanup Report
 
 本报告是 Phase 7.5 的只读清理分析。依据：

@@ -277,14 +277,13 @@ class SqlAlchemyCreatorDocumentAuthority:
         tenant_id: str,
         document_id: str,
     ) -> None:
-        async with self._sessions() as session:
-            async with session.begin():
-                await session.execute(
-                    delete(CreatorRetrievalDocumentRow).where(
-                        CreatorRetrievalDocumentRow.tenant_id == tenant_id,
-                        CreatorRetrievalDocumentRow.document_id == document_id,
-                    )
+        async with self._sessions() as session, session.begin():
+            await session.execute(
+                delete(CreatorRetrievalDocumentRow).where(
+                    CreatorRetrievalDocumentRow.tenant_id == tenant_id,
+                    CreatorRetrievalDocumentRow.document_id == document_id,
                 )
+            )
 
 
 def _apply_database_filters(statement, filters: CreatorRetrievalFilters):

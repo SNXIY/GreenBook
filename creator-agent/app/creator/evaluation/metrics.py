@@ -30,13 +30,13 @@ class MetricEvaluationContext:
 class CreatorEvaluatorRegistry:
     def __init__(
         self,
-        evaluator: "CreatorDeterministicMetricEvaluator",
+        evaluator: CreatorDeterministicMetricEvaluator,
     ) -> None:
         self._evaluator = evaluator
         self.version = f"{evaluator.name}/{evaluator.version}"
 
     @classmethod
-    def default(cls) -> "CreatorEvaluatorRegistry":
+    def default(cls) -> CreatorEvaluatorRegistry:
         return cls(CreatorDeterministicMetricEvaluator())
 
     def evaluate(

@@ -131,29 +131,28 @@ class JavaClient:
 
     @classmethod
     def from_env(cls, *, base_url: str | None = None) -> JavaClient:
-        """Build the real Java client from the Assistant deployment config."""
+        """Build the Java client from the canonical Java service config."""
 
         return cls(
             base_url=base_url or _env_first(
-                "ASSISTANT_JAVA_BASE_URL",
                 "GREENBOOK_JAVA_BASE_URL",
                 default="http://127.0.0.1:8080",
             ),
             connect_timeout=_positive_float(
-                "ASSISTANT_JAVA_CONNECT_TIMEOUT_SECONDS", 5.0
+                "GREENBOOK_JAVA_CONNECT_TIMEOUT_SECONDS", 5.0
             ),
             read_timeout=_positive_float(
-                "ASSISTANT_JAVA_READ_TIMEOUT_SECONDS", 30.0
+                "GREENBOOK_JAVA_READ_TIMEOUT_SECONDS", 30.0
             ),
             write_timeout=_positive_float(
-                "ASSISTANT_JAVA_WRITE_TIMEOUT_SECONDS", 30.0
+                "GREENBOOK_JAVA_WRITE_TIMEOUT_SECONDS", 30.0
             ),
             pool_timeout=_positive_float(
-                "ASSISTANT_JAVA_POOL_TIMEOUT_SECONDS", 5.0
+                "GREENBOOK_JAVA_POOL_TIMEOUT_SECONDS", 5.0
             ),
-            max_connections=_positive_int("ASSISTANT_JAVA_MAX_CONNECTIONS", 20),
-            max_keepalive=_positive_int("ASSISTANT_JAVA_MAX_KEEPALIVE", 10),
-            verify=_boolean_env("ASSISTANT_JAVA_VERIFY_TLS", True),
+            max_connections=_positive_int("GREENBOOK_JAVA_MAX_CONNECTIONS", 20),
+            max_keepalive=_positive_int("GREENBOOK_JAVA_MAX_KEEPALIVE", 10),
+            verify=_boolean_env("GREENBOOK_JAVA_VERIFY_TLS", True),
         )
 
     async def close(self) -> None:

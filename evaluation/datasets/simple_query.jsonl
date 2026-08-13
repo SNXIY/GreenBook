@@ -1,2 +1,0 @@
-{"case_id":"simple-query-java","input":"告诉我最近 Java 帖子的趋势，只给结论。","expected_tasks":1,"expected_goals":1,"expected_dependencies":[],"expected_agents":["SearchAgent"],"expected_side_effects":[]}
-{"case_id":"simple-query-status","input":"查看两篇文章的标题和发布时间，不要修改。","expected_tasks":1,"expected_goals":1,"expected_dependencies":[],"expected_agents":["SearchAgent"],"expected_side_effects":[]}

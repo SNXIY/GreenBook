@@ -46,7 +46,7 @@ const AiCreatePage = () => {
       header={
         <MainHeader
           headline="AI 创作"
-          subtitle="从想法到成稿，关键节点由你确认；完成后回到 GREEN-BOOK 补图并正式发布。"
+          subtitle="从想法到成稿，关键节点由你确认；完成后回到 GreenBook 补图并正式发布。"
           rightSlot={
             <div className={styles.headerActions}>
               <Link to="/create" className={styles.backLink}>
@@ -61,19 +61,19 @@ const AiCreatePage = () => {
       <div className={styles.handoffGuide}>
         <span><CheckIcon aria-hidden="true" /></span>
         <div>
-          <strong>成稿后点击“去 GREEN-BOOK 发布”</strong>
+          <strong>成稿后点击“去 GreenBook 发布”</strong>
           <small>系统会自动创建 Java 草稿并打开同一套渐进发布向导。</small>
         </div>
         <details>
           <summary>连接说明</summary>
-          <p>当前页面使用你的 GREEN-BOOK 登录身份连接创作 Agent；服务地址与任务记录默认不向普通用户展开。</p>
+          <p>当前页面使用你的 GreenBook 登录身份连接Creator Service；服务地址与任务记录默认不向普通用户展开。</p>
         </details>
         <ShieldIcon className={styles.shield} aria-hidden="true" />
       </div>
       <div className={styles.frameWrap}>
         <iframe
           className={styles.frame}
-          title="GREEN-BOOK AI 创作工作台"
+          title="GreenBook AI 创作工作台"
           src={frameSrc}
           allow="clipboard-read; clipboard-write"
         />

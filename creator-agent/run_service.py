@@ -23,8 +23,8 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "app.main:app",
-        host=os.getenv("CREATOR_API_HOST", "127.0.0.1"),
-        port=int(os.getenv("CREATOR_API_PORT", "8092")),
-        reload=_env_flag("CREATOR_DEV_RELOAD", default=True),
+        host=os.getenv("GREENBOOK_CREATOR_API_HOST", "127.0.0.1"),
+        port=int(os.getenv("GREENBOOK_CREATOR_API_PORT", "8092")),
+        reload=_env_flag("GREENBOOK_CREATOR_DEV_RELOAD", default=True),
         loop="asyncio" if sys.platform == "win32" else "auto",
     )

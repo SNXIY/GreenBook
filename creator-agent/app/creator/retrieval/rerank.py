@@ -12,7 +12,6 @@ from app.creator.retrieval.models import (
 from app.creator.retrieval.ports import CreatorReranker
 from app.creator.retrieval.scoring import bounded_score, lexical_relevance
 
-
 logger = logging.getLogger(__name__)
 
 

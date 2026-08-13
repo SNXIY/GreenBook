@@ -13,7 +13,6 @@ import os
 import re
 import shutil
 import socket
-import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -38,14 +37,19 @@ DEFAULT_STALL_TIMEOUT = max(2 * DEFAULT_SPECIALIST_TIMEOUT, 180)
 DEFAULT_CREATOR_HARD_TIMEOUT = (
     DEFAULT_MAX_MODEL_CALLS * max(DEFAULT_MODEL_TIMEOUT, DEFAULT_SPECIALIST_TIMEOUT) + 300
 )
-DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT = DEFAULT_CREATOR_HARD_TIMEOUT + 600
+DEFAULT_GREENBOOK_AGENT_RUN_HARD_TIMEOUT = DEFAULT_CREATOR_HARD_TIMEOUT + 600
 
 
 SERVER_CODE = r'''
 import asyncio, json, os
 from pathlib import Path
 import uvicorn
-from app.main import app
+
+if os.environ.get("P0_APP_KIND") == "agent":
+    from greenbook_agent_api.main import create_app
+    app = create_app()
+else:
+    from app.main import app
 
 async def main():
     config = uvicorn.Config(app, host="127.0.0.1", port=0,
@@ -129,10 +133,10 @@ class Manifest:
             "creator": {"pid": None, "port": None, "instance_id": None,
                          "build_commit": None, "database_path": None,
                          "redis_namespace": None, "log_path": str(root / "creator.log")},
-            "assistant": {"api_pid": None, "worker_pid": None, "api_port": None,
-                          "log_paths": [str(root / "assistant-api.log"), str(root / "assistant-worker.log")]},
+            "agent": {"api_pid": None, "worker_pid": None, "api_port": None,
+                          "log_paths": [str(root / "agent-api.log"), str(root / "agent-worker.log")]},
             "business": {"user_id": None, "conversation_id": None, "goal_ids": [],
-                         "assistant_run_ids": [], "creator_task_ids": [],
+                         "agent_run_ids": [], "creator_task_ids": [],
                          "creator_run_ids": [], "scheduled_action_ids": []},
             "timeouts": timeouts,
             "last_progress_at": None,
@@ -240,7 +244,7 @@ def start_server(*, root: Path, python: Path, env: dict[str, str], ready: Path,
     port = wait_ready(ready, process, deadline, manifest)
     manifest.update(f"{role.upper()}_HEALTHY", **({"creator": {**manifest.data["creator"], "pid": process.pid, "port": port}}
                                                    if role == "creator" else
-                                                   {"assistant": {**manifest.data["assistant"], "api_pid": process.pid, "worker_pid": process.pid, "api_port": port}}))
+                                                   {"agent": {**manifest.data["agent"], "api_pid": process.pid, "worker_pid": process.pid, "api_port": port}}))
     return process, port, pump
 
 
@@ -360,13 +364,13 @@ def submit_creator(base_url: str, token: str, payload: dict[str, Any], *, deadli
     _record_business_ids(manifest, accepted)
     manifest.data["business"]["creator_task_ids"].append(accepted["task_id"])
     manifest.data["business"]["creator_run_ids"].append(accepted["run_id"])
-    manifest.update("CREATOR_TASK_CREATED")
+    manifest.update("GREENBOOK_CREATOR_TASK_CREATED")
     snapshot = task_snapshot(base_url, token, accepted["task_id"], deadline=deadline,
                              manifest=manifest, creator_run_id=accepted["run_id"])
     return {"accepted": accepted, "snapshot": snapshot}
 
 
-def assistant_run(base_url: str, token: str, prompt: str, *, conversation: dict[str, Any] | None,
+def agent_run(base_url: str, token: str, prompt: str, *, conversation: dict[str, Any] | None,
                   deadline: Deadline, manifest: Manifest, label: str) -> dict[str, Any]:
     if label == "E2E2" and os.environ.get("P0_E2E_SKIP_E2E2") == "true":
         manifest.update("E2E2_SKIPPED")
@@ -374,7 +378,7 @@ def assistant_run(base_url: str, token: str, prompt: str, *, conversation: dict[
     headers = {"Authorization": f"Bearer {token}"}
     if conversation is None:
         deadline.check("Conversation create")
-        response = requests.post(f"{base_url}/api/v1/assistant/conversations", headers=headers,
+        response = requests.post(f"{base_url}/api/v1/agent/conversations", headers=headers,
                                  json={"title": "P0 final E2E", "surface": "HOME"}, timeout=15)
         response.raise_for_status()
         conversation = response.json()
@@ -382,23 +386,23 @@ def assistant_run(base_url: str, token: str, prompt: str, *, conversation: dict[
         manifest.update("CONVERSATION_CREATED")
     deadline.check(f"{label} message submit")
     accepted = requests.post(
-        f"{base_url}/api/v1/assistant/conversations/{conversation['conversation_id']}/messages",
+        f"{base_url}/api/v1/agent/conversations/{conversation['conversation_id']}/messages",
         headers={**headers, "Idempotency-Key": f"p0-final-{uuid.uuid4()}"},
         json={"content": prompt, "client_timezone": "Asia/Shanghai"}, timeout=15,
     )
     accepted.raise_for_status()
     accepted_view = accepted.json()
     run_id = accepted_view["run_id"]
-    manifest.data["business"]["assistant_run_ids"].append(run_id)
+    manifest.data["business"]["agent_run_ids"].append(run_id)
     manifest.update(f"{label}_RUN_CREATED")
     run_started = time.monotonic()
     last_progress = time.monotonic()
     last_sig: tuple[Any, ...] | None = None
     while True:
-        deadline.check(f"{label} Assistant Run")
-        if time.monotonic() - run_started >= DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT:
-            raise HarnessTimeout("ASSISTANT_RUN_HARD_TIMEOUT", f"{label} exceeded {DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT}s")
-        response = requests.get(f"{base_url}/api/v1/assistant/runs/{run_id}", headers=headers, timeout=15)
+        deadline.check(f"{label} Agent Run")
+        if time.monotonic() - run_started >= DEFAULT_GREENBOOK_AGENT_RUN_HARD_TIMEOUT:
+            raise HarnessTimeout("GREENBOOK_AGENT_RUN_HARD_TIMEOUT", f"{label} exceeded {DEFAULT_GREENBOOK_AGENT_RUN_HARD_TIMEOUT}s")
+        response = requests.get(f"{base_url}/api/v1/agent/runs/{run_id}", headers=headers, timeout=15)
         response.raise_for_status()
         view = response.json()
         steps = view.get("steps") or []
@@ -409,20 +413,20 @@ def assistant_run(base_url: str, token: str, prompt: str, *, conversation: dict[
             last_sig = sig
             last_progress = time.monotonic()
             manifest.progress(last_progress_monotonic=last_progress,
-                              assistant_run_status=view.get("status"), assistant_run_updated_at=view.get("updated_at"),
-                              assistant_step_count=len(steps), assistant_artifact_count=len(artifacts))
-            manifest.log("ASSISTANT_PROGRESS " + json.dumps({"label": label, "run_id": run_id,
+                              agent_run_status=view.get("status"), agent_run_updated_at=view.get("updated_at"),
+                              agent_step_count=len(steps), agent_artifact_count=len(artifacts))
+            manifest.log("GREENBOOK_AGENT_PROGRESS " + json.dumps({"label": label, "run_id": run_id,
                          "status": view.get("status"), "updated_at": view.get("updated_at"),
                          "step_count": len(steps), "artifact_count": len(artifacts)}, ensure_ascii=False))
         if view.get("status") in TERMINAL:
             if view.get("status") != "COMPLETED":
                 raise HarnessTimeout(
-                    "ASSISTANT_RUN_FAILED",
+                    "GREENBOOK_AGENT_RUN_FAILED",
                     f"{label} ended in {view.get('status')}",
                     evidence={"run_id": run_id, "run": view, "artifacts": artifacts},
                 )
             artifacts_response = requests.get(
-                f"{base_url}/api/v1/assistant/runs/{run_id}/artifacts",
+                f"{base_url}/api/v1/agent/runs/{run_id}/artifacts",
                 headers=headers,
                 timeout=15,
             )
@@ -487,48 +491,51 @@ def main() -> int:
     if args.e2e1_only:
         os.environ["P0_E2E_SKIP_E2E2"] = "true"
     creator_hard = DEFAULT_CREATOR_HARD_TIMEOUT
-    assistant_hard = DEFAULT_ASSISTANT_RUN_HARD_TIMEOUT
-    global_hard = args.global_timeout or (120 + 30 + 30 + assistant_hard * 2 + 120 + 120)
+    agent_hard = DEFAULT_GREENBOOK_AGENT_RUN_HARD_TIMEOUT
+    global_hard = args.global_timeout or (120 + 30 + 30 + agent_hard * 2 + 120 + 120)
     run_id = uuid.uuid4().hex
     run_root = Path(__file__).resolve().parents[1] / ".p0-e2e-runs" / run_id
     manifest = Manifest(run_root, run_id=run_id, timeouts={
         "stall_timeout": DEFAULT_STALL_TIMEOUT, "creator_task_hard_timeout": creator_hard,
-        "assistant_run_hard_timeout": assistant_hard, "global_hard_timeout": global_hard,
+        "agent_run_hard_timeout": agent_hard, "global_hard_timeout": global_hard,
     })
     manifest.data["started_at"] = started_at; manifest.data["harness_started_monotonic"] = started_monotonic; manifest._write()
     deadline = Deadline(global_hard, started=started_monotonic)
     repo = run_root.parents[1]
-    creator_root = repo / "creator-agent"; assistant_root = repo / "community-assistant-agent"
-    creator_python = creator_root / ".venv/Scripts/python.exe"; assistant_python = assistant_root / ".venv/Scripts/python.exe"
+    creator_root = repo / "creator-agent"; agent_root = repo / "apps" / "agent_api"
+    creator_python = creator_root / ".venv/Scripts/python.exe"
+    agent_python = repo / ".venv-v2/Scripts/python.exe"
+    if not agent_python.exists():
+        agent_python = Path(sys.executable)
     temp_path = Path(tempfile.mkdtemp(prefix="greenbook-p0-")); creator_db = temp_path / "creator.sqlite"; checkpoint_db = temp_path / "checkpoints.sqlite"
-    creator_process = assistant_process = None; creator_pump = assistant_pump = None; ports: list[int] = []
+    creator_process = agent_process = None; creator_pump = agent_pump = None; ports: list[int] = []
     creator_namespace = f"creator:p0:{run_id}"
     creator_env = {"DEEPSEEK_API_KEY": os.environ["DEEPSEEK_API_KEY"], "AI_PROVIDER":"deepseek",
-        "CREATOR_DATABASE_URL":f"sqlite+aiosqlite:///{creator_db}", "CREATOR_CHECKPOINT_BACKEND":"sqlite",
-        "CREATOR_CHECKPOINT_SQLITE_PATH":str(checkpoint_db), "CREATOR_CHECKPOINT_AUTO_SETUP":"true",
-        "CREATOR_CHECKPOINT_DIAGNOSTICS":"true", "CREATOR_API_EXECUTION_MODE":"local",
-        "CREATOR_API_CREATE_SCHEMA":"true", "CREATOR_IDENTITY_MODE":"oidc",
-        "CREATOR_IDENTITY_ISSUER":"http://127.0.0.1:8080", "CREATOR_IDENTITY_AUDIENCE":"creator-agent",
-        "CREATOR_IDENTITY_JWKS_URL":"http://127.0.0.1:8080/.well-known/jwks.json",
-        "CREATOR_IDENTITY_ALLOW_INSECURE_HTTP":"true", "REDIS_URL":"redis://:mindflow@127.0.0.1:26379/15",
-        "CREATOR_MAX_WRITER_REVISIONS":"4", "CREATOR_MAX_MODEL_CALLS":"24", "CREATOR_MAX_SUPERVISOR_TURNS":"24",
-        "CREATOR_MAX_AGENT_DISPATCHES":"24", "CREATOR_MAX_OUTPUT_TOKENS":"40000", "CREATOR_RUN_LEASE_SECONDS":"120",
-        "CREATOR_MODEL_TIMEOUT_SECONDS":"60", "CREATOR_SPECIALIST_TIMEOUT_SECONDS":"90",
-        "CREATOR_BUILD_COMMIT":subprocess.check_output(["git","rev-parse","HEAD"],cwd=creator_root,text=True).strip(),
-        "CREATOR_INSTANCE_ID":f"p0-e2e-{run_id[:8]}", "CREATOR_QUEUE_NAMESPACE":creator_namespace,
-        "CREATOR_DATABASE_IDENTIFIER":"temporary-sqlite", "CREATOR_API_WORKER_ID":f"p0-e2e-dispatcher:{run_id[:8]}"}
-    manifest.data["creator"].update({"instance_id":creator_env["CREATOR_INSTANCE_ID"],"build_commit":creator_env["CREATOR_BUILD_COMMIT"],"database_path":str(creator_db),"redis_namespace":creator_namespace}); manifest._write()
+        "GREENBOOK_CREATOR_DATABASE_URL":f"sqlite+aiosqlite:///{creator_db}", "GREENBOOK_CREATOR_CHECKPOINT_BACKEND":"sqlite",
+        "GREENBOOK_CREATOR_CHECKPOINT_SQLITE_PATH":str(checkpoint_db), "GREENBOOK_CREATOR_CHECKPOINT_AUTO_SETUP":"true",
+        "GREENBOOK_CREATOR_CHECKPOINT_DIAGNOSTICS":"true", "GREENBOOK_CREATOR_API_EXECUTION_MODE":"local",
+        "GREENBOOK_CREATOR_API_CREATE_SCHEMA":"true", "GREENBOOK_CREATOR_IDENTITY_MODE":"oidc",
+        "GREENBOOK_CREATOR_IDENTITY_ISSUER":"http://127.0.0.1:8080", "GREENBOOK_CREATOR_IDENTITY_AUDIENCE":"creator-agent",
+        "GREENBOOK_CREATOR_IDENTITY_JWKS_URL":"http://127.0.0.1:8080/.well-known/jwks.json",
+        "GREENBOOK_CREATOR_IDENTITY_ALLOW_INSECURE_HTTP":"true", "GREENBOOK_CREATOR_REDIS_URL":"redis://:mindflow@127.0.0.1:26379/15",
+        "GREENBOOK_CREATOR_MAX_WRITER_REVISIONS":"4", "GREENBOOK_CREATOR_MAX_MODEL_CALLS":"24", "GREENBOOK_CREATOR_MAX_SUPERVISOR_TURNS":"24",
+        "GREENBOOK_CREATOR_MAX_AGENT_DISPATCHES":"24", "GREENBOOK_CREATOR_MAX_OUTPUT_TOKENS":"40000", "GREENBOOK_CREATOR_RUN_LEASE_SECONDS":"120",
+        "GREENBOOK_CREATOR_MODEL_TIMEOUT_SECONDS":"60", "GREENBOOK_CREATOR_SPECIALIST_TIMEOUT_SECONDS":"90",
+        "GREENBOOK_CREATOR_BUILD_COMMIT":subprocess.check_output(["git","rev-parse","HEAD"],cwd=creator_root,text=True).strip(),
+        "GREENBOOK_CREATOR_INSTANCE_ID":f"p0-e2e-{run_id[:8]}", "GREENBOOK_CREATOR_QUEUE_NAMESPACE":creator_namespace,
+        "GREENBOOK_CREATOR_DATABASE_IDENTIFIER":"temporary-sqlite", "GREENBOOK_CREATOR_API_WORKER_ID":f"p0-e2e-dispatcher:{run_id[:8]}"}
+    manifest.data["creator"].update({"instance_id":creator_env["GREENBOOK_CREATOR_INSTANCE_ID"],"build_commit":creator_env["GREENBOOK_CREATOR_BUILD_COMMIT"],"database_path":str(creator_db),"redis_namespace":creator_namespace}); manifest._write()
     try:
         creator_process, creator_port, creator_pump = start_server(root=creator_root, python=creator_python, env=creator_env, ready=temp_path/"creator-ready.json", log_paths=[run_root/"creator.log"], deadline=deadline, manifest=manifest, role="creator"); ports.append(creator_port)
-        creator_url=f"http://127.0.0.1:{creator_port}"; health=wait_health(creator_url,deadline); openapi=requests.get(f"{creator_url}/openapi.json",timeout=15).json(); manifest.update("CREATOR_HEALTHY",creator_url=creator_url,health=health,checkpoint_ns="",revision_budget=4)
+        creator_url=f"http://127.0.0.1:{creator_port}"; health=wait_health(creator_url,deadline); manifest.update("GREENBOOK_CREATOR_HEALTHY",creator_url=creator_url,health=health,checkpoint_ns="",revision_budget=4)
         token=login(deadline); manifest.update("JAVA_LOGIN_COMPLETED",email_configured=True,password_configured=True)
-        assistant_env={"DEEPSEEK_API_KEY":os.environ["DEEPSEEK_API_KEY"],"ASSISTANT_DATABASE_URL":os.environ.get("P0_E2E_ASSISTANT_DATABASE_URL","postgresql+asyncpg://mindflow:mindflow@127.0.0.1:25432/mindflow_creator"),"ASSISTANT_REDIS_URL":"redis://:mindflow@127.0.0.1:26379/14","ASSISTANT_CREATOR_BASE_URL":creator_url,"ASSISTANT_JAVA_BASE_URL":"http://127.0.0.1:8080","ASSISTANT_IDENTITY_ISSUER":"http://127.0.0.1:8080","ASSISTANT_IDENTITY_AUDIENCE":"community-assistant-agent","ASSISTANT_IDENTITY_JWKS_URL":"http://127.0.0.1:8080/.well-known/jwks.json","ASSISTANT_ALLOW_INSECURE_HTTP":"true","ASSISTANT_SERVICE_SHARED_SECRET":os.environ["ASSISTANT_SERVICE_SHARED_SECRET"],"ASSISTANT_PROCESS_ROLE":"all","ASSISTANT_DEV_RELOAD":"false"}
-        assistant_process, assistant_port, assistant_pump=start_server(root=assistant_root,python=assistant_python,env=assistant_env,ready=temp_path/"assistant-ready.json",log_paths=[run_root/"assistant-api.log",run_root/"assistant-worker.log"],deadline=deadline,manifest=manifest,role="assistant"); ports.append(assistant_port); assistant_url=f"http://127.0.0.1:{assistant_port}"; wait_health(assistant_url,deadline); manifest.update("ASSISTANT_API_HEALTHY",assistant_url=assistant_url,creator_base_url=creator_url)
+        agent_env={"P0_APP_KIND":"agent","PYTHONPATH":os.pathsep.join(str(path) for path in (repo, repo / "packages" / "agent_core", repo / "packages" / "contracts", repo / "packages" / "java_client", repo / "packages" / "creator_client", repo / "packages" / "security", repo / "services" / "greenbook_mcp", repo / "apps" / "agent_api", repo / "apps" / "agent_worker")),"DEEPSEEK_API_KEY":os.environ["DEEPSEEK_API_KEY"],"GREENBOOK_AGENT_DATABASE_URL":os.environ.get("P0_E2E_GREENBOOK_AGENT_DATABASE_URL","postgresql+asyncpg://mindflow:mindflow@127.0.0.1:25432/mindflow_creator"),"GREENBOOK_AGENT_REDIS_URL":"redis://:mindflow@127.0.0.1:26379/14","GREENBOOK_CREATOR_BASE_URL":creator_url,"GREENBOOK_JAVA_BASE_URL":"http://127.0.0.1:8080","GREENBOOK_AGENT_IDENTITY_ISSUER":"http://127.0.0.1:8080","GREENBOOK_AGENT_IDENTITY_AUDIENCE":"greenbook-agent-runtime","GREENBOOK_AGENT_IDENTITY_JWKS_URL":"http://127.0.0.1:8080/.well-known/jwks.json","GREENBOOK_AGENT_ALLOW_INSECURE_HTTP":"true","GREENBOOK_AGENT_SERVICE_SHARED_SECRET":os.environ["GREENBOOK_AGENT_SERVICE_SHARED_SECRET"],"GREENBOOK_AGENT_PROCESS_ROLE":"all","GREENBOOK_AGENT_DEV_RELOAD":"false"}
+        agent_process, agent_port, agent_pump=start_server(root=agent_root,python=agent_python,env=agent_env,ready=temp_path/"agent-ready.json",log_paths=[run_root/"agent-api.log",run_root/"agent-worker.log"],deadline=deadline,manifest=manifest,role="agent"); ports.append(agent_port); agent_url=f"http://127.0.0.1:{agent_port}"; wait_health(agent_url,deadline); manifest.update("GREENBOOK_AGENT_API_HEALTHY",agent_url=agent_url,creator_base_url=creator_url)
         if args.e2e2_only:
             existing_conversation_id = os.environ["P0_E2E_EXISTING_CONVERSATION_ID"]
             conversation = {"conversation_id": existing_conversation_id}
-            e2e2 = assistant_run(
-                assistant_url,
+            e2e2 = agent_run(
+                agent_url,
                 token,
                 "Revise the just-created draft for beginners and add three concrete troubleshooting steps.",
                 conversation=conversation,
@@ -540,20 +547,20 @@ def main() -> int:
             manifest.update("COMPLETED", status="COMPLETED")
             return 0
         conversation=None
-        e2e1=assistant_run(assistant_url,token,"搜索一些社区里关于 Agent 稳定性的公开帖子，参考搜索结果写一篇实用内容，十分钟后发布。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E1"); conversation=e2e1["conversation"]; manifest.update("E2E1_COMPLETED")
-        e2e2=assistant_run(assistant_url,token,"把刚才那篇 Agent 稳定性的草稿改得更适合初学者，并增加三个具体排查步骤。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E2"); manifest.update("E2E2_COMPLETED")
+        e2e1=agent_run(agent_url,token,"搜索一些社区里关于 Agent 稳定性的公开帖子，参考搜索结果写一篇实用内容，十分钟后发布。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E1"); conversation=e2e1["conversation"]; manifest.update("E2E1_COMPLETED")
+        e2e2=agent_run(agent_url,token,"把刚才那篇 Agent 稳定性的草稿改得更适合初学者，并增加三个具体排查步骤。",conversation=conversation,deadline=deadline,manifest=manifest,label="E2E2"); manifest.update("E2E2_COMPLETED")
         collect_evidence(manifest=manifest,evidence={"e2e1":e2e1,"e2e2":e2e2}); manifest.update("COMPLETED",status="COMPLETED"); return 0
     except Exception as exc:
         evidence={"error_type":type(exc).__name__,"error":redact(str(exc)),"elapsed_seconds":deadline.elapsed,"hard_timeout":global_hard,"manifest":manifest.data.copy()}
         manifest.update("COLLECTING_EVIDENCE",status="COLLECTING_EVIDENCE",error=evidence); collect_evidence(manifest=manifest,evidence=evidence); manifest.update("FAILED",status="FAILED"); return 1
     finally:
         manifest.update("CLEANUP_STARTED")
-        stop_process(assistant_process,assistant_pump); stop_process(creator_process,creator_pump)
+        stop_process(agent_process,agent_pump); stop_process(creator_process,creator_pump)
         for port in ports:
             try: assert_port_free(port); manifest.log(f"PORT_RELEASED port={port}")
             except OSError as exc: manifest.log(f"PORT_RELEASE_CHECK_FAILED port={port} error={type(exc).__name__}")
         failed=manifest.data.get("status") not in {"COMPLETED"}; keep_failed=os.environ.get("P0_E2E_KEEP_FAILED_ARTIFACTS","true").lower() == "true"
-        redis_url=creator_env.get("REDIS_URL"); redis_result=cleanup_redis_namespace(redis_url,creator_namespace,manifest) if not failed or not keep_failed else {"preserved":True}
+        redis_url=creator_env.get("GREENBOOK_CREATOR_REDIS_URL"); redis_result=cleanup_redis_namespace(redis_url,creator_namespace,manifest) if not failed or not keep_failed else {"preserved":True}
         manifest.data["redis_cleanup"]=redis_result
         if not failed or not keep_failed:
             shutil.rmtree(temp_path,ignore_errors=True)

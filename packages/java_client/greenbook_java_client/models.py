@@ -7,21 +7,19 @@ SHA256: 1409b6d825a11dc161b501668ac09e07349a38b0690f060396ac77c60668eeef
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
-from typing import Any, Literal
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ── Enums ────────────────────────────────────────────────────────────
 
-class SortMode(str, Enum):
+class SortMode(StrEnum):
     hot = "hot"
     latest = "latest"
     relevant = "relevant"
 
 
-class Visibility(str, Enum):
+class Visibility(StrEnum):
     public = "public"
     followers = "followers"
     school = "school"
@@ -29,12 +27,12 @@ class Visibility(str, Enum):
     unlisted = "unlisted"
 
 
-class ContentOrigin(str, Enum):
+class ContentOrigin(StrEnum):
     MANUAL = "MANUAL"
     AI_ASSISTED = "AI_ASSISTED"
 
 
-class ScheduleStatus(str, Enum):
+class ScheduleStatus(StrEnum):
     SCHEDULED = "SCHEDULED"
     PROCESSING = "PROCESSING"
     PUBLISHED = "PUBLISHED"
@@ -42,7 +40,7 @@ class ScheduleStatus(str, Enum):
     FAILED = "FAILED"
 
 
-class AgentErrorCode(str, Enum):
+class AgentErrorCode(StrEnum):
     VALIDATION_ERROR = "VALIDATION_ERROR"
     AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED"
     UNAUTHORIZED = "UNAUTHORIZED"

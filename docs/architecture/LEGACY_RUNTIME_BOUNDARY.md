@@ -1,3 +1,5 @@
+> **Historical document.** Retained for traceability; it is not the current architecture authority. See [CURRENT_ARCHITECTURE.md](CURRENT_ARCHITECTURE.md).
+
 # GreenBook Legacy Runtime Boundary Audit
 
 本报告是 Phase 7.7-A 的只读审计结果。它描述当前 Legacy、Compatibility 和 ACTIVE 之间的边界，为后续迁移提供证据；本阶段没有修改、删除或移动源码。

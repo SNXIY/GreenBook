@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS login_logs (
 -- - tags、img_urls 使用 JSON 存储，兼容多标签/多图片；
 -- - content 存储在 OSS，仅记录 URL 与校验信息；
 -- - 一期类型仅 image_text，可扩展；
--- - 状态包含草稿/审核中/已发布，预留 rejected/deleted；
+-- - 状态包含草稿/已发布，预留 rejected/deleted；
 CREATE TABLE IF NOT EXISTS know_posts (
     id BIGINT UNSIGNED NOT NULL,
     tag_id BIGINT UNSIGNED NULL COMMENT '主分类/内容分类ID',
@@ -61,8 +61,6 @@ CREATE TABLE IF NOT EXISTS know_posts (
     video_url TEXT NULL COMMENT '视频URL（一期不使用）',
     status VARCHAR(16) NOT NULL DEFAULT 'draft',
     content_origin VARCHAR(32) NOT NULL DEFAULT 'MANUAL' COMMENT 'MANUAL | AI_ASSISTED',
-    moderation_task_id VARCHAR(64) NULL COMMENT 'external moderation agent task id',
-    moderation_reason VARCHAR(512) NULL COMMENT 'latest moderation decision reason',
     create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     publish_time TIMESTAMP NULL DEFAULT NULL,

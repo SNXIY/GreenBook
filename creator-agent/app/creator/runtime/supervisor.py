@@ -38,7 +38,7 @@ class SupervisorPolicy(BaseModel):
     minimum_publishable_threshold: float = Field(default=0.60, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
-    def validate_quality_thresholds(self) -> "SupervisorPolicy":
+    def validate_quality_thresholds(self) -> SupervisorPolicy:
         if self.minimum_publishable_threshold >= self.target_quality_threshold:
             raise ValueError("minimum_publishable_threshold must be below target_quality_threshold")
         return self
@@ -405,6 +405,50 @@ class CreatorSupervisorAgent:
                     ),
                 ),
             )
+
+        revision_scope = str(
+            state["goal"].constraints.get("revision_scope", "FULL_REVISION")
+        ).upper()
+        if revision_scope != "FULL_REVISION":
+            if draft.kind == ArtifactKind.SOURCE_DRAFT:
+                return self._new_plan_turn(
+                    state,
+                    reason=_text(
+                        state,
+                        "鎸夋寚瀹氱殑灏忚寖鍥磋鍒欎慨璁㈡簮鑽夌銆?",
+                        f"Apply the {revision_scope} revision to the source draft.",
+                    ),
+                    steps=(
+                        PlanStep(
+                            id="revise-draft-narrow",
+                            capability=AgentCapability.REVISE_DRAFT,
+                            objective=_text(
+                                state,
+                                "鍙簲鐢ㄦ寚瀹氱殑灏忚寖鍥翠慨鏀癸紝淇濇寔鍏朵粬鍐呭涓嶅彉銆?",
+                                "Apply only the requested revision scope and preserve all other content.",
+                            ),
+                            output_kind=ArtifactKind.DRAFT,
+                            input_kinds=(ArtifactKind.SOURCE_DRAFT,),
+                        ),
+                    ),
+                    usage_delta=BudgetUsage(
+                        supervisor_turns=1,
+                        writer_revisions=1,
+                    ),
+                )
+            if draft.kind == ArtifactKind.DRAFT:
+                return self._finish_turn(
+                    draft,
+                    _text(
+                        state,
+                        "灏忚寖鍥翠慨璁㈠凡瀹屾垚锛屽苟淇濈暀浜嗕笉鍙樺唴瀹广€?",
+                        f"{revision_scope} revision completed without a full rewrite.",
+                    ),
+                    finalization_metadata={
+                        "revision_scope": revision_scope,
+                        "narrow_revision": True,
+                    },
+                )
 
         if state["goal"].constraints.get("draft_revision_requested_from") == draft.id:
             return self._new_plan_turn(

@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
+import inspect
 import time
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
-from unittest.mock import AsyncMock
 
-from greenbook_assistant_api.models.runtime_context import RuntimeContext
-from greenbook_assistant_api.services.runtime_agent_service import (
-    RuntimeAgentService,
+from .models import (
+    EvalCase,
+    EvalCheck,
+    EvalResult,
+    EvaluationReport,
+    EvaluationTrace,
+    FailureCategory,
 )
-from greenbook_assistant_core.task.models import Task, TaskIntent, TaskStatus
-
-from .datasets import ALL_DATASETS
-from .metrics import MetricsCalculator
-from .models import EvalCase, EvalCheck, EvalResult, EvaluationReport
 
 
 class MockMCP:
@@ -64,229 +64,218 @@ _DEFAULT_MCP_RESPONSES: dict[str, dict] = {
 }
 
 
-class EvalRunner:
-    """Execute EvalCases against RuntimeAgentService and check expectations."""
+ActualCaseHandler = Callable[[EvalCase], Any | Awaitable[Any]]
+
+
+class EvaluationRunner:
+    """Run behavioral golden cases against a fake or real Runtime adapter.
+
+    The runner deliberately accepts an injected handler.  A deterministic
+    fake LLM/tool runtime can be used in unit tests, while integration tests
+    can pass the ConversationRuntime adapter.  No result is fabricated when
+    no adapter is configured.
+    """
 
     def __init__(
         self,
-        ras: RuntimeAgentService | None = None,
-        mcp_responses: dict[str, dict] | None = None,
+        runtime: Any | None = None,
+        *,
+        fake_llm: Any | None = None,
+        fake_tool_runtime: Any | None = None,
     ) -> None:
-        self._ras = ras or RuntimeAgentService()
-        self._mcp_responses = {**_DEFAULT_MCP_RESPONSES,
-                               **(mcp_responses or {})}
+        self._runtime = runtime
+        self.fake_llm = fake_llm
+        self.fake_tool_runtime = fake_tool_runtime
 
-    # ── main entry ───────────────────────────────────────────────
-
-    async def run_dataset(
-        self, dataset: list[EvalCase], dataset_name: str = "",
-    ) -> EvaluationReport:
-        results: list[EvalResult] = []
-        for case in dataset:
-            result = await self._run_one(case)
-            results.append(result)
-        return MetricsCalculator.compute(results, dataset_name)
-
-    async def run_all_datasets(self) -> dict[str, EvaluationReport]:
-        reports: dict[str, EvaluationReport] = {}
-        for name, dataset in ALL_DATASETS.items():
-            reports[name] = await self.run_dataset(dataset, name)
-        return reports
-
-    # ── single case ──────────────────────────────────────────────
-
-    async def _run_one(self, case: EvalCase) -> EvalResult:
-        t0 = time.monotonic()
-
+    async def run_case(
+        self,
+        case: EvalCase,
+        *,
+        actual: Any | None = None,
+        handler: ActualCaseHandler | None = None,
+    ) -> EvalResult:
+        started = time.monotonic()
         try:
-            ctx = self._build_context(case)
-            result = await self._ras.execute(ctx)
-        except Exception as exc:
-            elapsed = (time.monotonic() - t0) * 1000
+            if actual is None:
+                actual = await self._execute_case(case, handler)
+            payload = _payload(actual)
+            checks = _behavior_checks(case, payload)
+            failed = [check for check in checks if not check.ok]
+            categories = [_failure_category(check.check).value for check in failed]
+            trace = EvaluationTrace.model_validate(payload.get("trace") or payload)
+            metrics = _case_metrics(case, payload, checks)
+            elapsed = (time.monotonic() - started) * 1000.0
             return EvalResult(
-                case_id=case.case_id, category=case.category,
+                case_id=case.case_id,
+                category=case.category,
                 description=case.description,
-                passed=False, errors=[str(exc)], duration_ms=elapsed,
+                passed=not failed,
+                checks=checks,
+                errors=[str(payload.get("error", ""))] if payload.get("error") else [],
+                duration_ms=elapsed,
+                trace=trace.model_dump(mode="json"),
+                trace_summary={
+                    "event_count": len(trace.events),
+                    "tool_count": int(payload.get("tool_call_count", len(payload.get("tools", [])))),
+                    "step_count": len(payload.get("steps", [])),
+                },
+                failure_categories=list(dict.fromkeys(categories)),
+                metrics=metrics,
+            )
+        except Exception as exc:
+            elapsed = (time.monotonic() - started) * 1000.0
+            return EvalResult(
+                case_id=case.case_id,
+                category=case.category,
+                description=case.description,
+                passed=False,
+                errors=[str(exc)],
+                duration_ms=elapsed,
+                failure_categories=[FailureCategory.EXECUTION_ERROR.value],
             )
 
-        elapsed = (time.monotonic() - t0) * 1000
-        checks = self._check_expectations(case, ctx, result)
-        passed = all(c.ok for c in checks)
+    async def run_cases(
+        self,
+        cases: Sequence[EvalCase],
+        *,
+        handler: ActualCaseHandler | None = None,
+        run_id: str = "agent-eval",
+    ) -> EvaluationReport:
+        results = [await self.run_case(case, handler=handler) for case in cases]
+        from .metrics import EvaluationMetricsCalculator
 
-        return EvalResult(
-            case_id=case.case_id, category=case.category,
-            description=case.description,
-            passed=passed, checks=checks, duration_ms=elapsed,
+        passed = sum(1 for result in results if result.passed)
+        metrics = EvaluationMetricsCalculator.compute(results)
+        return EvaluationReport(
+            run_id=run_id,
+            total_cases=len(results),
+            total_passed=passed,
+            overall_accuracy=passed / len(results) if results else 0.0,
+            results=results,
+            metrics=metrics.model_dump(mode="json"),
         )
 
-    # ── context building ─────────────────────────────────────────
+    async def run_dataset(
+        self,
+        cases: Sequence[EvalCase],
+        *,
+        handler: ActualCaseHandler | None = None,
+    ) -> EvaluationReport:
+        return await self.run_cases(cases, handler=handler)
 
-    def _build_context(self, case: EvalCase) -> RuntimeContext:
-        mcp = MockMCP(self._mcp_responses)
+    def run_sync(
+        self,
+        cases: Sequence[EvalCase],
+        *,
+        handler: ActualCaseHandler | None = None,
+    ) -> EvaluationReport:
+        import asyncio
 
-        intent = TaskIntent(
-            relation="NEW_TASK",
-            goal=case.user_message,
-        )
+        return asyncio.run(self.run_cases(cases, handler=handler))
 
-        recent_tasks = self._build_recent_tasks(case.existing_tasks)
+    async def _execute_case(
+        self,
+        case: EvalCase,
+        handler: ActualCaseHandler | None,
+    ) -> Any:
+        target = handler or self._runtime
+        if target is None:
+            raise RuntimeError("EvaluationRunner requires a Runtime or case handler.")
+        if callable(target):
+            result = target(case)
+        elif callable(getattr(target, "run_case", None)):
+            result = target.run_case(case)
+        elif callable(getattr(target, "run", None)):
+            result = target.run(case)
+        else:
+            raise TypeError("Evaluation runtime must be callable or expose run_case/run.")
+        return await result if inspect.isawaitable(result) else result
 
-        return RuntimeContext(
-            conversation_id="eval-conv",
-            run_id=f"eval-{case.case_id}",
-            trace_id=f"trace-{case.case_id}",
-            user_id="eval-user",
-            tenant_id="eval-tenant",
-            user_message=case.user_message,
-            task_intent=intent,
-            mcp=mcp,
-            llm=None,  # L1 only
-            model="eval-model",
-            recent_tasks=recent_tasks,
-            session=None,
-        )
 
-    @staticmethod
-    def _build_recent_tasks(raw: list[dict]) -> list[Task]:
-        from datetime import UTC, datetime, timedelta
-        tasks: list[Task] = []
-        for d in raw:
-            ago = d.get("created_at_ago", 0)
-            created = (datetime.now(UTC) - timedelta(seconds=ago)).isoformat()
-            artifacts = []
-            for a in d.get("artifacts", []):
-                from greenbook_assistant_core.task.models import ArtifactRef
-                artifacts.append(ArtifactRef(
-                    artifact_id=f"art-{a.get('resource_id', 'x')}",
-                    task_id=d.get("task_id", ""),
-                    artifact_type=a.get("type", "DRAFT"),
-                    resource_id=a.get("resource_id"),
-                    resource_kind=a.get("type", "DRAFT"),
-                ))
-            tasks.append(Task(
-                task_id=d.get("task_id", ""),
-                conversation_id="eval-conv",
-                user_id="eval-user", tenant_id="eval-tenant",
-                goal=d.get("goal", ""),
-                goal_category=d.get("goal_category", "CREATE_CONTENT"),
-                status=TaskStatus.COMPLETED,
-                artifacts=artifacts,
-                created_at=created,
-            ))
-        return tasks
+def _payload(value: Any) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(mode="json")
+        return dict(dumped) if isinstance(dumped, Mapping) else {"value": dumped}
+    return {"value": value}
 
-    # ── expectation checking ─────────────────────────────────────
 
-    @staticmethod
-    def _check_expectations(
-        case: EvalCase, ctx: RuntimeContext, result: Any,
-    ) -> list[EvalCheck]:
-        checks: list[EvalCheck] = []
+def _behavior_checks(case: EvalCase, actual: Mapping[str, Any]) -> list[EvalCheck]:
+    checks: list[EvalCheck] = []
+    if case.expected_command:
+        value = actual.get("command", actual.get("command_type", ""))
+        if isinstance(value, Mapping):
+            value = value.get("type", value.get("command", ""))
+        checks.append(EvalCheck(check="command", expected=case.expected_command, actual=value, ok=str(value).upper() == case.expected_command.upper()))
+    if case.expected_target is not None:
+        value = actual.get("target", actual.get("resolved_target", {})) or {}
+        ok = all(value.get(key) == expected for key, expected in case.expected_target.items())
+        checks.append(EvalCheck(check="target", expected=case.expected_target, actual=value, ok=ok))
+    if case.expected_goals:
+        values = actual.get("goals", actual.get("goal_types", [])) or []
+        names = {
+            str(item.get("goal_type", item.get("kind", item.get("name", ""))))
+            if isinstance(item, Mapping) else str(item)
+            for item in values
+        }
+        ok = set(case.expected_goals) <= names
+        checks.append(EvalCheck(check="goals", expected=case.expected_goals, actual=values, ok=ok))
+    if case.expected_tools:
+        values = [str(item) for item in (actual.get("tools", actual.get("selected_tools", [])) or [])]
+        ok = set(case.expected_tools) <= set(values)
+        checks.append(EvalCheck(check="tools", expected=case.expected_tools, actual=values, ok=ok))
+    expected_status = case.expected_task_state
+    if expected_status:
+        value = str(actual.get("task_state", actual.get("status", ""))).upper()
+        checks.append(EvalCheck(check="task_state", expected=expected_status, actual=value, ok=value == expected_status.upper()))
+    if case.expected_artifacts:
+        values = [str(item) for item in (actual.get("artifacts", []) or [])]
+        checks.append(EvalCheck(check="artifacts", expected=case.expected_artifacts, actual=values, ok=set(case.expected_artifacts) <= set(values)))
+    if case.expected_side_effects:
+        values = set(str(item) for item in (actual.get("side_effects", []) or []))
+        safe = not bool(actual.get("duplicate_side_effect", False))
+        ok = safe and ("NO_DUPLICATE_PUBLICATION" in case.expected_side_effects or set(case.expected_side_effects) <= values)
+        checks.append(EvalCheck(check="side_effects", expected=case.expected_side_effects, actual=list(values), ok=ok))
+    if case.forbidden_actions:
+        values = set(str(item) for item in (actual.get("actions", []) or []))
+        checks.append(EvalCheck(check="forbidden_actions", expected=case.forbidden_actions, actual=list(values), ok=not values.intersection(case.forbidden_actions)))
+    return checks
 
-        # ── intent ──
-        if case.expected_intent:
-            intent = ctx.task_intent
-            for key, expected_val in case.expected_intent.items():
-                if key == "requirements":
-                    actual_reqs = [
-                        r.get("type") if isinstance(r, dict) else str(r)
-                        for r in (getattr(intent, "requirements", []) or [])
-                    ]
-                    expected_reqs = [
-                        r.get("type") if isinstance(r, dict) else str(r)
-                        for r in (expected_val or [])
-                    ]
-                    checks.append(EvalCheck(
-                        check="intent.requirements",
-                        expected=expected_reqs, actual=actual_reqs,
-                        ok=set(expected_reqs).issubset(set(actual_reqs)),
-                    ))
-                elif key == "resource_requests":
-                    actual = getattr(intent, "resource_requests", []) or []
-                    expected = expected_val
-                    # Compare as dict lists
-                    match = len(actual) >= len(expected)
-                    checks.append(EvalCheck(
-                        check="intent.resource_requests",
-                        expected=expected, actual=actual,
-                        ok=match,
-                    ))
-                else:
-                    actual_val = getattr(intent, key, None)
-                    checks.append(EvalCheck(
-                        check=f"intent.{key}",
-                        expected=expected_val, actual=actual_val,
-                        ok=actual_val == expected_val,
-                    ))
 
-        # ── sub_task_count ──
-        if case.expected_sub_task_count is not None:
-            pr = getattr(result, "partial_results", None) if result else None
-            actual_count = (pr or {}).get("sub_task_count", 1) if isinstance(pr, dict) else 1
-            checks.append(EvalCheck(
-                check="sub_task_count",
-                expected=case.expected_sub_task_count,
-                actual=actual_count,
-                ok=actual_count == case.expected_sub_task_count,
-            ))
+def _failure_category(check: str) -> FailureCategory:
+    return {
+        "command": FailureCategory.COMMAND_ERROR,
+        "target": FailureCategory.TARGET_ERROR,
+        "goals": FailureCategory.GOAL_ERROR,
+        "tools": FailureCategory.TOOL_SELECTION_ERROR,
+        "task_state": FailureCategory.EXECUTION_ERROR,
+        "side_effects": FailureCategory.RECOVERY_ERROR,
+        "forbidden_actions": FailureCategory.HALLUCINATION,
+    }.get(check, FailureCategory.EXECUTION_ERROR)
 
-        # ── status ──
-        actual_status = getattr(result, "status", "FAILED") if result else "FAILED"
-        checks.append(EvalCheck(
-            check="status",
-            expected=case.expected_status,
-            actual=actual_status,
-            ok=actual_status == case.expected_status,
-        ))
 
-        # ── clarification ──
-        if case.expected_clarification:
-            actual_clar = actual_status == "WAITING_APPROVAL"
-            checks.append(EvalCheck(
-                check="clarification",
-                expected=True, actual=actual_clar,
-                ok=actual_clar is True,
-            ))
-
-        # ── template ──
-        if case.expected_template:
-            # Template is not directly accessible from RuntimeResult
-            # Check via partial_results or skip
-            pass
-
-        # ── tools ──
-        if case.expected_tools:
-            mcp = getattr(ctx, "mcp", None)
-            called = []
-            if hasattr(mcp, "calls"):
-                called = [c[0] for c in mcp.calls]
-            checks.append(EvalCheck(
-                check="tools",
-                expected=case.expected_tools,
-                actual=called,
-                ok=set(case.expected_tools).issubset(set(called)),
-            ))
-
-        # ── resource_id ──
-        if case.expected_resource_id:
-            actual_rid = getattr(result, "draft_id", None) if result else None
-            checks.append(EvalCheck(
-                check="resource_id",
-                expected=case.expected_resource_id,
-                actual=actual_rid,
-                ok=actual_rid == case.expected_resource_id,
-            ))
-
-        # ── trace events ──
-        if case.expected_trace_events:
-            actual_events = []
-            if result and hasattr(result, "events"):
-                actual_events = [e.get("event", "") for e in (result.events or [])]
-            checks.append(EvalCheck(
-                check="trace_events",
-                expected=case.expected_trace_events,
-                actual=actual_events[:len(case.expected_trace_events)],
-                ok=set(case.expected_trace_events).issubset(set(actual_events)),
-            ))
-
-        return checks
+def _case_metrics(
+    case: EvalCase,
+    actual: Mapping[str, Any],
+    checks: Sequence[EvalCheck],
+) -> dict[str, float]:
+    values = {check.check: float(check.ok) for check in checks}
+    values["context_continuity"] = float(bool(actual.get("context_continuity", True)))
+    values["long_conversation_consistency"] = float(
+        bool(actual.get("long_conversation_consistency", values["context_continuity"]))
+    )
+    values["memory_retrieval_precision"] = float(bool(actual.get("memory_retrieval_ok", True)))
+    values["replan_recovery"] = float(bool(actual.get("replan_recovered", True)))
+    values["recovery_success"] = float(bool(actual.get("recovery_success", values["replan_recovery"])))
+    values["idempotent_recovery"] = float(not bool(actual.get("duplicate_side_effect", False)))
+    values["task_success"] = float(
+        bool(actual.get("task_success", actual.get("task_state") in {"COMPLETED", "SUCCESS"}))
+    )
+    values["multi_task"] = float(
+        bool(actual.get("multi_task_accuracy", actual.get("multi_task", True)))
+    )
+    values["plan_quality"] = float(bool(actual.get("plan_quality", True)))
+    values["latency_ms"] = float(actual.get("latency_ms", 0.0) or 0.0)
+    values["tool_call_count"] = float(actual.get("tool_call_count", len(actual.get("tools", []) or [])))
+    return values

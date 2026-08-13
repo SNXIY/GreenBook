@@ -168,7 +168,7 @@ class SearchPostsInput(ToolModel):
     limit: int = Field(default=10, ge=1, le=20)
 
     @model_validator(mode="after")
-    def validate_search(self) -> "SearchPostsInput":
+    def validate_search(self) -> SearchPostsInput:
         if any(not query.strip() or len(query) > 500 for query in self.queries):
             raise ValueError("Search queries must contain 1-500 characters")
         if (
@@ -235,7 +235,7 @@ class GetEngagementInput(ToolModel):
     end: datetime | None = None
 
     @model_validator(mode="after")
-    def validate_window(self) -> "GetEngagementInput":
+    def validate_window(self) -> GetEngagementInput:
         if self.start is not None and self.end is not None and self.start >= self.end:
             raise ValueError("start must be earlier than end")
         return self

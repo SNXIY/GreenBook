@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Protocol
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from langgraph.checkpoint.memory import InMemorySaver
 
 from app.creator.domain.models import (
     CreatorDecisionAction,
@@ -20,7 +20,26 @@ from app.creator.domain.models import (
     CreatorGoal,
     CreatorTaskKind,
 )
-
+from app.creator.runtime.models import (
+    AgentCapability,
+    AgentUsage,
+    ArtifactKind,
+    ArtifactRef,
+    BudgetLimits,
+    BudgetUsage,
+    FactRecord,
+    HumanDecisionRequest,
+    PlanSnapshot,
+    PlanStep,
+    PlanStepStatus,
+    ProgressEntry,
+    RunIdentity,
+    RuntimeControlStatus,
+    RuntimeFailure,
+    StepExecution,
+    SupervisorAction,
+    SupervisorDecision,
+)
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -81,7 +100,7 @@ class DiagnosticCheckpointer(BaseCheckpointSaver):
                 self._delegate.aput(config, checkpoint, metadata, new_versions),
                 timeout=30.0,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.exception("checkpoint_put_timeout label=%s identity=%s", self._label, self._identity(config))
             raise
         logger.info(
@@ -99,28 +118,6 @@ class DiagnosticCheckpointer(BaseCheckpointSaver):
         )
         logger.info("checkpoint_writes_finished label=%s identity=%s duration_ms=%.1f", self._label, self._identity(config), (time.monotonic() - started) * 1000)
         return result
-from app.creator.runtime.models import (
-    AgentCapability,
-    AgentUsage,
-    ArtifactKind,
-    ArtifactRef,
-    BudgetLimits,
-    BudgetUsage,
-    FactRecord,
-    HumanDecisionRequest,
-    PlanSnapshot,
-    PlanStep,
-    PlanStepStatus,
-    ProgressEntry,
-    RunIdentity,
-    RuntimeControlStatus,
-    RuntimeFailure,
-    StepExecution,
-    SupervisorAction,
-    SupervisorDecision,
-)
-
-
 class CreatorCheckpointSettings(Protocol):
     creator_checkpoint_backend: str
     creator_checkpoint_sqlite_path: str

@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.creator.application.ports import CreatorUnitOfWorkFactory
 from app.creator.domain.errors import CreatorPersistenceConflictError
 from app.creator.domain.models import CreatorOutboxMessage, OutboxStatus
 from app.creator.worker.service import CreatorWorkerError
-
 
 _REPLAY_NAMESPACE = uuid.UUID("d8d9d109-a453-4a25-8e31-54cd66443fb1")
 
@@ -37,7 +36,7 @@ async def replay_dead_outbox(
             f"{source_id}\n{operator}\n{replay_reason}",
         )
     )
-    requested_at = now or datetime.now(timezone.utc)
+    requested_at = now or datetime.now(UTC)
 
     try:
         async with uow_factory() as uow:

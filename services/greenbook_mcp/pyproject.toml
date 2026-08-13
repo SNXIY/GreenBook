@@ -1,7 +1,7 @@
 [project]
 name = "greenbook-mcp-server"
 version = "0.1.0"
-description = "GreenBook MCP Server — business capability tools via Streamable HTTP"
+description = "GreenBook MCP-compatible in-process tool runtime"
 requires-python = ">=3.12"
 dependencies = [
     "greenbook-contracts",

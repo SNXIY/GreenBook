@@ -1,5 +1,6 @@
 import type {
   Execution,
+  ExecutionControl,
   ExecutionEvent,
   ExecutionEventsResponse,
   ExecutionListResponse,
@@ -8,8 +9,8 @@ import type {
 } from "@/types/execution";
 
 const baseUrl = (
-  (import.meta.env.VITE_ASSISTANT_AGENT_URL as string | undefined)
-  ?? "/assistant-agent"
+  (import.meta.env.VITE_GREENBOOK_AGENT_URL as string | undefined)
+  ?? "/agent-api"
 ).replace(/\/$/, "");
 
 type RequestOptions = {
@@ -48,6 +49,11 @@ const request = async <T>(path: string, options: RequestOptions): Promise<T> => 
 const isTerminal = (status: string) =>
   ["COMPLETED", "FAILED", "CANCELLED"].includes(status);
 
+const isSettled = (execution: Execution) =>
+  isTerminal(execution.status)
+  || ["PAUSED", "WAITING_APPROVAL", "WAITING_HUMAN"].includes(execution.status)
+  || execution.control_state === "PAUSED";
+
 const parseEventFrame = (frame: string): ExecutionEvent | null => {
   const data = frame
     .split("\n")
@@ -80,6 +86,12 @@ export const executionService = {
 
   getExecution: (token: string, executionId: string, signal?: AbortSignal) =>
     executionService.get(token, executionId, signal),
+
+  control: (token: string, executionId: string, signal?: AbortSignal) =>
+    request<ExecutionControl>(
+      `/api/v1/executions/${encodeURIComponent(executionId)}/control`,
+      { token, signal }
+    ),
 
   steps: (token: string, executionId: string, signal?: AbortSignal) =>
     request<ExecutionStepsResponse>(
@@ -190,7 +202,7 @@ export const waitForExecution = async (
   };
 
   let current = await refresh();
-  if (isTerminal(current.status)) return current;
+  if (isSettled(current)) return current;
 
   const streamController = new AbortController();
   const abortStream = () => streamController.abort();
@@ -202,11 +214,11 @@ export const waitForExecution = async (
       async event => {
         onEvent?.(event);
         current = await refresh();
-        if (isTerminal(current.status)) streamController.abort();
+        if (isSettled(current)) streamController.abort();
       },
       streamController.signal
     );
-    if (isTerminal(current.status)) return current;
+    if (isSettled(current)) return current;
   } catch (error) {
     if (signal?.aborted) throw error;
     // Proxies can buffer or reject SSE. Polling remains the compatibility fallback.
@@ -216,7 +228,7 @@ export const waitForExecution = async (
 
   while (!signal?.aborted) {
     current = await refresh();
-    if (isTerminal(current.status)) return current;
+    if (isSettled(current)) return current;
     await new Promise<void>((resolve, reject) => {
       const timer = window.setTimeout(resolve, 800);
       signal?.addEventListener("abort", () => {
