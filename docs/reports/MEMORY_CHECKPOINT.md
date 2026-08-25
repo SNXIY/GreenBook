@@ -1,6 +1,6 @@
 # Memory Checkpoint
 
-Current Phase: Phase 1 complete
+Current Phase: Phase 2 complete
 
 Completed:
 
@@ -13,15 +13,23 @@ Completed:
   integration boundaries.
 - Confirmed the existing focused Memory/context suite passes before code
   changes.
+- Added tenant-aware `MemoryRecord`/`MemoryQuery` scope, lifecycle status, and
+  explicit source-conversation provenance compatibility.
+- Added forward migration `009_preference_memory_vertical_slice.sql` and
+  idempotent PostgreSQL storage/index support.
+- Added scoped CRUD, user isolation, tenant isolation, provenance, and
+  PostgreSQL parameter contract tests.
 
-Git Commit: Phase 1 baseline commit containing this report and checkpoint (see
+Git Commit: Phase 2 storage commit containing this report and checkpoint (see
 `git log --oneline` for the exact hash).
 
-Tests: `uv run pytest tests/unit/test_agent_memory.py tests/unit/test_memory_repository.py tests/unit/test_memory_retriever.py tests/integration/test_context_memory_runtime.py -q` — 34 passed.
+Tests: 39 focused Memory/storage/repository/retriever/context tests passed;
+`uv run ruff check packages/agent_core/greenbook_agent_core/memory tests/unit/test_preference_memory_storage.py`
+passed; migration splitter tests passed.
 
-Remaining: Phase 2 Preference Memory storage, tenant/user isolation, and CRUD
-tests.
+Remaining: Phase 3 structured Preference Memory extraction from completed
+Conversation turns.
 
-Resume From: Review `MEMORY_IMPLEMENTATION_BASELINE.md`, then extend the
-existing Memory contracts/repository with the minimal tenant-aware preference
-fields and a forward migration.
+Resume From: Add a structured `PreferenceMemoryExtractor` beside the existing
+procedural extractor, with long-term classification and no one-off task
+writes.

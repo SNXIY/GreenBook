@@ -19,6 +19,14 @@ class MemoryType(StrEnum):
     PROCEDURAL = "PROCEDURAL"
 
 
+class MemoryStatus(StrEnum):
+    """Lifecycle state for a reusable memory record."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUPERSEDED = "superseded"
+
+
 class MemoryRecord(BaseModel):
     """A bounded, auditable long-term memory record.
 
@@ -29,6 +37,8 @@ class MemoryRecord(BaseModel):
 
     memory_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str = ""
+    tenant_id: str = ""
+    status: MemoryStatus = MemoryStatus.ACTIVE
     conversation_id: str | None = None
     task_id: str | None = None
     memory_type: MemoryType = Field(
@@ -66,6 +76,18 @@ class MemoryRecord(BaseModel):
             normalized["memory_type"] = normalized["type"]
         if "structured_metadata" not in normalized and "metadata" in normalized:
             normalized["structured_metadata"] = normalized["metadata"]
+        # ``source_conversation_id`` is the explicit Preference Memory
+        # contract name. ``conversation_id`` remains the compatibility field
+        # used by pre-existing records; both refer to one provenance value.
+        if (
+            not normalized.get("conversation_id")
+            and normalized.get("source_conversation_id")
+        ):
+            normalized["conversation_id"] = normalized["source_conversation_id"]
+        if not normalized.get("status"):
+            normalized["status"] = MemoryStatus.ACTIVE
+        else:
+            normalized["status"] = str(normalized["status"]).lower()
         return normalized
 
     @property
@@ -80,17 +102,25 @@ class MemoryRecord(BaseModel):
 
         return self.structured_metadata
 
+    @property
+    def source_conversation_id(self) -> str | None:
+        """Explicit provenance spelling for the Preference Memory contract."""
+
+        return self.conversation_id
+
 
 class MemoryQuery(BaseModel):
     user_id: str = ""
+    tenant_id: str = ""
     conversation_id: str | None = None
     task_id: str | None = None
     type: MemoryType | None = None
     keywords: list[str] = Field(default_factory=list)
     metadata_filters: dict[str, Any] = Field(default_factory=dict)
+    status: MemoryStatus | None = None
     min_importance: float = Field(default=0.0, ge=0.0, le=1.0)
     limit: int = Field(default=10, ge=1, le=1000)
     sort_by: str = "importance"
 
 
-__all__ = ["MemoryQuery", "MemoryRecord", "MemoryType"]
+__all__ = ["MemoryQuery", "MemoryRecord", "MemoryStatus", "MemoryType"]

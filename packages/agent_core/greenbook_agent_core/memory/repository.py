@@ -16,15 +16,35 @@ class MemoryRepository(Protocol):
     """Canonical source-of-truth contract for long-term memory."""
 
     def save(self, record: MemoryRecord) -> MemoryRecord | Awaitable[MemoryRecord]: ...
-    def get(self, memory_id: str) -> MemoryRecord | None | Awaitable[MemoryRecord | None]: ...
+    def get(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> MemoryRecord | None | Awaitable[MemoryRecord | None]: ...
     def search(self, query: MemoryQuery) -> list[MemoryRecord] | Awaitable[list[MemoryRecord]]: ...
-    def touch(self, memory_id: str) -> MemoryRecord | None | Awaitable[MemoryRecord | None]: ...
-    def delete(self, memory_id: str) -> Any: ...
+    def touch(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> MemoryRecord | None | Awaitable[MemoryRecord | None]: ...
+    def delete(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> Any: ...
     def find_by_source(
         self,
         user_id: str,
         source_type: str,
         source_id: str,
+        *,
+        tenant_id: str = "",
     ) -> MemoryRecord | None | Awaitable[MemoryRecord | None]: ...
 
 
@@ -42,22 +62,43 @@ class InMemoryMemoryRepository:
         self._records[record.memory_id] = record.model_copy(deep=True)
         return record
 
-    def get(self, memory_id: str) -> MemoryRecord | None:
+    def get(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> MemoryRecord | None:
         value = self._records.get(memory_id)
+        if value is not None and not _in_scope(
+            value,
+            user_id=user_id,
+            tenant_id=tenant_id,
+        ):
+            return None
         return value.model_copy(deep=True) if value else None
 
-    def find_by_id(self, memory_id: str) -> MemoryRecord | None:
-        return self.get(memory_id)
+    def find_by_id(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> MemoryRecord | None:
+        return self.get(memory_id, user_id=user_id, tenant_id=tenant_id)
 
     def find_by_source(
         self,
         user_id: str,
         source_type: str,
         source_id: str,
+        *,
+        tenant_id: str = "",
     ) -> MemoryRecord | None:
         for item in self._records.values():
             if (
                 item.user_id == user_id
+                and item.tenant_id == tenant_id
                 and item.source_type == source_type
                 and item.source_id == source_id
             ):
@@ -81,9 +122,15 @@ class InMemoryMemoryRepository:
             values.sort(key=lambda item: item.importance, reverse=True)
         return [item.model_copy(deep=True) for item in values[: query.limit]]
 
-    def touch(self, memory_id: str) -> MemoryRecord | None:
+    def touch(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> MemoryRecord | None:
         item = self._records.get(memory_id)
-        if item is None:
+        if item is None or not _in_scope(item, user_id=user_id, tenant_id=tenant_id):
             return None
         item.access_count += 1
         item.last_accessed_at = datetime.now(UTC).isoformat()
@@ -99,12 +146,26 @@ class InMemoryMemoryRepository:
                 key = "memory_type"
             if key == "metadata":
                 key = "structured_metadata"
+            if key == "source_conversation_id":
+                key = "conversation_id"
             if hasattr(item, key):
                 setattr(item, key, value)
         item.updated_at = datetime.now(UTC).isoformat()
         return item.model_copy(deep=True)
 
-    def delete(self, memory_id: str) -> None:
+    def delete(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> None:
+        if memory_id in self._records and not _in_scope(
+            self._records[memory_id],
+            user_id=user_id,
+            tenant_id=tenant_id,
+        ):
+            return
         self._records.pop(memory_id, None)
 
     def count(self, user_id: str | None = None) -> int:
@@ -129,13 +190,16 @@ class PostgresMemoryRepository:
                 CREATE TABLE IF NOT EXISTS agent_memories (
                     memory_id VARCHAR(128) PRIMARY KEY,
                     user_id VARCHAR(128) NOT NULL,
+                    tenant_id VARCHAR(128) NOT NULL DEFAULT '',
                     conversation_id VARCHAR(128),
+                    source_conversation_id VARCHAR(128),
                     task_id VARCHAR(128),
                     memory_type VARCHAR(32) NOT NULL,
                     content TEXT NOT NULL,
                     structured_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
                     importance DOUBLE PRECISION NOT NULL DEFAULT 0.5,
                     confidence DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+                    status VARCHAR(32) NOT NULL DEFAULT 'active',
                     source_type VARCHAR(64) NOT NULL DEFAULT '',
                     source_id VARCHAR(128),
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -145,20 +209,44 @@ class PostgresMemoryRepository:
                     expires_at TIMESTAMPTZ
                 )
             """))
+            await session.execute(sa.text(
+                "ALTER TABLE agent_memories "
+                "ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(128) NOT NULL DEFAULT ''"
+            ))
+            await session.execute(sa.text(
+                "ALTER TABLE agent_memories "
+                "ADD COLUMN IF NOT EXISTS source_conversation_id VARCHAR(128)"
+            ))
+            await session.execute(sa.text(
+                "ALTER TABLE agent_memories "
+                "ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'active'"
+            ))
+            await session.execute(sa.text(
+                "UPDATE agent_memories "
+                "SET source_conversation_id = conversation_id "
+                "WHERE source_conversation_id IS NULL"
+            ))
+            await session.execute(sa.text(
+                "CREATE INDEX IF NOT EXISTS idx_agent_memories_scope_type "
+                "ON agent_memories (tenant_id, user_id, memory_type, status, updated_at DESC)"
+            ))
             await session.commit()
 
     async def save(self, record: MemoryRecord) -> MemoryRecord:
         async with self._session_factory() as session:
             await session.execute(sa.text("""
                 INSERT INTO agent_memories
-                    (memory_id, user_id, conversation_id, task_id, memory_type,
+                    (memory_id, user_id, tenant_id, conversation_id,
+                     source_conversation_id, task_id, memory_type,
                      content, structured_metadata, importance, confidence,
+                     status,
                      source_type, source_id, created_at, updated_at,
                      last_accessed_at, access_count, expires_at)
                 VALUES
-                    (:memory_id, :user_id, :conversation_id, :task_id, :memory_type,
+                    (:memory_id, :user_id, :tenant_id, :conversation_id,
+                     :source_conversation_id, :task_id, :memory_type,
                      :content, CAST(:structured_metadata AS jsonb), :importance,
-                     :confidence, :source_type, :source_id, :created_at,
+                     :confidence, :status, :source_type, :source_id, :created_at,
                      :updated_at, NULLIF(:last_accessed_at, '')::timestamptz,
                      :access_count, NULLIF(:expires_at, '')::timestamptz)
                 ON CONFLICT (memory_id) DO UPDATE SET
@@ -166,6 +254,9 @@ class PostgresMemoryRepository:
                     content = EXCLUDED.content,
                     importance = EXCLUDED.importance,
                     confidence = EXCLUDED.confidence,
+                    status = EXCLUDED.status,
+                    conversation_id = EXCLUDED.conversation_id,
+                    source_conversation_id = EXCLUDED.source_conversation_id,
                     updated_at = EXCLUDED.updated_at,
                     access_count = EXCLUDED.access_count,
                     last_accessed_at = EXCLUDED.last_accessed_at
@@ -173,18 +264,41 @@ class PostgresMemoryRepository:
             await session.commit()
         return record
 
-    async def get(self, memory_id: str) -> MemoryRecord | None:
+    async def get(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> MemoryRecord | None:
         async with self._session_factory() as session:
+            clauses = ["memory_id = :memory_id"]
+            params: dict[str, Any] = {"memory_id": memory_id}
+            if user_id is not None:
+                clauses.append("user_id = :user_id")
+                params["user_id"] = user_id
+            if tenant_id is not None:
+                clauses.append("tenant_id = :tenant_id")
+                params["tenant_id"] = tenant_id
             result = await session.execute(
-                sa.text("SELECT * FROM agent_memories WHERE memory_id = :memory_id"),
-                {"memory_id": memory_id},
+                sa.text(
+                    "SELECT * FROM agent_memories WHERE " + " AND ".join(clauses)
+                ),
+                params,
             )
             row = result.mappings().first()
         return _row_record(row) if row else None
 
     async def search(self, query: MemoryQuery) -> list[MemoryRecord]:
-        clauses = ["user_id = :user_id", "(expires_at IS NULL OR expires_at > NOW())"]
-        params: dict[str, Any] = {"user_id": query.user_id}
+        clauses = [
+            "user_id = :user_id",
+            "tenant_id = :tenant_id",
+            "(expires_at IS NULL OR expires_at > NOW())",
+        ]
+        params: dict[str, Any] = {
+            "user_id": query.user_id,
+            "tenant_id": query.tenant_id,
+        }
         if query.conversation_id:
             clauses.append("conversation_id = :conversation_id")
             params["conversation_id"] = query.conversation_id
@@ -197,6 +311,9 @@ class PostgresMemoryRepository:
         if query.min_importance:
             clauses.append("importance >= :min_importance")
             params["min_importance"] = query.min_importance
+        if query.status:
+            clauses.append("status = :status")
+            params["status"] = query.status.value
         order = {
             "created_at": "created_at DESC",
             "access_count": "access_count DESC",
@@ -220,24 +337,53 @@ class PostgresMemoryRepository:
             ]
         return values
 
-    async def touch(self, memory_id: str) -> MemoryRecord | None:
+    async def touch(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> MemoryRecord | None:
         now = datetime.now(UTC)
         async with self._session_factory() as session:
-            await session.execute(sa.text("""
+            clauses = ["memory_id = :memory_id"]
+            params: dict[str, Any] = {"memory_id": memory_id, "now": now}
+            if user_id is not None:
+                clauses.append("user_id = :user_id")
+                params["user_id"] = user_id
+            if tenant_id is not None:
+                clauses.append("tenant_id = :tenant_id")
+                params["tenant_id"] = tenant_id
+            await session.execute(sa.text(
+                """
                 UPDATE agent_memories
                 SET access_count = access_count + 1,
                     last_accessed_at = :now,
                     updated_at = :now
-                WHERE memory_id = :memory_id
-            """), {"memory_id": memory_id, "now": now})
+                WHERE """ + " AND ".join(clauses)
+            ), params)
             await session.commit()
-        return await self.get(memory_id)
+        return await self.get(memory_id, user_id=user_id, tenant_id=tenant_id)
 
-    async def delete(self, memory_id: str) -> None:
+    async def delete(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> None:
         async with self._session_factory() as session:
+            clauses = ["memory_id = :memory_id"]
+            params: dict[str, Any] = {"memory_id": memory_id}
+            if user_id is not None:
+                clauses.append("user_id = :user_id")
+                params["user_id"] = user_id
+            if tenant_id is not None:
+                clauses.append("tenant_id = :tenant_id")
+                params["tenant_id"] = tenant_id
             await session.execute(
-                sa.text("DELETE FROM agent_memories WHERE memory_id = :memory_id"),
-                {"memory_id": memory_id},
+                sa.text("DELETE FROM agent_memories WHERE " + " AND ".join(clauses)),
+                params,
             )
             await session.commit()
 
@@ -246,15 +392,19 @@ class PostgresMemoryRepository:
         user_id: str,
         source_type: str,
         source_id: str,
+        *,
+        tenant_id: str = "",
     ) -> MemoryRecord | None:
         async with self._session_factory() as session:
             result = await session.execute(
                 sa.text(
                     "SELECT * FROM agent_memories "
-                    "WHERE user_id = :user_id AND source_type = :source_type "
+                    "WHERE tenant_id = :tenant_id AND user_id = :user_id "
+                    "AND source_type = :source_type "
                     "AND source_id = :source_id LIMIT 1"
                 ),
                 {
+                    "tenant_id": tenant_id,
                     "user_id": user_id,
                     "source_type": source_type,
                     "source_id": source_id,
@@ -267,6 +417,8 @@ class PostgresMemoryRepository:
 def _matches(item: MemoryRecord, query: MemoryQuery) -> bool:
     if query.user_id and item.user_id != query.user_id:
         return False
+    if item.tenant_id != query.tenant_id:
+        return False
     if query.conversation_id and item.conversation_id != query.conversation_id:
         return False
     if query.task_id and item.task_id != query.task_id:
@@ -275,7 +427,20 @@ def _matches(item: MemoryRecord, query: MemoryQuery) -> bool:
         return False
     if item.importance < query.min_importance:
         return False
+    if query.status and item.status != query.status:
+        return False
     return all(item.metadata.get(key) == value for key, value in query.metadata_filters.items())
+
+
+def _in_scope(
+    item: MemoryRecord,
+    *,
+    user_id: str | None,
+    tenant_id: str | None,
+) -> bool:
+    if user_id is not None and item.user_id != user_id:
+        return False
+    return tenant_id is None or item.tenant_id == tenant_id
 
 
 def _expired(item: MemoryRecord) -> bool:
@@ -297,13 +462,16 @@ def _params(record: MemoryRecord) -> dict[str, Any]:
     return {
         "memory_id": record.memory_id,
         "user_id": record.user_id,
+        "tenant_id": record.tenant_id,
         "conversation_id": record.conversation_id,
+        "source_conversation_id": record.source_conversation_id,
         "task_id": record.task_id,
         "memory_type": record.memory_type.value,
         "content": record.content,
         "structured_metadata": json.dumps(record.metadata, ensure_ascii=False, default=str),
         "importance": record.importance,
         "confidence": record.confidence,
+        "status": record.status.value,
         "source_type": record.source_type,
         "source_id": record.source_id,
         # asyncpg binds PostgreSQL timestamptz parameters as datetime values;

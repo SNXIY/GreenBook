@@ -7,7 +7,7 @@ one retriever, and a conservative write policy.
 
 from .extractor import ProceduralMemoryExtractor
 from .manager import MemoryManager
-from .models import MemoryQuery, MemoryRecord, MemoryType
+from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .policy import MemoryWriteDecision, MemoryWritePolicy
 from .repository import (
     InMemoryMemoryRepository,
@@ -27,6 +27,7 @@ __all__ = [
     "StrategyRetriever",
     "ProceduralMemoryExtractor",
     "MemoryType",
+    "MemoryStatus",
     "MemoryWriteDecision",
     "MemoryWritePolicy",
     "PostgresMemoryRepository",

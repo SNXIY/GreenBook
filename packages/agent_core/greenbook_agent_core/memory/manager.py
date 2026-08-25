@@ -9,7 +9,7 @@ from typing import Any
 
 from greenbook_agent_core.command.correction import CorrectionEvent
 
-from .models import MemoryQuery, MemoryRecord, MemoryType
+from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .policy import MemoryWritePolicy
 from .repository import InMemoryMemoryRepository
 
@@ -40,6 +40,7 @@ class MemoryManager:
                 record.user_id,
                 record.source_type,
                 record.source_id,
+                tenant_id=record.tenant_id,
             )
             if existing is not None:
                 # The same logical fact (e.g. the same execution outcome
@@ -119,10 +120,17 @@ class MemoryManager:
         preference_type: str,
         value: str,
         confidence: float = 0.5,
+        *,
+        tenant_id: str = "",
+        source_conversation_id: str | None = None,
+        source_type: str = "USER_EXPLICIT_PREFERENCE",
     ) -> MemoryRecord:
         return self.remember(MemoryRecord(
             user_id=user_id,
+            tenant_id=tenant_id,
+            source_conversation_id=source_conversation_id,
             memory_type=MemoryType.PREFERENCE,
+            status=MemoryStatus.ACTIVE,
             content=f"Prefers {preference_type}: {value}",
             structured_metadata={
                 "preference_type": preference_type,
@@ -131,6 +139,7 @@ class MemoryManager:
             },
             importance=min(confidence * 0.8, 0.9),
             confidence=confidence,
+            source_type=source_type,
         ))
 
     def remember_pattern(
@@ -177,11 +186,23 @@ class MemoryManager:
         user_id: str,
         source_type: str,
         source_id: str,
+        *,
+        tenant_id: str = "",
     ) -> MemoryRecord | None:
         finder = getattr(self._repository, "find_by_source", None)
         if finder is None:
             return None
-        value = finder(user_id, source_type, source_id)
+        try:
+            value = finder(
+                user_id,
+                source_type,
+                source_id,
+                tenant_id=tenant_id,
+            )
+        except TypeError:
+            # Compatibility with injected repositories that predate tenant
+            # scope; production repositories implement the scoped signature.
+            value = finder(user_id, source_type, source_id)
         if inspect.isawaitable(value):
             value = _run(value)
         return value
