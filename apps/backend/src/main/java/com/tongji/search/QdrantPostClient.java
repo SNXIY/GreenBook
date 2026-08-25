@@ -61,6 +61,9 @@ public class QdrantPostClient {
         payload.put("post_id", document.postId());
         payload.put("event_version", document.eventVersion());
         payload.put("vector_version", embeddingService.vectorVersion());
+        payload.put("embedding_model", embeddingService.model());
+        payload.put("embedding_version", embeddingService.vectorVersion());
+        payload.put("dimension", embeddingService.dimension());
         put(payload, "status", document.status());
         put(payload, "visibility", document.visibility());
         if (document.updatedAt() != null) payload.put("updated_at", document.updatedAt().toString());
@@ -84,7 +87,10 @@ public class QdrantPostClient {
             throw new SearchProviderUnavailableException("Qdrant provider disabled");
         }
         HttpResponse<String> get = send("GET", collectionPath(""), null);
-        if (get.statusCode() == 200) return;
+        if (get.statusCode() == 200) {
+            validateCollectionDimension(get);
+            return;
+        }
         if (get.statusCode() != 404) throw classify(get, "Qdrant collection check failed");
         ObjectNode body = objectMapper.createObjectNode();
         ObjectNode vectors = body.putObject("vectors");
@@ -92,6 +98,23 @@ public class QdrantPostClient {
         vectors.put("distance", "Cosine");
         body.put("on_disk_payload", true);
         request("PUT", collectionPath(""), body);
+    }
+
+    private void validateCollectionDimension(HttpResponse<String> response) {
+        try {
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode vectors = root.path("result").path("config").path("params").path("vectors");
+            int actual = vectors.path("size").asInt(0);
+            if (actual > 0 && actual != properties.embeddingDimension()) {
+                throw new SearchProviderException("Qdrant collection dimension mismatch collection="
+                        + properties.qdrantCollection() + " expected=" + properties.embeddingDimension()
+                        + " actual=" + actual);
+            }
+        } catch (SearchProviderException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new SearchProviderException("Qdrant collection metadata parse failed", e);
+        }
     }
 
     private Long currentVersion(long postId) {

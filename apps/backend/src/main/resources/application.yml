@@ -84,6 +84,11 @@ search:
   hybrid:
     enabled: ${SEARCH_HYBRID_ENABLED:true}
     candidate-limit: ${SEARCH_HYBRID_CANDIDATE_LIMIT:100}
+    bm25-top-n: ${SEARCH_HYBRID_BM25_TOP_N:50}
+    dense-top-n: ${SEARCH_HYBRID_DENSE_TOP_N:100}
+    rrf-k: ${SEARCH_HYBRID_RRF_K:100}
+    business-rerank:
+      enabled: ${SEARCH_HYBRID_BUSINESS_RERANK_ENABLED:false}
   lifecycle:
     tenant-id: ${SEARCH_TENANT_ID:zhiguang}
   elasticsearch:
@@ -93,12 +98,15 @@ search:
   qdrant:
     enabled: ${SEARCH_QDRANT_ENABLED:true}
     base-url: ${SEARCH_QDRANT_URL:http://127.0.0.1:26333}
-    collection: ${SEARCH_QDRANT_COLLECTION:posts_dense}
+    collection: ${SEARCH_QDRANT_COLLECTION:posts_dense_multilingual_v1}
   embedding:
-    provider: ${SEARCH_EMBEDDING_PROVIDER:hashing}
-    model: ${SEARCH_EMBEDDING_MODEL:greenbook-post-hashing-256-v1}
-    vector-version: ${SEARCH_EMBEDDING_VECTOR_VERSION:posts-dense-v1}
-    dimension: ${SEARCH_EMBEDDING_DIMENSION:256}
+    provider: ${SEARCH_EMBEDDING_PROVIDER:multilingual-http}
+    model: ${SEARCH_EMBEDDING_MODEL:sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
+    vector-version: ${SEARCH_EMBEDDING_VECTOR_VERSION:posts-dense-multilingual-v1}
+    dimension: ${SEARCH_EMBEDDING_DIMENSION:384}
+    endpoint: ${SEARCH_EMBEDDING_ENDPOINT:http://127.0.0.1:8181/embed}
+    connect-timeout-ms: ${SEARCH_EMBEDDING_CONNECT_TIMEOUT_MS:1000}
+    request-timeout-ms: ${SEARCH_EMBEDDING_REQUEST_TIMEOUT_MS:5000}
   provider:
     connect-timeout-ms: ${SEARCH_PROVIDER_CONNECT_TIMEOUT_MS:800}
     request-timeout-ms: ${SEARCH_PROVIDER_REQUEST_TIMEOUT_MS:2500}

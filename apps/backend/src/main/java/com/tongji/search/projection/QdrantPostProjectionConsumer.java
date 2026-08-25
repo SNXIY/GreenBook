@@ -58,7 +58,7 @@ public class QdrantPostProjectionConsumer {
             return;
         }
         PostSearchDocument document = documents.build(post);
-        qdrant.upsert(document, embedding.embed(document.textForEmbedding()), embedding);
+        qdrant.upsert(document, embedding.embedDocument(document.textForEmbedding()), embedding);
         metrics.appliedQdrant(document.updatedAt());
     }
 }

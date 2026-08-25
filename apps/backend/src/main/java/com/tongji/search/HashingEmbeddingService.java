@@ -1,6 +1,7 @@
 package com.tongji.search;
 
 import com.tongji.search.config.SearchProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,7 @@ import java.util.Locale;
  * separately and can later be replaced behind EmbeddingService.
  */
 @Service
+@ConditionalOnProperty(name = "search.embedding.provider", havingValue = "hashing", matchIfMissing = true)
 public class HashingEmbeddingService implements EmbeddingService {
     private final SearchProperties properties;
 

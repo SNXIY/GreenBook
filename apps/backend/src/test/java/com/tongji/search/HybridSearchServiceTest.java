@@ -36,8 +36,6 @@ class HybridSearchServiceTest {
                 new LexicalSearchHit(3L, 7.0, 3)));
         when(mysql.count("java")).thenReturn(2L);
         when(mysql.loadPublicByIds(any())).thenReturn(List.of(row(1L), row(2L), row(3L)));
-        when(mysql.matchesQuery(any(), eq("java"))).thenAnswer(invocation ->
-                ((KnowPostDetailRow) invocation.getArgument(0)).getId() != 2L);
         when(mysql.toItem(any())).thenAnswer(invocation -> item(((KnowPostDetailRow) invocation.getArgument(0)).getId()));
 
         HybridSearchService service = new HybridSearchService(mysql, es, qdrant, embedding,
@@ -49,7 +47,9 @@ class HybridSearchServiceTest {
         assertEquals(2L, response.total());
         assertEquals(2, response.items().size());
         assertEquals("1", response.items().get(0).postId());
-        assertEquals(false, response.items().stream().anyMatch(item -> "2".equals(item.postId())));
+        assertEquals("2", response.items().get(1).postId());
+        verify(mysql, never()).matchesQuery(any(), any());
+        verify(mysql, times(2)).toItem(any());
         verify(qdrant).search(any(), eq(10));
     }
 

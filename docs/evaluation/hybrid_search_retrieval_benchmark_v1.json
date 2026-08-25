@@ -1,0 +1,24 @@
+{
+  "benchmark_version": "hybrid-search-retrieval-v1",
+  "frozen_at": "2026-08-25",
+  "dataset": "hybrid_search_retrieval_dataset_20260825.jsonl",
+  "fixture": "hybrid_search_retrieval_fixture_20260825.json",
+  "source_audit": {
+    "raw_query_count": 100,
+    "raw_qrel_count": 268,
+    "removed_invalid_count": 1,
+    "removed_query_ids": ["hs-096"]
+  },
+  "clean_validation": {
+    "valid_query_count": 99,
+    "valid_qrel_count": 266,
+    "searchable_qrel_count": 263,
+    "missing_fixture_count": 0,
+    "non_searchable_qrel_count": 3
+  },
+  "fixture_policy": {
+    "public_searchable": "status == published and visible == public",
+    "non_searchable_qrels": "excluded from retrieval-quality denominators and reported separately",
+    "missing_fixture": "DATASET_INVALID; never counted as RETRIEVAL_MISS"
+  }
+}

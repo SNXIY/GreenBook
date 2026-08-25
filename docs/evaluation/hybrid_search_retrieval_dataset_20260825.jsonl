@@ -93,7 +93,6 @@
 {"query_id":"hs-093","query":"量子烘焙数据库","language":"zh","kind":"no_result","qrels":{}}
 {"query_id":"hs-094","query":"unrelated oceanic botany","language":"en","kind":"no_result","qrels":{}}
 {"query_id":"hs-095","query":"完全虚构的火星菜谱","language":"zh","kind":"no_result","qrels":{}}
-{"query_id":"hs-096","query":"","language":"zh","kind":"empty_query","qrels":{"350444831992057856":2,"350326942672752640":1}}
 {"query_id":"hs-097","query":"Java","language":"zh","kind":"short_query","qrels":{"350329167449034752":2,"350308965579624448":1}}
 {"query_id":"hs-098","query":"Redis","language":"en","kind":"short_query","qrels":{"350444831992057856":2,"350326942672752640":1}}
 {"query_id":"hs-099","query":"Agent","language":"en","kind":"short_query","qrels":{"350329167449034752":2,"350308965579624448":1}}
