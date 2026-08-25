@@ -74,6 +74,8 @@ class MemoryRecord(BaseModel):
         normalized = dict(value)
         if "memory_type" not in normalized and "type" in normalized:
             normalized["memory_type"] = normalized["type"]
+        if str(normalized.get("memory_type") or "").casefold() == "preference":
+            normalized["memory_type"] = MemoryType.PREFERENCE.value
         if "structured_metadata" not in normalized and "metadata" in normalized:
             normalized["structured_metadata"] = normalized["metadata"]
         # ``source_conversation_id`` is the explicit Preference Memory
@@ -121,6 +123,17 @@ class MemoryQuery(BaseModel):
     min_importance: float = Field(default=0.0, ge=0.0, le=1.0)
     limit: int = Field(default=10, ge=1, le=1000)
     sort_by: str = "importance"
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_preference_type(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        raw = normalized.get("type")
+        if str(raw or "").casefold() == "preference":
+            normalized["type"] = MemoryType.PREFERENCE.value
+        return normalized
 
 
 __all__ = ["MemoryQuery", "MemoryRecord", "MemoryStatus", "MemoryType"]

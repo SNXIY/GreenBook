@@ -1,6 +1,6 @@
 # Memory Checkpoint
 
-Current Phase: Phase 4 complete
+Current Phase: Phase 5 complete
 
 Completed:
 
@@ -39,19 +39,29 @@ Completed:
   the disabled path leaves Conversation/Task/Execution context intact.
 - Added cross-conversation retrieval, user/tenant isolation, top-five,
   provider projection, and disabled-feature tests.
+- Added preference lifecycle convergence: same key/value merges into one
+  active record with confidence/evidence updates; a new value supersedes the
+  previous active value while retaining its historical row.
+- Added scoped `deactivate` and `supersede` operations, replacement metadata,
+  and retry protection so superseded/inactive source events cannot resurrect
+  old preferences.
+- Changed the legacy preference provider to read without touching access
+  metadata, and exposed the `MEMORY_ENABLED` state through the settings
+  projection. Preference type input now accepts the literal `preference`
+  spelling while retaining the existing SEMANTIC storage compatibility.
+- Added lifecycle, conflict, confidence, inactive, scope, disabled-service,
+  and no-touch provider tests.
 
-Git Commit: Phase 4 integration commit containing this report and checkpoint
+Git Commit: Phase 5 lifecycle commit containing this report and checkpoint
 (see `git log --oneline` for the exact hash).
 
-Tests: 20 focused Memory/retrieval/context tests passed; 74 existing context,
-  turn, and adapter unit tests passed; 6 existing runtime integration tests
-  passed; compileall passed; focused Memory/retrieval ruff checks passed.
+Tests: 56 focused Memory/storage/retrieval/extraction/lifecycle/context tests
+  passed; compileall passed; focused Memory/lifecycle ruff checks passed.
   Pytest emitted only the existing cache-path permission warning.
 
-Remaining: Phase 5 lifecycle update/conflict/inactivation behavior and full
-  feature-flag reliability validation; then Phase 6 handoff and final audit.
+Remaining: Phase 6 final tests, handoff, compile/lint audit, and protected
+  boundary confirmation.
 
 Resume From: Inspect `git status`, `git log`, and this checkpoint. Continue
-  with preference identity merge/update, superseded history, inactive records,
-  and lifecycle tests without changing ActionLoop, Durable Runtime, MCP, or
-  RAG.
+  with the final handoff and full acceptance audit without changing ActionLoop,
+  Durable Runtime, MCP, or RAG.

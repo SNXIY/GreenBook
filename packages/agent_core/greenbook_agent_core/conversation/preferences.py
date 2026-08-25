@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections import Counter
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
@@ -73,13 +74,21 @@ class MemoryUserPreferenceProvider:
         user_id: str,
         tenant_id: str = "",
     ) -> list[UserPreference]:
-        records = self._memory.recall(MemoryQuery(
+        query = MemoryQuery(
             user_id=user_id,
             tenant_id=tenant_id,
             type=MemoryType.SEMANTIC,
             status=MemoryStatus.ACTIVE,
             limit=100,
-        ))
+        )
+        store = getattr(self._memory, "store", None)
+        search = getattr(store, "search", None)
+        if callable(search):
+            records = search(query)
+            records = await records if inspect.isawaitable(records) else records
+        else:
+            # Compatibility fallback for a legacy injected MemoryManager.
+            records = self._memory.recall(query)
         evidence = Counter(
             (
                 str(record.metadata.get("preference_type") or ""),

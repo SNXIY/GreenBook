@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from greenbook_agent_core.command.correction import CorrectionEvent
@@ -14,6 +15,10 @@ from .policy import MemoryWritePolicy
 from .repository import InMemoryMemoryRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 class MemoryManager:
@@ -35,26 +40,46 @@ class MemoryManager:
         return self._repository
 
     def remember(self, record: MemoryRecord) -> MemoryRecord:
+        source_existing: MemoryRecord | None = None
         if record.source_type and record.source_id:
-            existing = self._find_by_source(
+            source_existing = self._find_by_source(
                 record.user_id,
                 record.source_type,
                 record.source_id,
                 tenant_id=record.tenant_id,
             )
-            if existing is not None:
+            if source_existing is not None and record.memory_type == MemoryType.PREFERENCE:
+                # A superseded/inactive preference is historical evidence.  A
+                # retried source event must never resurrect it as active.
+                if source_existing.status != MemoryStatus.ACTIVE:
+                    return source_existing
+                if self._preference_identity(source_existing) == self._preference_identity(record):
+                    record = record.model_copy(update={
+                        "memory_id": source_existing.memory_id,
+                        "created_at": source_existing.created_at,
+                        "access_count": source_existing.access_count,
+                        "last_accessed_at": source_existing.last_accessed_at,
+                    })
+            elif source_existing is not None:
                 # The same logical fact (e.g. the same execution outcome
                 # re-delivered by a retry) must not multiply into duplicate
                 # rows: reuse the existing identity (memory_id / created_at)
                 # and refresh the payload. The durable store upserts by
                 # memory_id, so this is an in-place update, not an insert.
                 updates = record.model_dump()
-                updates["memory_id"] = existing.memory_id
-                updates["created_at"] = existing.created_at
-                updates["user_id"] = existing.user_id
-                updates["access_count"] = existing.access_count
-                updates["last_accessed_at"] = existing.last_accessed_at
+                updates["memory_id"] = source_existing.memory_id
+                updates["created_at"] = source_existing.created_at
+                updates["user_id"] = source_existing.user_id
+                updates["tenant_id"] = source_existing.tenant_id
+                updates["access_count"] = source_existing.access_count
+                updates["last_accessed_at"] = source_existing.last_accessed_at
                 record = MemoryRecord.model_validate(updates)
+        if (
+            record.memory_type == MemoryType.PREFERENCE
+            and record.status == MemoryStatus.ACTIVE
+            and self._preference_identity(record) is not None
+        ):
+            return self._remember_preference(record)
         saved = self._repository.save(record)
         self._persist(saved)
         return saved
@@ -71,14 +96,65 @@ class MemoryManager:
             touched.append(value or record)
         return touched
 
-    def forget(self, memory_id: str) -> None:
-        value = self._repository.delete(memory_id)
+    def forget(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> None:
+        value = self._delete(
+            memory_id,
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
         if inspect.isawaitable(value):
             _run(value)
         if self._durable_repository is not None:
-            value = self._durable_repository.delete(memory_id)
+            try:
+                value = self._durable_repository.delete(
+                    memory_id,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                )
+            except TypeError:
+                value = self._durable_repository.delete(memory_id)
             if inspect.isawaitable(value):
                 self._persist_awaitable(value, memory_id)
+
+    def deactivate(
+        self,
+        memory_id: str,
+        *,
+        user_id: str,
+        tenant_id: str,
+    ) -> MemoryRecord | None:
+        """Make one memory unavailable to recall while retaining its audit row."""
+
+        return self._set_status(
+            memory_id,
+            MemoryStatus.INACTIVE,
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
+
+    def supersede(
+        self,
+        memory_id: str,
+        *,
+        user_id: str,
+        tenant_id: str,
+        replacement_memory_id: str | None = None,
+    ) -> MemoryRecord | None:
+        """Retain a historical preference after a newer value wins."""
+
+        return self._set_status(
+            memory_id,
+            MemoryStatus.SUPERSEDED,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            replacement_memory_id=replacement_memory_id,
+        )
 
     def remember_execution(
         self,
@@ -206,6 +282,188 @@ class MemoryManager:
         if inspect.isawaitable(value):
             value = _run(value)
         return value
+
+    def _remember_preference(self, record: MemoryRecord) -> MemoryRecord:
+        """Merge one preference identity without creating active duplicates."""
+
+        active = self._active_preferences(record)
+        identity = self._preference_identity(record)
+        same_value = [
+            item for item in active
+            if self._preference_identity(item) == identity
+        ]
+        if same_value:
+            existing = same_value[0]
+            metadata = dict(existing.metadata)
+            metadata["evidence_count"] = int(metadata.get("evidence_count", 1) or 1) + 1
+            self._append_provenance(
+                metadata,
+                existing=existing,
+                incoming=record,
+            )
+            merged = existing.model_copy(update={
+                "content": record.content or existing.content,
+                "structured_metadata": metadata,
+                "confidence": max(existing.confidence, record.confidence),
+                "importance": max(existing.importance, record.importance),
+                "updated_at": _now_iso(),
+            })
+            return self._save(merged)
+
+        preference_key = self._preference_key(record)
+        if preference_key:
+            # A new value for one preference key wins the active projection,
+            # but old values remain queryable as superseded history.
+            for item in active:
+                if self._preference_key(item) != preference_key:
+                    continue
+                self._save(item.model_copy(update={
+                    "status": MemoryStatus.SUPERSEDED,
+                    "updated_at": _now_iso(),
+                }))
+        return self._save(record)
+
+    def _active_preferences(self, record: MemoryRecord) -> list[MemoryRecord]:
+        search = getattr(self._repository, "search", None)
+        if not callable(search):
+            return []
+        try:
+            values = search(MemoryQuery(
+                user_id=record.user_id,
+                tenant_id=record.tenant_id,
+                type=MemoryType.PREFERENCE,
+                status=MemoryStatus.ACTIVE,
+                limit=100,
+                sort_by="created_at",
+            ))
+        except Exception:  # noqa: BLE001 - lifecycle remains best effort for injected stores
+            logger.warning("preference_lifecycle_search_failed", exc_info=True)
+            return []
+        if inspect.isawaitable(values):
+            try:
+                values = _run(values)
+            except RuntimeError:
+                # MemoryManager is synchronous by contract.  Production uses
+                # its synchronous in-process primary and persists a durable
+                # shadow; an async-only injected repository cannot be merged
+                # from this call path without changing that contract.
+                return []
+        return [
+            item if isinstance(item, MemoryRecord) else MemoryRecord.model_validate(item)
+            for item in (values or ())
+        ]
+
+    @staticmethod
+    def _preference_key(record: MemoryRecord) -> str:
+        return str(record.metadata.get("preference_type") or "").strip().casefold()
+
+    @classmethod
+    def _preference_identity(cls, record: MemoryRecord) -> tuple[str, str] | None:
+        key = cls._preference_key(record)
+        value = str(record.metadata.get("value") or "").strip().casefold()
+        if not key or not value:
+            return None
+        return key, value
+
+    @staticmethod
+    def _append_provenance(
+        metadata: dict[str, Any],
+        *,
+        existing: MemoryRecord,
+        incoming: MemoryRecord,
+    ) -> None:
+        conversations = list(metadata.get("source_conversation_ids") or [])
+        for value in (existing.source_conversation_id, incoming.source_conversation_id):
+            if value and value not in conversations:
+                conversations.append(value)
+        if conversations:
+            metadata["source_conversation_ids"] = conversations[-20:]
+        source_ids = list(metadata.get("source_ids") or [])
+        for value in (existing.source_id, incoming.source_id):
+            if value and value not in source_ids:
+                source_ids.append(value)
+        if source_ids:
+            metadata["source_ids"] = source_ids[-20:]
+
+    def _save(self, record: MemoryRecord) -> MemoryRecord:
+        saved = self._repository.save(record)
+        if inspect.isawaitable(saved):
+            try:
+                saved = _run(saved)
+            except RuntimeError:
+                # Keep the contract synchronous for the existing in-process
+                # primary.  Async-only repositories are handled by their own
+                # caller; do not return a coroutine as a MemoryRecord.
+                return record
+        self._persist(saved)
+        return saved
+
+    def _get_scoped(
+        self,
+        memory_id: str,
+        *,
+        user_id: str,
+        tenant_id: str,
+    ) -> MemoryRecord | None:
+        getter = getattr(self._repository, "get", None)
+        if not callable(getter):
+            getter = getattr(self._repository, "find_by_id", None)
+        if not callable(getter):
+            return None
+        try:
+            value = getter(memory_id, user_id=user_id, tenant_id=tenant_id)
+        except TypeError:
+            value = getter(memory_id)
+        if inspect.isawaitable(value):
+            try:
+                value = _run(value)
+            except RuntimeError:
+                return None
+        return value
+
+    def _set_status(
+        self,
+        memory_id: str,
+        status: MemoryStatus,
+        *,
+        user_id: str,
+        tenant_id: str,
+        replacement_memory_id: str | None = None,
+    ) -> MemoryRecord | None:
+        record = self._get_scoped(
+            memory_id,
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
+        if record is None:
+            return None
+        metadata = dict(record.metadata)
+        if replacement_memory_id:
+            metadata["replacement_memory_id"] = replacement_memory_id
+        return self._save(record.model_copy(update={
+            "status": status,
+            "structured_metadata": metadata,
+            "updated_at": _now_iso(),
+        }))
+
+    def _delete(
+        self,
+        memory_id: str,
+        *,
+        user_id: str | None,
+        tenant_id: str | None,
+    ) -> Any:
+        delete = getattr(self._repository, "delete", None)
+        if not callable(delete):
+            return None
+        try:
+            return delete(
+                memory_id,
+                user_id=user_id,
+                tenant_id=tenant_id,
+            )
+        except TypeError:
+            return delete(memory_id)
 
     def _persist(self, record: MemoryRecord) -> None:
         if self._durable_repository is None:

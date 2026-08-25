@@ -118,6 +118,8 @@ class MessageView(BaseModel):
 
 
 class MemorySettings(BaseModel):
+    enabled: bool = False
+    preference_enabled: bool = False
     episodic_enabled: bool = False
     semantic_enabled: bool = False
 
@@ -2147,7 +2149,12 @@ async def get_messages(conversation_id: str, request: Request) -> list[MessageVi
 @router.get("/memory/settings")
 async def get_memory_settings(request: Request) -> MemorySettings:
     _get_auth(request)
-    return MemorySettings()
+    enabled = bool(getattr(request.app.state, "memory_enabled", False))
+    return MemorySettings(
+        enabled=enabled,
+        preference_enabled=enabled,
+        semantic_enabled=enabled,
+    )
 
 
 class MemoryRecordView(BaseModel):
@@ -2172,7 +2179,12 @@ async def get_memory_records(
         return []
 
     try:
-        parsed_type = MemoryType(memory_type.upper()) if memory_type else None
+        normalized_type = memory_type.strip().upper()
+        parsed_type = (
+            MemoryType.PREFERENCE
+            if normalized_type == "PREFERENCE"
+            else MemoryType(normalized_type)
+        ) if normalized_type else None
     except ValueError:
         parsed_type = None
     query = MemoryQuery(
