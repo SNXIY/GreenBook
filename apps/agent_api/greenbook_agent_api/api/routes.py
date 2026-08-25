@@ -7,6 +7,7 @@ import json
 import time
 import logging
 import os
+import re
 import uuid
 from collections.abc import AsyncIterator, Mapping, Sequence
 from datetime import UTC, datetime
@@ -172,6 +173,78 @@ def _get_auth(request: Request) -> AuthContext:
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def deterministic_conversation_title(content: str, *, max_length: int = 64) -> str:
+    """Build a stable first-message title without an additional model call."""
+
+    normalized = re.sub(r"\s+", " ", str(content or "").strip())
+    if not normalized:
+        return ""
+    if len(normalized) <= max_length:
+        return normalized
+    return f"{normalized[:max(1, max_length - 1)].rstrip()}…"
+
+
+def _has_custom_conversation_title(title: Any) -> bool:
+    normalized = str(title or "").strip().casefold()
+    return normalized not in {"", "new conversation", "新会话", "greenbook agent"}
+
+
+async def _set_title_from_first_message(
+    request: Request,
+    session: SessionContext,
+    content: str,
+    auth: AuthContext,
+) -> None:
+    """Persist a deterministic title only for an untitled first message.
+
+    A title projection failure must never block the durable user message or
+    create a second runtime path.
+    """
+
+    title = deterministic_conversation_title(content)
+    if not title:
+        return
+    service = getattr(request.app.state, "conversation_service", None)
+    try:
+        if service is not None:
+            conversation = await service.get_conversation(
+                session.conversation_id,
+                user_id=auth.user_id,
+                tenant_id=auth.tenant_id,
+            )
+            if conversation is None or _has_custom_conversation_title(conversation.get("title")):
+                return
+            messages = await service.list_messages(
+                session.conversation_id,
+                user_id=auth.user_id,
+                tenant_id=auth.tenant_id,
+            )
+            if any(str(item.get("role") or "") == "user" for item in messages):
+                return
+            await service.save_session(session, title=title)
+            return
+
+        store = getattr(request.app.state, "conversation_store", {})
+        record = store.get(session.conversation_id)
+        if not isinstance(record, dict):
+            return
+        if _has_custom_conversation_title(record.get("title")):
+            return
+        if any(
+            str(item.get("role") or "") == "user"
+            for item in (record.get("messages") or [])
+            if isinstance(item, Mapping)
+        ):
+            return
+        record["title"] = title
+        record["updated_at"] = _now_iso()
+    except Exception:  # noqa: BLE001 - title projection is non-critical
+        logger.exception(
+            "conversation_title_projection_failed conversation_id=%s",
+            session.conversation_id,
+        )
 
 
 def _record_value(record: Any, key: str, default: Any = "") -> Any:
@@ -933,6 +1006,27 @@ async def list_conversations(
     )
 
 
+@router.get("/conversations/{conversation_id}", response_model=ConversationSummary)
+async def get_conversation(conversation_id: str, request: Request) -> ConversationSummary:
+    """Validate one durable Conversation against the caller's ownership scope."""
+
+    auth = _get_auth(request)
+    conversation_service = getattr(request.app.state, "conversation_service", None)
+    if conversation_service is not None:
+        record = await conversation_service.get_conversation(
+            conversation_id,
+            user_id=auth.user_id,
+            tenant_id=auth.tenant_id,
+        )
+    else:
+        record = getattr(request.app.state, "conversation_store", {}).get(conversation_id)
+        if record is not None and not _conversation_belongs_to(auth, record):
+            record = None
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+    return _conversation_summary(record)
+
+
 @router.post("/conversations", response_model=ConversationSummary)
 async def create_conversation(
     body: ConversationCreateRequest,
@@ -1692,6 +1786,7 @@ async def _send_runtime_message_async(
             )
             if existing is not None:
                 return _accepted_response_from_durable(existing, replayed=True)
+    await _set_title_from_first_message(request, session, body.content, auth)
     run_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
     try:

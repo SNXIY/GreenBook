@@ -9,6 +9,7 @@
     "test:agent-ux": "esbuild tests/agent_projection.test.ts --bundle --platform=node --format=esm | node --input-type=module",
     "test:user-activity": "esbuild tests/user_activity_projection.test.ts --bundle --platform=node --format=esm --loader:.css=text --define:import.meta.env.VITE_GREENBOOK_AGENT_URL=undefined | node --input-type=module",
     "test:execution": "esbuild tests/execution_api_contract.test.ts --bundle --platform=node --format=esm --define:import.meta.env.VITE_GREENBOOK_AGENT_URL=undefined | node --input-type=module",
+    "test:conversation-lifecycle": "esbuild tests/conversation_lifecycle.test.ts --bundle --platform=node --format=esm --alias:@=./src | node --input-type=module",
     "test:semantic-confirmation": "esbuild tests/semantic_confirmation_projection.test.ts --bundle --platform=node --format=esm --packages=external --loader:.css=text --loader:.module.css=text --alias:@=./src --define:import.meta.env.VITE_GREENBOOK_AGENT_URL=undefined | node --input-type=module",
     "preview": "vite preview",
     "lint": "tsc --noEmit"

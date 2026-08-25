@@ -60,6 +60,7 @@ from .conversation_runtime_adapter import (
     _SEMANTIC_ACTION_CAPABILITIES,
     ConversationRuntimeAdapter,
 )
+from .explicit_resource_admission import admit_explicit_resources
 
 logger = logging.getLogger(__name__)
 
@@ -367,9 +368,63 @@ class TurnCoordinator:
             )
         except Exception:  # noqa: BLE001 - diagnostics must never affect routing
             pass
+        # A typed business identity may refer to a resource created in another
+        # Conversation. Resolve it through the user-scoped Java/MCP read
+        # boundary before TargetResolver sees it. Labels, recency, and
+        # conversation-local "recent" entities never enter this path.
+        admission = await admit_explicit_resources(
+            command,
+            existing_candidates=list(command_context.targets),
+            mcp=mcp,
+            auth=auth,
+            session=session,
+            trace_id=request.trace_id,
+            run_id=request.run_id,
+        )
+        if admission.failed:
+            unresolved = command.model_copy(update={
+                "target_resolution": TargetResolutionStatus.NOT_FOUND.value,
+                "target_candidates": [],
+            })
+            request.current_command = unresolved
+            return self._clarify_result(
+                unresolved,
+                assembled,
+                request,
+                FastPathDecision(route=TurnRoute.CLARIFY, reason="target_unresolved"),
+            )
+        if admission.candidates:
+            scoped_resources = list(assembled.selected_resources or [])
+            for candidate in admission.candidates:
+                identity = (
+                    str(candidate.get("resource_kind") or candidate.get("kind") or "").upper(),
+                    str(candidate.get("resource_id") or candidate.get("id") or ""),
+                )
+                if not any(
+                    (
+                        str(item.get("resource_kind") or item.get("kind") or "").upper(),
+                        str(item.get("resource_id") or item.get("id") or ""),
+                    ) == identity
+                    for item in scoped_resources
+                    if isinstance(item, Mapping)
+                ):
+                    scoped_resources.append(candidate)
+            assembled = assembled.model_copy(update={"selected_resources": scoped_resources})
+            command = admission.command
+            command_context = assembled.to_command_context()
+            request.current_command = command
         target_resolution = await self._resolve_target(
             command, command_context, assembled=assembled
         )
+        command, explicit_task_error = await self._materialize_external_resource_task(
+            command,
+            request,
+            target_resolution,
+        )
+        if explicit_task_error:
+            request.current_command = command
+            return self._fail(request, explicit_task_error)
+        request.current_command = command
         resolved_target = getattr(target_resolution, "target", None)
         resolved_target_kind = getattr(resolved_target, "kind", "")
         resolved_target_kind = str(
@@ -609,6 +664,151 @@ class TurnCoordinator:
                 command.target_resolution = TargetResolutionStatus.RESOLVED.value
         return resolution
 
+    async def _materialize_external_resource_task(
+        self,
+        command: Command,
+        request: TurnRequest,
+        target_resolution: Any,
+    ) -> tuple[Command, str]:
+        """Bind an admitted cross-Conversation resource to a fresh Task.
+
+        The business resource remains Java-owned.  This creates only the
+        ordinary current-Conversation Task projection required by the existing
+        Objective admission and then lets the unchanged ActionLoopExecutor
+        load it by ``resolved_target.task_id``.  No source Conversation
+        session, recent entity, approval, or execution state is copied.
+        """
+
+        parameters = dict(getattr(command, "parameters", None) or {})
+        external = [
+            dict(item)
+            for item in (parameters.get("__external_explicit_resource_admission") or [])
+            if isinstance(item, Mapping)
+        ]
+        if not external or not getattr(command, "task_changes", None):
+            return command, ""
+        if not getattr(target_resolution, "is_resolved", False):
+            return command, ""
+        mutation_actions = {
+            "UPDATE_DRAFT",
+            "DELETE_DRAFT",
+            "CREATE_SCHEDULE",
+            "UPDATE_SCHEDULE",
+            "CANCEL_SCHEDULE",
+            "DELETE_POST",
+            "PUBLISH_NOW",
+        }
+        if not any(
+            str((getattr(change, "desired_changes", None) or {}).get("semantic_action") or "")
+            .strip()
+            .upper()
+            in mutation_actions
+            for change in (getattr(command, "task_changes", None) or ())
+        ):
+            return command, ""
+
+        manager = self._task_manager
+        create = getattr(manager, "create_task", None)
+        add_resource = getattr(manager, "add_resource", None)
+        if not callable(create) or not callable(add_resource):
+            return command, "EXPLICIT_RESOURCE_TASK_ADMISSION_UNAVAILABLE"
+        goal = str(
+            getattr(command, "requested_goal", "")
+            or getattr(command, "raw_input", "")
+            or "Explicit business resource operation"
+        ).strip()
+        try:
+            task = create(
+                conversation_id=request.conversation_id,
+                user_id=request.user_id,
+                tenant_id=request.tenant_id,
+                goal=goal,
+                goal_category=str(getattr(command, "goal_category", "") or "GOAL_DRIVEN"),
+            )
+            task = await task if inspect.isawaitable(task) else task
+            task_id = str(getattr(task, "task_id", "") or "") if task is not None else ""
+            if not task_id:
+                return command, "EXPLICIT_RESOURCE_TASK_ADMISSION_FAILED"
+            for item in external:
+                admitted_id = str(item.get("resource_id") or item.get("id") or "")
+                admitted_kind = str(
+                    item.get("resource_kind") or item.get("kind") or ""
+                ).upper()
+                if not admitted_id or admitted_kind not in {"DRAFT", "SCHEDULE", "POST"}:
+                    return command, "EXPLICIT_RESOURCE_TASK_ADMISSION_FAILED"
+                updated = add_resource(
+                    task_id,
+                    resource_id=admitted_id,
+                    resource_kind=admitted_kind,
+                    title=str(item.get("title") or item.get("label") or ""),
+                    status=str(item.get("status") or ""),
+                )
+                updated = await updated if inspect.isawaitable(updated) else updated
+                if updated is None:
+                    return command, "EXPLICIT_RESOURCE_TASK_ADMISSION_FAILED"
+        except Exception:  # noqa: BLE001 - explicit admission fails closed
+            logger.exception(
+                "explicit_resource_task_admission_failed conversation_id=%s run_id=%s",
+                request.conversation_id,
+                request.run_id,
+            )
+            return command, "EXPLICIT_RESOURCE_TASK_ADMISSION_FAILED"
+
+        next_command = command.model_copy(deep=True)
+        next_parameters = dict(next_command.parameters or {})
+        all_admitted = []
+        for raw in next_parameters.get("__explicit_resource_admission") or ():
+            item = dict(raw) if isinstance(raw, Mapping) else {}
+            identity = (
+                str(item.get("resource_kind") or item.get("kind") or "").upper(),
+                str(item.get("resource_id") or item.get("id") or ""),
+            )
+            if identity in {
+                (
+                    str(item2.get("resource_kind") or item2.get("kind") or "").upper(),
+                    str(item2.get("resource_id") or item2.get("id") or ""),
+                )
+                for item2 in external
+            }:
+                item["task_id"] = task_id
+            all_admitted.append(item)
+        next_parameters["__explicit_resource_admission"] = all_admitted
+        next_parameters["__external_explicit_resource_admission"] = [
+            {**item, "task_id": task_id} for item in external
+        ]
+        next_command.parameters = next_parameters
+        target = dict(next_command.resolved_target or {})
+        target["task_id"] = task_id
+        next_command.resolved_target = target
+        changes = []
+        external_ids = {
+            str(item.get("resource_id") or item.get("id") or "") for item in external
+        }
+        for change in next_command.task_changes or ():
+            reference = dict(change.target_reference or {})
+            desired = dict(change.desired_changes or {})
+            target_ref = desired.get("resource_target")
+            target_ref = dict(target_ref) if isinstance(target_ref, Mapping) else {}
+            resource_id = str(
+                reference.get("resource_id")
+                or reference.get("draft_id")
+                or reference.get("schedule_id")
+                or reference.get("post_id")
+                or target_ref.get("resource_id")
+                or ""
+            )
+            if resource_id in external_ids:
+                reference["task_id"] = task_id
+                target_ref["task_id"] = task_id
+                desired["resource_target"] = target_ref
+                change = change.model_copy(update={
+                    "target_reference": reference,
+                    "desired_changes": desired,
+                })
+            changes.append(change)
+        next_command.task_changes = changes
+        return next_command, ""
+
     def _resolve_delta_objective_target(self, command: Command, assembled: Any) -> Any:
         """Resolve explicit TaskDelta references over conversation Objectives.
 
@@ -640,10 +840,19 @@ class TurnCoordinator:
         tasks = snapshot_tasks if failed_retry_requested else (
             selected_tasks or snapshot_tasks
         )
-        if not tasks:
+        runtime_parameters = dict(getattr(command, "parameters", None) or {})
+        admitted_resources = [
+            dict(item)
+            for item in (runtime_parameters.get("__explicit_resource_admission") or [])
+            if isinstance(item, Mapping)
+        ]
+        external_resource = bool(
+            runtime_parameters.get("__external_explicit_resource_admission")
+        )
+        if not tasks and not admitted_resources:
             return None
-        candidates: list[dict[str, Any]] = []
-        for task in tasks:
+        candidates: list[dict[str, Any]] = list(admitted_resources) if external_resource else []
+        for task in () if external_resource else tasks:
             task_id = str(task.get("task_id") or "") if isinstance(task, Mapping) else ""
             if not task_id:
                 continue

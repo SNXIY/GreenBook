@@ -1,8 +1,11 @@
 export type AgentConversation = {
   conversation_id: string;
-  title: string;
+  title: string | null;
   context_post_id?: string | null;
-  surface: "HOME" | "COMMENT" | "POST";
+  surface?: "HOME" | "COMMENT" | "POST" | string | null;
+  active_draft_id?: string | null;
+  active_schedule_id?: string | null;
+  created_at?: string;
   updated_at: string;
 };
 
