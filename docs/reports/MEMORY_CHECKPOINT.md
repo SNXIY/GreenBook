@@ -1,6 +1,6 @@
 # Memory Checkpoint
 
-Current Phase: Phase 5 complete
+Current Phase: Phase 6 complete
 
 Completed:
 
@@ -51,17 +51,27 @@ Completed:
   spelling while retaining the existing SEMANTIC storage compatibility.
 - Added lifecycle, conflict, confidence, inactive, scope, disabled-service,
   and no-touch provider tests.
+- Generated `MEMORY_IMPLEMENTATION_HANDOFF.md` covering architecture, data
+  model, extraction, retrieval, context integration, isolation, tests,
+  limitations, next steps, and all phase commits.
+- Ran the unit/integration runtime suite, repository compileall, focused Memory
+  lint, full repository lint, protected-boundary diff inspection, and final
+  worktree checks.
 
-Git Commit: Phase 5 lifecycle commit containing this report and checkpoint
+Git Commit: Phase 6 handoff commit containing this report and checkpoint
 (see `git log --oneline` for the exact hash).
 
 Tests: 56 focused Memory/storage/retrieval/extraction/lifecycle/context tests
-  passed; compileall passed; focused Memory/lifecycle ruff checks passed.
+  passed; 1529 existing unit/integration tests passed, 1 skipped, and 6
+  unrelated pre-existing failures remained; compileall passed; focused Memory
+  Ruff checks passed. Full repository Ruff reported 174 existing findings.
   Pytest emitted only the existing cache-path permission warning.
 
-Remaining: Phase 6 final tests, handoff, compile/lint audit, and protected
-  boundary confirmation.
+Remaining: No required Preference Memory slice work. Existing unrelated
+  Objective/MCP/Turn failures and repository-wide Ruff findings remain outside
+  this Memory change; see `MEMORY_IMPLEMENTATION_HANDOFF.md`.
 
-Resume From: Inspect `git status`, `git log`, and this checkpoint. Continue
-  with the final handoff and full acceptance audit without changing ActionLoop,
-  Durable Runtime, MCP, or RAG.
+Resume From: Inspect `git status`, `git log`, and this checkpoint. If resumed,
+  start from the final handoff and address only explicitly scoped follow-up
+  work; do not restart the Memory phases or modify ActionLoop, Durable Runtime,
+  MCP, RAG, or the Java business facade.
