@@ -231,6 +231,7 @@ class ConversationRuntimeAdapter:
         conversation_service: Any | None = None,
         context_builder: ContextBuilder | None = None,
         memory_retriever: MemoryRetriever | None = None,
+        memory_enabled: bool = True,
         max_concurrent_work_per_conversation: int = 3,
         max_concurrent_direct_tools: int = 6,
     ) -> None:
@@ -285,6 +286,7 @@ class ConversationRuntimeAdapter:
         self._control_service = control_service
         self._approval_service = approval_service
         self._preference_provider = preference_provider
+        self._memory_enabled = bool(memory_enabled)
         memory_manager = getattr(self._runtime_service, "_memory_mgr", None)
         if memory_retriever is None and memory_manager is not None:
             store = getattr(memory_manager, "store", None)
@@ -300,6 +302,7 @@ class ConversationRuntimeAdapter:
             memory_retriever=memory_retriever,
             preference_provider=preference_provider,
             task_scope_factory=TaskScope,
+            memory_enabled=self._memory_enabled,
         )
 
     async def execute(
@@ -374,6 +377,7 @@ class ConversationRuntimeAdapter:
                 conversation_id=conversation_id,
                 user_id=user_id,
                 tenant_id=tenant_id,
+                target_query=message,
             )
             timings["context_ready_at"] = _now_timing()
 
@@ -558,6 +562,7 @@ class ConversationRuntimeAdapter:
                 user_id=user_id,
                 tenant_id=tenant_id,
                 current_command=command,
+                target_query=message,
             )
 
             bootstrap_action = self._bootstrap_action(command)
@@ -3392,6 +3397,7 @@ class ConversationRuntimeAdapter:
         tenant_id: str,
         current_command: Command | None = None,
         current_goal: Any | None = None,
+        target_query: str = "",
     ) -> ContextSnapshot:
         """Build one bounded snapshot for the whole turn.
 
@@ -3408,7 +3414,8 @@ class ConversationRuntimeAdapter:
             history=history,
             current_command=current_command,
             current_goal=current_goal,
-            memory_recall=False,
+            target_query=target_query,
+            memory_recall=self._memory_enabled,
         )
 
     @staticmethod

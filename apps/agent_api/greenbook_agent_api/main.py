@@ -54,9 +54,9 @@ from greenbook_agent_core.execution.topology import validate_single_consumer
 from greenbook_agent_core.human import PostgresApprovalRequestStore
 from greenbook_agent_core.human.approval_runtime_service import ApprovalRuntimeService
 from greenbook_agent_core.memory import (
-    MemoryRetriever,
     PostgresMemoryRepository,
     PreferenceMemoryService,
+    PreferenceRetriever,
 )
 from greenbook_agent_core.memory.manager import MemoryManager
 from greenbook_agent_core.observability.metrics import MemoryMetricsCollector
@@ -993,6 +993,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError(
             "GREENBOOK_AGENT_EXECUTION_DISPATCH must be 'direct' or 'queue'"
         )
+    memory_enabled = _env_bool("MEMORY_ENABLED", default=True)
     execution_repository = runtime_persistence.execution_repository
     execution_event_store = runtime_persistence.execution_event_store
     execution_state_manager = runtime_container.execution_state_manager
@@ -1008,11 +1009,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         durable_memory_repository = PostgresMemoryRepository(session_ctx)
         await durable_memory_repository.ensure_storage()
     memory_manager = MemoryManager(durable_repository=durable_memory_repository)
-    preference_memory_service = PreferenceMemoryService(memory_manager)
-    memory_retriever = MemoryRetriever(
+    preference_memory_service = PreferenceMemoryService(
+        memory_manager,
+        enabled=memory_enabled,
+    )
+    preference_retriever = PreferenceRetriever(
         durable_memory_repository or memory_manager.store,
     )
     app.state.memory_store = durable_memory_repository or memory_manager.store
+    app.state.memory_enabled = memory_enabled
     app.state.preference_memory_service = preference_memory_service
     preference_provider = MemoryUserPreferenceProvider(memory_manager)
     task_provider = TaskProvider()
@@ -1084,7 +1089,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         approval_service=approval_runtime_service,
         preference_provider=preference_provider,
         conversation_service=conversation_service,
-        memory_retriever=memory_retriever,
+        memory_retriever=preference_retriever,
+        memory_enabled=memory_enabled,
         max_concurrent_work_per_conversation=int(
             _env_first(
                 "GREENBOOK_AGENT_MAX_CONCURRENT_WORK_PER_CONVERSATION",
@@ -1117,10 +1123,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             external_operation_store=runtime_persistence.external_operation_store,
             artifact_store=runtime_persistence.artifact_store,
             observation_store=runtime_persistence.observation_store,
-            memory_retriever=memory_retriever,
+            memory_retriever=preference_retriever,
             preference_provider=preference_provider,
             task_scope_factory=TaskScope,
-        )
+            memory_enabled=memory_enabled,
+        ),
+        memory_recall=memory_enabled,
     )
     action_loop_executor = ActionLoopExecutor(
         adapter=conversation_runtime_adapter,

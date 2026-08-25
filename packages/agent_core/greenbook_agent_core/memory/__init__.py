@@ -14,6 +14,7 @@ from .extractor import (
 from .manager import MemoryManager
 from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .policy import MemoryWriteDecision, MemoryWritePolicy
+from .preference_retriever import PreferenceRetriever
 from .repository import (
     InMemoryMemoryRepository,
     MemoryRepository,
@@ -28,6 +29,7 @@ __all__ = [
     "MemoryRecord",
     "MemoryRepository",
     "MemoryRetriever",
+    "PreferenceRetriever",
     "MemoryManager",
     "StrategyRetriever",
     "ProceduralMemoryExtractor",

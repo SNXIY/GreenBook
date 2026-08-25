@@ -1473,6 +1473,21 @@ def project_interpreter_context(value: Any) -> dict[str, Any]:
     """
 
     source = as_dict(value)
+    metadata = source.get("metadata")
+    metadata = metadata if isinstance(metadata, Mapping) else {}
+    # ContextSnapshot is carried through CommandContext.metadata so the
+    # resolver can retain canonical facts.  Preference Memory is read from
+    # that projection here, then sanitized before it reaches the Interpreter.
+    preference_values = (
+        source.get("user_preferences")
+        or metadata.get("user_preferences")
+        or []
+    )
+    recalled_memory_values = (
+        source.get("recalled_memories")
+        or metadata.get("recalled_memories")
+        or []
+    )
     target_values = (
         source.get("targets")
         or source.get("target_candidates")
@@ -1507,6 +1522,12 @@ def project_interpreter_context(value: Any) -> dict[str, Any]:
         ),
         "recent_verified_outcomes": _safe_interpreter_value(
             list(source.get("recent_verified_outcomes") or [])
+        ),
+        "user_preferences": _safe_interpreter_value(
+            list(preference_values or [])
+        ),
+        "recalled_memories": _safe_interpreter_value(
+            list(recalled_memory_values or [])
         ),
     }
     # Do not pass CommandContext.metadata through: from_any stores the full

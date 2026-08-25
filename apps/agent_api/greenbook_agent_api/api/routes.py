@@ -23,7 +23,7 @@ from greenbook_agent_core.execution.execution_queue import ExecutionQueueMessage
 from greenbook_agent_core.execution.operation_ledger import is_reconciliation_exhausted
 from greenbook_agent_core.execution.presenter import business_state_for_resource
 from greenbook_agent_core.human import ApprovalRequestStatus
-from greenbook_agent_core.memory.models import MemoryQuery, MemoryType
+from greenbook_agent_core.memory.models import MemoryQuery, MemoryStatus, MemoryType
 from greenbook_agent_core.task.provider import TaskScope
 from greenbook_agent_core.task.manager import TaskConfirmationConflictError
 from greenbook_agent_core.task.models import TaskConfirmationState
@@ -2177,7 +2177,9 @@ async def get_memory_records(
         parsed_type = None
     query = MemoryQuery(
         user_id=auth.user_id,
+        tenant_id=auth.tenant_id,
         type=parsed_type,
+        status=MemoryStatus.ACTIVE,
         limit=max(1, min(int(limit), 100)),
         sort_by="created_at",
     )

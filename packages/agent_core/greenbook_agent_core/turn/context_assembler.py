@@ -32,9 +32,11 @@ class ContextAssembler:
         context_builder: ContextBuilder | Any | None = None,
         *,
         budget: TurnBudget | None = None,
+        memory_recall: bool | None = None,
     ) -> None:
         self._builder = context_builder or ContextBuilder()
         self._budget = budget or TurnBudget()
+        self._memory_recall = memory_recall
 
     async def assemble(
         self,
@@ -49,11 +51,14 @@ class ContextAssembler:
         current_goal: Any | None = None,
         focus_task_ids: Sequence[str] | None = None,
         run_id: str = "",
-        memory_recall: bool = False,
+        memory_recall: bool | None = None,
         user_input: str = "",
     ) -> AssembledTurnContext:
         """Return the canonical snapshot plus task-scoped Fast Path views."""
 
+        selected_memory_recall = (
+            self._memory_recall if memory_recall is None else memory_recall
+        )
         snapshot = await self._build_snapshot(
             conversation_id=conversation_id,
             user_id=user_id,
@@ -64,7 +69,8 @@ class ContextAssembler:
             current_command=current_command,
             current_goal=current_goal,
             run_id=run_id,
-            memory_recall=memory_recall,
+            memory_recall=selected_memory_recall,
+            target_query=user_input,
         )
         focus_ids = self._resolve_focus(
             snapshot,
@@ -120,8 +126,11 @@ class ContextAssembler:
             )
             if not accepts_run_id:
                 kwargs.pop("run_id", None)
-            if not accepts_kwargs and "memory_recall" not in parameter_names:
-                kwargs.pop("memory_recall", None)
+            if not accepts_kwargs:
+                if "memory_recall" not in parameter_names:
+                    kwargs.pop("memory_recall", None)
+                if "target_query" not in parameter_names:
+                    kwargs.pop("target_query", None)
         except (TypeError, ValueError):
             pass
         value = build(**kwargs)

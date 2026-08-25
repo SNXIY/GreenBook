@@ -38,7 +38,7 @@ class TurnBudget(BaseModel):
     max_scoped_executions: int = Field(default=10, ge=0)
     artifact_max_chars: int = Field(default=1500, ge=200)
     max_completed_objective_summary: int = Field(default=4, ge=0)
-    max_memories: int = Field(default=8, ge=0)
+    max_memories: int = Field(default=5, ge=0, le=5)
     max_memory_chars: int = Field(default=1200, ge=200)
     max_verified_outcomes: int = Field(default=8, ge=0)
 

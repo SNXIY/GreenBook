@@ -37,6 +37,7 @@ class ContextBuilder:
         preference_provider: Any | None = None,
         task_scope_factory: Any | None = None,
         budget: ContextBudget | None = None,
+        memory_enabled: bool = True,
     ) -> None:
         self._conversation_source = conversation_source
         self._task_provider = task_provider
@@ -50,6 +51,7 @@ class ContextBuilder:
         self._preference_provider = preference_provider
         self._task_scope_factory = task_scope_factory
         self._budget = budget or ContextBudget()
+        self._memory_enabled = bool(memory_enabled)
 
     async def build(
         self,
@@ -182,15 +184,16 @@ class ContextBuilder:
                 stage(name)
 
         stage("context_parallel_start")
-        # Long-term recall is an explicit projection, not a prerequisite for
-        # Conversation/Task/Objective continuity.  ``None`` preserves the
-        # standalone builder's historical behavior for callers that already
-        # supplied a structured command; production assemblers pass False and
-        # opt in only when a future structured memory dependency exists.
+        # Long-term recall is an optional projection, not a prerequisite for
+        # Conversation/Task/Objective continuity.  The production assembler
+        # supplies the current user input as ``target_query`` so a new
+        # conversation can recall an older preference before interpretation.
         recall_enabled = (
-            bool(memory_recall)
+            self._memory_enabled and bool(memory_recall)
             if memory_recall is not None
-            else current_command is not None or current_goal is not None
+            else self._memory_enabled and bool(
+                current_command is not None or current_goal is not None or target_query
+            )
         )
         if not recall_enabled:
             stage("memory_recall_skipped")
@@ -203,9 +206,14 @@ class ContextBuilder:
                 conversation_id=conversation_id,
                 limit=self._budget.max_verified_outcomes,
             )),
-            tracked("context_preferences_ready", self._load_preferences(user_id)),
+            tracked("context_preferences_ready", self._load_preferences(
+                user_id,
+                tenant_id=tenant_id,
+                enabled=recall_enabled,
+            )),
             tracked("context_memory_ready", self._recall(
                 user_id=user_id,
+                tenant_id=tenant_id,
                 conversation_id=conversation_id,
                 command=current_command,
                 goal=current_goal,
@@ -237,6 +245,7 @@ class ContextBuilder:
                 not in {"RESULT_UNKNOWN", "RECONCILING", "VERIFYING_RESULT"}
             ]
         stage("memory_format_start")
+        memory_limit = min(self._budget.max_memories, 5)
         recalled_preferences = [
             {
                 "key": item.get("structured_metadata", {}).get("preference_type", ""),
@@ -250,7 +259,7 @@ class ContextBuilder:
         ]
         preferences = preferences or recalled_preferences
         preferences = [
-            _compact_preference(item) for item in preferences[: self._budget.max_memories]
+            _compact_preference(item) for item in preferences[:memory_limit]
         ]
         stage("memory_format_ready")
 
@@ -303,11 +312,11 @@ class ContextBuilder:
             user_preferences=preferences,
             recalled_memories=[
                 _compact_memory(item, self._budget.max_memory_chars)
-                for item in recalled[: self._budget.max_memories]
+                for item in recalled[:memory_limit]
             ],
             memory_ids_used=[
                 str(item.get("memory_id"))
-                for item in recalled[: self._budget.max_memories]
+                for item in recalled[:memory_limit]
                 if item.get("memory_id")
             ],
             plan_version=max(
@@ -453,14 +462,25 @@ class ContextBuilder:
             scoped.append(item)
         return [_compact_observation(item) for item in scoped]
 
-    async def _load_preferences(self, user_id: str) -> list[dict[str, Any]]:
+    async def _load_preferences(
+        self,
+        user_id: str,
+        *,
+        tenant_id: str = "",
+        enabled: bool = True,
+    ) -> list[dict[str, Any]]:
+        if not enabled:
+            return []
         provider = self._preference_provider
         if provider is None:
             return []
         loader = getattr(provider, "list_preferences", None)
         if not callable(loader):
             return []
-        value = loader(user_id=user_id)
+        try:
+            value = loader(user_id=user_id, tenant_id=tenant_id)
+        except TypeError:
+            value = loader(user_id=user_id)
         values = await value if inspect.isawaitable(value) else value
         return [as_dict(item) for item in (values or ())]
 
@@ -468,18 +488,28 @@ class ContextBuilder:
         if not enabled:
             return []
         provider = self._memory_retriever or self._memory_provider
-        if provider is None or self._budget.max_memories == 0:
+        memory_limit = min(self._budget.max_memories, 5)
+        if provider is None or memory_limit == 0:
             return []
         retrieve = getattr(provider, "retrieve", None)
         if not callable(retrieve):
             return []
         try:
-            value = retrieve(limit=self._budget.max_memories, touch=False, **kwargs)
+            value = retrieve(limit=memory_limit, touch=False, **kwargs)
         except TypeError:
+            legacy_kwargs = {
+                key: value
+                for key, value in kwargs.items()
+                if key != "tenant_id"
+            }
             try:
-                value = retrieve(limit=self._budget.max_memories, **kwargs)
+                value = retrieve(limit=memory_limit, touch=False, **legacy_kwargs)
             except TypeError:
-                value = retrieve(user_id=kwargs["user_id"], limit=self._budget.max_memories)
+                value = retrieve(
+                    user_id=kwargs["user_id"],
+                    limit=memory_limit,
+                    touch=False,
+                )
         values = await value if inspect.isawaitable(value) else value
         return [as_dict(item) for item in (values or ())]
 

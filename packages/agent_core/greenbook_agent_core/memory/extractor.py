@@ -240,9 +240,11 @@ class PreferenceMemoryService:
         memory_manager: Any,
         *,
         extractor: type[PreferenceMemoryExtractor] = PreferenceMemoryExtractor,
+        enabled: bool = True,
     ) -> None:
         self._memory = memory_manager
         self._extractor = extractor
+        self._enabled = bool(enabled)
 
     def process_completed_turn(
         self,
@@ -252,6 +254,11 @@ class PreferenceMemoryService:
         conversation_id: str,
         user_message: str,
     ) -> tuple[PreferenceExtraction, MemoryRecord | None]:
+        if not self._enabled:
+            return PreferenceExtraction(
+                decision=MemoryWriteDecision.SKIP,
+                reason="memory_feature_disabled",
+            ), None
         extraction = self._extractor.extract(user_message)
         record = self._extractor.to_record(
             extraction,

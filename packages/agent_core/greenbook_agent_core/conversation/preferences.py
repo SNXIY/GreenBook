@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from greenbook_agent_core.command.models import Command
 from greenbook_agent_core.execution.temporal_resolver import TemporalResolver
 from greenbook_agent_core.memory.manager import MemoryManager
-from greenbook_agent_core.memory.models import MemoryQuery, MemoryType
+from greenbook_agent_core.memory.models import MemoryQuery, MemoryStatus, MemoryType
 
 
 class UserPreference(BaseModel):
@@ -26,12 +26,18 @@ class UserPreference(BaseModel):
 
 
 class UserPreferenceProvider(Protocol):
-    async def list_preferences(self, *, user_id: str) -> list[UserPreference]: ...
+    async def list_preferences(
+        self,
+        *,
+        user_id: str,
+        tenant_id: str = "",
+    ) -> list[UserPreference]: ...
 
     async def set_preference(
         self,
         *,
         user_id: str,
+        tenant_id: str = "",
         key: str,
         value: str,
         confidence: float = 1.0,
@@ -41,6 +47,7 @@ class UserPreferenceProvider(Protocol):
         self,
         *,
         user_id: str,
+        tenant_id: str = "",
         command: Command,
         timezone: str,
     ) -> None: ...
@@ -60,10 +67,17 @@ class MemoryUserPreferenceProvider:
         self._minimum = max(1, minimum_observations)
         self._temporal = temporal_resolver or TemporalResolver()
 
-    async def list_preferences(self, *, user_id: str) -> list[UserPreference]:
+    async def list_preferences(
+        self,
+        *,
+        user_id: str,
+        tenant_id: str = "",
+    ) -> list[UserPreference]:
         records = self._memory.recall(MemoryQuery(
             user_id=user_id,
+            tenant_id=tenant_id,
             type=MemoryType.SEMANTIC,
+            status=MemoryStatus.ACTIVE,
             limit=100,
         ))
         evidence = Counter(
@@ -100,6 +114,7 @@ class MemoryUserPreferenceProvider:
         self,
         *,
         user_id: str,
+        tenant_id: str = "",
         key: str,
         value: str,
         confidence: float = 1.0,
@@ -109,6 +124,7 @@ class MemoryUserPreferenceProvider:
             key,
             value,
             confidence,
+            tenant_id=tenant_id,
         )
         record.metadata["source"] = "EXPLICIT"
         return UserPreference(
@@ -122,6 +138,7 @@ class MemoryUserPreferenceProvider:
         self,
         *,
         user_id: str,
+        tenant_id: str = "",
         command: Command,
         timezone: str,
     ) -> None:
@@ -161,6 +178,7 @@ class MemoryUserPreferenceProvider:
             "preferred_publish_time",
             local.strftime("%H:%M"),
             confidence=0.65,
+            tenant_id=tenant_id,
         )
 
 

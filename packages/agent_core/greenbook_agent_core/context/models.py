@@ -19,7 +19,9 @@ class ContextBudget(BaseModel):
     max_operations: int = Field(default=20, ge=1)
     max_artifacts: int = Field(default=40, ge=1)
     max_resources: int = Field(default=50, ge=1)
-    max_memories: int = Field(default=8, ge=0)
+    # Preference Memory is deliberately a small decision hint, never a full
+    # profile dump.  ContextBuilder also caps caller-supplied budgets at five.
+    max_memories: int = Field(default=5, ge=0, le=5)
     max_target_candidates: int = Field(default=80, ge=1)
     max_memory_chars: int = Field(default=1200, ge=200)
     max_operation_chars: int = Field(default=1200, ge=200)
