@@ -25,22 +25,18 @@ from .tool_schemas import (
     CreateDraftArguments,
     DeleteDraftArguments,
     DeletePostArguments,
-    GetAccountSummaryArguments,
     GetDraftArguments,
     GetPostArguments,
-    GetPostPerformanceArguments,
     GetScheduleStatusArguments,
-    ListCommentsArguments,
     ListDraftsArguments,
     ListOwnPostsArguments,
     PublishNowArguments,
     ScheduleArguments,
     SearchPublicPostsArguments,
-    SendReplyArguments,
     UpdateScheduleArguments,
     UpdateDraftArguments,
 )
-from .tools import analytics, community, content, interaction, publication
+from .tools import community, content, publication
 
 _TOOLS: dict[str, ToolContract] = {}
 _METADATA: ToolRegistry | None = None
@@ -210,45 +206,10 @@ _register(
     input_schema=PublishNowArguments,
 )
 
-# Interaction ---------------------------------------------------------------
-_register(
-    "interaction.list_comments",
-    interaction.list_comments,
-    capability="LIST_COMMENTS",
-    operations=("QUERY_COMMENTS",),
-    description="List comments on a post",
-    category="interaction",
-    input_schema=ListCommentsArguments,
-)
-_register(
-    "interaction.send_reply",
-    interaction.send_reply,
-    capability="REPLY_USER",
-    operations=("REPLY_COMMENT",),
-    description="Reply to a comment (requires approval)",
-    category="interaction",
-    input_schema=SendReplyArguments,
-)
-
-# Analytics -----------------------------------------------------------------
-_register(
-    "analytics.get_post_performance",
-    analytics.get_post_performance,
-    capability="ANALYZE_PERFORMANCE",
-    operations=("QUERY_ANALYTICS",),
-    description="Get performance metrics for a single post",
-    category="analytics",
-    input_schema=GetPostPerformanceArguments,
-)
-_register(
-    "analytics.get_account_summary",
-    analytics.get_account_summary,
-    capability="ANALYZE_PERFORMANCE",
-    operations=("QUERY_ANALYTICS",),
-    description="Get analytics summary for the current account",
-    category="analytics",
-    input_schema=GetAccountSummaryArguments,
-)
+# Interaction and analytics handlers/schemas remain in the repository as
+# historical compatibility assets.  They are deliberately not registered in
+# the active Agent catalog because the current product scope excludes these
+# capabilities.
 
 
 def get_tool(name: str) -> ToolContract:

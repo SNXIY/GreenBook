@@ -75,10 +75,6 @@ _SEMANTIC_CAPABILITY: dict[str, str] = {
     "UPDATE_SCHEDULE": "MANAGE_SCHEDULE",
     "CANCEL_SCHEDULE": "CANCEL_SCHEDULE",
     "PUBLISH_NOW": "PUBLISH_NOW",
-    "LIST_COMMENTS": "LIST_COMMENTS",
-    "REPLY_COMMENT": "REPLY_USER",
-    "GET_POST_PERFORMANCE": "ANALYZE_PERFORMANCE",
-    "GET_ACCOUNT_SUMMARY": "ANALYZE_PERFORMANCE",
 }
 
 _SEMANTIC_TOOL: dict[str, str] = {
@@ -96,10 +92,6 @@ _SEMANTIC_TOOL: dict[str, str] = {
     "UPDATE_SCHEDULE": "publication.update_schedule",
     "CANCEL_SCHEDULE": "publication.cancel_schedule",
     "PUBLISH_NOW": "publication.publish_now",
-    "LIST_COMMENTS": "interaction.list_comments",
-    "REPLY_COMMENT": "interaction.send_reply",
-    "GET_POST_PERFORMANCE": "analytics.get_post_performance",
-    "GET_ACCOUNT_SUMMARY": "analytics.get_account_summary",
 }
 
 # Actions with an external side effect; they must go through the durable
@@ -113,11 +105,10 @@ _WRITE_ACTIONS = frozenset({
     "UPDATE_SCHEDULE",
     "CANCEL_SCHEDULE",
     "PUBLISH_NOW",
-    "REPLY_COMMENT",
 })
 _MUTATION_ACTIONS = frozenset({
     "UPDATE_DRAFT", "DELETE_DRAFT", "DELETE_POST", "UPDATE_SCHEDULE", "CANCEL_SCHEDULE",
-    "PUBLISH_NOW", "REPLY_COMMENT",
+    "PUBLISH_NOW",
 })
 
 # Action -> the business resource it is expected to produce (drives FINISH).
@@ -134,9 +125,6 @@ _ACTION_RESOURCE_KIND: dict[str, str] = {
     "GET_DRAFT": "DRAFT",
     "LIST_DRAFTS": "DRAFT",
     "GET_SCHEDULE": "SCHEDULE",
-    "LIST_COMMENTS": "COMMENT",
-    "GET_POST_PERFORMANCE": "POST",
-    "GET_ACCOUNT_SUMMARY": "ACCOUNT",
     # A successful GET_POST produces a POST resource = strong evidence for a
     # GROUNDED_SYNTHESIS objective.  Distinct from the SEARCH_RESULT candidate set.
     "GET_POST": "POST",
@@ -2708,7 +2696,7 @@ def _resource_ref_from_raw(
     if not resource_id:
         return None
     default_kind = "POST" if action in {
-        "SEARCH_POSTS", "LIST_OWN_POSTS", "GET_POST", "GET_POST_PERFORMANCE",
+        "SEARCH_POSTS", "LIST_OWN_POSTS", "GET_POST",
     } else str(_ACTION_RESOURCE_KIND.get(action) or action or "RESOURCE")
     kind = str(
         data.get("kind")

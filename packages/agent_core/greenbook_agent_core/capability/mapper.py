@@ -55,7 +55,6 @@ class CapabilityMapper:
             "ANALYZE_COMMUNITY":  ["SEARCH_COMMUNITY"],
             "PUBLISH_CONTENT":    ["SCHEDULE_PUBLISH"],
             "MANAGE_SCHEDULE":    ["MANAGE_SCHEDULE"],
-            "INTERACT":           ["REPLY_USER"],
             "QUERY_INFO":         ["GET_DRAFT"],
             "COMPOSITE":          [
                 "SEARCH_COMMUNITY",

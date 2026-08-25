@@ -1205,14 +1205,9 @@ business request such as "立即发布这篇文章" is a CREATE or MODIFY operat
 with the PUBLISH_NOW capability, not a CONTROL command.
 
 Required capabilities must be semantic and sufficient for the requested
-outcome, but must not include capabilities whose required target or evidence
-is absent. In particular, do not request GET_POST_DETAIL or
-ANALYZE_PERFORMANCE for a general community trend, interest, column-planning,
-or promotion request unless the user explicitly asks for a concrete post,
-engagement metrics, account performance, or supplies an eligible target. Do
-not treat understanding community interests as a request for the user's own
-performance metrics, and do not add capabilities merely because they are
-present in the catalog.
+outcome, but must be selected only from the supplied active capability catalog.
+Do not invent capabilities that are absent from that catalog or add a
+capability merely because it appears in historical compatibility data.
 
 When the user asks to write, generate, create, or save an article as a draft,
 use GENERATE_CONTENT; SAVE_DRAFT is not a canonical capability. Use

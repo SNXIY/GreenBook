@@ -37,9 +37,6 @@ FAST_READ_ACTIONS = frozenset({
     "GET_POST",
     "LIST_OWN_POSTS",
     "GET_SCHEDULE",
-    "LIST_COMMENTS",
-    "GET_POST_PERFORMANCE",
-    "GET_ACCOUNT_SUMMARY",
 })
 
 # Capability name -> canonical semantic action (reverse of CapabilityRegistry
@@ -63,8 +60,6 @@ _CAPABILITY_TO_ACTION: dict[str, str] = {
     "GET_POST_DETAIL": "GET_POST",
     "LIST_OWN_POSTS": "LIST_OWN_POSTS",
     "GET_SCHEDULE_STATUS": "GET_SCHEDULE",
-    "LIST_COMMENTS": "LIST_COMMENTS",
-    "ANALYZE_PERFORMANCE": "ANALYZE_PERFORMANCE",
 }
 
 # Semantic actions that, on their own, still require dynamic reasoning/replan
@@ -73,7 +68,6 @@ _NON_FAST_ACTIONS = frozenset({
     "SEARCH_POSTS",
     "CREATE_DRAFT",
     "CREATE_SCHEDULE",
-    "REPLY_COMMENT",
     "ANALYZE_CONTENT_PATTERNS",
     "VALIDATE_QUALITY",
 })
@@ -92,8 +86,6 @@ _TARGETED_ACTIONS = frozenset({
     "GET_DRAFT",
     "GET_POST",
     "GET_SCHEDULE",
-    "LIST_COMMENTS",
-    "GET_POST_PERFORMANCE",
 })
 
 _NON_ACTIONABLE_QUERY_OPERATIONS = frozenset({
