@@ -1,0 +1,5195 @@
+{
+  "status": "VALID",
+  "generated_at": "2026-08-25",
+  "scope": {
+    "failure_case_count": 20,
+    "query_count": 20,
+    "candidate_post_count": 83,
+    "candidate_chunk_count": 1817,
+    "candidate_scope": "Top10 posts from the 20 exported failure cases",
+    "ranking": "offline exact cosine over the candidate-post chunk pool",
+    "A": "content only",
+    "B": "title + content",
+    "C": "title + tags + content",
+    "C_PRODUCTION": "current Qdrant vector from title + tags + description + content"
+  },
+  "metrics": {
+    "A_CONTENT_ONLY": {
+      "CONDITIONAL_CHUNK_RECALL@10": 0.03125,
+      "evaluated_query_count": 16,
+      "gold_post_present_query_count": 16,
+      "candidate_post_count": 83,
+      "candidate_chunk_count": 1817
+    },
+    "B_TITLE_CONTENT": {
+      "CONDITIONAL_CHUNK_RECALL@10": 0.177083,
+      "evaluated_query_count": 16,
+      "gold_post_present_query_count": 16,
+      "candidate_post_count": 83,
+      "candidate_chunk_count": 1817
+    },
+    "C_TITLE_TAGS_CONTENT": {
+      "CONDITIONAL_CHUNK_RECALL@10": 0.0625,
+      "evaluated_query_count": 16,
+      "gold_post_present_query_count": 16,
+      "candidate_post_count": 83,
+      "candidate_chunk_count": 1817
+    },
+    "C_PRODUCTION": {
+      "CONDITIONAL_CHUNK_RECALL@10": 0.072917,
+      "evaluated_query_count": 16,
+      "gold_post_present_query_count": 16,
+      "candidate_post_count": 83,
+      "candidate_chunk_count": 1817
+    }
+  },
+  "details": [
+    {
+      "query_id": "rag-001",
+      "query": "Java 后端可靠性实践有哪些核心原则？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 290,
+      "expected_candidate_gold_chunks": [
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.81244065,
+              "rank": 1
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.81195828,
+              "rank": 2
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.80971379,
+              "rank": 3
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.80573652,
+              "rank": 4
+            },
+            {
+              "chunk_id": "d1ed4add-a7a3-3b45-a1a7-bed165ac5123",
+              "score": 0.78897564,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.78584063,
+              "rank": 6
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.77666205,
+              "rank": 7
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.77057315,
+              "rank": 8
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.75985466,
+              "rank": 9
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.75692065,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.83951572,
+              "rank": 1
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.82429387,
+              "rank": 2
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.81934645,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f16c7bb1-b17a-34fc-95f8-895fa9e432c1",
+              "score": 0.81897675,
+              "rank": 4
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.81815537,
+              "rank": 5
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.81489066,
+              "rank": 6
+            },
+            {
+              "chunk_id": "b9904da2-3163-372f-ac90-40f9f975e873",
+              "score": 0.81462334,
+              "rank": 7
+            },
+            {
+              "chunk_id": "013ad657-126b-3c0c-8202-45686797fd73",
+              "score": 0.81405703,
+              "rank": 8
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.81392955,
+              "rank": 9
+            },
+            {
+              "chunk_id": "dc944214-7f2a-327c-990e-15a386d48012",
+              "score": 0.80865589,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.80171033,
+              "rank": 1
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.79102222,
+              "rank": 2
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.78636483,
+              "rank": 3
+            },
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.78435202,
+              "rank": 4
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.78138142,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f59ec448-d26a-3b02-89fb-cf7db0190203",
+              "score": 0.78077377,
+              "rank": 6
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.78074739,
+              "rank": 7
+            },
+            {
+              "chunk_id": "0bed0ebf-3688-3261-81c0-08fc4945bf3d",
+              "score": 0.78022288,
+              "rank": 8
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.77972401,
+              "rank": 9
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.77161941,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.79603103,
+              "rank": 1
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.78888792,
+              "rank": 2
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.78649452,
+              "rank": 3
+            },
+            {
+              "chunk_id": "0bed0ebf-3688-3261-81c0-08fc4945bf3d",
+              "score": 0.78549445,
+              "rank": 4
+            },
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.7805389,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f59ec448-d26a-3b02-89fb-cf7db0190203",
+              "score": 0.77991604,
+              "rank": 6
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.77946056,
+              "rank": 7
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.77482422,
+              "rank": 8
+            },
+            {
+              "chunk_id": "0683aca5-4b6e-3421-b061-0fb525baae1d",
+              "score": 0.77227148,
+              "rank": 9
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.77075736,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-002",
+      "query": "What are the main practices for reliable Java backends?",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 297,
+      "expected_candidate_gold_chunks": [
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.73239115,
+              "rank": 1
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.7268717,
+              "rank": 2
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.72020608,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.71367744,
+              "rank": 4
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.68602109,
+              "rank": 5
+            },
+            {
+              "chunk_id": "89aeb92d-bb96-3974-bb29-8169290c9385",
+              "score": 0.65027438,
+              "rank": 6
+            },
+            {
+              "chunk_id": "c344b040-5ef1-39b9-a5fa-08c269b7000b",
+              "score": 0.64012144,
+              "rank": 7
+            },
+            {
+              "chunk_id": "0683aca5-4b6e-3421-b061-0fb525baae1d",
+              "score": 0.63734123,
+              "rank": 8
+            },
+            {
+              "chunk_id": "3ed3afc1-0fd0-3643-91f5-409d8717636c",
+              "score": 0.63305915,
+              "rank": 9
+            },
+            {
+              "chunk_id": "69e387ad-58cd-3fc0-8c61-1d53a18816a4",
+              "score": 0.63305915,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.73814024,
+              "rank": 1
+            },
+            {
+              "chunk_id": "98d95a76-981c-3264-8ded-ba5226746692",
+              "score": 0.73625122,
+              "rank": 2
+            },
+            {
+              "chunk_id": "a9355606-bf8a-3bfb-9b57-195e7c2e6976",
+              "score": 0.73362289,
+              "rank": 3
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.73221817,
+              "rank": 4
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.7295537,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.72026381,
+              "rank": 6
+            },
+            {
+              "chunk_id": "f23194d4-4c00-3059-8240-e8459c5ae004",
+              "score": 0.71803057,
+              "rank": 7
+            },
+            {
+              "chunk_id": "27980263-c16a-3b15-b995-17c831afa583",
+              "score": 0.7175498,
+              "rank": 8
+            },
+            {
+              "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+              "score": 0.71691752,
+              "rank": 9
+            },
+            {
+              "chunk_id": "0090943e-55b5-3449-9b33-2a38c02f61a5",
+              "score": 0.70887384,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+              "score": 0.71691752,
+              "rank": 9
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.72090608,
+              "rank": 1
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.70675941,
+              "rank": 2
+            },
+            {
+              "chunk_id": "a9355606-bf8a-3bfb-9b57-195e7c2e6976",
+              "score": 0.69759127,
+              "rank": 3
+            },
+            {
+              "chunk_id": "27980263-c16a-3b15-b995-17c831afa583",
+              "score": 0.69606378,
+              "rank": 4
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.69314336,
+              "rank": 5
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.68991913,
+              "rank": 6
+            },
+            {
+              "chunk_id": "f23194d4-4c00-3059-8240-e8459c5ae004",
+              "score": 0.68315151,
+              "rank": 7
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.68274494,
+              "rank": 8
+            },
+            {
+              "chunk_id": "232438dc-70e5-31c2-9d41-1365bff94e3a",
+              "score": 0.68174595,
+              "rank": 9
+            },
+            {
+              "chunk_id": "0683aca5-4b6e-3421-b061-0fb525baae1d",
+              "score": 0.68012561,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.72680733,
+              "rank": 1
+            },
+            {
+              "chunk_id": "27980263-c16a-3b15-b995-17c831afa583",
+              "score": 0.69554628,
+              "rank": 2
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.69039245,
+              "rank": 3
+            },
+            {
+              "chunk_id": "0683aca5-4b6e-3421-b061-0fb525baae1d",
+              "score": 0.68846896,
+              "rank": 4
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.68618887,
+              "rank": 5
+            },
+            {
+              "chunk_id": "232438dc-70e5-31c2-9d41-1365bff94e3a",
+              "score": 0.68428852,
+              "rank": 6
+            },
+            {
+              "chunk_id": "73feee42-bf98-3eec-b398-1e16c8213a1b",
+              "score": 0.68401083,
+              "rank": 7
+            },
+            {
+              "chunk_id": "98d95a76-981c-3264-8ded-ba5226746692",
+              "score": 0.6817686,
+              "rank": 8
+            },
+            {
+              "chunk_id": "a9355606-bf8a-3bfb-9b57-195e7c2e6976",
+              "score": 0.68151897,
+              "rank": 9
+            },
+            {
+              "chunk_id": "130faee2-fd96-3eca-a9a5-21b7e7801341",
+              "score": 0.67568459,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-003",
+      "query": "如何在 Java 服务中实现后端稳定性？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 285,
+      "expected_candidate_gold_chunks": [
+        "d2665fbc-a38a-3670-9245-7864b3744540",
+        "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.8524098,
+              "rank": 1
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.84099848,
+              "rank": 2
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.83785421,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.82315282,
+              "rank": 4
+            },
+            {
+              "chunk_id": "c344b040-5ef1-39b9-a5fa-08c269b7000b",
+              "score": 0.81071814,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.80833622,
+              "rank": 6
+            },
+            {
+              "chunk_id": "8078fdf5-9ebb-38b1-9221-6057bec6f73a",
+              "score": 0.80648286,
+              "rank": 7
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.80395751,
+              "rank": 8
+            },
+            {
+              "chunk_id": "75f824b6-81c0-3199-a1e0-a3ca390a1005",
+              "score": 0.79732495,
+              "rank": 9
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.79657181,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "d2665fbc-a38a-3670-9245-7864b3744540": {
+              "rank": null,
+              "score": null
+            },
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.86387229,
+              "rank": 1
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.85919985,
+              "rank": 2
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.85881975,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.84943417,
+              "rank": 4
+            },
+            {
+              "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+              "score": 0.84923036,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.8470973,
+              "rank": 6
+            },
+            {
+              "chunk_id": "c344b040-5ef1-39b9-a5fa-08c269b7000b",
+              "score": 0.84540019,
+              "rank": 7
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.84264799,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f772339a-90e9-3d85-9839-b0e7ee2320ce",
+              "score": 0.84133506,
+              "rank": 9
+            },
+            {
+              "chunk_id": "73feee42-bf98-3eec-b398-1e16c8213a1b",
+              "score": 0.84073822,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "d2665fbc-a38a-3670-9245-7864b3744540": {
+              "rank": null,
+              "score": null
+            },
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.83723228,
+              "rank": 1
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.82338847,
+              "rank": 2
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.82267758,
+              "rank": 3
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.82227743,
+              "rank": 4
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.82076731,
+              "rank": 5
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.81968498,
+              "rank": 6
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.81558247,
+              "rank": 7
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.80926776,
+              "rank": 8
+            },
+            {
+              "chunk_id": "73feee42-bf98-3eec-b398-1e16c8213a1b",
+              "score": 0.80715914,
+              "rank": 9
+            },
+            {
+              "chunk_id": "8078fdf5-9ebb-38b1-9221-6057bec6f73a",
+              "score": 0.80445744,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "d2665fbc-a38a-3670-9245-7864b3744540": {
+              "rank": null,
+              "score": null
+            },
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.82526593,
+              "rank": 1
+            },
+            {
+              "chunk_id": "73feee42-bf98-3eec-b398-1e16c8213a1b",
+              "score": 0.82197992,
+              "rank": 2
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.82012519,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.81906286,
+              "rank": 4
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.81441845,
+              "rank": 5
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.81307967,
+              "rank": 6
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.81195287,
+              "rank": 7
+            },
+            {
+              "chunk_id": "c300af92-e82b-3fc5-abcf-be5740f16bad",
+              "score": 0.80781696,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.80531457,
+              "rank": 9
+            },
+            {
+              "chunk_id": "75f824b6-81c0-3199-a1e0-a3ca390a1005",
+              "score": 0.79842055,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "d2665fbc-a38a-3670-9245-7864b3744540": {
+              "rank": null,
+              "score": null
+            },
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-004",
+      "query": "从 Java 入门到生产实践需要掌握哪些可靠性要点？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 277,
+      "expected_candidate_gold_chunks": [
+        "dfef4e49-4c1c-37f1-930d-1fc17bacf62b"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "db7092a3-9dd1-3c66-9151-4225ae38a63a",
+              "score": 0.66793442,
+              "rank": 1
+            },
+            {
+              "chunk_id": "1b9bb74d-5dfe-3311-8d64-d5475c4b1d92",
+              "score": 0.6636237,
+              "rank": 2
+            },
+            {
+              "chunk_id": "3294dc66-1d19-3eb5-afc2-ee79efd9cf39",
+              "score": 0.64264655,
+              "rank": 3
+            },
+            {
+              "chunk_id": "4b2c99f3-4447-3a72-a117-99836d1a8ea9",
+              "score": 0.63968253,
+              "rank": 4
+            },
+            {
+              "chunk_id": "d07d6435-bfc8-33fd-ad47-0d1ef29c3a25",
+              "score": 0.62628076,
+              "rank": 5
+            },
+            {
+              "chunk_id": "2f4219c9-2f9c-3c1a-84bf-f7e68deb7561",
+              "score": 0.6202979,
+              "rank": 6
+            },
+            {
+              "chunk_id": "fe4987f4-160e-375c-9656-cb9255a3ca64",
+              "score": 0.6202979,
+              "rank": 7
+            },
+            {
+              "chunk_id": "6266c801-40de-325a-952a-1097a78cbc97",
+              "score": 0.61930128,
+              "rank": 8
+            },
+            {
+              "chunk_id": "2cc5687c-3b06-3e08-9ce5-0afd33f1b20d",
+              "score": 0.60901387,
+              "rank": 9
+            },
+            {
+              "chunk_id": "dbe0dbb3-9372-3e1c-9082-5b16927ac356",
+              "score": 0.60619754,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "dfef4e49-4c1c-37f1-930d-1fc17bacf62b": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "7677375a-8d9c-35aa-8580-036a1888d633",
+              "score": 0.59394515,
+              "rank": 1
+            },
+            {
+              "chunk_id": "c76e586c-b172-396c-9fa4-1adb1fe965d1",
+              "score": 0.59394515,
+              "rank": 2
+            },
+            {
+              "chunk_id": "f039c868-ab33-3beb-96ca-2fccfb9466ad",
+              "score": 0.58540373,
+              "rank": 3
+            },
+            {
+              "chunk_id": "ac9a594b-8c7f-3e46-be1e-2e2994c50d0f",
+              "score": 0.58164251,
+              "rank": 4
+            },
+            {
+              "chunk_id": "ec2f0417-ad2c-3d55-abbd-3b6781c89cfb",
+              "score": 0.57920505,
+              "rank": 5
+            },
+            {
+              "chunk_id": "db7092a3-9dd1-3c66-9151-4225ae38a63a",
+              "score": 0.57389496,
+              "rank": 6
+            },
+            {
+              "chunk_id": "034cd24e-10cd-3487-9ead-e3bcee12e45b",
+              "score": 0.57375145,
+              "rank": 7
+            },
+            {
+              "chunk_id": "d07d6435-bfc8-33fd-ad47-0d1ef29c3a25",
+              "score": 0.56888786,
+              "rank": 8
+            },
+            {
+              "chunk_id": "e41af149-c0ff-3f45-9b2c-e54512ddb802",
+              "score": 0.56809499,
+              "rank": 9
+            },
+            {
+              "chunk_id": "2f4219c9-2f9c-3c1a-84bf-f7e68deb7561",
+              "score": 0.56292597,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "dfef4e49-4c1c-37f1-930d-1fc17bacf62b": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "7105b8f0-5aed-3c7b-8a33-fd2581e50fd9",
+              "score": 0.55981114,
+              "rank": 1
+            },
+            {
+              "chunk_id": "7677375a-8d9c-35aa-8580-036a1888d633",
+              "score": 0.55173148,
+              "rank": 2
+            },
+            {
+              "chunk_id": "c76e586c-b172-396c-9fa4-1adb1fe965d1",
+              "score": 0.55173148,
+              "rank": 3
+            },
+            {
+              "chunk_id": "ac9a594b-8c7f-3e46-be1e-2e2994c50d0f",
+              "score": 0.55001229,
+              "rank": 4
+            },
+            {
+              "chunk_id": "3294dc66-1d19-3eb5-afc2-ee79efd9cf39",
+              "score": 0.54666013,
+              "rank": 5
+            },
+            {
+              "chunk_id": "e12beff0-f5ef-3808-9277-ee39db49b670",
+              "score": 0.5455113,
+              "rank": 6
+            },
+            {
+              "chunk_id": "f039c868-ab33-3beb-96ca-2fccfb9466ad",
+              "score": 0.54331103,
+              "rank": 7
+            },
+            {
+              "chunk_id": "ec2f0417-ad2c-3d55-abbd-3b6781c89cfb",
+              "score": 0.54246205,
+              "rank": 8
+            },
+            {
+              "chunk_id": "1e8dbecf-ff58-306a-9977-2d5e79d8b1d8",
+              "score": 0.5420929,
+              "rank": 9
+            },
+            {
+              "chunk_id": "2f4219c9-2f9c-3c1a-84bf-f7e68deb7561",
+              "score": 0.53995259,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "dfef4e49-4c1c-37f1-930d-1fc17bacf62b": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "ba3b155e-f52d-364a-93b6-6d48ed06318b",
+              "score": 0.54223653,
+              "rank": 1
+            },
+            {
+              "chunk_id": "7677375a-8d9c-35aa-8580-036a1888d633",
+              "score": 0.54163318,
+              "rank": 2
+            },
+            {
+              "chunk_id": "c76e586c-b172-396c-9fa4-1adb1fe965d1",
+              "score": 0.54163318,
+              "rank": 3
+            },
+            {
+              "chunk_id": "ac9a594b-8c7f-3e46-be1e-2e2994c50d0f",
+              "score": 0.53943865,
+              "rank": 4
+            },
+            {
+              "chunk_id": "1e8dbecf-ff58-306a-9977-2d5e79d8b1d8",
+              "score": 0.53761626,
+              "rank": 5
+            },
+            {
+              "chunk_id": "7105b8f0-5aed-3c7b-8a33-fd2581e50fd9",
+              "score": 0.53733653,
+              "rank": 6
+            },
+            {
+              "chunk_id": "3294dc66-1d19-3eb5-afc2-ee79efd9cf39",
+              "score": 0.53721875,
+              "rank": 7
+            },
+            {
+              "chunk_id": "f039c868-ab33-3beb-96ca-2fccfb9466ad",
+              "score": 0.5337058,
+              "rank": 8
+            },
+            {
+              "chunk_id": "2f4219c9-2f9c-3c1a-84bf-f7e68deb7561",
+              "score": 0.5295931,
+              "rank": 9
+            },
+            {
+              "chunk_id": "fe4987f4-160e-375c-9656-cb9255a3ca64",
+              "score": 0.5295931,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "dfef4e49-4c1c-37f1-930d-1fc17bacf62b": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-005",
+      "query": "What should a learner know to build production Java services?",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 255,
+      "expected_candidate_gold_chunks": [],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "c01aee0f-ffa7-3d2d-8fc0-1c46e236efcc",
+              "score": 0.7234034,
+              "rank": 1
+            },
+            {
+              "chunk_id": "7bc9e72d-dcc7-34f5-a421-afb8e21e94cf",
+              "score": 0.71520806,
+              "rank": 2
+            },
+            {
+              "chunk_id": "cdcdd5ba-08b1-330b-b7c0-631d63126831",
+              "score": 0.70607297,
+              "rank": 3
+            },
+            {
+              "chunk_id": "b46fe117-2ca5-3c84-b3c9-60aa0674acca",
+              "score": 0.70407007,
+              "rank": 4
+            },
+            {
+              "chunk_id": "434c695c-e7d6-3e4a-8696-fcf4eb066826",
+              "score": 0.69672583,
+              "rank": 5
+            },
+            {
+              "chunk_id": "07a991e3-45fd-37b2-af21-b9199cc2dc88",
+              "score": 0.69442502,
+              "rank": 6
+            },
+            {
+              "chunk_id": "e972f548-1f7e-33cd-ada1-e59da052290e",
+              "score": 0.68733423,
+              "rank": 7
+            },
+            {
+              "chunk_id": "c30e4a48-b1c4-35e1-8d89-c2f8139612f9",
+              "score": 0.68571661,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f2f2104a-6761-3171-9173-7efc3ab26416",
+              "score": 0.68449438,
+              "rank": 9
+            },
+            {
+              "chunk_id": "e900bbcb-c1ed-3e2d-9661-e55e5288f42c",
+              "score": 0.67792104,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "c01aee0f-ffa7-3d2d-8fc0-1c46e236efcc",
+              "score": 0.69399596,
+              "rank": 1
+            },
+            {
+              "chunk_id": "e972f548-1f7e-33cd-ada1-e59da052290e",
+              "score": 0.69122041,
+              "rank": 2
+            },
+            {
+              "chunk_id": "02303b90-ae29-3e9b-a276-597135c66e9f",
+              "score": 0.68160385,
+              "rank": 3
+            },
+            {
+              "chunk_id": "7bc9e72d-dcc7-34f5-a421-afb8e21e94cf",
+              "score": 0.67559123,
+              "rank": 4
+            },
+            {
+              "chunk_id": "cdcdd5ba-08b1-330b-b7c0-631d63126831",
+              "score": 0.67503984,
+              "rank": 5
+            },
+            {
+              "chunk_id": "c30e4a48-b1c4-35e1-8d89-c2f8139612f9",
+              "score": 0.67437352,
+              "rank": 6
+            },
+            {
+              "chunk_id": "9110866d-5c17-3e5c-9d27-956679b747b9",
+              "score": 0.67127862,
+              "rank": 7
+            },
+            {
+              "chunk_id": "b46fe117-2ca5-3c84-b3c9-60aa0674acca",
+              "score": 0.66914121,
+              "rank": 8
+            },
+            {
+              "chunk_id": "e900bbcb-c1ed-3e2d-9661-e55e5288f42c",
+              "score": 0.66785035,
+              "rank": 9
+            },
+            {
+              "chunk_id": "b9379dfe-4abe-3193-9110-e64b3ef615c6",
+              "score": 0.66612914,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "e972f548-1f7e-33cd-ada1-e59da052290e",
+              "score": 0.68130637,
+              "rank": 1
+            },
+            {
+              "chunk_id": "c01aee0f-ffa7-3d2d-8fc0-1c46e236efcc",
+              "score": 0.65281049,
+              "rank": 2
+            },
+            {
+              "chunk_id": "02303b90-ae29-3e9b-a276-597135c66e9f",
+              "score": 0.65265189,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a774fb6a-da8a-31b6-aaa0-59643bb6cd73",
+              "score": 0.65016278,
+              "rank": 4
+            },
+            {
+              "chunk_id": "c30e4a48-b1c4-35e1-8d89-c2f8139612f9",
+              "score": 0.64979446,
+              "rank": 5
+            },
+            {
+              "chunk_id": "71515152-1a98-3644-a52e-4be61b9f5dc8",
+              "score": 0.6410598,
+              "rank": 6
+            },
+            {
+              "chunk_id": "7bc9e72d-dcc7-34f5-a421-afb8e21e94cf",
+              "score": 0.63862964,
+              "rank": 7
+            },
+            {
+              "chunk_id": "911f422c-d32c-336b-b241-7970123b267b",
+              "score": 0.63679742,
+              "rank": 8
+            },
+            {
+              "chunk_id": "2ea9d72d-70a2-39ca-a018-e02ab9b317a8",
+              "score": 0.63568507,
+              "rank": 9
+            },
+            {
+              "chunk_id": "980110a4-11a0-3e79-ac43-dfdff32a51b6",
+              "score": 0.6348822,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "e972f548-1f7e-33cd-ada1-e59da052290e",
+              "score": 0.67993019,
+              "rank": 1
+            },
+            {
+              "chunk_id": "02303b90-ae29-3e9b-a276-597135c66e9f",
+              "score": 0.65704431,
+              "rank": 2
+            },
+            {
+              "chunk_id": "c01aee0f-ffa7-3d2d-8fc0-1c46e236efcc",
+              "score": 0.65030188,
+              "rank": 3
+            },
+            {
+              "chunk_id": "911f422c-d32c-336b-b241-7970123b267b",
+              "score": 0.64667497,
+              "rank": 4
+            },
+            {
+              "chunk_id": "c30e4a48-b1c4-35e1-8d89-c2f8139612f9",
+              "score": 0.64384833,
+              "rank": 5
+            },
+            {
+              "chunk_id": "a774fb6a-da8a-31b6-aaa0-59643bb6cd73",
+              "score": 0.64024766,
+              "rank": 6
+            },
+            {
+              "chunk_id": "56f767b1-27fc-3f47-9d71-ef6f075fd479",
+              "score": 0.63799143,
+              "rank": 7
+            },
+            {
+              "chunk_id": "71515152-1a98-3644-a52e-4be61b9f5dc8",
+              "score": 0.63776993,
+              "rank": 8
+            },
+            {
+              "chunk_id": "7bc9e72d-dcc7-34f5-a421-afb8e21e94cf",
+              "score": 0.63589273,
+              "rank": 9
+            },
+            {
+              "chunk_id": "980110a4-11a0-3e79-ac43-dfdff32a51b6",
+              "score": 0.63492774,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        }
+      }
+    },
+    {
+      "query_id": "rag-006",
+      "query": "Java 稳定性验证通常包括哪些内容？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 274,
+      "expected_candidate_gold_chunks": [
+        "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7",
+        "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749",
+        "d682c77c-29ed-3c52-b728-90e5e27d7b99"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.81996306,
+              "rank": 1
+            },
+            {
+              "chunk_id": "d0ba6621-b7ff-3441-bc37-d465c70e2a2d",
+              "score": 0.78226281,
+              "rank": 2
+            },
+            {
+              "chunk_id": "8078fdf5-9ebb-38b1-9221-6057bec6f73a",
+              "score": 0.77504588,
+              "rank": 3
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.77205891,
+              "rank": 4
+            },
+            {
+              "chunk_id": "d04b4322-2d4e-3562-8db5-8edc050cadc3",
+              "score": 0.7452951,
+              "rank": 5
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.73123828,
+              "rank": 6
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.73016046,
+              "rank": 7
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.72614119,
+              "rank": 8
+            },
+            {
+              "chunk_id": "265a1f2b-cc08-311b-bc77-cb38935a7c0f",
+              "score": 0.72421811,
+              "rank": 9
+            },
+            {
+              "chunk_id": "75f824b6-81c0-3199-a1e0-a3ca390a1005",
+              "score": 0.72374423,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7": {
+              "rank": null,
+              "score": null
+            },
+            "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749": {
+              "rank": null,
+              "score": null
+            },
+            "d682c77c-29ed-3c52-b728-90e5e27d7b99": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "f16c7bb1-b17a-34fc-95f8-895fa9e432c1",
+              "score": 0.88193798,
+              "rank": 1
+            },
+            {
+              "chunk_id": "50f30740-970b-33a6-80d4-4109fb9c1b6b",
+              "score": 0.84813063,
+              "rank": 2
+            },
+            {
+              "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+              "score": 0.84698303,
+              "rank": 3
+            },
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.83659786,
+              "rank": 4
+            },
+            {
+              "chunk_id": "a69c5d5b-da81-3591-8974-4164e7b2624c",
+              "score": 0.8168951,
+              "rank": 5
+            },
+            {
+              "chunk_id": "4a00d167-748f-397c-9c5e-9f85c2f61c4e",
+              "score": 0.8154543,
+              "rank": 6
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.79166441,
+              "rank": 7
+            },
+            {
+              "chunk_id": "08c9bf51-fb20-3e6c-a239-c744bb14cf94",
+              "score": 0.78319445,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f8a99646-c372-3f4f-8fa1-2028b4403868",
+              "score": 0.78104219,
+              "rank": 9
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.78094619,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7": {
+              "rank": null,
+              "score": null
+            },
+            "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749": {
+              "rank": null,
+              "score": null
+            },
+            "d682c77c-29ed-3c52-b728-90e5e27d7b99": {
+              "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+              "score": 0.84698303,
+              "rank": 3
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "f16c7bb1-b17a-34fc-95f8-895fa9e432c1",
+              "score": 0.85538818,
+              "rank": 1
+            },
+            {
+              "chunk_id": "50f30740-970b-33a6-80d4-4109fb9c1b6b",
+              "score": 0.83671796,
+              "rank": 2
+            },
+            {
+              "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+              "score": 0.82813923,
+              "rank": 3
+            },
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.82253258,
+              "rank": 4
+            },
+            {
+              "chunk_id": "a69c5d5b-da81-3591-8974-4164e7b2624c",
+              "score": 0.81947684,
+              "rank": 5
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.78600806,
+              "rank": 6
+            },
+            {
+              "chunk_id": "4a00d167-748f-397c-9c5e-9f85c2f61c4e",
+              "score": 0.78598619,
+              "rank": 7
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.77740515,
+              "rank": 8
+            },
+            {
+              "chunk_id": "d0ba6621-b7ff-3441-bc37-d465c70e2a2d",
+              "score": 0.77555107,
+              "rank": 9
+            },
+            {
+              "chunk_id": "f8a99646-c372-3f4f-8fa1-2028b4403868",
+              "score": 0.77235253,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7": {
+              "rank": null,
+              "score": null
+            },
+            "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749": {
+              "rank": null,
+              "score": null
+            },
+            "d682c77c-29ed-3c52-b728-90e5e27d7b99": {
+              "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+              "score": 0.82813923,
+              "rank": 3
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "f16c7bb1-b17a-34fc-95f8-895fa9e432c1",
+              "score": 0.85652557,
+              "rank": 1
+            },
+            {
+              "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+              "score": 0.83364831,
+              "rank": 2
+            },
+            {
+              "chunk_id": "50f30740-970b-33a6-80d4-4109fb9c1b6b",
+              "score": 0.83245193,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a69c5d5b-da81-3591-8974-4164e7b2624c",
+              "score": 0.81800513,
+              "rank": 4
+            },
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.81396783,
+              "rank": 5
+            },
+            {
+              "chunk_id": "d04b4322-2d4e-3562-8db5-8edc050cadc3",
+              "score": 0.77263858,
+              "rank": 6
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.7723316,
+              "rank": 7
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.76891634,
+              "rank": 8
+            },
+            {
+              "chunk_id": "4a00d167-748f-397c-9c5e-9f85c2f61c4e",
+              "score": 0.76851711,
+              "rank": 9
+            },
+            {
+              "chunk_id": "c300af92-e82b-3fc5-abcf-be5740f16bad",
+              "score": 0.76812962,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7": {
+              "rank": null,
+              "score": null
+            },
+            "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749": {
+              "rank": null,
+              "score": null
+            },
+            "d682c77c-29ed-3c52-b728-90e5e27d7b99": {
+              "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+              "score": 0.83364831,
+              "rank": 2
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-007",
+      "query": "Java 后端架构设计如何支持可靠性？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 287,
+      "expected_candidate_gold_chunks": [
+        "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.84900083,
+              "rank": 1
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.82707653,
+              "rank": 2
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.7948855,
+              "rank": 3
+            },
+            {
+              "chunk_id": "d1ed4add-a7a3-3b45-a1a7-bed165ac5123",
+              "score": 0.794838,
+              "rank": 4
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.78171997,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.78077247,
+              "rank": 6
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.77492316,
+              "rank": 7
+            },
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.76648744,
+              "rank": 8
+            },
+            {
+              "chunk_id": "8078fdf5-9ebb-38b1-9221-6057bec6f73a",
+              "score": 0.75954505,
+              "rank": 9
+            },
+            {
+              "chunk_id": "74ff403d-2159-311b-96aa-e0f68378db73",
+              "score": 0.75225581,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.84149058,
+              "rank": 1
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.82912552,
+              "rank": 2
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.82823679,
+              "rank": 3
+            },
+            {
+              "chunk_id": "1d439b7c-3f43-3e9f-9942-2962362224cc",
+              "score": 0.8100557,
+              "rank": 4
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.80957462,
+              "rank": 5
+            },
+            {
+              "chunk_id": "d1ed4add-a7a3-3b45-a1a7-bed165ac5123",
+              "score": 0.80560619,
+              "rank": 6
+            },
+            {
+              "chunk_id": "75d1eba9-446c-34b9-8d90-6d2ebbfbade3",
+              "score": 0.80227092,
+              "rank": 7
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.80123306,
+              "rank": 8
+            },
+            {
+              "chunk_id": "df3e4865-4feb-3da2-a5ba-4ae8d645d43e",
+              "score": 0.80019362,
+              "rank": 9
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.7973835,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.81664845,
+              "rank": 1
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.7930877,
+              "rank": 2
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.78851035,
+              "rank": 3
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.78633671,
+              "rank": 4
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.78458009,
+              "rank": 5
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.7774015,
+              "rank": 6
+            },
+            {
+              "chunk_id": "1d439b7c-3f43-3e9f-9942-2962362224cc",
+              "score": 0.77170638,
+              "rank": 7
+            },
+            {
+              "chunk_id": "a71dca70-ada4-3876-8e3d-b983dccc1e87",
+              "score": 0.7701517,
+              "rank": 8
+            },
+            {
+              "chunk_id": "5d45f11f-5772-3325-8850-7276ce79a83c",
+              "score": 0.76807857,
+              "rank": 9
+            },
+            {
+              "chunk_id": "75d1eba9-446c-34b9-8d90-6d2ebbfbade3",
+              "score": 0.76721744,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.81001511,
+              "rank": 1
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.79370304,
+              "rank": 2
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.7915296,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a71dca70-ada4-3876-8e3d-b983dccc1e87",
+              "score": 0.77872238,
+              "rank": 4
+            },
+            {
+              "chunk_id": "798056e6-27ba-39f5-83e0-7efda6c36921",
+              "score": 0.77716391,
+              "rank": 5
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.77546107,
+              "rank": 6
+            },
+            {
+              "chunk_id": "0bed0ebf-3688-3261-81c0-08fc4945bf3d",
+              "score": 0.77543271,
+              "rank": 7
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.77316042,
+              "rank": 8
+            },
+            {
+              "chunk_id": "1d439b7c-3f43-3e9f-9942-2962362224cc",
+              "score": 0.76856048,
+              "rank": 9
+            },
+            {
+              "chunk_id": "75d1eba9-446c-34b9-8d90-6d2ebbfbade3",
+              "score": 0.76560756,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-009",
+      "query": "Java 服务如何处理异常、重试与稳定性？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 277,
+      "expected_candidate_gold_chunks": [
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "d0ba6621-b7ff-3441-bc37-d465c70e2a2d",
+              "score": 0.80942785,
+              "rank": 1
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.78152751,
+              "rank": 2
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.77673187,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.76864307,
+              "rank": 4
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.75854633,
+              "rank": 5
+            },
+            {
+              "chunk_id": "be9bb302-d5be-37fb-bca2-86981fd564a4",
+              "score": 0.75105424,
+              "rank": 6
+            },
+            {
+              "chunk_id": "d04b4322-2d4e-3562-8db5-8edc050cadc3",
+              "score": 0.74911062,
+              "rank": 7
+            },
+            {
+              "chunk_id": "75f824b6-81c0-3199-a1e0-a3ca390a1005",
+              "score": 0.74717028,
+              "rank": 8
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.74289829,
+              "rank": 9
+            },
+            {
+              "chunk_id": "07aba084-36cc-3c40-81dc-7d458b9b0ff1",
+              "score": 0.73737602,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "e3218ab0-c420-367c-8101-3c6184db2334",
+              "score": 0.76517286,
+              "rank": 1
+            },
+            {
+              "chunk_id": "98d95a76-981c-3264-8ded-ba5226746692",
+              "score": 0.76183558,
+              "rank": 2
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.75891049,
+              "rank": 3
+            },
+            {
+              "chunk_id": "d0ba6621-b7ff-3441-bc37-d465c70e2a2d",
+              "score": 0.75869921,
+              "rank": 4
+            },
+            {
+              "chunk_id": "a9355606-bf8a-3bfb-9b57-195e7c2e6976",
+              "score": 0.75707704,
+              "rank": 5
+            },
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.75393933,
+              "rank": 6
+            },
+            {
+              "chunk_id": "1b6b7bfb-698c-3546-87ef-fa9d6bc7d57a",
+              "score": 0.75291006,
+              "rank": 7
+            },
+            {
+              "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+              "score": 0.75288462,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.75178472,
+              "rank": 9
+            },
+            {
+              "chunk_id": "f6633897-bc27-313e-8b3b-08e967264d54",
+              "score": 0.74732915,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+              "score": 0.75288462,
+              "rank": 8
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "774be4cc-858f-31f9-8667-42505ff9c4cc",
+              "score": 0.74399111,
+              "rank": 1
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.73853608,
+              "rank": 2
+            },
+            {
+              "chunk_id": "d0ba6621-b7ff-3441-bc37-d465c70e2a2d",
+              "score": 0.73361293,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f6633897-bc27-313e-8b3b-08e967264d54",
+              "score": 0.73309739,
+              "rank": 4
+            },
+            {
+              "chunk_id": "13f82ea2-5860-3d3f-b3fa-b31129dde4ef",
+              "score": 0.71843538,
+              "rank": 5
+            },
+            {
+              "chunk_id": "8288b2b2-a90f-3da6-9925-0f528b8a70d5",
+              "score": 0.71797311,
+              "rank": 6
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.71446745,
+              "rank": 7
+            },
+            {
+              "chunk_id": "232438dc-70e5-31c2-9d41-1365bff94e3a",
+              "score": 0.71321201,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.7123399,
+              "rank": 9
+            },
+            {
+              "chunk_id": "f00c39fa-c486-348e-b9f4-e36d3abe3b9a",
+              "score": 0.7105389,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "774be4cc-858f-31f9-8667-42505ff9c4cc",
+              "score": 0.75004954,
+              "rank": 1
+            },
+            {
+              "chunk_id": "8288b2b2-a90f-3da6-9925-0f528b8a70d5",
+              "score": 0.73131685,
+              "rank": 2
+            },
+            {
+              "chunk_id": "f6633897-bc27-313e-8b3b-08e967264d54",
+              "score": 0.7284883,
+              "rank": 3
+            },
+            {
+              "chunk_id": "232438dc-70e5-31c2-9d41-1365bff94e3a",
+              "score": 0.72571594,
+              "rank": 4
+            },
+            {
+              "chunk_id": "d0ba6621-b7ff-3441-bc37-d465c70e2a2d",
+              "score": 0.72369445,
+              "rank": 5
+            },
+            {
+              "chunk_id": "a9c0bad7-0146-3d30-95cd-ac9377bbb2a8",
+              "score": 0.72228039,
+              "rank": 6
+            },
+            {
+              "chunk_id": "13f82ea2-5860-3d3f-b3fa-b31129dde4ef",
+              "score": 0.71598289,
+              "rank": 7
+            },
+            {
+              "chunk_id": "d04b4322-2d4e-3562-8db5-8edc050cadc3",
+              "score": 0.71434174,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.71265385,
+              "rank": 9
+            },
+            {
+              "chunk_id": "741d2cc3-1328-3e86-b217-d9036cb89840",
+              "score": 0.71085422,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-010",
+      "query": "Java 后端迁移与升级有哪些实践要点？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 266,
+      "expected_candidate_gold_chunks": [],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "6b2ffbbf-9551-3f55-9425-b9a82b1e4a7a",
+              "score": 0.72338561,
+              "rank": 1
+            },
+            {
+              "chunk_id": "0655bcc8-72f0-3adc-815a-703d3bdbd952",
+              "score": 0.72300489,
+              "rank": 2
+            },
+            {
+              "chunk_id": "a8caf762-03a4-3fae-839f-e3d1b24a9802",
+              "score": 0.70824064,
+              "rank": 3
+            },
+            {
+              "chunk_id": "bf33f9b1-5bf6-357f-b519-75cc737d2375",
+              "score": 0.70784338,
+              "rank": 4
+            },
+            {
+              "chunk_id": "c344b040-5ef1-39b9-a5fa-08c269b7000b",
+              "score": 0.69803824,
+              "rank": 5
+            },
+            {
+              "chunk_id": "9a8f8dea-a2ef-361d-99c2-a0f218194427",
+              "score": 0.69504766,
+              "rank": 6
+            },
+            {
+              "chunk_id": "f29e9b71-2078-31d4-9f0d-9561ee5a6acb",
+              "score": 0.69268317,
+              "rank": 7
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.69050329,
+              "rank": 8
+            },
+            {
+              "chunk_id": "29a3b418-4302-3820-b490-c3b81fe29fb2",
+              "score": 0.67800741,
+              "rank": 9
+            },
+            {
+              "chunk_id": "80c85cb0-f53e-3451-a5d7-32d612ff423e",
+              "score": 0.66899818,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "a8caf762-03a4-3fae-839f-e3d1b24a9802",
+              "score": 0.7381456,
+              "rank": 1
+            },
+            {
+              "chunk_id": "c358a6fb-03f1-3e8d-9535-aea8f896d322",
+              "score": 0.73531966,
+              "rank": 2
+            },
+            {
+              "chunk_id": "0655bcc8-72f0-3adc-815a-703d3bdbd952",
+              "score": 0.72979004,
+              "rank": 3
+            },
+            {
+              "chunk_id": "d92be662-cb99-3944-902a-b660159a8079",
+              "score": 0.72660458,
+              "rank": 4
+            },
+            {
+              "chunk_id": "77f08d6d-0aa4-3b1a-80cc-d66f8a5916ab",
+              "score": 0.7253208,
+              "rank": 5
+            },
+            {
+              "chunk_id": "29a3b418-4302-3820-b490-c3b81fe29fb2",
+              "score": 0.72263103,
+              "rank": 6
+            },
+            {
+              "chunk_id": "5488f9d7-5d60-3351-8a86-11f6de59cd08",
+              "score": 0.71730046,
+              "rank": 7
+            },
+            {
+              "chunk_id": "fa465bfa-dd8a-343a-accd-d8d95704fad7",
+              "score": 0.71673523,
+              "rank": 8
+            },
+            {
+              "chunk_id": "1b6a650f-3614-38e6-8913-b752d2416bab",
+              "score": 0.70787838,
+              "rank": 9
+            },
+            {
+              "chunk_id": "cbf936ce-98fb-3170-8fd8-e1f5283844eb",
+              "score": 0.70691468,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "0655bcc8-72f0-3adc-815a-703d3bdbd952",
+              "score": 0.7130841,
+              "rank": 1
+            },
+            {
+              "chunk_id": "a8caf762-03a4-3fae-839f-e3d1b24a9802",
+              "score": 0.71246309,
+              "rank": 2
+            },
+            {
+              "chunk_id": "c358a6fb-03f1-3e8d-9535-aea8f896d322",
+              "score": 0.70970041,
+              "rank": 3
+            },
+            {
+              "chunk_id": "fa465bfa-dd8a-343a-accd-d8d95704fad7",
+              "score": 0.70413487,
+              "rank": 4
+            },
+            {
+              "chunk_id": "29a3b418-4302-3820-b490-c3b81fe29fb2",
+              "score": 0.70099907,
+              "rank": 5
+            },
+            {
+              "chunk_id": "d92be662-cb99-3944-902a-b660159a8079",
+              "score": 0.70003216,
+              "rank": 6
+            },
+            {
+              "chunk_id": "77f08d6d-0aa4-3b1a-80cc-d66f8a5916ab",
+              "score": 0.69744223,
+              "rank": 7
+            },
+            {
+              "chunk_id": "5488f9d7-5d60-3351-8a86-11f6de59cd08",
+              "score": 0.69254287,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.68348134,
+              "rank": 9
+            },
+            {
+              "chunk_id": "cbf936ce-98fb-3170-8fd8-e1f5283844eb",
+              "score": 0.67839779,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "a8caf762-03a4-3fae-839f-e3d1b24a9802",
+              "score": 0.70519236,
+              "rank": 1
+            },
+            {
+              "chunk_id": "29a3b418-4302-3820-b490-c3b81fe29fb2",
+              "score": 0.70450595,
+              "rank": 2
+            },
+            {
+              "chunk_id": "fa465bfa-dd8a-343a-accd-d8d95704fad7",
+              "score": 0.70138571,
+              "rank": 3
+            },
+            {
+              "chunk_id": "0655bcc8-72f0-3adc-815a-703d3bdbd952",
+              "score": 0.69660757,
+              "rank": 4
+            },
+            {
+              "chunk_id": "c358a6fb-03f1-3e8d-9535-aea8f896d322",
+              "score": 0.69348179,
+              "rank": 5
+            },
+            {
+              "chunk_id": "5488f9d7-5d60-3351-8a86-11f6de59cd08",
+              "score": 0.69007498,
+              "rank": 6
+            },
+            {
+              "chunk_id": "d92be662-cb99-3944-902a-b660159a8079",
+              "score": 0.68916539,
+              "rank": 7
+            },
+            {
+              "chunk_id": "77f08d6d-0aa4-3b1a-80cc-d66f8a5916ab",
+              "score": 0.68817653,
+              "rank": 8
+            },
+            {
+              "chunk_id": "f91cd71e-6fa3-3fe1-b7a7-774e550a0d7c",
+              "score": 0.68372438,
+              "rank": 9
+            },
+            {
+              "chunk_id": "cbf936ce-98fb-3170-8fd8-e1f5283844eb",
+              "score": 0.67566436,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        }
+      }
+    },
+    {
+      "query_id": "rag-011",
+      "query": "Redis 缓存的生产实践有哪些？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 113,
+      "expected_candidate_gold_chunks": [],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.74156596,
+              "rank": 1
+            },
+            {
+              "chunk_id": "df70b7af-04a7-3713-bec5-fa7bf2b774e2",
+              "score": 0.7278647,
+              "rank": 2
+            },
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.71186143,
+              "rank": 3
+            },
+            {
+              "chunk_id": "c4ce422c-a0f9-3265-aa88-779ab3b2ecbd",
+              "score": 0.70133791,
+              "rank": 4
+            },
+            {
+              "chunk_id": "6f829bcf-73ce-39e0-8f71-e1045677c6d8",
+              "score": 0.68293399,
+              "rank": 5
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.67736605,
+              "rank": 6
+            },
+            {
+              "chunk_id": "4144eb9b-ec36-368e-8ceb-0a1ccd94e8d1",
+              "score": 0.67355367,
+              "rank": 7
+            },
+            {
+              "chunk_id": "0f17f850-0ddc-311b-b0da-ab3af98cb4bc",
+              "score": 0.67055886,
+              "rank": 8
+            },
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.65661706,
+              "rank": 9
+            },
+            {
+              "chunk_id": "f786a81d-3c34-372d-baa5-a52466c7e2c7",
+              "score": 0.64197576,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.74451522,
+              "rank": 1
+            },
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.73326235,
+              "rank": 2
+            },
+            {
+              "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+              "score": 0.71140232,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a006e2be-4cdc-3905-b79f-d97d2aa98769",
+              "score": 0.71115917,
+              "rank": 4
+            },
+            {
+              "chunk_id": "df70b7af-04a7-3713-bec5-fa7bf2b774e2",
+              "score": 0.70652294,
+              "rank": 5
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.70442656,
+              "rank": 6
+            },
+            {
+              "chunk_id": "8bfb849f-ce48-3087-88fd-d5781225a392",
+              "score": 0.7022716,
+              "rank": 7
+            },
+            {
+              "chunk_id": "40a99473-68ab-38d0-a528-24ac50296e71",
+              "score": 0.70083408,
+              "rank": 8
+            },
+            {
+              "chunk_id": "52ee7c8d-e726-37bc-970b-cba446e9c07c",
+              "score": 0.70083408,
+              "rank": 9
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.69874739,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.69951334,
+              "rank": 1
+            },
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.69884783,
+              "rank": 2
+            },
+            {
+              "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+              "score": 0.69233198,
+              "rank": 3
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.67994455,
+              "rank": 4
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.67382623,
+              "rank": 5
+            },
+            {
+              "chunk_id": "30d3096e-9e3b-3592-b201-4f9e5069437a",
+              "score": 0.66379538,
+              "rank": 6
+            },
+            {
+              "chunk_id": "40a99473-68ab-38d0-a528-24ac50296e71",
+              "score": 0.65831272,
+              "rank": 7
+            },
+            {
+              "chunk_id": "52ee7c8d-e726-37bc-970b-cba446e9c07c",
+              "score": 0.65831272,
+              "rank": 8
+            },
+            {
+              "chunk_id": "a006e2be-4cdc-3905-b79f-d97d2aa98769",
+              "score": 0.65020534,
+              "rank": 9
+            },
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.64948001,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.69657478,
+              "rank": 1
+            },
+            {
+              "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+              "score": 0.68709472,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.67956776,
+              "rank": 3
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.67829762,
+              "rank": 4
+            },
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.66666678,
+              "rank": 5
+            },
+            {
+              "chunk_id": "30d3096e-9e3b-3592-b201-4f9e5069437a",
+              "score": 0.65657524,
+              "rank": 6
+            },
+            {
+              "chunk_id": "10cb7665-1a15-3289-83e8-40aaafb5bb7c",
+              "score": 0.65580341,
+              "rank": 7
+            },
+            {
+              "chunk_id": "40a99473-68ab-38d0-a528-24ac50296e71",
+              "score": 0.65394492,
+              "rank": 8
+            },
+            {
+              "chunk_id": "52ee7c8d-e726-37bc-970b-cba446e9c07c",
+              "score": 0.65394492,
+              "rank": 9
+            },
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.65316865,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        }
+      }
+    },
+    {
+      "query_id": "rag-012",
+      "query": "What are reliable Redis cache practices in production?",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 197,
+      "expected_candidate_gold_chunks": [
+        "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+        "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.68734442,
+              "rank": 1
+            },
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.67410493,
+              "rank": 2
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.65863779,
+              "rank": 3
+            },
+            {
+              "chunk_id": "ec9d185d-bc7c-3307-a52d-1ac6edb0942f",
+              "score": 0.63738995,
+              "rank": 4
+            },
+            {
+              "chunk_id": "2fb3b743-8969-3898-8fdc-adbe6c862da3",
+              "score": 0.63294783,
+              "rank": 5
+            },
+            {
+              "chunk_id": "dbf2f71b-7765-3a38-a739-388a6be83329",
+              "score": 0.62136227,
+              "rank": 6
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.61010498,
+              "rank": 7
+            },
+            {
+              "chunk_id": "300d8025-2937-392c-a850-827ee0c8df4f",
+              "score": 0.59698926,
+              "rank": 8
+            },
+            {
+              "chunk_id": "40ccdbe6-e5c2-3458-b6d5-4cb5e0da1045",
+              "score": 0.59565963,
+              "rank": 9
+            },
+            {
+              "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+              "score": 0.59004679,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c769e67-f3b9-3237-b3cb-13d88f8ed184": {
+              "rank": null,
+              "score": null
+            },
+            "6324e49c-10d8-335b-b8f3-88d9dc25de55": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.67070143,
+              "rank": 1
+            },
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.63227574,
+              "rank": 2
+            },
+            {
+              "chunk_id": "66ab3e3d-c2b8-3dd8-915c-2125d88da201",
+              "score": 0.62266762,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f922029a-559b-3a2c-a680-fa54ee8708b0",
+              "score": 0.62266762,
+              "rank": 4
+            },
+            {
+              "chunk_id": "3353ada1-6dc2-3deb-b943-22e0cb23b797",
+              "score": 0.61984279,
+              "rank": 5
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.61360152,
+              "rank": 6
+            },
+            {
+              "chunk_id": "8b488097-7938-3bf2-8505-893168b8d808",
+              "score": 0.61220436,
+              "rank": 7
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.61182295,
+              "rank": 8
+            },
+            {
+              "chunk_id": "20b6eb4b-443e-35f3-bc3c-3770dcbbfbbc",
+              "score": 0.61151849,
+              "rank": 9
+            },
+            {
+              "chunk_id": "ffe4eadf-ca35-34c7-bb42-f9b466f6662f",
+              "score": 0.60970665,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c769e67-f3b9-3237-b3cb-13d88f8ed184": {
+              "rank": null,
+              "score": null
+            },
+            "6324e49c-10d8-335b-b8f3-88d9dc25de55": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.62521422,
+              "rank": 1
+            },
+            {
+              "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+              "score": 0.6057026,
+              "rank": 2
+            },
+            {
+              "chunk_id": "8b488097-7938-3bf2-8505-893168b8d808",
+              "score": 0.6014655,
+              "rank": 3
+            },
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.59598945,
+              "rank": 4
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.59295468,
+              "rank": 5
+            },
+            {
+              "chunk_id": "66ab3e3d-c2b8-3dd8-915c-2125d88da201",
+              "score": 0.58696285,
+              "rank": 6
+            },
+            {
+              "chunk_id": "f922029a-559b-3a2c-a680-fa54ee8708b0",
+              "score": 0.58696285,
+              "rank": 7
+            },
+            {
+              "chunk_id": "20b6eb4b-443e-35f3-bc3c-3770dcbbfbbc",
+              "score": 0.58605356,
+              "rank": 8
+            },
+            {
+              "chunk_id": "ffe4eadf-ca35-34c7-bb42-f9b466f6662f",
+              "score": 0.58439561,
+              "rank": 9
+            },
+            {
+              "chunk_id": "8d7e22cb-3e42-3069-beda-4ed503511e62",
+              "score": 0.58011531,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c769e67-f3b9-3237-b3cb-13d88f8ed184": {
+              "rank": null,
+              "score": null
+            },
+            "6324e49c-10d8-335b-b8f3-88d9dc25de55": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.61583913,
+              "rank": 1
+            },
+            {
+              "chunk_id": "8b488097-7938-3bf2-8505-893168b8d808",
+              "score": 0.60408195,
+              "rank": 2
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.5966941,
+              "rank": 3
+            },
+            {
+              "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+              "score": 0.58771265,
+              "rank": 4
+            },
+            {
+              "chunk_id": "8d7e22cb-3e42-3069-beda-4ed503511e62",
+              "score": 0.58409446,
+              "rank": 5
+            },
+            {
+              "chunk_id": "66ab3e3d-c2b8-3dd8-915c-2125d88da201",
+              "score": 0.58354207,
+              "rank": 6
+            },
+            {
+              "chunk_id": "f922029a-559b-3a2c-a680-fa54ee8708b0",
+              "score": 0.58354207,
+              "rank": 7
+            },
+            {
+              "chunk_id": "20b6eb4b-443e-35f3-bc3c-3770dcbbfbbc",
+              "score": 0.58269668,
+              "rank": 8
+            },
+            {
+              "chunk_id": "ffe4eadf-ca35-34c7-bb42-f9b466f6662f",
+              "score": 0.57927142,
+              "rank": 9
+            },
+            {
+              "chunk_id": "dbf2f71b-7765-3a38-a739-388a6be83329",
+              "score": 0.57271708,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c769e67-f3b9-3237-b3cb-13d88f8ed184": {
+              "rank": null,
+              "score": null
+            },
+            "6324e49c-10d8-335b-b8f3-88d9dc25de55": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-013",
+      "query": "如何设计 Redis 缓存架构？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 138,
+      "expected_candidate_gold_chunks": [
+        "92d82d5d-7798-336e-9d15-3b00a535eea3",
+        "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.7680703,
+              "rank": 1
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.76508862,
+              "rank": 2
+            },
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.75849454,
+              "rank": 3
+            },
+            {
+              "chunk_id": "b4599878-778e-3e06-aed5-025465b9dcd6",
+              "score": 0.75515676,
+              "rank": 4
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.72613039,
+              "rank": 5
+            },
+            {
+              "chunk_id": "60ae3193-acc2-30e2-bdab-abb6b7e7e4f0",
+              "score": 0.72370652,
+              "rank": 6
+            },
+            {
+              "chunk_id": "8bfb849f-ce48-3087-88fd-d5781225a392",
+              "score": 0.70304426,
+              "rank": 7
+            },
+            {
+              "chunk_id": "55311427-826e-34b2-a1d2-5da3ef0b9e32",
+              "score": 0.69731911,
+              "rank": 8
+            },
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.68164051,
+              "rank": 9
+            },
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.65549617,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "92d82d5d-7798-336e-9d15-3b00a535eea3": {
+              "rank": null,
+              "score": null
+            },
+            "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.77723086,
+              "rank": 1
+            },
+            {
+              "chunk_id": "b4599878-778e-3e06-aed5-025465b9dcd6",
+              "score": 0.76516522,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.75607171,
+              "rank": 3
+            },
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.75231246,
+              "rank": 4
+            },
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.749903,
+              "rank": 5
+            },
+            {
+              "chunk_id": "38f14824-3c9d-3a38-b75d-c9f534889ba5",
+              "score": 0.7493164,
+              "rank": 6
+            },
+            {
+              "chunk_id": "d22563d7-df7b-3a55-9683-a84a0a6fa238",
+              "score": 0.7493164,
+              "rank": 7
+            },
+            {
+              "chunk_id": "8bfb849f-ce48-3087-88fd-d5781225a392",
+              "score": 0.74863,
+              "rank": 8
+            },
+            {
+              "chunk_id": "0894a950-1537-3e69-a633-470607a6b64d",
+              "score": 0.74520305,
+              "rank": 9
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.74399505,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "92d82d5d-7798-336e-9d15-3b00a535eea3": {
+              "rank": null,
+              "score": null
+            },
+            "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "b4599878-778e-3e06-aed5-025465b9dcd6",
+              "score": 0.75124549,
+              "rank": 1
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.74122893,
+              "rank": 2
+            },
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.7372986,
+              "rank": 3
+            },
+            {
+              "chunk_id": "38f14824-3c9d-3a38-b75d-c9f534889ba5",
+              "score": 0.72286635,
+              "rank": 4
+            },
+            {
+              "chunk_id": "d22563d7-df7b-3a55-9683-a84a0a6fa238",
+              "score": 0.72286635,
+              "rank": 5
+            },
+            {
+              "chunk_id": "39c290ab-9617-33be-85d7-4354c81d78e9",
+              "score": 0.72119359,
+              "rank": 6
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.71513312,
+              "rank": 7
+            },
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.71394507,
+              "rank": 8
+            },
+            {
+              "chunk_id": "8c9ad076-37b3-3fa4-bdbe-0b08ea2af208",
+              "score": 0.70740176,
+              "rank": 9
+            },
+            {
+              "chunk_id": "60ae3193-acc2-30e2-bdab-abb6b7e7e4f0",
+              "score": 0.69534876,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "92d82d5d-7798-336e-9d15-3b00a535eea3": {
+              "rank": null,
+              "score": null
+            },
+            "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "b4599878-778e-3e06-aed5-025465b9dcd6",
+              "score": 0.75614479,
+              "rank": 1
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.7386033,
+              "rank": 2
+            },
+            {
+              "chunk_id": "73f51d10-57b4-37ef-8622-81bc33af60d6",
+              "score": 0.736795,
+              "rank": 3
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.71997357,
+              "rank": 4
+            },
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.71917246,
+              "rank": 5
+            },
+            {
+              "chunk_id": "38f14824-3c9d-3a38-b75d-c9f534889ba5",
+              "score": 0.71799496,
+              "rank": 6
+            },
+            {
+              "chunk_id": "d22563d7-df7b-3a55-9683-a84a0a6fa238",
+              "score": 0.71799496,
+              "rank": 7
+            },
+            {
+              "chunk_id": "8c9ad076-37b3-3fa4-bdbe-0b08ea2af208",
+              "score": 0.70351948,
+              "rank": 8
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.70158251,
+              "rank": 9
+            },
+            {
+              "chunk_id": "e1d204ec-7ec5-3f5d-aa44-eb869ed8472d",
+              "score": 0.69657796,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "92d82d5d-7798-336e-9d15-3b00a535eea3": {
+              "rank": null,
+              "score": null
+            },
+            "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-015",
+      "query": "When should a Redis system use RDB or AOF?",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 209,
+      "expected_candidate_gold_chunks": [
+        "2e4a054f-408f-3697-9be4-3081464164f1",
+        "73919788-d3d3-315e-a039-43cd69e71b71"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.78673703,
+              "rank": 1
+            },
+            {
+              "chunk_id": "c4ce422c-a0f9-3265-aa88-779ab3b2ecbd",
+              "score": 0.63298866,
+              "rank": 2
+            },
+            {
+              "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+              "score": 0.60404446,
+              "rank": 3
+            },
+            {
+              "chunk_id": "8f1c68f0-c8f0-3ebd-909c-718b983b9da6",
+              "score": 0.60148871,
+              "rank": 4
+            },
+            {
+              "chunk_id": "40ccdbe6-e5c2-3458-b6d5-4cb5e0da1045",
+              "score": 0.58784311,
+              "rank": 5
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.58002396,
+              "rank": 6
+            },
+            {
+              "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+              "score": 0.56711728,
+              "rank": 7
+            },
+            {
+              "chunk_id": "ec9d185d-bc7c-3307-a52d-1ac6edb0942f",
+              "score": 0.56702828,
+              "rank": 8
+            },
+            {
+              "chunk_id": "4f3ce91a-b642-306e-ba71-c28a7d9f0524",
+              "score": 0.56046203,
+              "rank": 9
+            },
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.55951745,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "2e4a054f-408f-3697-9be4-3081464164f1": {
+              "rank": null,
+              "score": null
+            },
+            "73919788-d3d3-315e-a039-43cd69e71b71": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.70659174,
+              "rank": 1
+            },
+            {
+              "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+              "score": 0.67526816,
+              "rank": 2
+            },
+            {
+              "chunk_id": "66ab3e3d-c2b8-3dd8-915c-2125d88da201",
+              "score": 0.65524236,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f922029a-559b-3a2c-a680-fa54ee8708b0",
+              "score": 0.65524236,
+              "rank": 4
+            },
+            {
+              "chunk_id": "30d3096e-9e3b-3592-b201-4f9e5069437a",
+              "score": 0.62011065,
+              "rank": 5
+            },
+            {
+              "chunk_id": "8f1c68f0-c8f0-3ebd-909c-718b983b9da6",
+              "score": 0.60407385,
+              "rank": 6
+            },
+            {
+              "chunk_id": "73919788-d3d3-315e-a039-43cd69e71b71",
+              "score": 0.5987095,
+              "rank": 7
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.59773764,
+              "rank": 8
+            },
+            {
+              "chunk_id": "fb9fce6c-d770-3dc7-a9a2-800e27bdf668",
+              "score": 0.59588441,
+              "rank": 9
+            },
+            {
+              "chunk_id": "3b8f7e41-3107-3c1a-8f81-d6e948b052b5",
+              "score": 0.59532308,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "2e4a054f-408f-3697-9be4-3081464164f1": {
+              "rank": null,
+              "score": null
+            },
+            "73919788-d3d3-315e-a039-43cd69e71b71": {
+              "chunk_id": "73919788-d3d3-315e-a039-43cd69e71b71",
+              "score": 0.5987095,
+              "rank": 7
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.66732683,
+              "rank": 1
+            },
+            {
+              "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+              "score": 0.64468249,
+              "rank": 2
+            },
+            {
+              "chunk_id": "66ab3e3d-c2b8-3dd8-915c-2125d88da201",
+              "score": 0.61218851,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f922029a-559b-3a2c-a680-fa54ee8708b0",
+              "score": 0.61218851,
+              "rank": 4
+            },
+            {
+              "chunk_id": "30d3096e-9e3b-3592-b201-4f9e5069437a",
+              "score": 0.59093237,
+              "rank": 5
+            },
+            {
+              "chunk_id": "fb9fce6c-d770-3dc7-a9a2-800e27bdf668",
+              "score": 0.57739988,
+              "rank": 6
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.57357906,
+              "rank": 7
+            },
+            {
+              "chunk_id": "52cedc81-366d-3caa-b81f-b80306030913",
+              "score": 0.566224,
+              "rank": 8
+            },
+            {
+              "chunk_id": "3b8f7e41-3107-3c1a-8f81-d6e948b052b5",
+              "score": 0.55917104,
+              "rank": 9
+            },
+            {
+              "chunk_id": "8d7e22cb-3e42-3069-beda-4ed503511e62",
+              "score": 0.55836888,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "2e4a054f-408f-3697-9be4-3081464164f1": {
+              "rank": null,
+              "score": null
+            },
+            "73919788-d3d3-315e-a039-43cd69e71b71": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "ad50a065-c1e5-3bed-8b45-1d0d7d0a53f1",
+              "score": 0.66003551,
+              "rank": 1
+            },
+            {
+              "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+              "score": 0.64960739,
+              "rank": 2
+            },
+            {
+              "chunk_id": "30d3096e-9e3b-3592-b201-4f9e5069437a",
+              "score": 0.59111607,
+              "rank": 3
+            },
+            {
+              "chunk_id": "66ab3e3d-c2b8-3dd8-915c-2125d88da201",
+              "score": 0.58315443,
+              "rank": 4
+            },
+            {
+              "chunk_id": "f922029a-559b-3a2c-a680-fa54ee8708b0",
+              "score": 0.58315443,
+              "rank": 5
+            },
+            {
+              "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+              "score": 0.57932263,
+              "rank": 6
+            },
+            {
+              "chunk_id": "fb9fce6c-d770-3dc7-a9a2-800e27bdf668",
+              "score": 0.57600024,
+              "rank": 7
+            },
+            {
+              "chunk_id": "8d7e22cb-3e42-3069-beda-4ed503511e62",
+              "score": 0.5546026,
+              "rank": 8
+            },
+            {
+              "chunk_id": "52cedc81-366d-3caa-b81f-b80306030913",
+              "score": 0.55151497,
+              "rank": 9
+            },
+            {
+              "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+              "score": 0.54954554,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "2e4a054f-408f-3697-9be4-3081464164f1": {
+              "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+              "score": 0.54954554,
+              "rank": 10
+            },
+            "73919788-d3d3-315e-a039-43cd69e71b71": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-016",
+      "query": "Redis 高可用部署需要注意什么？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 75,
+      "expected_candidate_gold_chunks": [
+        "7a82316a-5a9f-311c-a9d4-874297a84313"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "40ccdbe6-e5c2-3458-b6d5-4cb5e0da1045",
+              "score": 0.69878572,
+              "rank": 1
+            },
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.66393907,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.66167966,
+              "rank": 3
+            },
+            {
+              "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+              "score": 0.65592827,
+              "rank": 4
+            },
+            {
+              "chunk_id": "ec9d185d-bc7c-3307-a52d-1ac6edb0942f",
+              "score": 0.63736095,
+              "rank": 5
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.60951975,
+              "rank": 6
+            },
+            {
+              "chunk_id": "cbcce19e-516f-340e-aafc-811258f64b26",
+              "score": 0.56785084,
+              "rank": 7
+            },
+            {
+              "chunk_id": "c6f4d42e-4f3f-351c-89f6-c2add9a34989",
+              "score": 0.55455655,
+              "rank": 8
+            },
+            {
+              "chunk_id": "300d8025-2937-392c-a850-827ee0c8df4f",
+              "score": 0.5381467,
+              "rank": 9
+            },
+            {
+              "chunk_id": "4f3ce91a-b642-306e-ba71-c28a7d9f0524",
+              "score": 0.53689052,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "7a82316a-5a9f-311c-a9d4-874297a84313": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.68828104,
+              "rank": 1
+            },
+            {
+              "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+              "score": 0.67906283,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.67861463,
+              "rank": 3
+            },
+            {
+              "chunk_id": "80036a01-ebf8-3f0a-96a0-c6efd7d386b1",
+              "score": 0.67174499,
+              "rank": 4
+            },
+            {
+              "chunk_id": "40ccdbe6-e5c2-3458-b6d5-4cb5e0da1045",
+              "score": 0.65050403,
+              "rank": 5
+            },
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.65042234,
+              "rank": 6
+            },
+            {
+              "chunk_id": "10cb7665-1a15-3289-83e8-40aaafb5bb7c",
+              "score": 0.64135543,
+              "rank": 7
+            },
+            {
+              "chunk_id": "700d4ccf-726e-3a95-b516-fec9c3a89454",
+              "score": 0.6404468,
+              "rank": 8
+            },
+            {
+              "chunk_id": "38f14824-3c9d-3a38-b75d-c9f534889ba5",
+              "score": 0.63643339,
+              "rank": 9
+            },
+            {
+              "chunk_id": "d22563d7-df7b-3a55-9683-a84a0a6fa238",
+              "score": 0.63643339,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "7a82316a-5a9f-311c-a9d4-874297a84313": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.65589066,
+              "rank": 1
+            },
+            {
+              "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+              "score": 0.6536041,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.65244734,
+              "rank": 3
+            },
+            {
+              "chunk_id": "80036a01-ebf8-3f0a-96a0-c6efd7d386b1",
+              "score": 0.63556128,
+              "rank": 4
+            },
+            {
+              "chunk_id": "40ccdbe6-e5c2-3458-b6d5-4cb5e0da1045",
+              "score": 0.61700912,
+              "rank": 5
+            },
+            {
+              "chunk_id": "38f14824-3c9d-3a38-b75d-c9f534889ba5",
+              "score": 0.61691389,
+              "rank": 6
+            },
+            {
+              "chunk_id": "d22563d7-df7b-3a55-9683-a84a0a6fa238",
+              "score": 0.61691389,
+              "rank": 7
+            },
+            {
+              "chunk_id": "700d4ccf-726e-3a95-b516-fec9c3a89454",
+              "score": 0.61266695,
+              "rank": 8
+            },
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.61207112,
+              "rank": 9
+            },
+            {
+              "chunk_id": "10cb7665-1a15-3289-83e8-40aaafb5bb7c",
+              "score": 0.6113761,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "7a82316a-5a9f-311c-a9d4-874297a84313": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.65814778,
+              "rank": 1
+            },
+            {
+              "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+              "score": 0.64778487,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.64372004,
+              "rank": 3
+            },
+            {
+              "chunk_id": "80036a01-ebf8-3f0a-96a0-c6efd7d386b1",
+              "score": 0.63997364,
+              "rank": 4
+            },
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.620636,
+              "rank": 5
+            },
+            {
+              "chunk_id": "10cb7665-1a15-3289-83e8-40aaafb5bb7c",
+              "score": 0.62056174,
+              "rank": 6
+            },
+            {
+              "chunk_id": "38f14824-3c9d-3a38-b75d-c9f534889ba5",
+              "score": 0.61917815,
+              "rank": 7
+            },
+            {
+              "chunk_id": "d22563d7-df7b-3a55-9683-a84a0a6fa238",
+              "score": 0.61917815,
+              "rank": 8
+            },
+            {
+              "chunk_id": "40a99473-68ab-38d0-a528-24ac50296e71",
+              "score": 0.61596304,
+              "rank": 9
+            },
+            {
+              "chunk_id": "52ee7c8d-e726-37bc-970b-cba446e9c07c",
+              "score": 0.61596304,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "7a82316a-5a9f-311c-a9d4-874297a84313": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-017",
+      "query": "Redis 实战中的性能与可靠性如何保障？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 86,
+      "expected_candidate_gold_chunks": [],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.79176987,
+              "rank": 1
+            },
+            {
+              "chunk_id": "45562c85-ad35-320a-b32a-0eb72494e645",
+              "score": 0.73184058,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.70305665,
+              "rank": 3
+            },
+            {
+              "chunk_id": "ec9d185d-bc7c-3307-a52d-1ac6edb0942f",
+              "score": 0.69390634,
+              "rank": 4
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.64828736,
+              "rank": 5
+            },
+            {
+              "chunk_id": "cbcce19e-516f-340e-aafc-811258f64b26",
+              "score": 0.64782462,
+              "rank": 6
+            },
+            {
+              "chunk_id": "3e87a457-1c0c-3027-92dd-2cf9aa8daae6",
+              "score": 0.63611704,
+              "rank": 7
+            },
+            {
+              "chunk_id": "c6f4d42e-4f3f-351c-89f6-c2add9a34989",
+              "score": 0.59234817,
+              "rank": 8
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.5664526,
+              "rank": 9
+            },
+            {
+              "chunk_id": "e1d204ec-7ec5-3f5d-aa44-eb869ed8472d",
+              "score": 0.533634,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.76961833,
+              "rank": 1
+            },
+            {
+              "chunk_id": "09589b25-87af-3437-8a4d-6ad763171b9a",
+              "score": 0.7513022,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.748138,
+              "rank": 3
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.74771636,
+              "rank": 4
+            },
+            {
+              "chunk_id": "10cb7665-1a15-3289-83e8-40aaafb5bb7c",
+              "score": 0.74623611,
+              "rank": 5
+            },
+            {
+              "chunk_id": "40a99473-68ab-38d0-a528-24ac50296e71",
+              "score": 0.73574975,
+              "rank": 6
+            },
+            {
+              "chunk_id": "52ee7c8d-e726-37bc-970b-cba446e9c07c",
+              "score": 0.73574975,
+              "rank": 7
+            },
+            {
+              "chunk_id": "6df7a8fe-67b2-32fa-b086-f2d0d5b1b622",
+              "score": 0.73299572,
+              "rank": 8
+            },
+            {
+              "chunk_id": "22697bba-6096-3431-8aec-2d6f93e55b88",
+              "score": 0.73027931,
+              "rank": 9
+            },
+            {
+              "chunk_id": "80036a01-ebf8-3f0a-96a0-c6efd7d386b1",
+              "score": 0.72490431,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.73471108,
+              "rank": 1
+            },
+            {
+              "chunk_id": "09589b25-87af-3437-8a4d-6ad763171b9a",
+              "score": 0.7292773,
+              "rank": 2
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.71631638,
+              "rank": 3
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.71361596,
+              "rank": 4
+            },
+            {
+              "chunk_id": "10cb7665-1a15-3289-83e8-40aaafb5bb7c",
+              "score": 0.71257223,
+              "rank": 5
+            },
+            {
+              "chunk_id": "40a99473-68ab-38d0-a528-24ac50296e71",
+              "score": 0.70909835,
+              "rank": 6
+            },
+            {
+              "chunk_id": "52ee7c8d-e726-37bc-970b-cba446e9c07c",
+              "score": 0.70909835,
+              "rank": 7
+            },
+            {
+              "chunk_id": "22697bba-6096-3431-8aec-2d6f93e55b88",
+              "score": 0.69817644,
+              "rank": 8
+            },
+            {
+              "chunk_id": "6df7a8fe-67b2-32fa-b086-f2d0d5b1b622",
+              "score": 0.69471278,
+              "rank": 9
+            },
+            {
+              "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+              "score": 0.69350124,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "fe82476e-9dac-3b6e-a649-d3e28649442f",
+              "score": 0.73505127,
+              "rank": 1
+            },
+            {
+              "chunk_id": "09589b25-87af-3437-8a4d-6ad763171b9a",
+              "score": 0.72286446,
+              "rank": 2
+            },
+            {
+              "chunk_id": "10cb7665-1a15-3289-83e8-40aaafb5bb7c",
+              "score": 0.71158329,
+              "rank": 3
+            },
+            {
+              "chunk_id": "acb83f3e-c853-38cf-bec5-d14c37d69546",
+              "score": 0.71064991,
+              "rank": 4
+            },
+            {
+              "chunk_id": "40a99473-68ab-38d0-a528-24ac50296e71",
+              "score": 0.69835985,
+              "rank": 5
+            },
+            {
+              "chunk_id": "52ee7c8d-e726-37bc-970b-cba446e9c07c",
+              "score": 0.69835985,
+              "rank": 6
+            },
+            {
+              "chunk_id": "22697bba-6096-3431-8aec-2d6f93e55b88",
+              "score": 0.69587517,
+              "rank": 7
+            },
+            {
+              "chunk_id": "6df7a8fe-67b2-32fa-b086-f2d0d5b1b622",
+              "score": 0.69575639,
+              "rank": 8
+            },
+            {
+              "chunk_id": "137d86e5-4cb0-3a94-8a04-7cde414bb5a7",
+              "score": 0.69483552,
+              "rank": 9
+            },
+            {
+              "chunk_id": "8c9ad076-37b3-3fa4-bdbe-0b08ea2af208",
+              "score": 0.68511892,
+              "rank": 10
+            }
+          ],
+          "gold": {}
+        }
+      }
+    },
+    {
+      "query_id": "rag-020",
+      "query": "What are the operational concerns for a popular Redis deployment?",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 180,
+      "expected_candidate_gold_chunks": [
+        "6c573f34-26a6-31bc-b5a8-18ef4e96abca"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "51977a42-6e87-3eb6-bfff-a1fdf6222d27",
+              "score": 0.65000401,
+              "rank": 1
+            },
+            {
+              "chunk_id": "45562c85-ad35-320a-b32a-0eb72494e645",
+              "score": 0.64487533,
+              "rank": 2
+            },
+            {
+              "chunk_id": "61a2ec8e-4de1-3252-8bf3-1768f33a9280",
+              "score": 0.60640209,
+              "rank": 3
+            },
+            {
+              "chunk_id": "e8b322d4-ff2c-30af-823b-8aecfbf246d8",
+              "score": 0.56957894,
+              "rank": 4
+            },
+            {
+              "chunk_id": "f77cee83-e4f6-3917-9653-8ee23b19e9dd",
+              "score": 0.55725218,
+              "rank": 5
+            },
+            {
+              "chunk_id": "ec9d185d-bc7c-3307-a52d-1ac6edb0942f",
+              "score": 0.5473575,
+              "rank": 6
+            },
+            {
+              "chunk_id": "60ae3193-acc2-30e2-bdab-abb6b7e7e4f0",
+              "score": 0.53857671,
+              "rank": 7
+            },
+            {
+              "chunk_id": "c1bc656b-17fa-3b25-ba14-a6154742faea",
+              "score": 0.52901607,
+              "rank": 8
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.51690064,
+              "rank": 9
+            },
+            {
+              "chunk_id": "b345d964-5bf2-35da-bb46-2fdaa3b1c49f",
+              "score": 0.50312589,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c573f34-26a6-31bc-b5a8-18ef4e96abca": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "45562c85-ad35-320a-b32a-0eb72494e645",
+              "score": 0.5810786,
+              "rank": 1
+            },
+            {
+              "chunk_id": "60ae3193-acc2-30e2-bdab-abb6b7e7e4f0",
+              "score": 0.57465096,
+              "rank": 2
+            },
+            {
+              "chunk_id": "769db7c9-69a7-3b3f-ae96-0852a0efffc7",
+              "score": 0.55219195,
+              "rank": 3
+            },
+            {
+              "chunk_id": "f77cee83-e4f6-3917-9653-8ee23b19e9dd",
+              "score": 0.54844396,
+              "rank": 4
+            },
+            {
+              "chunk_id": "b4599878-778e-3e06-aed5-025465b9dcd6",
+              "score": 0.54345188,
+              "rank": 5
+            },
+            {
+              "chunk_id": "700d4ccf-726e-3a95-b516-fec9c3a89454",
+              "score": 0.53909404,
+              "rank": 6
+            },
+            {
+              "chunk_id": "c1bc656b-17fa-3b25-ba14-a6154742faea",
+              "score": 0.53187728,
+              "rank": 7
+            },
+            {
+              "chunk_id": "2bf03711-393b-3a66-83e9-1be2701a9dba",
+              "score": 0.53179406,
+              "rank": 8
+            },
+            {
+              "chunk_id": "e8b322d4-ff2c-30af-823b-8aecfbf246d8",
+              "score": 0.53130081,
+              "rank": 9
+            },
+            {
+              "chunk_id": "b767bec3-ac5b-3ae9-81cf-095627cbb87c",
+              "score": 0.52709929,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c573f34-26a6-31bc-b5a8-18ef4e96abca": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "45562c85-ad35-320a-b32a-0eb72494e645",
+              "score": 0.54172641,
+              "rank": 1
+            },
+            {
+              "chunk_id": "f77cee83-e4f6-3917-9653-8ee23b19e9dd",
+              "score": 0.53819871,
+              "rank": 2
+            },
+            {
+              "chunk_id": "769db7c9-69a7-3b3f-ae96-0852a0efffc7",
+              "score": 0.53426896,
+              "rank": 3
+            },
+            {
+              "chunk_id": "60ae3193-acc2-30e2-bdab-abb6b7e7e4f0",
+              "score": 0.53337724,
+              "rank": 4
+            },
+            {
+              "chunk_id": "b4599878-778e-3e06-aed5-025465b9dcd6",
+              "score": 0.52614923,
+              "rank": 5
+            },
+            {
+              "chunk_id": "ab3c373b-fd8d-356a-93a4-34642eeef6f1",
+              "score": 0.52559834,
+              "rank": 6
+            },
+            {
+              "chunk_id": "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+              "score": 0.51516571,
+              "rank": 7
+            },
+            {
+              "chunk_id": "700d4ccf-726e-3a95-b516-fec9c3a89454",
+              "score": 0.5142193,
+              "rank": 8
+            },
+            {
+              "chunk_id": "b767bec3-ac5b-3ae9-81cf-095627cbb87c",
+              "score": 0.51369022,
+              "rank": 9
+            },
+            {
+              "chunk_id": "61f901a3-b6d3-3666-ba71-4b647af50bfc",
+              "score": 0.51136666,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c573f34-26a6-31bc-b5a8-18ef4e96abca": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "f77cee83-e4f6-3917-9653-8ee23b19e9dd",
+              "score": 0.55654516,
+              "rank": 1
+            },
+            {
+              "chunk_id": "45562c85-ad35-320a-b32a-0eb72494e645",
+              "score": 0.54303533,
+              "rank": 2
+            },
+            {
+              "chunk_id": "769db7c9-69a7-3b3f-ae96-0852a0efffc7",
+              "score": 0.53422957,
+              "rank": 3
+            },
+            {
+              "chunk_id": "b4599878-778e-3e06-aed5-025465b9dcd6",
+              "score": 0.53374612,
+              "rank": 4
+            },
+            {
+              "chunk_id": "60ae3193-acc2-30e2-bdab-abb6b7e7e4f0",
+              "score": 0.53144457,
+              "rank": 5
+            },
+            {
+              "chunk_id": "ab3c373b-fd8d-356a-93a4-34642eeef6f1",
+              "score": 0.53144241,
+              "rank": 6
+            },
+            {
+              "chunk_id": "5e84346d-a6eb-340c-8060-812b0f4fe5e4",
+              "score": 0.52682986,
+              "rank": 7
+            },
+            {
+              "chunk_id": "61f901a3-b6d3-3666-ba71-4b647af50bfc",
+              "score": 0.51062531,
+              "rank": 8
+            },
+            {
+              "chunk_id": "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+              "score": 0.51052487,
+              "rank": 9
+            },
+            {
+              "chunk_id": "e8b322d4-ff2c-30af-823b-8aecfbf246d8",
+              "score": 0.5094902,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "6c573f34-26a6-31bc-b5a8-18ef4e96abca": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-021",
+      "query": "Agent 工程实践通常包括哪些内容？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 221,
+      "expected_candidate_gold_chunks": [
+        "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+        "05d06fdc-d3dd-3471-9999-cf0977c9f1f7"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "fa038aa3-d100-39cb-bf23-0aac6c35d953",
+              "score": 0.8170517,
+              "rank": 1
+            },
+            {
+              "chunk_id": "4a2e1873-c1a1-3f92-bd9b-dea93c882a6b",
+              "score": 0.80963777,
+              "rank": 2
+            },
+            {
+              "chunk_id": "503959ff-9e33-345b-8a17-ac793aa9c573",
+              "score": 0.78834017,
+              "rank": 3
+            },
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.77199403,
+              "rank": 4
+            },
+            {
+              "chunk_id": "2635898d-5930-3df0-977c-f2c6a94ed165",
+              "score": 0.76697009,
+              "rank": 5
+            },
+            {
+              "chunk_id": "6cfb2fb2-3257-34d0-bb1e-0ceb9c676153",
+              "score": 0.7635581,
+              "rank": 6
+            },
+            {
+              "chunk_id": "78b22d16-adc5-3c37-8b1e-1157b5421bf4",
+              "score": 0.76060271,
+              "rank": 7
+            },
+            {
+              "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+              "score": 0.75669604,
+              "rank": 8
+            },
+            {
+              "chunk_id": "45319802-cc8a-3415-8a0b-5e35f4a7f82f",
+              "score": 0.75526773,
+              "rank": 9
+            },
+            {
+              "chunk_id": "0b867ceb-f854-3fc1-91e5-ee4f4b339f21",
+              "score": 0.75449177,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "32fa8b13-4048-3269-8c6c-a656ccf0bfeb": {
+              "rank": null,
+              "score": null
+            },
+            "05d06fdc-d3dd-3471-9999-cf0977c9f1f7": {
+              "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+              "score": 0.75669604,
+              "rank": 8
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "270410a3-f4cd-3489-b310-335877302c28",
+              "score": 0.84223106,
+              "rank": 1
+            },
+            {
+              "chunk_id": "336223a4-ceed-3665-8948-b44565ae02ed",
+              "score": 0.83232925,
+              "rank": 2
+            },
+            {
+              "chunk_id": "21054c95-98be-3bc1-831d-a0156decdc00",
+              "score": 0.82433181,
+              "rank": 3
+            },
+            {
+              "chunk_id": "0e5e7034-2fdd-35bc-977a-69f9534a1390",
+              "score": 0.82363911,
+              "rank": 4
+            },
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.818565,
+              "rank": 5
+            },
+            {
+              "chunk_id": "9f883bff-eed2-39c7-9a18-506d6b3b0305",
+              "score": 0.81740248,
+              "rank": 6
+            },
+            {
+              "chunk_id": "201109e1-d466-33d3-ba91-9e83c6e157cc",
+              "score": 0.81418919,
+              "rank": 7
+            },
+            {
+              "chunk_id": "fa038aa3-d100-39cb-bf23-0aac6c35d953",
+              "score": 0.81360923,
+              "rank": 8
+            },
+            {
+              "chunk_id": "8c771379-ded7-3616-b156-e75562cfb80f",
+              "score": 0.81006279,
+              "rank": 9
+            },
+            {
+              "chunk_id": "3b2ebef5-1321-37fb-9b00-cd733c820569",
+              "score": 0.81002505,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "32fa8b13-4048-3269-8c6c-a656ccf0bfeb": {
+              "rank": null,
+              "score": null
+            },
+            "05d06fdc-d3dd-3471-9999-cf0977c9f1f7": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "336223a4-ceed-3665-8948-b44565ae02ed",
+              "score": 0.8276515,
+              "rank": 1
+            },
+            {
+              "chunk_id": "270410a3-f4cd-3489-b310-335877302c28",
+              "score": 0.82667523,
+              "rank": 2
+            },
+            {
+              "chunk_id": "fa038aa3-d100-39cb-bf23-0aac6c35d953",
+              "score": 0.82219999,
+              "rank": 3
+            },
+            {
+              "chunk_id": "0e5e7034-2fdd-35bc-977a-69f9534a1390",
+              "score": 0.8159819,
+              "rank": 4
+            },
+            {
+              "chunk_id": "503959ff-9e33-345b-8a17-ac793aa9c573",
+              "score": 0.81358408,
+              "rank": 5
+            },
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.80846522,
+              "rank": 6
+            },
+            {
+              "chunk_id": "201109e1-d466-33d3-ba91-9e83c6e157cc",
+              "score": 0.80843691,
+              "rank": 7
+            },
+            {
+              "chunk_id": "4a2e1873-c1a1-3f92-bd9b-dea93c882a6b",
+              "score": 0.80782127,
+              "rank": 8
+            },
+            {
+              "chunk_id": "3b2ebef5-1321-37fb-9b00-cd733c820569",
+              "score": 0.80723566,
+              "rank": 9
+            },
+            {
+              "chunk_id": "8c771379-ded7-3616-b156-e75562cfb80f",
+              "score": 0.8069366,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "32fa8b13-4048-3269-8c6c-a656ccf0bfeb": {
+              "rank": null,
+              "score": null
+            },
+            "05d06fdc-d3dd-3471-9999-cf0977c9f1f7": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "fa038aa3-d100-39cb-bf23-0aac6c35d953",
+              "score": 0.82246954,
+              "rank": 1
+            },
+            {
+              "chunk_id": "270410a3-f4cd-3489-b310-335877302c28",
+              "score": 0.82140008,
+              "rank": 2
+            },
+            {
+              "chunk_id": "336223a4-ceed-3665-8948-b44565ae02ed",
+              "score": 0.81812392,
+              "rank": 3
+            },
+            {
+              "chunk_id": "503959ff-9e33-345b-8a17-ac793aa9c573",
+              "score": 0.81187324,
+              "rank": 4
+            },
+            {
+              "chunk_id": "8c771379-ded7-3616-b156-e75562cfb80f",
+              "score": 0.81146391,
+              "rank": 5
+            },
+            {
+              "chunk_id": "0e5e7034-2fdd-35bc-977a-69f9534a1390",
+              "score": 0.8110748,
+              "rank": 6
+            },
+            {
+              "chunk_id": "4a2e1873-c1a1-3f92-bd9b-dea93c882a6b",
+              "score": 0.80408704,
+              "rank": 7
+            },
+            {
+              "chunk_id": "9f883bff-eed2-39c7-9a18-506d6b3b0305",
+              "score": 0.80335239,
+              "rank": 8
+            },
+            {
+              "chunk_id": "a1dcc41e-4a71-32a2-a75d-f6a9362bfe30",
+              "score": 0.80136596,
+              "rank": 9
+            },
+            {
+              "chunk_id": "201109e1-d466-33d3-ba91-9e83c6e157cc",
+              "score": 0.79989711,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "32fa8b13-4048-3269-8c6c-a656ccf0bfeb": {
+              "rank": null,
+              "score": null
+            },
+            "05d06fdc-d3dd-3471-9999-cf0977c9f1f7": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-022",
+      "query": "How should an agent system be designed for production engineering?",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 220,
+      "expected_candidate_gold_chunks": [
+        "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+        "0201c4a2-b0a1-3225-9b3f-7e34167e03c0",
+        "09377971-4054-38b2-bbaa-268c631e1b51"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "3b2ebef5-1321-37fb-9b00-cd733c820569",
+              "score": 0.76927405,
+              "rank": 1
+            },
+            {
+              "chunk_id": "86603355-083e-3c51-aeb7-38baec9a2736",
+              "score": 0.7335421,
+              "rank": 2
+            },
+            {
+              "chunk_id": "ce5d1525-8bb4-36c2-b336-25cb63d6e8ac",
+              "score": 0.72584474,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a04d404a-08e2-34af-b129-13277bc8af1f",
+              "score": 0.72112895,
+              "rank": 4
+            },
+            {
+              "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+              "score": 0.72002814,
+              "rank": 5
+            },
+            {
+              "chunk_id": "9f883bff-eed2-39c7-9a18-506d6b3b0305",
+              "score": 0.71448374,
+              "rank": 6
+            },
+            {
+              "chunk_id": "20d8cf31-4cb7-3aea-b6b3-baf7fd7b1f71",
+              "score": 0.69913805,
+              "rank": 7
+            },
+            {
+              "chunk_id": "7545a1e3-024d-3347-8fde-37465e68dac6",
+              "score": 0.69840283,
+              "rank": 8
+            },
+            {
+              "chunk_id": "0cd8916d-a0d0-30e1-92e4-e06cf723367b",
+              "score": 0.69838546,
+              "rank": 9
+            },
+            {
+              "chunk_id": "39c0b676-1e0c-333d-b642-202d6e9dc2cf",
+              "score": 0.69679449,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "49fb5863-33c2-3d1f-a815-3aa7829d487c": {
+              "rank": null,
+              "score": null
+            },
+            "0201c4a2-b0a1-3225-9b3f-7e34167e03c0": {
+              "rank": null,
+              "score": null
+            },
+            "09377971-4054-38b2-bbaa-268c631e1b51": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "3b2ebef5-1321-37fb-9b00-cd733c820569",
+              "score": 0.75038372,
+              "rank": 1
+            },
+            {
+              "chunk_id": "9f883bff-eed2-39c7-9a18-506d6b3b0305",
+              "score": 0.73580976,
+              "rank": 2
+            },
+            {
+              "chunk_id": "646b8375-336e-36b2-8932-c94a590dbaab",
+              "score": 0.72618555,
+              "rank": 3
+            },
+            {
+              "chunk_id": "270410a3-f4cd-3489-b310-335877302c28",
+              "score": 0.71578502,
+              "rank": 4
+            },
+            {
+              "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+              "score": 0.71541425,
+              "rank": 5
+            },
+            {
+              "chunk_id": "90309854-872a-3359-a6a2-56bffae318c2",
+              "score": 0.71409212,
+              "rank": 6
+            },
+            {
+              "chunk_id": "201109e1-d466-33d3-ba91-9e83c6e157cc",
+              "score": 0.70911997,
+              "rank": 7
+            },
+            {
+              "chunk_id": "86603355-083e-3c51-aeb7-38baec9a2736",
+              "score": 0.69860809,
+              "rank": 8
+            },
+            {
+              "chunk_id": "e19066fd-cd0e-32b6-8c46-f9e476a190eb",
+              "score": 0.69794885,
+              "rank": 9
+            },
+            {
+              "chunk_id": "0e5e7034-2fdd-35bc-977a-69f9534a1390",
+              "score": 0.69599676,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "49fb5863-33c2-3d1f-a815-3aa7829d487c": {
+              "rank": null,
+              "score": null
+            },
+            "0201c4a2-b0a1-3225-9b3f-7e34167e03c0": {
+              "rank": null,
+              "score": null
+            },
+            "09377971-4054-38b2-bbaa-268c631e1b51": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "3b2ebef5-1321-37fb-9b00-cd733c820569",
+              "score": 0.71876321,
+              "rank": 1
+            },
+            {
+              "chunk_id": "646b8375-336e-36b2-8932-c94a590dbaab",
+              "score": 0.71001807,
+              "rank": 2
+            },
+            {
+              "chunk_id": "90309854-872a-3359-a6a2-56bffae318c2",
+              "score": 0.69190401,
+              "rank": 3
+            },
+            {
+              "chunk_id": "201109e1-d466-33d3-ba91-9e83c6e157cc",
+              "score": 0.68815691,
+              "rank": 4
+            },
+            {
+              "chunk_id": "9f883bff-eed2-39c7-9a18-506d6b3b0305",
+              "score": 0.68640891,
+              "rank": 5
+            },
+            {
+              "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+              "score": 0.68353211,
+              "rank": 6
+            },
+            {
+              "chunk_id": "0e5e7034-2fdd-35bc-977a-69f9534a1390",
+              "score": 0.67049721,
+              "rank": 7
+            },
+            {
+              "chunk_id": "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+              "score": 0.66710187,
+              "rank": 8
+            },
+            {
+              "chunk_id": "270410a3-f4cd-3489-b310-335877302c28",
+              "score": 0.66049838,
+              "rank": 9
+            },
+            {
+              "chunk_id": "09377971-4054-38b2-bbaa-268c631e1b51",
+              "score": 0.65736569,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "49fb5863-33c2-3d1f-a815-3aa7829d487c": {
+              "chunk_id": "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+              "score": 0.66710187,
+              "rank": 8
+            },
+            "0201c4a2-b0a1-3225-9b3f-7e34167e03c0": {
+              "rank": null,
+              "score": null
+            },
+            "09377971-4054-38b2-bbaa-268c631e1b51": {
+              "chunk_id": "09377971-4054-38b2-bbaa-268c631e1b51",
+              "score": 0.65736569,
+              "rank": 10
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "3b2ebef5-1321-37fb-9b00-cd733c820569",
+              "score": 0.71543995,
+              "rank": 1
+            },
+            {
+              "chunk_id": "646b8375-336e-36b2-8932-c94a590dbaab",
+              "score": 0.7017794,
+              "rank": 2
+            },
+            {
+              "chunk_id": "9f883bff-eed2-39c7-9a18-506d6b3b0305",
+              "score": 0.68995476,
+              "rank": 3
+            },
+            {
+              "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+              "score": 0.6854194,
+              "rank": 4
+            },
+            {
+              "chunk_id": "201109e1-d466-33d3-ba91-9e83c6e157cc",
+              "score": 0.68225971,
+              "rank": 5
+            },
+            {
+              "chunk_id": "90309854-872a-3359-a6a2-56bffae318c2",
+              "score": 0.6819792,
+              "rank": 6
+            },
+            {
+              "chunk_id": "0e5e7034-2fdd-35bc-977a-69f9534a1390",
+              "score": 0.66584778,
+              "rank": 7
+            },
+            {
+              "chunk_id": "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+              "score": 0.6612079,
+              "rank": 8
+            },
+            {
+              "chunk_id": "e19066fd-cd0e-32b6-8c46-f9e476a190eb",
+              "score": 0.65906813,
+              "rank": 9
+            },
+            {
+              "chunk_id": "270410a3-f4cd-3489-b310-335877302c28",
+              "score": 0.65816588,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "49fb5863-33c2-3d1f-a815-3aa7829d487c": {
+              "chunk_id": "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+              "score": 0.6612079,
+              "rank": 8
+            },
+            "0201c4a2-b0a1-3225-9b3f-7e34167e03c0": {
+              "rank": null,
+              "score": null
+            },
+            "09377971-4054-38b2-bbaa-268c631e1b51": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-023",
+      "query": "如何从 Agent 原型演进到可靠系统？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 220,
+      "expected_candidate_gold_chunks": [
+        "78d79da5-9e7c-30f1-bb20-0e5a607c0955",
+        "e1178112-c1dd-323a-8360-48dc4d2db525"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "3b2ebef5-1321-37fb-9b00-cd733c820569",
+              "score": 0.75989625,
+              "rank": 1
+            },
+            {
+              "chunk_id": "9f883bff-eed2-39c7-9a18-506d6b3b0305",
+              "score": 0.74646494,
+              "rank": 2
+            },
+            {
+              "chunk_id": "39c0b676-1e0c-333d-b642-202d6e9dc2cf",
+              "score": 0.74608092,
+              "rank": 3
+            },
+            {
+              "chunk_id": "ad081ede-3902-3fde-af7f-837f52ff707a",
+              "score": 0.74505522,
+              "rank": 4
+            },
+            {
+              "chunk_id": "1ca6f01a-d1f0-353e-864c-fc44bbd96197",
+              "score": 0.74371571,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f4cf343b-fa96-3dfe-8829-a569554e2064",
+              "score": 0.73313045,
+              "rank": 6
+            },
+            {
+              "chunk_id": "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+              "score": 0.73297975,
+              "rank": 7
+            },
+            {
+              "chunk_id": "0cd8916d-a0d0-30e1-92e4-e06cf723367b",
+              "score": 0.72916713,
+              "rank": 8
+            },
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.72220782,
+              "rank": 9
+            },
+            {
+              "chunk_id": "f9eac52b-7c5c-3eba-96dc-01fa3c978c8e",
+              "score": 0.71871137,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "78d79da5-9e7c-30f1-bb20-0e5a607c0955": {
+              "rank": null,
+              "score": null
+            },
+            "e1178112-c1dd-323a-8360-48dc4d2db525": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+              "score": 0.72757082,
+              "rank": 1
+            },
+            {
+              "chunk_id": "f4cf343b-fa96-3dfe-8829-a569554e2064",
+              "score": 0.72695674,
+              "rank": 2
+            },
+            {
+              "chunk_id": "ad081ede-3902-3fde-af7f-837f52ff707a",
+              "score": 0.72595636,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a22b229b-a972-397b-bec6-8a598032d5f7",
+              "score": 0.72397136,
+              "rank": 4
+            },
+            {
+              "chunk_id": "8c896d5e-b3aa-3ab7-a056-2c3f39eafc73",
+              "score": 0.71057711,
+              "rank": 5
+            },
+            {
+              "chunk_id": "ac2dbb41-2f83-3171-a2b5-ef716c846f36",
+              "score": 0.71056428,
+              "rank": 6
+            },
+            {
+              "chunk_id": "b7080e05-eda3-3c1e-82d2-3ae8bd0191a1",
+              "score": 0.71035731,
+              "rank": 7
+            },
+            {
+              "chunk_id": "bb3ca2fa-a815-3823-9241-9e831638503a",
+              "score": 0.70480642,
+              "rank": 8
+            },
+            {
+              "chunk_id": "492edd86-6f4e-32bc-b19a-7c13d809de66",
+              "score": 0.70384104,
+              "rank": 9
+            },
+            {
+              "chunk_id": "2ff15e0d-5cbe-3d2a-8ed0-3889acd6f4ef",
+              "score": 0.7015814,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "78d79da5-9e7c-30f1-bb20-0e5a607c0955": {
+              "rank": null,
+              "score": null
+            },
+            "e1178112-c1dd-323a-8360-48dc4d2db525": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "ad081ede-3902-3fde-af7f-837f52ff707a",
+              "score": 0.72065348,
+              "rank": 1
+            },
+            {
+              "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+              "score": 0.71744075,
+              "rank": 2
+            },
+            {
+              "chunk_id": "8688ad7d-6552-352f-807b-d39095fed0c7",
+              "score": 0.69619952,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a22b229b-a972-397b-bec6-8a598032d5f7",
+              "score": 0.68883138,
+              "rank": 4
+            },
+            {
+              "chunk_id": "c6dcb946-28e0-3d6b-8e5b-d6a22f76708a",
+              "score": 0.68629648,
+              "rank": 5
+            },
+            {
+              "chunk_id": "f4cf343b-fa96-3dfe-8829-a569554e2064",
+              "score": 0.68335194,
+              "rank": 6
+            },
+            {
+              "chunk_id": "8c896d5e-b3aa-3ab7-a056-2c3f39eafc73",
+              "score": 0.68188267,
+              "rank": 7
+            },
+            {
+              "chunk_id": "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+              "score": 0.67888062,
+              "rank": 8
+            },
+            {
+              "chunk_id": "492edd86-6f4e-32bc-b19a-7c13d809de66",
+              "score": 0.67867577,
+              "rank": 9
+            },
+            {
+              "chunk_id": "b7080e05-eda3-3c1e-82d2-3ae8bd0191a1",
+              "score": 0.67594863,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "78d79da5-9e7c-30f1-bb20-0e5a607c0955": {
+              "rank": null,
+              "score": null
+            },
+            "e1178112-c1dd-323a-8360-48dc4d2db525": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "ad081ede-3902-3fde-af7f-837f52ff707a",
+              "score": 0.71845715,
+              "rank": 1
+            },
+            {
+              "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+              "score": 0.71072176,
+              "rank": 2
+            },
+            {
+              "chunk_id": "8688ad7d-6552-352f-807b-d39095fed0c7",
+              "score": 0.6894633,
+              "rank": 3
+            },
+            {
+              "chunk_id": "a22b229b-a972-397b-bec6-8a598032d5f7",
+              "score": 0.68365179,
+              "rank": 4
+            },
+            {
+              "chunk_id": "f4cf343b-fa96-3dfe-8829-a569554e2064",
+              "score": 0.676328,
+              "rank": 5
+            },
+            {
+              "chunk_id": "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+              "score": 0.6750667,
+              "rank": 6
+            },
+            {
+              "chunk_id": "c6dcb946-28e0-3d6b-8e5b-d6a22f76708a",
+              "score": 0.67504213,
+              "rank": 7
+            },
+            {
+              "chunk_id": "8c896d5e-b3aa-3ab7-a056-2c3f39eafc73",
+              "score": 0.67339231,
+              "rank": 8
+            },
+            {
+              "chunk_id": "b7080e05-eda3-3c1e-82d2-3ae8bd0191a1",
+              "score": 0.66697402,
+              "rank": 9
+            },
+            {
+              "chunk_id": "492edd86-6f4e-32bc-b19a-7c13d809de66",
+              "score": 0.66638552,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "78d79da5-9e7c-30f1-bb20-0e5a607c0955": {
+              "rank": null,
+              "score": null
+            },
+            "e1178112-c1dd-323a-8360-48dc4d2db525": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    },
+    {
+      "query_id": "rag-024",
+      "query": "Agent 如何编排工具、状态和工作流？",
+      "candidate_post_count": 10,
+      "candidate_chunk_count": 224,
+      "expected_candidate_gold_chunks": [
+        "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422",
+        "fce2c8b8-5b45-361a-80ac-5d3f4deab63f",
+        "93cee2cf-0481-3abb-a434-23d2e05b6325"
+      ],
+      "representations": {
+        "A_CONTENT_ONLY": {
+          "top10": [
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.82383483,
+              "rank": 1
+            },
+            {
+              "chunk_id": "ff626860-c690-3375-b4e9-cf064019d5bb",
+              "score": 0.78178703,
+              "rank": 2
+            },
+            {
+              "chunk_id": "78b22d16-adc5-3c37-8b1e-1157b5421bf4",
+              "score": 0.78120363,
+              "rank": 3
+            },
+            {
+              "chunk_id": "97f1f5d9-d4cf-3350-9eb7-ebde8d73a387",
+              "score": 0.78116453,
+              "rank": 4
+            },
+            {
+              "chunk_id": "fa038aa3-d100-39cb-bf23-0aac6c35d953",
+              "score": 0.77175346,
+              "rank": 5
+            },
+            {
+              "chunk_id": "e4011bf7-346e-3792-b98f-60254480f521",
+              "score": 0.75967224,
+              "rank": 6
+            },
+            {
+              "chunk_id": "4a2e1873-c1a1-3f92-bd9b-dea93c882a6b",
+              "score": 0.75441453,
+              "rank": 7
+            },
+            {
+              "chunk_id": "503959ff-9e33-345b-8a17-ac793aa9c573",
+              "score": 0.75438757,
+              "rank": 8
+            },
+            {
+              "chunk_id": "78200cd7-d91f-3640-ac68-ac0bcd292d9e",
+              "score": 0.75399388,
+              "rank": 9
+            },
+            {
+              "chunk_id": "a636c0a3-2881-33ff-bf05-5bd849285903",
+              "score": 0.75399388,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422": {
+              "rank": null,
+              "score": null
+            },
+            "fce2c8b8-5b45-361a-80ac-5d3f4deab63f": {
+              "rank": null,
+              "score": null
+            },
+            "93cee2cf-0481-3abb-a434-23d2e05b6325": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "B_TITLE_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "2ffcdce6-6a43-3de2-8654-2541dac17b9d",
+              "score": 0.79555132,
+              "rank": 1
+            },
+            {
+              "chunk_id": "3caa4506-e4d3-35b5-a4cd-ac1a71717787",
+              "score": 0.79293044,
+              "rank": 2
+            },
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.79101184,
+              "rank": 3
+            },
+            {
+              "chunk_id": "336223a4-ceed-3665-8948-b44565ae02ed",
+              "score": 0.78405186,
+              "rank": 4
+            },
+            {
+              "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+              "score": 0.77410537,
+              "rank": 5
+            },
+            {
+              "chunk_id": "d9211211-1d35-3835-a043-fc4df0ff74e8",
+              "score": 0.7732832,
+              "rank": 6
+            },
+            {
+              "chunk_id": "001df435-a7b2-300c-b029-9884b4cfdd5f",
+              "score": 0.77291477,
+              "rank": 7
+            },
+            {
+              "chunk_id": "492edd86-6f4e-32bc-b19a-7c13d809de66",
+              "score": 0.77133549,
+              "rank": 8
+            },
+            {
+              "chunk_id": "9bdec8cf-9260-3690-8ba0-dba533385a94",
+              "score": 0.76819824,
+              "rank": 9
+            },
+            {
+              "chunk_id": "ff626860-c690-3375-b4e9-cf064019d5bb",
+              "score": 0.76736003,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422": {
+              "rank": null,
+              "score": null
+            },
+            "fce2c8b8-5b45-361a-80ac-5d3f4deab63f": {
+              "rank": null,
+              "score": null
+            },
+            "93cee2cf-0481-3abb-a434-23d2e05b6325": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_TITLE_TAGS_CONTENT": {
+          "top10": [
+            {
+              "chunk_id": "2ffcdce6-6a43-3de2-8654-2541dac17b9d",
+              "score": 0.77853056,
+              "rank": 1
+            },
+            {
+              "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+              "score": 0.7717347,
+              "rank": 2
+            },
+            {
+              "chunk_id": "3caa4506-e4d3-35b5-a4cd-ac1a71717787",
+              "score": 0.77125855,
+              "rank": 3
+            },
+            {
+              "chunk_id": "336223a4-ceed-3665-8948-b44565ae02ed",
+              "score": 0.76209673,
+              "rank": 4
+            },
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.76169427,
+              "rank": 5
+            },
+            {
+              "chunk_id": "492edd86-6f4e-32bc-b19a-7c13d809de66",
+              "score": 0.76038623,
+              "rank": 6
+            },
+            {
+              "chunk_id": "80d7ed00-9604-3979-bc40-1954b95730b1",
+              "score": 0.75733452,
+              "rank": 7
+            },
+            {
+              "chunk_id": "001df435-a7b2-300c-b029-9884b4cfdd5f",
+              "score": 0.75052115,
+              "rank": 8
+            },
+            {
+              "chunk_id": "d9211211-1d35-3835-a043-fc4df0ff74e8",
+              "score": 0.74976889,
+              "rank": 9
+            },
+            {
+              "chunk_id": "2ff15e0d-5cbe-3d2a-8ed0-3889acd6f4ef",
+              "score": 0.74406056,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422": {
+              "rank": null,
+              "score": null
+            },
+            "fce2c8b8-5b45-361a-80ac-5d3f4deab63f": {
+              "rank": null,
+              "score": null
+            },
+            "93cee2cf-0481-3abb-a434-23d2e05b6325": {
+              "rank": null,
+              "score": null
+            }
+          }
+        },
+        "C_PRODUCTION": {
+          "top10": [
+            {
+              "chunk_id": "2ffcdce6-6a43-3de2-8654-2541dac17b9d",
+              "score": 0.77667177,
+              "rank": 1
+            },
+            {
+              "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+              "score": 0.76939903,
+              "rank": 2
+            },
+            {
+              "chunk_id": "3caa4506-e4d3-35b5-a4cd-ac1a71717787",
+              "score": 0.76684233,
+              "rank": 3
+            },
+            {
+              "chunk_id": "80d7ed00-9604-3979-bc40-1954b95730b1",
+              "score": 0.7624298,
+              "rank": 4
+            },
+            {
+              "chunk_id": "492edd86-6f4e-32bc-b19a-7c13d809de66",
+              "score": 0.75763921,
+              "rank": 5
+            },
+            {
+              "chunk_id": "336223a4-ceed-3665-8948-b44565ae02ed",
+              "score": 0.75748058,
+              "rank": 6
+            },
+            {
+              "chunk_id": "05df006b-9199-3eaa-8d7a-f8da86e9fb82",
+              "score": 0.75062693,
+              "rank": 7
+            },
+            {
+              "chunk_id": "503959ff-9e33-345b-8a17-ac793aa9c573",
+              "score": 0.74462042,
+              "rank": 8
+            },
+            {
+              "chunk_id": "521bc64d-77cf-34dd-9d3f-20a676e5a1f2",
+              "score": 0.73982223,
+              "rank": 9
+            },
+            {
+              "chunk_id": "f4cf343b-fa96-3dfe-8829-a569554e2064",
+              "score": 0.73955947,
+              "rank": 10
+            }
+          ],
+          "gold": {
+            "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422": {
+              "rank": null,
+              "score": null
+            },
+            "fce2c8b8-5b45-361a-80ac-5d3f4deab63f": {
+              "rank": null,
+              "score": null
+            },
+            "93cee2cf-0481-3abb-a434-23d2e05b6325": {
+              "rank": null,
+              "score": null
+            }
+          }
+        }
+      }
+    }
+  ]
+}
