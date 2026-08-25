@@ -53,7 +53,11 @@ from greenbook_agent_core.execution.runtime_result import RuntimeResult
 from greenbook_agent_core.execution.topology import validate_single_consumer
 from greenbook_agent_core.human import PostgresApprovalRequestStore
 from greenbook_agent_core.human.approval_runtime_service import ApprovalRuntimeService
-from greenbook_agent_core.memory import MemoryRetriever, PostgresMemoryRepository
+from greenbook_agent_core.memory import (
+    MemoryRetriever,
+    PostgresMemoryRepository,
+    PreferenceMemoryService,
+)
 from greenbook_agent_core.memory.manager import MemoryManager
 from greenbook_agent_core.observability.metrics import MemoryMetricsCollector
 from greenbook_agent_core.runtime.container import RuntimeContainer
@@ -1004,10 +1008,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         durable_memory_repository = PostgresMemoryRepository(session_ctx)
         await durable_memory_repository.ensure_storage()
     memory_manager = MemoryManager(durable_repository=durable_memory_repository)
+    preference_memory_service = PreferenceMemoryService(memory_manager)
     memory_retriever = MemoryRetriever(
         durable_memory_repository or memory_manager.store,
     )
     app.state.memory_store = durable_memory_repository or memory_manager.store
+    app.state.preference_memory_service = preference_memory_service
     preference_provider = MemoryUserPreferenceProvider(memory_manager)
     task_provider = TaskProvider()
     await task_provider.ensure_storage()

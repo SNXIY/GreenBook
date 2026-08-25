@@ -1,6 +1,6 @@
 # Memory Checkpoint
 
-Current Phase: Phase 2 complete
+Current Phase: Phase 3 complete
 
 Completed:
 
@@ -19,17 +19,26 @@ Completed:
   idempotent PostgreSQL storage/index support.
 - Added scoped CRUD, user isolation, tenant isolation, provenance, and
   PostgreSQL parameter contract tests.
+- Added structured `PreferenceExtraction`, deterministic
+  `PreferenceMemoryExtractor`, and `PreferenceMemoryService` contracts.
+- Added high-confidence extraction for title style, technical depth, concise
+  replies, and technology stack preferences; transient tasks and invalid input
+  return `SKIP`.
+- Wired completed-turn extraction into the API result projection with
+  deterministic source-id idempotency. Memory extraction failures cannot break
+  turn convergence.
 
-Git Commit: Phase 2 storage commit containing this report and checkpoint (see
-`git log --oneline` for the exact hash).
+Git Commit: Phase 3 extraction commit containing this report and checkpoint
+(see `git log --oneline` for the exact hash).
 
-Tests: 39 focused Memory/storage/repository/retriever/context tests passed;
+Tests: 46 focused Memory/storage/extraction/repository/retriever/context tests
+passed;
 `uv run ruff check packages/agent_core/greenbook_agent_core/memory tests/unit/test_preference_memory_storage.py`
-passed; migration splitter tests passed.
+passed; compileall and migration splitter tests passed.
 
-Remaining: Phase 3 structured Preference Memory extraction from completed
-Conversation turns.
+Remaining: Phase 4 PreferenceRetriever and canonical Context/Interpreter
+integration with `MEMORY_ENABLED`.
 
-Resume From: Add a structured `PreferenceMemoryExtractor` beside the existing
-procedural extractor, with long-term classification and no one-off task
-writes.
+Resume From: Add tenant-aware preference retrieval capped at five records,
+project only bounded preference evidence to the Interpreter, and keep the
+disabled path unchanged.

@@ -5,7 +5,12 @@ Task/Execution/Artifact facts.  The package exposes one repository contract,
 one retriever, and a conservative write policy.
 """
 
-from .extractor import ProceduralMemoryExtractor
+from .extractor import (
+    PreferenceExtraction,
+    PreferenceMemoryExtractor,
+    PreferenceMemoryService,
+    ProceduralMemoryExtractor,
+)
 from .manager import MemoryManager
 from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .policy import MemoryWriteDecision, MemoryWritePolicy
@@ -26,6 +31,9 @@ __all__ = [
     "MemoryManager",
     "StrategyRetriever",
     "ProceduralMemoryExtractor",
+    "PreferenceExtraction",
+    "PreferenceMemoryExtractor",
+    "PreferenceMemoryService",
     "MemoryType",
     "MemoryStatus",
     "MemoryWriteDecision",

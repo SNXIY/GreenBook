@@ -889,6 +889,46 @@ def _resource_id_from_artifact(artifact: Any) -> str:
     return str(getattr(artifact, "resource_id", "") or "")
 
 
+def _extract_completed_turn_preference(
+    app: Any,
+    *,
+    result: RuntimeResult,
+    conversation_id: str,
+    auth: AuthContext,
+    message_content: str,
+) -> None:
+    """Classify one completed turn without turning the turn into Memory."""
+
+    if str(result.status or "").upper() != "COMPLETED":
+        return
+    service = getattr(app.state, "preference_memory_service", None)
+    process = getattr(service, "process_completed_turn", None)
+    if not callable(process) or not str(message_content or "").strip():
+        return
+    try:
+        extraction, record = process(
+            user_id=auth.user_id,
+            tenant_id=auth.tenant_id,
+            conversation_id=conversation_id,
+            user_message=message_content,
+        )
+        if record is not None:
+            logger.info(
+                "preference_memory_written memory_id=%s conversation_id=%s "
+                "preference_key=%s confidence=%.2f",
+                record.memory_id,
+                conversation_id,
+                extraction.preference_key,
+                extraction.confidence,
+            )
+    except Exception:  # noqa: BLE001 - Memory must not break turn convergence
+        logger.warning(
+            "preference_memory_extraction_failed conversation_id=%s",
+            conversation_id,
+            exc_info=True,
+        )
+
+
 async def _durable_run_record(
     run_id: str,
     request: Request,
@@ -1636,6 +1676,14 @@ async def handle_run_result(
                 pass
         session.last_successful_run_id = run_id
         await _save_session(_app_as_request(app), session)
+
+    _extract_completed_turn_preference(
+        app,
+        result=result,
+        conversation_id=conversation_id,
+        auth=auth,
+        message_content=message_content,
+    )
 
     app.state.run_store[run_id] = _runtime_run_record(
         result,
