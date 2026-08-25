@@ -26,7 +26,6 @@ _WRITE_ACTIONS = frozenset(
         "UPDATE_SCHEDULE",
         "CANCEL_SCHEDULE",
         "PUBLISH_NOW",
-        "REPLY_COMMENT",
     }
 )
 _TARGET_ARGUMENT = {

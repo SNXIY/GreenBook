@@ -41,6 +41,12 @@ if ($manageWorker) {
 }
 
 $env:GREENBOOK_JAVA_BASE_URL = Get-GreenBookEnvValue -Name "GREENBOOK_JAVA_BASE_URL" -DefaultValue "http://127.0.0.1:8080"
+$mcpTransport = (Get-GreenBookEnvValue -Name "GREENBOOK_MCP_TRANSPORT" -DefaultValue "mcp").Trim().ToLowerInvariant()
+if ($mcpTransport -notin @("mcp", "local")) {
+  throw "GREENBOOK_MCP_TRANSPORT must be 'mcp' or 'local'."
+}
+$env:GREENBOOK_MCP_TRANSPORT = $mcpTransport
+$env:GREENBOOK_BUSINESS_MCP_BASE_URL = Get-GreenBookEnvValue -Name "GREENBOOK_BUSINESS_MCP_BASE_URL" -DefaultValue "http://127.0.0.1:8095/mcp"
 $env:GREENBOOK_CREATOR_BASE_URL = Get-GreenBookEnvValue -Name "GREENBOOK_CREATOR_BASE_URL" -DefaultValue "http://127.0.0.1:8092"
 $env:GREENBOOK_AGENT_IDENTITY_ISSUER = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_IDENTITY_ISSUER" -DefaultValue "http://127.0.0.1:8080"
 $env:GREENBOOK_AGENT_IDENTITY_AUDIENCE = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_IDENTITY_AUDIENCE" -DefaultValue "greenbook-agent-runtime"

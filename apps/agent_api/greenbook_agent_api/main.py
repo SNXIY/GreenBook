@@ -62,6 +62,7 @@ from greenbook_agent_core.task.provider import TaskProvider, TaskScope
 from greenbook_contracts.events import EVENT_ACTION_COMPLETED, EVENT_PARTIAL_RESULT
 from greenbook_java_client.client import JavaClient
 from greenbook_mcp_server import tool_registry as mcp_tool_registry
+from greenbook_mcp_server.client import GreenBookMCPClient
 from greenbook_mcp_server.server import GreenBookMCPServer
 from greenbook_security.auth_context import AuthContextResolver, _extract_bearer
 from greenbook_security.jwt import JwtValidationError, validate_access_token
@@ -952,11 +953,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         tool_registry=mcp_tool_registry,
         security_policy=SecurityPolicy(),
     )
-    app.state.mcp = GreenBookMCPServer(
+    app.state.local_mcp = GreenBookMCPServer(
         java=app.state.java,
         capability_registry=runtime_container.capability_registry,
         llm=app.state.llm,
         model=llm_model,
+    )
+    app.state.mcp = GreenBookMCPClient(
+        app.state.local_mcp,
+        base_url=_env_first(
+            "GREENBOOK_BUSINESS_MCP_BASE_URL",
+            default="",
+        ),
+        transport_mode=_env_first("GREENBOOK_MCP_TRANSPORT", default="mcp"),
+        runtime_token=os.getenv("GREENBOOK_MCP_RUNTIME_TOKEN", ""),
     )
     app.state.auth_resolver = AuthContextResolver(
         jwks_url=jwks_url,

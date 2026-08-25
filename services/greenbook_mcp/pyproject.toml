@@ -5,11 +5,15 @@ description = "GreenBook MCP-compatible in-process tool runtime"
 requires-python = ">=3.12"
 dependencies = [
     "greenbook-contracts",
+    "greenbook-agent-core",
     "greenbook-security",
     "greenbook-java-client",
     "mcp>=1.10",
     "pydantic>=2.10",
     "httpx>=0.28",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "openai>=1.80",
 ]
 
 [tool.hatch.build.targets.wheel]

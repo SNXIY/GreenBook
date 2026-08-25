@@ -62,9 +62,13 @@ def test_exported_contracts_include_schema_and_policy_metadata() -> None:
 @pytest.mark.asyncio
 async def test_output_contract_is_validated_after_handler_execution() -> None:
     java = SimpleNamespace(
-        get_account_summary=AsyncMock(
+        get_post=AsyncMock(
             return_value=ToolResult.success(
-                SimpleNamespace(model_dump=lambda mode: {"views": 1})
+                SimpleNamespace(
+                    post_id="post-1",
+                    title="Example",
+                    model_dump=lambda mode: {"post_id": "post-1", "title": "Example"},
+                )
             )
         )
     )
@@ -72,7 +76,7 @@ async def test_output_contract_is_validated_after_handler_execution() -> None:
     auth = AuthContext(user_id="user-1", tenant_id="tenant-1", raw_access_token="token")
 
     result = await server.execute_tool(
-        "analytics.get_account_summary",
+        "community.get_post",
         auth=auth,
         session=SimpleNamespace(
             conversation_id="conversation-1",
@@ -83,10 +87,11 @@ async def test_output_contract_is_validated_after_handler_execution() -> None:
             resolve_active_schedule_id=lambda: (None, []),
             record_entity=lambda **_: None,
         ),
+        post_id="post-1",
     )
 
     assert result["ok"] is True
-    assert result["data"] == {"views": 1}
+    assert result["data"] == {"post_id": "post-1", "title": "Example"}
 
 
 @pytest.mark.asyncio
@@ -267,17 +272,19 @@ async def test_side_effect_failure_before_write_is_not_result_unknown(
 async def test_read_handler_exception_remains_a_normal_tool_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def broken_handler(_ctx: object) -> ToolResult[object]:
+    async def broken_handler(_ctx: object, post_id: str) -> ToolResult[object]:
+        del post_id
         raise RuntimeError("read handler crash")
 
     server = GreenBookMCPServer(java=object())
-    monkeypatch.setattr(get_tool("analytics.get_account_summary"), "handler", broken_handler)
+    monkeypatch.setattr(get_tool("community.get_post"), "handler", broken_handler)
     auth = AuthContext(user_id="user-1", tenant_id="tenant-1", raw_access_token="token")
 
     result = await server.execute_tool(
-        "analytics.get_account_summary",
+        "community.get_post",
         auth=auth,
         session=_session(),
+        post_id="post-1",
     )
 
     assert result["ok"] is False

@@ -115,10 +115,6 @@ _SEMANTIC_ACTION_CAPABILITIES: dict[str, str] = {
     SemanticAction.UPDATE_SCHEDULE.value: "MANAGE_SCHEDULE",
     SemanticAction.CANCEL_SCHEDULE.value: "CANCEL_SCHEDULE",
     SemanticAction.PUBLISH_NOW.value: "PUBLISH_NOW",
-    SemanticAction.LIST_COMMENTS.value: "LIST_COMMENTS",
-    SemanticAction.REPLY_COMMENT.value: "REPLY_USER",
-    SemanticAction.GET_POST_PERFORMANCE.value: "ANALYZE_PERFORMANCE",
-    SemanticAction.GET_ACCOUNT_SUMMARY.value: "ANALYZE_PERFORMANCE",
 }
 
 _UPDATE_CONTENT_PROMPT = """You rewrite a GreenBook draft body per a user edit.
@@ -5194,7 +5190,6 @@ def _artifact_type_for_capability(capability: str) -> str:
         "GENERATE_CONTENT": "DRAFT",
         "SCHEDULE_PUBLISH": "SCHEDULE",
         "PUBLISH_NOW": "POST",
-        "ANALYZE_PERFORMANCE": "ANALYSIS_REPORT",
         "VALIDATE_QUALITY": "VALIDATION_REPORT",
         "MANAGE_SCHEDULE": "SCHEDULE",
         "CANCEL_SCHEDULE": "SCHEDULE",

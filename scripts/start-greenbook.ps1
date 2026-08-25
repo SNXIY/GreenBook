@@ -107,8 +107,17 @@ function Wait-WorkerReady {
 
 $noReloadArguments = if ($NoReload) { @("-NoReload") } else { @() }
 $agentPort = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_API_PORT" -DefaultValue "8094"
+$mcpPort = Get-GreenBookEnvValue -Name "GREENBOOK_MCP_PORT" -DefaultValue "8095"
 $javaBaseUrl = Get-GreenBookEnvValue -Name "GREENBOOK_JAVA_BASE_URL" -DefaultValue "http://127.0.0.1:8080"
 $agentBaseUrl = "http://127.0.0.1:" + $agentPort
+$mcpBaseUrl = "http://127.0.0.1:" + $mcpPort
+$env:GREENBOOK_MCP_PORT = $mcpPort
+$env:GREENBOOK_BUSINESS_MCP_BASE_URL = Get-GreenBookEnvValue -Name "GREENBOOK_BUSINESS_MCP_BASE_URL" -DefaultValue ($mcpBaseUrl + "/mcp")
+$mcpTransport = (Get-GreenBookEnvValue -Name "GREENBOOK_MCP_TRANSPORT" -DefaultValue "mcp").Trim().ToLowerInvariant()
+if ($mcpTransport -notin @("mcp", "local")) {
+  throw "GREENBOOK_MCP_TRANSPORT must be 'mcp' or 'local'."
+}
+$env:GREENBOOK_MCP_TRANSPORT = $mcpTransport
 $executionDispatch = (Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_EXECUTION_DISPATCH" -DefaultValue "queue").Trim().ToLowerInvariant()
 if ($executionDispatch -notin @("queue", "direct")) {
   throw "GREENBOOK_AGENT_EXECUTION_DISPATCH must be 'queue' or 'direct'."
@@ -130,6 +139,9 @@ $env:GREENBOOK_AGENT_IN_PROCESS_WORKER = if ($inProcessWorker) { "true" } else {
 Write-Host "Starting GreenBook Runtime development services..."
 $null = Start-GreenBookTerminal -Name "Java Backend" -Script "scripts\start-be.ps1"
 Wait-HttpReady -Name "Java Backend" -Url ($javaBaseUrl.TrimEnd("/") + "/actuator/health")
+
+$null = Start-GreenBookTerminal -Name "GreenBook Business MCP" -Script "scripts\start-mcp.ps1" -Arguments @("-NoReload")
+Wait-HttpReady -Name "GreenBook Business MCP" -Url ($mcpBaseUrl + "/health")
 
 $null = Start-GreenBookTerminal -Name "Agent API" -Script "scripts\start-agent.ps1" -Arguments $agentArguments
 Wait-HttpReady -Name "Agent API" -Url ($agentBaseUrl + "/health")

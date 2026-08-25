@@ -228,6 +228,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                 from greenbook_agent_core.memory.manager import MemoryManager
                 from greenbook_agent_core.task.provider import TaskProvider
                 from greenbook_mcp_server.server import GreenBookMCPServer
+                from greenbook_mcp_server.client import GreenBookMCPClient
                 from openai import AsyncOpenAI
 
                 llm_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv(
@@ -243,11 +244,20 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                             "https://api.deepseek.com",
                         ),
                     )
-                mcp = GreenBookMCPServer(
+                local_mcp = GreenBookMCPServer(
                     java=java,
                     capability_registry=runtime_container.capability_registry,
                     llm=llm,
                     model=os.getenv("LLM_MODEL", "deepseek-v4-flash"),
+                )
+                mcp = GreenBookMCPClient(
+                    local_mcp,
+                    base_url=os.getenv(
+                        "GREENBOOK_BUSINESS_MCP_BASE_URL",
+                        "",
+                    ),
+                    transport_mode=os.getenv("GREENBOOK_MCP_TRANSPORT", "mcp"),
+                    runtime_token=os.getenv("GREENBOOK_MCP_RUNTIME_TOKEN", ""),
                 )
                 conversation_service = ConversationService()
                 await conversation_service.ensure_storage()

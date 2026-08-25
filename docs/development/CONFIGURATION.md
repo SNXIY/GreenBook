@@ -8,6 +8,11 @@ aliases, and duplicate Java aliases are not supported.
 | --- | --- | --- | --- | --- |
 | `GREENBOOK_JAVA_BASE_URL` | Java client | no | `http://127.0.0.1:8080` | Java Backend base URL |
 | `GREENBOOK_AGENT_API_PORT` | Agent API | no | `8094` | Agent API host port |
+| `GREENBOOK_MCP_PORT` | Business MCP | no | `8095` | GreenBook Business MCP Streamable HTTP host port |
+| `GREENBOOK_BUSINESS_MCP_BASE_URL` | Agent/Worker | no | `http://127.0.0.1:8095/mcp` | Business MCP endpoint |
+| `GREENBOOK_MCP_TRANSPORT` | Agent/Worker | no | `mcp` | Canonical production transport: `mcp`; explicit isolated test/development transport: `local` |
+| `GREENBOOK_MCP_RUNTIME_TOKEN` | Agent/Business MCP | deployment | — | Internal runtime trust token; never model-editable |
+| `GREENBOOK_MCP_TIMEOUT_SECONDS` | Agent/Worker | no | `30` | MCP request timeout |
 | `GREENBOOK_AGENT_RUNTIME_STORAGE` | Agent Runtime | no | inferred | `postgres` or explicit `memory` |
 | `GREENBOOK_AGENT_DATABASE_URL` | Agent Runtime | production | — | Agent Runtime PostgreSQL URL |
 | `GREENBOOK_AGENT_RUNTIME_DATABASE_URL` | Agent Runtime | queue profile | derived | Durable execution database URL |

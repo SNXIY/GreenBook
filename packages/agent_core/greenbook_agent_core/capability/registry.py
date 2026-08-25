@@ -60,20 +60,6 @@ _CATALOG: list[Capability] = [
         output_artifact_type="ANALYSIS_REPORT",
         result_requirement="GROUNDED_SYNTHESIS",
     ),
-    Capability(
-        name="ANALYZE_PERFORMANCE",
-        description="Get engagement metrics for a post or account",
-        category=CapabilityCategory.ANALYZE,
-        tools=["analytics.get_post_performance", "analytics.get_account_summary"],
-        # The capability projects two canonical read tools: post analytics
-        # require ``post_id`` while account summary is scoped by the
-        # authenticated user and does not.  Keep the semantic capability
-        # input optional; the selected ToolMetadata schema remains the final
-        # validator for post-specific calls.
-        inputs=CapabilityInput(optional=["post_id"]),
-        output_artifact_type="PERFORMANCE_DATA",
-    ),
-
     # ── CREATE ───────────────────────────────────────────────────
     Capability(
         name="GENERATE_CONTENT",
@@ -192,22 +178,6 @@ _CATALOG: list[Capability] = [
     ),
 
     # ── INTERACT ─────────────────────────────────────────────────
-    Capability(
-        name="LIST_COMMENTS",
-        description="List comments on a post",
-        category=CapabilityCategory.INTERACT,
-        tools=["interaction.list_comments"],
-        inputs=CapabilityInput(required=["post_id"], optional=["cursor", "size"]),
-        output_artifact_type="",
-    ),
-    Capability(
-        name="REPLY_USER",
-        description="Reply to a comment on a post (requires user approval)",
-        category=CapabilityCategory.INTERACT,
-        tools=["interaction.send_reply"],
-        inputs=CapabilityInput(required=["post_id", "parent_comment_id", "content"]),
-        output_artifact_type="COMMENT",
-    ),
 ]
 
 
@@ -341,10 +311,6 @@ class CapabilityRegistry:
             "UPDATE_SCHEDULE": "MANAGE_SCHEDULE",
             "CANCEL_SCHEDULE": "CANCEL_SCHEDULE",
             "PUBLISH_NOW": "PUBLISH_NOW",
-            "LIST_COMMENTS": "LIST_COMMENTS",
-            "REPLY_COMMENT": "REPLY_USER",
-            "GET_POST_PERFORMANCE": "ANALYZE_PERFORMANCE",
-            "GET_ACCOUNT_SUMMARY": "ANALYZE_PERFORMANCE",
         }
         if semantic_action:
             cap_name = semantic_mapping.get(semantic_action)
@@ -374,7 +340,6 @@ class CapabilityRegistry:
             "CREATE":     "GENERATE_CONTENT",
             "VALIDATE":   "VALIDATE_QUALITY",
             "PUBLISH":    "SCHEDULE_PUBLISH",
-            "REPLY":      "REPLY_USER",
             "QUERY":      "GET_DRAFT",
             "CANCEL":     "CANCEL_SCHEDULE",
         }

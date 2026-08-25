@@ -52,11 +52,11 @@ Decide only from the supplied Task observation: objective/objectives,
 artifacts, resources, execution statuses, and (when present) an action plan.
 
 Decision semantics:
-- CALL_TOOL: execute one canonical semantic_action (SEARCH_POSTS, GET_POST,
-  GET_DRAFT, LIST_DRAFTS, GET_SCHEDULE, LIST_COMMENTS, GET_POST_PERFORMANCE,
-  LIST_OWN_POSTS, GET_ACCOUNT_SUMMARY, UPDATE_DRAFT, DELETE_DRAFT,
-  UPDATE_SCHEDULE, CANCEL_SCHEDULE, PUBLISH_NOW, CREATE_SCHEDULE, CREATE_DRAFT,
-  REPLY_COMMENT).  Do not set tool_name; the runtime resolves it.
+- CALL_TOOL: execute one canonical semantic_action from the active capability
+  catalog (SEARCH_POSTS, GET_POST, GET_DRAFT, LIST_DRAFTS, GET_SCHEDULE,
+  LIST_OWN_POSTS, UPDATE_DRAFT, DELETE_DRAFT, UPDATE_SCHEDULE,
+  CANCEL_SCHEDULE, PUBLISH_NOW, CREATE_SCHEDULE, CREATE_DRAFT).  Do not set
+  tool_name; the runtime resolves it.
 - GENERATE_CONTENT: create a draft (semantic_action CREATE_DRAFT).
 - CLARIFY: the Task objective is ambiguous or missing required arguments.
 - WAIT: an external write is in flight; do not reason over it.

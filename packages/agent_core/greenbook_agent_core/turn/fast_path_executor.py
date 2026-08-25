@@ -32,8 +32,6 @@ _RESOURCE_ARG: dict[str, str] = {
     "CANCEL_SCHEDULE": "schedule_id",
     "GET_SCHEDULE": "schedule_id",
     "GET_POST": "post_id",
-    "LIST_COMMENTS": "post_id",
-    "GET_POST_PERFORMANCE": "post_id",
 }
 
 
