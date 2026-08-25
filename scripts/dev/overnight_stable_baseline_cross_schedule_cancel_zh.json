@@ -1,0 +1,13 @@
+[
+  {
+    "name": "cross-turn-schedule-cancel",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-CROSS-PYTHON-RETEST 的 Python 学习草稿，并安排两分钟后发布",
+        "hitl_sequence": ["confirm", "approve"]
+      },
+      {"text": "把刚才那篇改成三分钟后发布"},
+      {"text": "取消刚才那篇的定时发布"}
+    ]
+  }
+]

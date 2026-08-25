@@ -107,30 +107,34 @@ function Wait-WorkerReady {
 
 $noReloadArguments = if ($NoReload) { @("-NoReload") } else { @() }
 $agentPort = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_API_PORT" -DefaultValue "8094"
-$creatorPort = Get-GreenBookEnvValue -Name "GREENBOOK_CREATOR_API_PORT" -DefaultValue "8092"
 $javaBaseUrl = Get-GreenBookEnvValue -Name "GREENBOOK_JAVA_BASE_URL" -DefaultValue "http://127.0.0.1:8080"
-$creatorBaseUrl = Get-GreenBookEnvValue -Name "GREENBOOK_CREATOR_BASE_URL" -DefaultValue ("http://127.0.0.1:" + $creatorPort)
 $agentBaseUrl = "http://127.0.0.1:" + $agentPort
 $executionDispatch = (Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_EXECUTION_DISPATCH" -DefaultValue "queue").Trim().ToLowerInvariant()
 if ($executionDispatch -notin @("queue", "direct")) {
   throw "GREENBOOK_AGENT_EXECUTION_DISPATCH must be 'queue' or 'direct'."
 }
 $queueMode = $executionDispatch -eq "queue"
-$agentArguments = @("-ApiOnly") + $noReloadArguments
 $workerHealthFile = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_WORKER_HEALTH_FILE" -DefaultValue ".runtime\agent-worker-health.json"
-$env:GREENBOOK_AGENT_PROCESS_ROLE = "api"
+$inProcessWorker = (Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_IN_PROCESS_WORKER" -DefaultValue "false").Trim().ToLowerInvariant() -in @("1", "true", "yes", "on")
+if (-not $queueMode) {
+  $inProcessWorker = $false
+}
+$agentArguments = if ($queueMode -and $inProcessWorker) {
+  $noReloadArguments
+} else {
+  @("-ApiOnly") + $noReloadArguments
+}
+$env:GREENBOOK_AGENT_PROCESS_ROLE = if ($queueMode -and $inProcessWorker) { "all" } else { "api" }
+$env:GREENBOOK_AGENT_IN_PROCESS_WORKER = if ($inProcessWorker) { "true" } else { "false" }
 
 Write-Host "Starting GreenBook Runtime development services..."
 $null = Start-GreenBookTerminal -Name "Java Backend" -Script "scripts\start-be.ps1"
 Wait-HttpReady -Name "Java Backend" -Url ($javaBaseUrl.TrimEnd("/") + "/actuator/health")
 
-$null = Start-GreenBookTerminal -Name "Creator Service" -Script "scripts\start-creator.ps1" -Arguments $noReloadArguments
-Wait-HttpReady -Name "Creator Service" -Url ($creatorBaseUrl.TrimEnd("/") + "/actuator/health/ready")
-
 $null = Start-GreenBookTerminal -Name "Agent API" -Script "scripts\start-agent.ps1" -Arguments $agentArguments
 Wait-HttpReady -Name "Agent API" -Url ($agentBaseUrl + "/health")
 
-if ($queueMode) {
+if ($queueMode -and -not $inProcessWorker) {
   $null = Start-GreenBookTerminal -Name "Agent Worker" -Script "scripts\start-agent-worker.ps1"
   Wait-WorkerReady -HealthFile $workerHealthFile
 }
@@ -139,11 +143,15 @@ $null = Start-GreenBookTerminal -Name "Frontend" -Script "scripts\start-fe.ps1"
 
 Write-Host ""
 if ($queueMode) {
-  Write-Host "Services launched. Agent API and Worker run as separate processes over the durable queue."
+  if ($inProcessWorker) {
+    Write-Host "Services launched. Agent API owns the in-process queue consumer (no standalone Worker)."
+  } else {
+    Write-Host "Services launched. Agent API and Worker run as separate processes over the durable queue."
+  }
 } else {
   Write-Host "Services launched. Agent is using direct development dispatch; no Worker is required."
 }
-Write-Host "Use .\scripts\check-runtime-status.ps1 to inspect API, Worker, Queue, Database, Creator and Java."
+Write-Host "Use .\scripts\check-runtime-status.ps1 to inspect API, Worker, Queue, Database and Java."
 Write-Host "Close the service windows individually when you want to stop development."
 & "$PSScriptRoot\check-runtime-status.ps1"
 if ($LASTEXITCODE -ne 0) {

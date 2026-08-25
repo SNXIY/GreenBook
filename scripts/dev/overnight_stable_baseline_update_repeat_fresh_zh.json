@@ -1,0 +1,22 @@
+[
+  {
+    "name": "update-title-body-five-fresh-zh",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-UPDATE-JAVA 的 Java 学习草稿，只保存草稿"},
+      {"text": "把 GB-STABLE-R1-FRESH-UPDATE-JAVA 这篇草稿的标题改成 GB-STABLE-R1-FRESH-UPDATE-JAVA-TITLE"},
+      {"text": "给刚才的 Java 草稿补充两条实践建议"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-UPDATE-AGENT 的 Agent 学习草稿，只保存草稿"},
+      {"text": "把 GB-STABLE-R1-FRESH-UPDATE-AGENT 这篇草稿的标题改成 GB-STABLE-R1-FRESH-UPDATE-AGENT-TITLE"},
+      {"text": "给刚才的 Agent 草稿补充两条工程实践建议"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-UPDATE-REDIS 的 Redis 学习草稿，只保存草稿"},
+      {"text": "把 GB-STABLE-R1-FRESH-UPDATE-REDIS 这篇草稿的标题改成 GB-STABLE-R1-FRESH-UPDATE-REDIS-TITLE"},
+      {"text": "给刚才的 Redis 草稿补充两条缓存实践建议"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-UPDATE-SPRING 的 Spring Boot 学习草稿，只保存草稿"},
+      {"text": "把 GB-STABLE-R1-FRESH-UPDATE-SPRING 这篇草稿的标题改成 GB-STABLE-R1-FRESH-UPDATE-SPRING-TITLE"},
+      {"text": "给刚才的 Spring Boot 草稿补充两条 API 实践建议"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-UPDATE-AI 的 AI 学习草稿，只保存草稿"},
+      {"text": "把 GB-STABLE-R1-FRESH-UPDATE-AI 这篇草稿的标题改成 GB-STABLE-R1-FRESH-UPDATE-AI-TITLE"},
+      {"text": "给刚才的 AI 草稿补充两条实践建议"}
+    ]
+  }
+]

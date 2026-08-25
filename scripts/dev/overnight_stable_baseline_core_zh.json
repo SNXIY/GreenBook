@@ -1,0 +1,67 @@
+[
+  {
+    "name": "chat-five-zh",
+    "turns": [
+      {"text": "你好"},
+      {"text": "你能做什么？"},
+      {"text": "谢谢"},
+      {"text": "请用一句话解释什么是缓存"},
+      {"text": "给我一个与社区业务无关的旅行收纳建议"}
+    ]
+  },
+  {
+    "name": "search-java-natural-zh",
+    "turns": [
+      {"text": "搜几篇 Java 学习相关帖子"},
+      {"text": "找一些 Java 后端实践文章"},
+      {"text": "最近有没有高质量的 Java 面试经验分享"}
+    ]
+  },
+  {
+    "name": "search-agent-natural-zh",
+    "turns": [
+      {"text": "搜一些 Agent 学习相关帖子"},
+      {"text": "找几篇智能体工程实践文章"},
+      {"text": "有没有关于 Agent memory 的帖子"}
+    ]
+  },
+  {
+    "name": "search-other-natural-zh",
+    "turns": [
+      {"text": "找一些 Redis 缓存实践文章"},
+      {"text": "搜索 Spring Boot REST API 入门内容"},
+      {"text": "搜几篇 Python 和 AI 学习相关帖子"},
+      {"text": "找一些 Redis 性能优化相关帖子"}
+    ]
+  },
+  {
+    "name": "view-java-zh",
+    "turns": [
+      {"text": "搜索 Java 学习相关帖子", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-agent-zh",
+    "turns": [
+      {"text": "搜索 Agent 学习相关帖子", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-redis-zh",
+    "turns": [
+      {"text": "搜索 Redis 缓存实践文章", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-spring-zh",
+    "turns": [
+      {"text": "搜索 Spring Boot 入门内容", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-python-zh",
+    "turns": [
+      {"text": "搜索 Python 和 AI 学习相关帖子", "ui_action": "click_search_first"}
+    ]
+  }
+]

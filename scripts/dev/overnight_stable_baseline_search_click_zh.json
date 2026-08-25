@@ -1,0 +1,22 @@
+[
+  {
+    "name": "search-java-click-zh",
+    "turns": [
+      {
+        "text": "\u641c\u51e0\u7bc7 Java \u5b66\u4e60\u76f8\u5173\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      }
+    ]
+  },
+  {
+    "name": "search-agent-click-zh",
+    "turns": [
+      {
+        "text": "\u641c\u4e00\u4e9b Agent \u5b66\u4e60\u76f8\u5173\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      }
+    ]
+  }
+]

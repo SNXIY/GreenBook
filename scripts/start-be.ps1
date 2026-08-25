@@ -11,12 +11,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $jwtSecret = Get-GreenBookEnvValue -Name "JWT_SECRET" -DefaultValue ""
-$creatorHandoffSecret = Get-GreenBookEnvValue -Name "GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET" -DefaultValue ""
-$creatorAgentSecret = Get-GreenBookEnvValue -Name "GREENBOOK_CREATOR_AGENT_SHARED_SECRET" -DefaultValue ""
 $agentSecret = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" -DefaultValue ""
 Assert-GreenBookSecret -Name "JWT_SECRET" -Value $jwtSecret -ForbiddenValues @("change-me-to-a-long-random-string")
-Assert-GreenBookSecret -Name "GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET" -Value $creatorHandoffSecret -ForbiddenValues @("change-me-creator-handoff")
-Assert-GreenBookSecret -Name "GREENBOOK_CREATOR_AGENT_SHARED_SECRET" -Value $creatorAgentSecret -ForbiddenValues @("change-me-creator-proxy")
 Assert-GreenBookSecret -Name "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" -Value $agentSecret -ForbiddenValues @("change-me-agent-service")
 
 $env:SPRING_PROFILES_ACTIVE = ""
@@ -35,8 +31,6 @@ $env:CANAL_ENABLED = Get-GreenBookEnvValue -Name "CANAL_ENABLED" -DefaultValue "
 $env:JWT_ISSUER = Get-GreenBookEnvValue -Name "JWT_ISSUER" -DefaultValue "http://127.0.0.1:8080"
 $env:LOCAL_STORAGE_PUBLIC_BASE_URL = Get-GreenBookEnvValue -Name "GREENBOOK_JAVA_PUBLIC_BASE_URL" -DefaultValue "http://127.0.0.1:8080"
 $env:JWT_SECRET = $jwtSecret
-$env:GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET = $creatorHandoffSecret
-$env:GREENBOOK_CREATOR_AGENT_SHARED_SECRET = $creatorAgentSecret
 $env:GREENBOOK_AGENT_SERVICE_SHARED_SECRET = $agentSecret
 
 if (-not (Get-Command mvn -ErrorAction SilentlyContinue)) {

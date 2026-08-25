@@ -1,0 +1,13 @@
+[
+  {
+    "name": "draft-schedule-cancel-flow",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-LIFE-JAVA 的 Java 学习草稿，只保存草稿"},
+      {"text": "Java 那篇标题改成 GB-STABLE-R1-LIFE-JAVA-UPDATED"},
+      {"text": "给 Java 那篇补充一段实践建议和常见坑"},
+      {"text": "Java 那篇五分钟后定时发布", "hitl_sequence": ["confirm", "approve"]},
+      {"text": "Java 那篇改到十分钟后发布", "hitl_sequence": ["confirm", "approve"]},
+      {"text": "取消 Java 那篇定时发布", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  }
+]

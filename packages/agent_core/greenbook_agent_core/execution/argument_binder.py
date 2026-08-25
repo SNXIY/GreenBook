@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.planning.contracts import PlanStep
-from greenbook_agent_core.time_parser import parse_natural_schedule_time
+from greenbook_agent_core.execution.temporal_resolver import TemporalResolver
+from greenbook_agent_core.time_parser import TemporalBase
 
 if TYPE_CHECKING:
     from greenbook_agent_core.runtime.container import RuntimeContainer
@@ -94,7 +96,15 @@ class ArgumentBinder:
         """Filter already-resolved arguments; never infer from text."""
 
         properties, _required = self._schema_fields(step, schema)
-        arguments = dict(getattr(execution_input, "arguments", {}) or {})
+        # A top-level argument belongs only to the legacy single-step input
+        # shape.  In a multi-step execution, each PlanStep owns its arguments;
+        # treating the request-level scalar as a base would leak a schedule
+        # time or target from one logical Goal into another.
+        arguments = (
+            dict(getattr(execution_input, "arguments", {}) or {})
+            if len(getattr(execution_input, "steps", ()) or ()) <= 1
+            else {}
+        )
         arguments.update(dict(step.constraints or {}))
         bound = {
             str(key): value
@@ -106,6 +116,7 @@ class ArgumentBinder:
             bound,
             execution_input=execution_input,
             properties=properties,
+            semantic_arguments=arguments,
         )
         return bound
 
@@ -116,6 +127,7 @@ class ArgumentBinder:
         *,
         execution_input: ExecutionInput,
         properties: Mapping[str, Mapping[str, Any] | None],
+        semantic_arguments: Mapping[str, Any],
     ) -> None:
         """Resolve user-relative schedule text at the execution boundary.
 
@@ -134,8 +146,24 @@ class ArgumentBinder:
         if "run_at" not in properties:
             return
 
+        temporal_base = self._temporal_base(semantic_arguments)
         reference_time = self._now
-        if reference_time is None:
+        if temporal_base == TemporalBase.EXISTING_SCHEDULE_TIME:
+            reference_time = self._existing_schedule_time(semantic_arguments)
+            if reference_time is None:
+                # Production update_schedule can read the authoritative
+                # Schedule immediately before its PUT.  Preserve the declared
+                # base and raw expression for that handler when its schema
+                # explicitly supports it; legacy schemas still fail closed.
+                if "temporal_base" in properties:
+                    bound["temporal_base"] = temporal_base.value
+                    if "timezone" in properties and "timezone" not in bound:
+                        bound["timezone"] = self._timezone
+                    return
+                raise ValueError(
+                    "EXISTING_SCHEDULE_TIME requires authoritative existing_schedule_run_at"
+                )
+        elif reference_time is None:
             created_at = str(getattr(execution_input, "created_at", "") or "")
             if created_at:
                 try:
@@ -145,15 +173,88 @@ class ArgumentBinder:
                 except ValueError:
                     reference_time = None
 
-        parsed = parse_natural_schedule_time(
-            str(getattr(execution_input, "goal", "") or ""),
-            self._timezone,
-            now=reference_time,
+        # A queued request may contain several schedule steps.  Their
+        # temporal expressions belong to the individual PlanStep; parsing the
+        # request-wide execution_input.goal would make every schedule inherit
+        # the first goal's time.  Keep the single-step fallback only for the
+        # legacy contract where the step itself did not carry run_at.
+        raw_run_at = bound.get("run_at")
+        explicit_run_at = raw_run_at not in (None, "")
+        parse_source = str(raw_run_at or "")
+        if not parse_source and len(getattr(execution_input, "steps", ()) or ()) == 1:
+            parse_source = str(getattr(execution_input, "goal", "") or "")
+        # A canonical ISO instant carries its own offset; never re-parse it as
+        # natural language. A "Z" value is already UTC and passes through;
+        # an explicit offset (e.g. +08:00) is normalized to the Java contract's
+        # UTC "Z" form. Re-parsing "…T12:00:00Z" as natural language would
+        # interpret the wall clock in the session timezone and shift the
+        # instant by the offset (observed: stored as 04:00 instead of 12:00).
+        iso_instant = re.compile(
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?"
+            r"(?:Z|[+-]\d{2}:\d{2})$"
         )
-        if parsed:
-            bound["run_at"] = parsed
-            if "timezone" in properties:
+        if iso_instant.match(parse_source):
+            if not parse_source.endswith("Z"):
+                try:
+                    parsed_iso = datetime.fromisoformat(parse_source)
+                    if parsed_iso.tzinfo is not None:
+                        bound["run_at"] = parsed_iso.astimezone(UTC).isoformat().replace("+00:00", "Z")
+                except ValueError:
+                    pass
+            if "timezone" in properties and "timezone" not in bound:
                 bound["timezone"] = self._timezone
+
+        elif parse_source:
+            parsed = TemporalResolver(now=reference_time).resolve(
+                parse_source,
+                timezone=self._timezone,
+            )
+            if parsed:
+                bound["run_at"] = parsed
+                if "timezone" in properties:
+                    bound["timezone"] = self._timezone
+            elif explicit_run_at:
+                # A schedule tool must never receive a natural-language
+                # temporal value that the canonical resolver could not turn
+                # into an instant.  Semantic clarification normally prevents
+                # this path; the binder remains a final fail-closed boundary
+                # for direct/replayed Runtime inputs.
+                raise ValueError(
+                    "Unresolved future temporal expression cannot be scheduled"
+                )
+        elif raw_run_at not in (None, "") and "timezone" in properties and "timezone" not in bound:
+            # Canonical ISO values already carry their own instant.  Only add
+            # the display/contract timezone when the caller did not provide
+            # one; never apply a second clock conversion here.
+            bound["timezone"] = self._timezone
+
+    @staticmethod
+    def _temporal_base(values: Mapping[str, Any]) -> TemporalBase:
+        raw = values.get("temporal_base") or values.get("relative_to")
+        nested = values.get("temporal_constraint")
+        if not raw and isinstance(nested, Mapping):
+            raw = nested.get("temporal_base") or nested.get("relative_to")
+        if raw in (None, ""):
+            return TemporalBase.CURRENT_TIME
+        normalized = str(raw).strip().upper().replace("-", "_").replace(" ", "_")
+        try:
+            return TemporalBase(normalized)
+        except ValueError as exc:
+            raise ValueError(f"Unknown temporal_base: {raw}") from exc
+
+    @staticmethod
+    def _existing_schedule_time(values: Mapping[str, Any]) -> datetime | None:
+        raw = values.get("existing_schedule_run_at")
+        nested = values.get("temporal_constraint")
+        if raw in (None, "") and isinstance(nested, Mapping):
+            raw = nested.get("existing_schedule_run_at")
+        if raw in (None, ""):
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 
     def _tool_name(self, step: PlanStep) -> str:
         selected = str(getattr(step, "tool_name", "") or "")

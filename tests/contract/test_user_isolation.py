@@ -74,17 +74,47 @@ class TestUnauthenticatedAccess:
         assert resp.status_code == 401
 
     def test_approve_unauth_returns_401(self, client):
-        resp = client.post("/api/v1/agent/approvals/ap1/approve", json={"decision": "APPROVE"})
+        resp = client.post(
+            "/api/v1/agent/executions/e1/approve",
+            json={"decision": "APPROVE"},
+        )
         assert resp.status_code == 401
 
     def test_reject_unauth_returns_401(self, client):
-        resp = client.post("/api/v1/agent/approvals/ap1/reject")
+        resp = client.post(
+            "/api/v1/agent/runs/r1/approvals/ap1",
+            json={"decision": "REJECT"},
+        )
         assert resp.status_code == 401
 
 
 # ── Ownership tests ────────────────────────────────────────────────
 
 class TestConversationOwnership:
+    def test_post_context_is_persisted_and_filterable(self, client):
+        response = client.post(
+            "/api/v1/agent/conversations",
+            json={"title": "post context", "surface": "POST", "context_post_id": "post-42"},
+            headers=_make_headers(),
+        )
+        assert response.status_code == 200
+        conversation_id = response.json()["conversation_id"]
+        assert client.app.state.conversation_store[conversation_id]["active_post_id"] == "post-42"
+
+        matching = client.get(
+            "/api/v1/agent/conversations?context_post_id=post-42",
+            headers=_make_headers(),
+        )
+        assert matching.status_code == 200
+        assert [item["conversation_id"] for item in matching.json()["items"]] == [conversation_id]
+
+        unrelated = client.get(
+            "/api/v1/agent/conversations?context_post_id=post-99",
+            headers=_make_headers(),
+        )
+        assert unrelated.status_code == 200
+        assert unrelated.json()["items"] == []
+
     def test_empty_list_for_new_user(self, client):
         resp = client.get("/api/v1/agent/conversations", headers=_make_headers())
         assert resp.status_code == 200
@@ -199,28 +229,59 @@ class TestRunOwnership:
         resp = client.get("/api/v1/agent/runs/nope", headers=_make_headers())
         assert resp.status_code == 404
 
+    def test_run_response_carries_created_and_updated_at(self, client):
+        client.app.state.run_store["r-1"] = {
+            "run_id": "r-1", "conversation_id": "c-1",
+            "user_id": "user-a", "tenant_id": "t1",
+            "status": "COMPLETED", "content": "ok",
+            "trace_id": "t1", "tool_rounds": 0, "events": [],
+            "created_at": "2026-08-01T00:00:00Z",
+            "updated_at": "2026-08-01T01:00:00Z",
+        }
+        resp = client.get("/api/v1/agent/runs/r-1", headers=_make_headers(_make_auth("user-a")))
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created_at"] == "2026-08-01T00:00:00Z"
+        assert body["updated_at"] == "2026-08-01T01:00:00Z"
+
+    def test_list_runs_sorts_by_updated_at_without_crashing(self, client):
+        # Regression: the frontend sorts active runs by created_at; the API
+        # must return stable time fields for every run so multiple active
+        # runs in one conversation cannot break the panel restore path.
+        store = client.app.state.run_store
+        for i, run_id in enumerate(("r-old", "r-new")):
+            store[run_id] = {
+                "run_id": run_id, "conversation_id": "c-1",
+                "user_id": "user-a", "tenant_id": "t1",
+                "status": "RUNNING", "content": f"work {i}",
+                "trace_id": f"t-{i}", "tool_rounds": 0, "events": [],
+                "created_at": f"2026-08-0{i+1}T00:00:00Z",
+                "updated_at": f"2026-08-0{i+1}T00:00:00Z",
+            }
+        resp = client.get("/api/v1/agent/runs", headers=_make_headers(_make_auth("user-a")))
+        assert resp.status_code == 200
+        items = resp.json()
+        assert len(items) == 2
+        assert items[0]["run_id"] == "r-new"  # newest first
+        for item in items:
+            assert item["created_at"]
+            assert item["updated_at"]
+
 
 class TestApprovalOwnership:
-    def test_owner_can_approve(self, client):
-        client.app.state.approval_store["ap-1"] = {
-            "approval_id": "ap-1", "conversation_id": "c-1",
-            "user_id": "user-a", "tenant_id": "t1",
-            "operation": "publication.publish_now",
-            "status": "PENDING",
-        }
-        resp = client.post("/api/v1/agent/approvals/ap-1/approve",
-                           json={"decision": "APPROVE"},
-                           headers=_make_headers(_make_auth("user-a")))
-        assert resp.status_code == 200
+    """Approval decisions are ownership-checked by the durable
+    ``ApprovalRuntimeService``; the route layer maps a foreign user to 404.
+    The legacy in-memory ``/approvals/{id}/approve|reject`` writes were
+    removed in Phase 4 — see ``test_phase17b_human_control_runtime.py`` for
+    the durable service ownership test."""
 
-    def test_other_user_gets_404(self, client):
-        client.app.state.approval_store["ap-1"] = {
-            "approval_id": "ap-1", "conversation_id": "c-1",
-            "user_id": "user-a", "tenant_id": "t1",
-            "operation": "publication.publish_now",
-            "status": "PENDING",
-        }
-        resp = client.post("/api/v1/agent/approvals/ap-1/approve",
-                           json={"decision": "APPROVE"},
-                           headers=_make_headers(_make_auth("user-b")))
-        assert resp.status_code == 404
+    def test_legacy_approval_write_endpoints_are_gone(self, client):
+        assert client.post(
+            "/api/v1/agent/approvals/ap-1/approve",
+            json={"decision": "APPROVE"},
+            headers=_make_headers(_make_auth("user-a")),
+        ).status_code == 404
+        assert client.post(
+            "/api/v1/agent/approvals/ap-1/reject",
+            headers=_make_headers(_make_auth("user-a")),
+        ).status_code == 404

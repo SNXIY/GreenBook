@@ -7,6 +7,8 @@ SHA256: 1409b6d825a11dc161b501668ac09e07349a38b0690f060396ac77c60668eeef
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import logging
 import os
 import re
@@ -37,6 +39,18 @@ from greenbook_java_client.models import (
 )
 
 logger = logging.getLogger(__name__)
+_active_agent_run_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "greenbook_java_agent_run_id", default=""
+)
+
+
+@contextlib.contextmanager
+def agent_run_scope(run_id: str | None):
+    token = _active_agent_run_id.set(str(run_id or ""))
+    try:
+        yield
+    finally:
+        _active_agent_run_id.reset(token)
 _SENSITIVE_RE = re.compile(
     r"(Authorization|Bearer|access_token|refresh_token|api_key|secret)"
     r"[\s:=]+[^\s,;)]+",
@@ -84,7 +98,7 @@ def _boolean_env(name: str, default: bool) -> bool:
     raise ValueError(f"{name} must be a boolean")
 
 
-# ── Public API ───────────────────────────────────────────────────────
+# 鈹€鈹€ Public API 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 
 class JavaClient:
@@ -158,7 +172,7 @@ class JavaClient:
     async def close(self) -> None:
         await self.http.aclose()
 
-    # ── Header builders ──────────────────────────────────────────
+    # 鈹€鈹€ Header builders 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     def _headers(
         self,
@@ -172,6 +186,7 @@ class JavaClient:
         traceparent: str | None = None,
     ) -> dict[str, str]:
         h: dict[str, str] = {}
+        agent_run_id = agent_run_id or _active_agent_run_id.get()
         if bearer_token:
             h["Authorization"] = f"Bearer {bearer_token}"
         if trace_id:
@@ -191,7 +206,118 @@ class JavaClient:
     def _trace_id(self, headers: dict[str, str]) -> str | None:
         return headers.get("X-Trace-ID")
 
-    # ── Low-level request ────────────────────────────────────────
+    # 鈹€鈹€ Low-level request 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def _map_structured_error(
+        self,
+        resp: httpx.Response,
+        trace_id: str | None,
+        receipt_id: str | None,
+    ) -> ToolResult[Any]:
+        """Map the structured downstream contract before status fallbacks."""
+        body_text = ""
+        with suppress(Exception):
+            body_text = (resp.text or "")[:2000]
+        structured: AgentErrorResponse | None = None
+        try:
+            payload = resp.json()
+            structured = AgentErrorResponse.model_validate(payload.get("error", payload))
+        except Exception:
+            pass
+
+        code = str(structured.code) if structured else ""
+        user_msg = structured.user_message if structured else None
+        state = {
+            "java_status": resp.status_code,
+            "java_error_code": code or None,
+            "field": structured.field if structured else None,
+            "max_length": structured.max_length if structured else None,
+            "actual_length": structured.actual_length if structured else None,
+            "execution_id": structured.execution_id if structured else None,
+            "receipt_id": receipt_id,
+        }
+        if 400 <= resp.status_code < 500 and code not in {
+            "RESULT_UNKNOWN",
+            "UNKNOWN_SIDE_EFFECT_OUTCOME",
+        }:
+            # A structured 4xx is a known Java rejection.  The request
+            # crossed the HTTP boundary, but the requested mutation did not
+            # start; this must not become RESULT_UNKNOWN merely because
+            # request_sent is true.
+            state.update({
+                "side_effect_started": False,
+                "side_effect_state": "NOT_STARTED",
+                "result_known": True,
+            })
+
+        if code in {"FIELD_TOO_LONG", "INVALID_DRAFT_METADATA"}:
+            return ToolResult.permanent_input(
+                code, body_text,
+                user_message=user_msg or "The draft metadata does not meet the publishing requirements.",
+                state=state,
+            )
+        if code in {"VALIDATION_ERROR", "BAD_REQUEST"} or resp.status_code in {400, 422}:
+            return ToolResult.permanent_input(
+                code or "VALIDATION_ERROR", body_text,
+                user_message=user_msg or "The downstream service rejected the request parameters.",
+                state=state,
+            )
+        if resp.status_code == 401 or code in {"AUTHENTICATION_REQUIRED", "UNAUTHORIZED"}:
+            return ToolResult.failure(
+                "AUTHENTICATION_FAILED", body_text or "Java rejected the access token",
+                user_msg or "Authentication is required.", request_sent=True,
+                trace_id=trace_id, state=state,
+            )
+        if resp.status_code == 403 or code in {"FORBIDDEN", "PERMISSION_DENIED"}:
+            return ToolResult.failure(
+                "AUTHORIZATION_DENIED", body_text or "Java denied this operation",
+                user_msg or "You do not have permission to perform this action.",
+                request_sent=True, trace_id=trace_id, state=state,
+            )
+        if resp.status_code == 404 or code == "NOT_FOUND":
+            result = ToolResult.not_found(message=body_text)
+            result.state = state
+            return result
+        if code == "DRAFT_VERSION_CONFLICT":
+            result = ToolResult.draft_version_conflict(message=body_text)
+            result.state = state
+            return result
+        if code == "IDEMPOTENCY_CONFLICT":
+            result = ToolResult.idempotency_conflict(message=body_text)
+            result.state = state
+            return result
+        if code == "BUSINESS_REJECTED":
+            result = ToolResult.business_rejected(message=body_text, user_message=user_msg or "")
+            result.state = state
+            return result
+        if code in {"RESULT_UNKNOWN", "UNKNOWN_SIDE_EFFECT_OUTCOME"}:
+            result = ToolResult.result_unknown(message=body_text, trace_id=trace_id)
+            result.state = {
+                **state,
+                "side_effect_started": True,
+                "side_effect_state": "POSSIBLE",
+                "result_known": False,
+            }
+            return result
+        if resp.status_code == 409 or code == "CONFLICT":
+            result = ToolResult.conflict(message=body_text, user_message=user_msg or "")
+            result.state = state
+            return result
+        if code in {"DEPENDENCY_UNAVAILABLE", "BACKEND_TEMPORARY_UNAVAILABLE"} \
+                or resp.status_code in {502, 503, 504}:
+            result = ToolResult.java_backend_unavailable(
+                f"Java backend temporarily unavailable: {body_text}", trace_id=trace_id
+            )
+            result.state = state
+            return result
+        if code in {"INTERNAL_ERROR", "SERVER_FAILURE"} or resp.status_code >= 500:
+            result = ToolResult.server_failure(body_text, trace_id=trace_id)
+            result.state = state
+            return result
+
+        result = ToolResult.internal_error(f"Unexpected {resp.status_code}: {body_text}", trace_id=trace_id)
+        result.state = state
+        return result
 
     async def _request(
         self,
@@ -214,7 +340,7 @@ class JavaClient:
         except httpx.ConnectError:
             logger.warning("Java connect failed path=%s", path)
             return ToolResult.java_backend_unavailable(
-                "Java backend unreachable — connection failed. No request was sent.",
+                "Java backend unreachable 鈥?connection failed. No request was sent.",
                 trace_id=trace_id,
             )
         except httpx.ConnectTimeout:
@@ -230,10 +356,22 @@ class JavaClient:
                     "Write request was sent but Java response timed out. "
                     "Use the same Idempotency-Key to query or replay.",
                     trace_id=trace_id,
+                    state={
+                        "idempotency_key": req_headers.get("Idempotency-Key"),
+                        "side_effect_started": True,
+                        "side_effect_state": "POSSIBLE",
+                        "result_known": False,
+                    },
                 )
-            return ToolResult.timeout(
+            result = ToolResult.timeout(
                 "Java backend read timed out. You may safely retry."
             )
+            result.state = {
+                "side_effect_started": False,
+                "side_effect_state": "NONE",
+                "result_known": False,
+            }
+            return result
         except httpx.WriteTimeout:
             logger.warning("Java write timeout path=%s method=%s", path, method)
             result = ToolResult.request_not_sent(
@@ -251,22 +389,37 @@ class JavaClient:
             logger.warning("Java timeout path=%s method=%s", path, method)
             if is_write:
                 return ToolResult.result_unknown(
-                    "Write request timed out — result is unknown. "
+                    "Write request timed out 鈥?result is unknown. "
                     "Use the same Idempotency-Key to query or replay.",
                     trace_id=trace_id,
+                    state={
+                        "idempotency_key": req_headers.get("Idempotency-Key"),
+                        "side_effect_started": True,
+                        "side_effect_state": "POSSIBLE",
+                        "result_known": False,
+                    },
                 )
-            return ToolResult.timeout(
+            result = ToolResult.timeout(
                 "Java backend request timed out. You may safely retry."
             )
+            result.state = {
+                "side_effect_started": False,
+                "side_effect_state": "NONE",
+                "result_known": False,
+            }
+            return result
         except (httpx.RemoteProtocolError, httpx.NetworkError):
             if is_write:
-                return ToolResult.failure(
-                    "JAVA_BACKEND_UNAVAILABLE",
-                    "Java backend network error during a write request",
-                    "Java 社区服务网络异常，无法确认本次写入是否提交。",
-                    retryable=True,
-                    request_sent=None,
+                return ToolResult.result_unknown(
+                    "Java connection was lost during a write; commit state is unknown. "
+                    "Use the same Idempotency-Key for reconciliation or replay.",
                     trace_id=trace_id,
+                    state={
+                        "idempotency_key": req_headers.get("Idempotency-Key"),
+                        "side_effect_started": True,
+                        "side_effect_state": "POSSIBLE",
+                        "result_known": False,
+                    },
                 )
             return ToolResult.java_backend_unavailable(
                 "Java backend network error. No request was processed.",
@@ -277,7 +430,11 @@ class JavaClient:
         receipt_id = resp.headers.get("X-Receipt-ID")
 
         if resp.status_code == 204:
-            return ToolResult.success({}, trace_id=resp_trace_id)
+            return ToolResult.success(
+                {},
+                trace_id=resp_trace_id,
+                receipt_id=receipt_id,
+            )
 
         if 200 <= resp.status_code < 300:
             try:
@@ -286,7 +443,7 @@ class JavaClient:
                 return ToolResult.failure(
                     "BAD_GATEWAY",
                     "Java returned a non-JSON success response",
-                    "社区服务返回了无法识别的结果，请稍后重试。",
+                    "Downstream returned an unreadable success response; please retry later.",
                     request_sent=is_write,
                     trace_id=resp_trace_id,
                 )
@@ -312,69 +469,7 @@ class JavaClient:
         trace_id: str | None,
         receipt_id: str | None,
     ) -> ToolResult[Any]:
-        body_text = ""
-        with suppress(Exception):
-            body_text = (resp.text or "")[:2000]
-
-        structured: AgentErrorResponse | None = None
-        try:
-            payload = resp.json()
-            structured = AgentErrorResponse.model_validate(payload.get("error", payload))
-        except Exception:
-            pass
-
-        code = str(structured.code) if structured else ""
-        user_msg = structured.user_message if structured else None
-        if resp.status_code == 422:
-            return ToolResult.failure(
-                "DOWNSTREAM_VALIDATION_FAILED",
-                body_text,
-                user_msg or "下游服务拒绝了请求参数。",
-                request_sent=True,
-                trace_id=trace_id,
-            )
-
-        if resp.status_code == 400 or code == "VALIDATION_ERROR":
-            return ToolResult.validation_error(message=body_text, user_message=user_msg or "")
-
-        if resp.status_code == 401 or code in ("AUTHENTICATION_REQUIRED", "UNAUTHORIZED"):
-            return ToolResult.failure(
-                "AUTHENTICATION_FAILED",
-                "Java rejected the access token",
-                "登录状态已失效，请重新登录。",
-            )
-
-        if resp.status_code == 403 or code in ("FORBIDDEN", "PERMISSION_DENIED"):
-            return ToolResult.failure(
-                "AUTHORIZATION_DENIED",
-                "Java denied this operation",
-                "你没有权限执行此操作。",
-            )
-
-        if resp.status_code == 404 or code == "NOT_FOUND":
-            return ToolResult.not_found(message=body_text)
-
-        if code == "DRAFT_VERSION_CONFLICT":
-            return ToolResult.draft_version_conflict(message=body_text)
-
-        if code == "IDEMPOTENCY_CONFLICT":
-            return ToolResult.idempotency_conflict(message=body_text)
-
-        if code == "BUSINESS_REJECTED":
-            return ToolResult.business_rejected(message=body_text, user_message=user_msg or "")
-
-        if code == "RESULT_UNKNOWN":
-            return ToolResult.result_unknown(message=body_text, trace_id=trace_id)
-
-        if resp.status_code == 409 or code == "CONFLICT":
-            return ToolResult.conflict(message=body_text, user_message=user_msg or "")
-
-        if resp.status_code >= 500 or code == "DEPENDENCY_UNAVAILABLE":
-            return ToolResult.java_backend_unavailable(
-                f"Java backend error: {body_text}", trace_id=trace_id
-            )
-
-        return ToolResult.internal_error(f"Unexpected {resp.status_code}: {body_text}", trace_id=trace_id)
+        return await self._map_structured_error(resp, trace_id, receipt_id)
 
     def _log_call(
         self,
@@ -391,7 +486,7 @@ class JavaClient:
             method, path, status, latency_ms, trace_id, error_code,
         )
 
-    # ── Community ─────────────────────────────────────────────────
+    # 鈹€鈹€ Community 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def search_posts(
         self,
@@ -459,7 +554,31 @@ class JavaClient:
             result.data = [AgentOwnPostSummary.model_validate(item) for item in result.data]
         return result
 
-    # ── Draft ────────────────────────────────────────────────────
+    async def delete_post(
+        self,
+        post_id: str,
+        *,
+        bearer_token: str,
+        idempotency_key: str,
+        trace_id: str | None = None,
+        conversation_id: str | None = None,
+        agent_run_id: str | None = None,
+        tool_call_id: str | None = None,
+    ) -> ToolResult[Any]:
+        """Soft-delete one owned published post through the canonical API."""
+        headers = self._headers(
+            bearer_token=bearer_token,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+            agent_run_id=agent_run_id,
+            tool_call_id=tool_call_id,
+            idempotency_key=idempotency_key,
+        )
+        return await self._request(
+            "DELETE", f"/api/v1/agent/posts/{post_id}", headers=headers,
+        )
+
+    # 鈹€鈹€ Draft 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def create_draft(
         self,
@@ -554,7 +673,32 @@ class JavaClient:
             result.data = DraftResponse.model_validate(result.data)
         return result
 
-    # ── Publication ──────────────────────────────────────────────
+    async def delete_draft(
+        self,
+        draft_id: str,
+        *,
+        bearer_token: str,
+        idempotency_key: str,
+        trace_id: str | None = None,
+        conversation_id: str | None = None,
+        agent_run_id: str | None = None,
+        tool_call_id: str | None = None,
+    ) -> ToolResult[Any]:
+        headers = self._headers(
+            bearer_token=bearer_token,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+            agent_run_id=agent_run_id,
+            tool_call_id=tool_call_id,
+            idempotency_key=idempotency_key,
+        )
+        return await self._request(
+            "DELETE",
+            f"/api/v1/agent/drafts/{draft_id}",
+            headers=headers,
+        )
+
+    # 鈹€鈹€ Publication 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def create_schedule(
         self,
@@ -680,7 +824,7 @@ class JavaClient:
             result.data = PublishResponse.model_validate(result.data)
         return result
 
-    # ── Interaction ──────────────────────────────────────────────
+    # 鈹€鈹€ Interaction 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def list_comments(
         self,
@@ -706,6 +850,28 @@ class JavaClient:
         )
         if result.ok and result.data is not None:
             result.data = AgentCommentPageResponse.model_validate(result.data)
+        return result
+
+    async def get_comment(
+        self,
+        comment_id: str,
+        *,
+        bearer_token: str,
+        trace_id: str | None = None,
+        conversation_id: str | None = None,
+    ) -> ToolResult[AgentCommentResponse]:
+        """Read one comment for authoritative reply verification."""
+
+        headers = self._headers(
+            bearer_token=bearer_token,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+        )
+        result = await self._request(
+            "GET", f"/api/v1/agent/comments/{comment_id}", headers=headers,
+        )
+        if result.ok and result.data is not None:
+            result.data = AgentCommentResponse.model_validate(result.data)
         return result
 
     async def reply_to_comment(
@@ -736,7 +902,7 @@ class JavaClient:
             result.data = AgentCommentResponse.model_validate(result.data)
         return result
 
-    # ── Analytics ────────────────────────────────────────────────
+    # 鈹€鈹€ Analytics 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def get_post_analytics(
         self,

@@ -1,16 +1,19 @@
 package com.tongji.agentfacade.api.dto;
 
+import com.tongji.agentfacade.contract.DraftMetadataContract;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 
-@Schema(description = "草稿更新请求")
+@Schema(description = "Draft update request")
 public record AgentDraftUpdateRequest(
-        @Schema(description = "标题") String title,
-        @Schema(description = "正文 Markdown") String content,
-        @Schema(description = "摘要") String summary,
-        @Schema(description = "标签") java.util.List<String> tags,
-        @Schema(description = "可见性") String visibility,
-        @Schema(description = "期望的草稿版本（ISO-8601更新时间），用于乐观锁冲突检测。不传则跳过版本检查")
+        @Schema(description = "Title") String title,
+        @Schema(description = "Markdown body") String content,
+        @Schema(description = "Short summary stored in know_posts.description")
+        @Size(max = DraftMetadataContract.DESCRIPTION_MAX_LENGTH) String summary,
+        @Schema(description = "Tags") java.util.List<String> tags,
+        @Schema(description = "Visibility") String visibility,
+        @Schema(description = "Expected draft version for optimistic locking")
         Instant expectedVersion
 ) {}

@@ -14,10 +14,8 @@ from greenbook_agent_core.execution.runtime.ledger import (
     ToolExecutionLedger,
 )
 from greenbook_agent_core.execution.runtime.tool_runtime import (
-    InvocationResult,
     ToolRuntime,
 )
-
 
 # ── helpers ──────────────────────────────────────────────────────
 
@@ -237,8 +235,11 @@ async def test_handler_exception_recorded() -> None:
     result = await runtime.invoke(ctx)
 
     assert result.ok is False
-    assert result.error_code == "TOOL_EXECUTION_FAILED"
+    assert result.error_code == "INTERNAL_ERROR"
     assert result.retryable is False
+    assert result.request_sent is False
+    assert result.evidence is not None
+    assert result.evidence.side_effect_state.value == "NOT_STARTED"
 
 
 def test_ledger_rejects_duplicate_key_without_replay() -> None:

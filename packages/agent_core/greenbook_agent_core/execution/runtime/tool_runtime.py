@@ -27,13 +27,41 @@ logger = logging.getLogger(__name__)
 ToolHandler = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 
 
+def _receipt_payload(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return dict(value)
+    dump = getattr(value, "model_dump", None)
+    if callable(dump):
+        rendered = dump(mode="json")
+        return dict(rendered) if isinstance(rendered, dict) else None
+    return None
+
+
+def _resource_refs(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    refs: list[dict[str, Any]] = []
+    for item in value:
+        if isinstance(item, dict):
+            refs.append(dict(item))
+        else:
+            dump = getattr(item, "model_dump", None)
+            if callable(dump):
+                rendered = dump(mode="json")
+                if isinstance(rendered, dict):
+                    refs.append(dict(rendered))
+    return refs
+
+
 @dataclass(slots=True)
 class AsyncTaskHandle:
     """Non-blocking result returned by a long-running tool.
 
     ``awaitable`` is consumed exactly once by ToolRuntime.  The handle itself
     is deliberately small so an MCP adapter can return it without coupling
-    the execution state model to a Creator-specific task implementation.
+    the execution state model to a long-running task implementation.
     """
 
     task_id: str
@@ -70,6 +98,11 @@ class InvocationResult(BaseModel):
     pending: bool = False
     async_task_id: str = ""
     evidence: ExecutionEvidence | None = None
+    # Preserve the Phase 1 verification receipt across the Worker boundary.
+    # Runtime evidence alone intentionally does not contain the verified
+    # business postcondition needed by UserActivity completion.
+    operation_receipt: dict[str, Any] | None = None
+    resource_refs: list[dict[str, Any]] = []
 
     @classmethod
     def from_tool_result(
@@ -99,6 +132,8 @@ class InvocationResult(BaseModel):
             duration_ms=duration_ms,
             status="COMPLETED" if bool(raw.get("ok", False)) else "FAILED",
             evidence=resolved_evidence,
+            operation_receipt=_receipt_payload(raw.get("operation_receipt")),
+            resource_refs=_resource_refs(raw.get("resource_refs")),
         )
 
 
@@ -132,7 +167,7 @@ class ToolRuntime:
         # Keep a strong reference until the continuation has resumed the
         # Worker. The event loop only keeps weak references to Tasks; without
         # this set a short-lived test/runtime loop can collect a pending
-        # Creator continuation before it records its terminal result.
+        # async continuation before it records its terminal result.
         self._async_tasks: set[asyncio.Task[None]] = set()
 
     # ── main entry ───────────────────────────────────────────────
@@ -230,15 +265,19 @@ class ToolRuntime:
             evidence = ExecutionEvidence.from_payload(
                 {},
                 base=base_evidence,
-                request_sent=None,
-                side_effect_state="UNKNOWN",
-                error_code="TOOL_EXECUTION_FAILED",
+                # This is an exception in the Runtime/handler boundary, not
+                # an external acknowledgement loss.  Side-effect adapters
+                # that cannot prove a write outcome return RESULT_UNKNOWN
+                # explicitly before this generic guard.
+                request_sent=False,
+                side_effect_state="NOT_STARTED",
+                error_code="INTERNAL_ERROR",
                 raw_error_type=type(exc).__name__,
                 phase="TOOL_HANDLER_EXCEPTION",
             )
             self._ledger.record_failure(
                 ctx.invocation_id,
-                "TOOL_EXECUTION_FAILED",
+                "INTERNAL_ERROR",
                 str(exc),
                 elapsed,
                 evidence=evidence,
@@ -252,9 +291,10 @@ class ToolRuntime:
             return InvocationResult(
                 invocation_id=ctx.invocation_id,
                 tool_name=ctx.tool_name,
-                error_code="TOOL_EXECUTION_FAILED",
+                error_code="INTERNAL_ERROR",
                 error_message=str(exc),
                 retryable=False,
+                request_sent=False,
                 duration_ms=elapsed,
                 status="FAILED",
                 evidence=evidence,
@@ -336,7 +376,7 @@ class ToolRuntime:
                                       tool_call_id=evidence.tool_call_id or "",
                                       operation_id=evidence.operation_id or "")
         else:
-            code = code or "TOOL_EXECUTION_FAILED"
+            code = code or "INTERNAL_ERROR"
             msg = str(raw.get("user_message") or raw.get("message", ""))
             evidence = ExecutionEvidence.from_payload(
                 raw,
@@ -394,7 +434,7 @@ class ToolRuntime:
             else:
                 raw = {
                     "ok": False,
-                    "code": "TOOL_EXECUTION_FAILED",
+                    "code": "INTERNAL_ERROR",
                     "message": "Async tool returned an invalid result",
                 }
             elapsed = (time.monotonic() - start) * 1000.0
@@ -414,7 +454,7 @@ class ToolRuntime:
             else:
                 self._ledger.record_failure(
                     ctx.invocation_id,
-                    code or "TOOL_EXECUTION_FAILED",
+                    code or "INTERNAL_ERROR",
                     str(raw.get("user_message") or raw.get("message", "")),
                     elapsed,
                     raw,
@@ -486,15 +526,15 @@ class ToolRuntime:
             evidence = ExecutionEvidence.from_payload(
                 {},
                 base=base_evidence,
-                request_sent=None,
-                side_effect_state="UNKNOWN",
-                error_code="TOOL_EXECUTION_FAILED",
+                request_sent=False,
+                side_effect_state="NOT_STARTED",
+                error_code="INTERNAL_ERROR",
                 raw_error_type=type(exc).__name__,
                 phase="ASYNC_HANDLER_EXCEPTION",
             )
             self._ledger.record_failure(
                 ctx.invocation_id,
-                "TOOL_EXECUTION_FAILED",
+                "INTERNAL_ERROR",
                 str(exc),
                 elapsed,
                 evidence=evidence,
@@ -502,8 +542,9 @@ class ToolRuntime:
             result = InvocationResult(
                 invocation_id=ctx.invocation_id,
                 tool_name=ctx.tool_name,
-                error_code="TOOL_EXECUTION_FAILED",
+                error_code="INTERNAL_ERROR",
                 error_message=str(exc),
+                request_sent=False,
                 duration_ms=elapsed,
                 status="FAILED",
                 async_task_id=handle.task_id,

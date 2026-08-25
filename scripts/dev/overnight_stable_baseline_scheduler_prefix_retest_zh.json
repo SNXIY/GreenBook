@@ -1,0 +1,9 @@
+[
+  {
+    "name": "scheduler-leading-verb-retest-zh",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHED-PREFIX-AGENT 的 Agent 学习草稿，只保存草稿"},
+      {"text": "过五分钟把刚才那篇发出去", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  }
+]

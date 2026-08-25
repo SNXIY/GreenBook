@@ -2,6 +2,7 @@ package com.tongji.agentfacade;
 
 import com.tongji.agentfacade.api.dto.*;
 import com.tongji.agentfacade.service.AgentFacadeService;
+import com.tongji.agentfacade.mapper.ScheduledPublicationMapper;
 import com.tongji.agentfacade.service.IdempotencyService;
 import com.tongji.agentfacade.service.ScheduledPublicationService;
 import com.tongji.comment.service.CommentService;
@@ -41,6 +42,7 @@ class TextOnlyPostWithoutOssTest {
     @Mock private CounterService counterService;
     @Mock private OssStorageService ossStorageService;
     @Mock private RelationMapper relationMapper;
+    @Mock private ScheduledPublicationMapper scheduledPublicationMapper;
 
     private AgentFacadeService agentFacadeService;
 
@@ -52,7 +54,7 @@ class TextOnlyPostWithoutOssTest {
     void setUp() {
         agentFacadeService = new AgentFacadeService(
                 knowPostMapper, knowPostService, commentService,
-                counterService, relationMapper, ossStorageService);
+                counterService, relationMapper, ossStorageService, scheduledPublicationMapper);
     }
 
     @Test

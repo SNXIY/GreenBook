@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
 from greenbook_java_client.models import (
     AgentDraftCreateRequest,
     AgentDraftUpdateRequest,
     AgentErrorResponse,
     DraftResponse,
     ScheduleCreateRequest,
-    ScheduleStatus,
     ScheduledPublicationResponse,
+    ScheduleStatus,
     SearchPageResponse,
 )
 

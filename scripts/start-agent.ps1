@@ -52,7 +52,6 @@ $env:PYTHONPATH = @(
   "$Root\packages\agent_core",
   "$Root\packages\contracts",
   "$Root\packages\java_client",
-  "$Root\packages\creator_client",
   "$Root\packages\security",
   "$Root\services\greenbook_mcp",
   "$Root\apps\agent_api"
@@ -78,7 +77,6 @@ if (-not $NoReload) {
 }
 
 Write-Host "GreenBook Agent API: Runtime API started at http://127.0.0.1:$agentPort"
-Write-Host "Creator base URL: $env:GREENBOOK_CREATOR_BASE_URL"
 if ($manageWorker) {
   Write-Host "Agent Worker: in-process queue consumer (no static worker token required)"
 } elseif ($executionDispatch -eq "queue") {

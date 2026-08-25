@@ -1,0 +1,23 @@
+[
+  {
+    "name": "scheduler-two-turn-java",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHED3-JAVA 的 Java 学习草稿，只保存草稿"},
+      {"text": "刚才那篇五分钟后发布"}
+    ]
+  },
+  {
+    "name": "scheduler-two-turn-agent",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHED3-AGENT 的 Agent 学习草稿，只保存草稿"},
+      {"text": "过五分钟把刚才那篇发出去"}
+    ]
+  },
+  {
+    "name": "scheduler-two-turn-redis",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHED3-REDIS 的 Redis 学习草稿，只保存草稿"},
+      {"text": "刚才的 Redis 草稿五分钟后上线"}
+    ]
+  }
+]

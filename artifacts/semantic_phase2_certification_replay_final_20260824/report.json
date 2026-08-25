@@ -1,0 +1,2310 @@
+{
+  "status": "COMPLETED",
+  "mode": "deterministic_replay_no_llm",
+  "context_mode": "scoped",
+  "dataset": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+  "baseline_results": "D:\\agent\\green-book\\artifacts\\semantic_phase2_scoped_replay_postfix_20260824\\results.json",
+  "scope": {
+    "all_cases": 60,
+    "all_utterances": 78,
+    "affected_case_prefixes": [
+      "B",
+      "F",
+      "G",
+      "H"
+    ],
+    "affected_cases": 28,
+    "affected_utterances": 46
+  },
+  "schema_replay": {
+    "baseline_schema_parse_failures": 0,
+    "after_raw_schema_valid": 78,
+    "after_raw_schema_invalid": 0
+  },
+  "all": {
+    "before": {
+      "primary_case_count": 60,
+      "evaluated_utterance_count": 78,
+      "exact_semantic_success": 58,
+      "exact_semantic_accuracy": 0.7435897435897436,
+      "primary_exact_semantic_success": 44,
+      "primary_exact_semantic_accuracy": 0.7333333333333333,
+      "unsafe_semantic_error_count": 9,
+      "unsafe_semantic_error_rate": 0.11538461538461539,
+      "primary_unsafe_semantic_error_count": 9,
+      "primary_unsafe_semantic_error_rate": 0.15,
+      "strict_exact": 58,
+      "strict_exact_accuracy": 0.7435897435897436,
+      "primary_strict_exact": 44,
+      "primary_strict_exact_accuracy": 0.7333333333333333,
+      "strict_unsafe": 9,
+      "strict_unsafe_rate": 0.11538461538461539,
+      "primary_strict_unsafe": 9,
+      "primary_strict_unsafe_rate": 0.15,
+      "core_intent_exact": 71,
+      "core_intent_exact_accuracy": 0.9102564102564102,
+      "primary_core_intent_exact": 57,
+      "primary_core_intent_exact_accuracy": 0.95,
+      "core_intent_unsafe": 3,
+      "core_intent_unsafe_rate": 0.038461538461538464,
+      "primary_core_intent_unsafe": 3,
+      "primary_core_intent_unsafe_rate": 0.05,
+      "clarification": {
+        "expected": 19,
+        "actual": 19,
+        "unnecessary": 2,
+        "missing": 2
+      },
+      "metrics": {
+        "UNKNOWN_should_have_been_used": 2,
+        "constraint_lost": 3,
+        "constraint_violation": 3,
+        "exact_semantic_success": 58,
+        "extra_goal": 2,
+        "missing_clarification": 2,
+        "missing_goal": 3,
+        "premature_commitment": 1,
+        "semantic_validation_failure": 2,
+        "target_ambiguity_missed": 1,
+        "unnecessary_clarification": 2,
+        "wrong_action": 8,
+        "wrong_goal_split": 5,
+        "wrong_publication": 3,
+        "wrong_target": 9,
+        "wrong_time": 3
+      },
+      "by_category": {
+        "A_SINGLE_ORAL": {
+          "total": 8,
+          "exact": 8,
+          "exact_accuracy": 1.0,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 8
+          }
+        },
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "exact_accuracy": 0.625,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 5,
+            "missing_goal": 1,
+            "wrong_goal_split": 1,
+            "wrong_time": 3
+          }
+        },
+        "C_TARGET_REFERENCE": {
+          "total": 8,
+          "exact": 7,
+          "exact_accuracy": 0.875,
+          "unsafe": 0,
+          "core_intent_exact": 7,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "exact_semantic_success": 7,
+            "wrong_publication": 1
+          }
+        },
+        "D_TEMPORAL": {
+          "total": 8,
+          "exact": 7,
+          "exact_accuracy": 0.875,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 7,
+            "wrong_action": 1
+          }
+        },
+        "E_NEGATIVE_CONSTRAINT": {
+          "total": 8,
+          "exact": 7,
+          "exact_accuracy": 0.875,
+          "unsafe": 1,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "UNKNOWN_should_have_been_used": 1,
+            "exact_semantic_success": 7,
+            "wrong_publication": 1
+          }
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "exact_accuracy": 0.375,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "UNKNOWN_should_have_been_used": 1,
+            "constraint_lost": 3,
+            "constraint_violation": 3,
+            "exact_semantic_success": 3,
+            "extra_goal": 1,
+            "missing_clarification": 1,
+            "missing_goal": 1,
+            "wrong_action": 3,
+            "wrong_goal_split": 2,
+            "wrong_publication": 1,
+            "wrong_target": 3
+          }
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 1,
+          "exact_accuracy": 0.16666666666666666,
+          "unsafe": 1,
+          "core_intent_exact": 5,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "exact_semantic_success": 1,
+            "missing_clarification": 1,
+            "missing_goal": 1,
+            "premature_commitment": 1,
+            "target_ambiguity_missed": 1,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 4
+          }
+        },
+        "H_PARAPHRASE": {
+          "total": 24,
+          "exact": 20,
+          "exact_accuracy": 0.8333333333333334,
+          "unsafe": 0,
+          "core_intent_exact": 20,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 20,
+            "extra_goal": 1,
+            "semantic_validation_failure": 2,
+            "unnecessary_clarification": 2,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 2
+          }
+        }
+      },
+      "primary_by_category": {
+        "A_SINGLE_ORAL": {
+          "total": 8,
+          "exact": 8,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 1.0,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.625,
+          "unsafe_rate": 0.375,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "C_TARGET_REFERENCE": {
+          "total": 8,
+          "exact": 7,
+          "unsafe": 0,
+          "core_intent_exact": 7,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.875,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe_rate": 0.125
+        },
+        "D_TEMPORAL": {
+          "total": 8,
+          "exact": 7,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.875,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "E_NEGATIVE_CONSTRAINT": {
+          "total": 8,
+          "exact": 7,
+          "unsafe": 1,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.875,
+          "unsafe_rate": 0.125,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.375,
+          "unsafe_rate": 0.5,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe_rate": 0.125
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 1,
+          "unsafe": 1,
+          "core_intent_exact": 5,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.16666666666666666,
+          "unsafe_rate": 0.16666666666666666,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe_rate": 0.16666666666666666
+        },
+        "H_PARAPHRASE": {
+          "total": 6,
+          "exact": 6,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 1.0,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        }
+      },
+      "provenance_coverage": {
+        "desired_outcome": {
+          "covered": 64,
+          "total": 78,
+          "coverage": 0.8205128205128205
+        },
+        "formal_source_span": {
+          "covered": 0,
+          "total": 78,
+          "coverage": 0.0
+        },
+        "hard_constraints": {
+          "covered": 75,
+          "total": 78,
+          "coverage": 0.9615384615384616
+        },
+        "target_reference": {
+          "covered": 72,
+          "total": 78,
+          "coverage": 0.9230769230769231
+        },
+        "temporal_expression": {
+          "covered": 67,
+          "total": 78,
+          "coverage": 0.8589743589743589
+        }
+      },
+      "first_bad_state": {
+        "Interpreter": 10,
+        "Normalization": 1,
+        "Objective projection": 4,
+        "TargetResolver": 5
+      },
+      "top_failure_clusters": [
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+          "count": 4
+        },
+        {
+          "cluster": "B_MULTI_TARGET:wrong_time",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_violation",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_lost",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_target",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_action",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_goal_split",
+          "count": 2
+        },
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:semantic_validation_failure",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_target",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:unnecessary_clarification",
+          "count": 2
+        },
+        {
+          "cluster": "B_MULTI_TARGET:missing_goal",
+          "count": 1
+        },
+        {
+          "cluster": "B_MULTI_TARGET:wrong_goal_split",
+          "count": 1
+        },
+        {
+          "cluster": "C_TARGET_REFERENCE:wrong_publication",
+          "count": 1
+        }
+      ]
+    },
+    "after": {
+      "primary_case_count": 60,
+      "evaluated_utterance_count": 78,
+      "exact_semantic_success": 59,
+      "exact_semantic_accuracy": 0.7564102564102564,
+      "primary_exact_semantic_success": 45,
+      "primary_exact_semantic_accuracy": 0.75,
+      "unsafe_semantic_error_count": 8,
+      "unsafe_semantic_error_rate": 0.10256410256410256,
+      "primary_unsafe_semantic_error_count": 8,
+      "primary_unsafe_semantic_error_rate": 0.13333333333333333,
+      "strict_exact": 59,
+      "strict_exact_accuracy": 0.7564102564102564,
+      "primary_strict_exact": 45,
+      "primary_strict_exact_accuracy": 0.75,
+      "strict_unsafe": 8,
+      "strict_unsafe_rate": 0.10256410256410256,
+      "primary_strict_unsafe": 8,
+      "primary_strict_unsafe_rate": 0.13333333333333333,
+      "core_intent_exact": 72,
+      "core_intent_exact_accuracy": 0.9230769230769231,
+      "primary_core_intent_exact": 58,
+      "primary_core_intent_exact_accuracy": 0.9666666666666667,
+      "core_intent_unsafe": 2,
+      "core_intent_unsafe_rate": 0.02564102564102564,
+      "primary_core_intent_unsafe": 2,
+      "primary_core_intent_unsafe_rate": 0.03333333333333333,
+      "clarification": {
+        "expected": 19,
+        "actual": 20,
+        "unnecessary": 2,
+        "missing": 1
+      },
+      "metrics": {
+        "UNKNOWN_should_have_been_used": 2,
+        "constraint_lost": 3,
+        "constraint_violation": 3,
+        "exact_semantic_success": 59,
+        "extra_goal": 2,
+        "missing_clarification": 1,
+        "missing_goal": 3,
+        "semantic_validation_failure": 2,
+        "unnecessary_clarification": 2,
+        "wrong_action": 8,
+        "wrong_goal_split": 5,
+        "wrong_publication": 3,
+        "wrong_target": 8,
+        "wrong_time": 3
+      },
+      "by_category": {
+        "A_SINGLE_ORAL": {
+          "total": 8,
+          "exact": 8,
+          "exact_accuracy": 1.0,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 8
+          }
+        },
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "exact_accuracy": 0.625,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 5,
+            "missing_goal": 1,
+            "wrong_goal_split": 1,
+            "wrong_time": 3
+          }
+        },
+        "C_TARGET_REFERENCE": {
+          "total": 8,
+          "exact": 7,
+          "exact_accuracy": 0.875,
+          "unsafe": 0,
+          "core_intent_exact": 7,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "exact_semantic_success": 7,
+            "wrong_publication": 1
+          }
+        },
+        "D_TEMPORAL": {
+          "total": 8,
+          "exact": 7,
+          "exact_accuracy": 0.875,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 7,
+            "wrong_action": 1
+          }
+        },
+        "E_NEGATIVE_CONSTRAINT": {
+          "total": 8,
+          "exact": 7,
+          "exact_accuracy": 0.875,
+          "unsafe": 1,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "UNKNOWN_should_have_been_used": 1,
+            "exact_semantic_success": 7,
+            "wrong_publication": 1
+          }
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "exact_accuracy": 0.375,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "UNKNOWN_should_have_been_used": 1,
+            "constraint_lost": 3,
+            "constraint_violation": 3,
+            "exact_semantic_success": 3,
+            "extra_goal": 1,
+            "missing_clarification": 1,
+            "missing_goal": 1,
+            "wrong_action": 3,
+            "wrong_goal_split": 2,
+            "wrong_publication": 1,
+            "wrong_target": 3
+          }
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 2,
+          "exact_accuracy": 0.3333333333333333,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 2,
+            "missing_goal": 1,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 3
+          }
+        },
+        "H_PARAPHRASE": {
+          "total": 24,
+          "exact": 20,
+          "exact_accuracy": 0.8333333333333334,
+          "unsafe": 0,
+          "core_intent_exact": 20,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 20,
+            "extra_goal": 1,
+            "semantic_validation_failure": 2,
+            "unnecessary_clarification": 2,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 2
+          }
+        }
+      },
+      "primary_by_category": {
+        "A_SINGLE_ORAL": {
+          "total": 8,
+          "exact": 8,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 1.0,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.625,
+          "unsafe_rate": 0.375,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "C_TARGET_REFERENCE": {
+          "total": 8,
+          "exact": 7,
+          "unsafe": 0,
+          "core_intent_exact": 7,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.875,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe_rate": 0.125
+        },
+        "D_TEMPORAL": {
+          "total": 8,
+          "exact": 7,
+          "unsafe": 0,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.875,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "E_NEGATIVE_CONSTRAINT": {
+          "total": 8,
+          "exact": 7,
+          "unsafe": 1,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.875,
+          "unsafe_rate": 0.125,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.375,
+          "unsafe_rate": 0.5,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe_rate": 0.125
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 2,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.3333333333333333,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "H_PARAPHRASE": {
+          "total": 6,
+          "exact": 6,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 1.0,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        }
+      },
+      "provenance_coverage": {
+        "desired_outcome": {
+          "covered": 64,
+          "total": 78,
+          "coverage": 0.8205128205128205
+        },
+        "formal_source_span": {
+          "covered": 0,
+          "total": 78,
+          "coverage": 0.0
+        },
+        "hard_constraints": {
+          "covered": 75,
+          "total": 78,
+          "coverage": 0.9615384615384616
+        },
+        "target_reference": {
+          "covered": 72,
+          "total": 78,
+          "coverage": 0.9230769230769231
+        },
+        "temporal_expression": {
+          "covered": 67,
+          "total": 78,
+          "coverage": 0.8589743589743589
+        }
+      },
+      "first_bad_state": {
+        "Interpreter": 10,
+        "Normalization": 1,
+        "Objective projection": 4,
+        "TargetResolver": 4
+      },
+      "top_failure_clusters": [
+        {
+          "cluster": "B_MULTI_TARGET:wrong_time",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_violation",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_lost",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_target",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_action",
+          "count": 3
+        },
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_goal_split",
+          "count": 2
+        },
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:semantic_validation_failure",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_target",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:unnecessary_clarification",
+          "count": 2
+        },
+        {
+          "cluster": "B_MULTI_TARGET:missing_goal",
+          "count": 1
+        },
+        {
+          "cluster": "B_MULTI_TARGET:wrong_goal_split",
+          "count": 1
+        },
+        {
+          "cluster": "C_TARGET_REFERENCE:wrong_publication",
+          "count": 1
+        }
+      ]
+    },
+    "metric_delta": {
+      "UNKNOWN_should_have_been_used": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "constraint_lost": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      },
+      "constraint_violation": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      },
+      "exact_semantic_success": {
+        "before": 58,
+        "after": 59,
+        "delta": 1
+      },
+      "extra_goal": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "missing_clarification": {
+        "before": 2,
+        "after": 1,
+        "delta": -1
+      },
+      "missing_goal": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      },
+      "premature_commitment": {
+        "before": 1,
+        "after": 0,
+        "delta": -1
+      },
+      "semantic_validation_failure": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "target_ambiguity_missed": {
+        "before": 1,
+        "after": 0,
+        "delta": -1
+      },
+      "unnecessary_clarification": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "wrong_action": {
+        "before": 8,
+        "after": 8,
+        "delta": 0
+      },
+      "wrong_goal_split": {
+        "before": 5,
+        "after": 5,
+        "delta": 0
+      },
+      "wrong_publication": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      },
+      "wrong_target": {
+        "before": 9,
+        "after": 8,
+        "delta": -1
+      },
+      "wrong_time": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      }
+    }
+  },
+  "affected": {
+    "before": {
+      "primary_case_count": 28,
+      "evaluated_utterance_count": 46,
+      "exact_semantic_success": 29,
+      "exact_semantic_accuracy": 0.6304347826086957,
+      "primary_exact_semantic_success": 15,
+      "primary_exact_semantic_accuracy": 0.5357142857142857,
+      "unsafe_semantic_error_count": 8,
+      "unsafe_semantic_error_rate": 0.17391304347826086,
+      "primary_unsafe_semantic_error_count": 8,
+      "primary_unsafe_semantic_error_rate": 0.2857142857142857,
+      "strict_exact": 29,
+      "strict_exact_accuracy": 0.6304347826086957,
+      "primary_strict_exact": 15,
+      "primary_strict_exact_accuracy": 0.5357142857142857,
+      "strict_unsafe": 8,
+      "strict_unsafe_rate": 0.17391304347826086,
+      "primary_strict_unsafe": 8,
+      "primary_strict_unsafe_rate": 0.2857142857142857,
+      "core_intent_exact": 40,
+      "core_intent_exact_accuracy": 0.8695652173913043,
+      "primary_core_intent_exact": 26,
+      "primary_core_intent_exact_accuracy": 0.9285714285714286,
+      "core_intent_unsafe": 2,
+      "core_intent_unsafe_rate": 0.043478260869565216,
+      "primary_core_intent_unsafe": 2,
+      "primary_core_intent_unsafe_rate": 0.07142857142857142,
+      "clarification": {
+        "expected": 9,
+        "actual": 9,
+        "unnecessary": 2,
+        "missing": 2
+      },
+      "metrics": {
+        "UNKNOWN_should_have_been_used": 1,
+        "constraint_lost": 3,
+        "constraint_violation": 3,
+        "exact_semantic_success": 29,
+        "extra_goal": 2,
+        "missing_clarification": 2,
+        "missing_goal": 3,
+        "premature_commitment": 1,
+        "semantic_validation_failure": 2,
+        "target_ambiguity_missed": 1,
+        "unnecessary_clarification": 2,
+        "wrong_action": 7,
+        "wrong_goal_split": 5,
+        "wrong_publication": 1,
+        "wrong_target": 9,
+        "wrong_time": 3
+      },
+      "by_category": {
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "exact_accuracy": 0.625,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 5,
+            "missing_goal": 1,
+            "wrong_goal_split": 1,
+            "wrong_time": 3
+          }
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "exact_accuracy": 0.375,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "UNKNOWN_should_have_been_used": 1,
+            "constraint_lost": 3,
+            "constraint_violation": 3,
+            "exact_semantic_success": 3,
+            "extra_goal": 1,
+            "missing_clarification": 1,
+            "missing_goal": 1,
+            "wrong_action": 3,
+            "wrong_goal_split": 2,
+            "wrong_publication": 1,
+            "wrong_target": 3
+          }
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 1,
+          "exact_accuracy": 0.16666666666666666,
+          "unsafe": 1,
+          "core_intent_exact": 5,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "exact_semantic_success": 1,
+            "missing_clarification": 1,
+            "missing_goal": 1,
+            "premature_commitment": 1,
+            "target_ambiguity_missed": 1,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 4
+          }
+        },
+        "H_PARAPHRASE": {
+          "total": 24,
+          "exact": 20,
+          "exact_accuracy": 0.8333333333333334,
+          "unsafe": 0,
+          "core_intent_exact": 20,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 20,
+            "extra_goal": 1,
+            "semantic_validation_failure": 2,
+            "unnecessary_clarification": 2,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 2
+          }
+        }
+      },
+      "primary_by_category": {
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.625,
+          "unsafe_rate": 0.375,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.375,
+          "unsafe_rate": 0.5,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe_rate": 0.125
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 1,
+          "unsafe": 1,
+          "core_intent_exact": 5,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.16666666666666666,
+          "unsafe_rate": 0.16666666666666666,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe_rate": 0.16666666666666666
+        },
+        "H_PARAPHRASE": {
+          "total": 6,
+          "exact": 6,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 1.0,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        }
+      },
+      "provenance_coverage": {
+        "desired_outcome": {
+          "covered": 35,
+          "total": 46,
+          "coverage": 0.7608695652173914
+        },
+        "formal_source_span": {
+          "covered": 0,
+          "total": 46,
+          "coverage": 0.0
+        },
+        "hard_constraints": {
+          "covered": 43,
+          "total": 46,
+          "coverage": 0.9347826086956522
+        },
+        "target_reference": {
+          "covered": 40,
+          "total": 46,
+          "coverage": 0.8695652173913043
+        },
+        "temporal_expression": {
+          "covered": 39,
+          "total": 46,
+          "coverage": 0.8478260869565217
+        }
+      },
+      "first_bad_state": {
+        "Interpreter": 9,
+        "Objective projection": 3,
+        "TargetResolver": 5
+      },
+      "top_failure_clusters": [
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+          "count": 4
+        },
+        {
+          "cluster": "B_MULTI_TARGET:wrong_time",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_violation",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_lost",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_target",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_action",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_goal_split",
+          "count": 2
+        },
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:semantic_validation_failure",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_target",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:unnecessary_clarification",
+          "count": 2
+        },
+        {
+          "cluster": "B_MULTI_TARGET:missing_goal",
+          "count": 1
+        },
+        {
+          "cluster": "B_MULTI_TARGET:wrong_goal_split",
+          "count": 1
+        },
+        {
+          "cluster": "F_CROSS_TURN:missing_clarification",
+          "count": 1
+        }
+      ]
+    },
+    "after": {
+      "primary_case_count": 28,
+      "evaluated_utterance_count": 46,
+      "exact_semantic_success": 30,
+      "exact_semantic_accuracy": 0.6521739130434783,
+      "primary_exact_semantic_success": 16,
+      "primary_exact_semantic_accuracy": 0.5714285714285714,
+      "unsafe_semantic_error_count": 7,
+      "unsafe_semantic_error_rate": 0.15217391304347827,
+      "primary_unsafe_semantic_error_count": 7,
+      "primary_unsafe_semantic_error_rate": 0.25,
+      "strict_exact": 30,
+      "strict_exact_accuracy": 0.6521739130434783,
+      "primary_strict_exact": 16,
+      "primary_strict_exact_accuracy": 0.5714285714285714,
+      "strict_unsafe": 7,
+      "strict_unsafe_rate": 0.15217391304347827,
+      "primary_strict_unsafe": 7,
+      "primary_strict_unsafe_rate": 0.25,
+      "core_intent_exact": 41,
+      "core_intent_exact_accuracy": 0.8913043478260869,
+      "primary_core_intent_exact": 27,
+      "primary_core_intent_exact_accuracy": 0.9642857142857143,
+      "core_intent_unsafe": 1,
+      "core_intent_unsafe_rate": 0.021739130434782608,
+      "primary_core_intent_unsafe": 1,
+      "primary_core_intent_unsafe_rate": 0.03571428571428571,
+      "clarification": {
+        "expected": 9,
+        "actual": 10,
+        "unnecessary": 2,
+        "missing": 1
+      },
+      "metrics": {
+        "UNKNOWN_should_have_been_used": 1,
+        "constraint_lost": 3,
+        "constraint_violation": 3,
+        "exact_semantic_success": 30,
+        "extra_goal": 2,
+        "missing_clarification": 1,
+        "missing_goal": 3,
+        "semantic_validation_failure": 2,
+        "unnecessary_clarification": 2,
+        "wrong_action": 7,
+        "wrong_goal_split": 5,
+        "wrong_publication": 1,
+        "wrong_target": 8,
+        "wrong_time": 3
+      },
+      "by_category": {
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "exact_accuracy": 0.625,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 5,
+            "missing_goal": 1,
+            "wrong_goal_split": 1,
+            "wrong_time": 3
+          }
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "exact_accuracy": 0.375,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe": 1,
+          "metrics": {
+            "UNKNOWN_should_have_been_used": 1,
+            "constraint_lost": 3,
+            "constraint_violation": 3,
+            "exact_semantic_success": 3,
+            "extra_goal": 1,
+            "missing_clarification": 1,
+            "missing_goal": 1,
+            "wrong_action": 3,
+            "wrong_goal_split": 2,
+            "wrong_publication": 1,
+            "wrong_target": 3
+          }
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 2,
+          "exact_accuracy": 0.3333333333333333,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 2,
+            "missing_goal": 1,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 3
+          }
+        },
+        "H_PARAPHRASE": {
+          "total": 24,
+          "exact": 20,
+          "exact_accuracy": 0.8333333333333334,
+          "unsafe": 0,
+          "core_intent_exact": 20,
+          "core_intent_accuracy": 0.8333333333333334,
+          "core_intent_unsafe": 0,
+          "metrics": {
+            "exact_semantic_success": 20,
+            "extra_goal": 1,
+            "semantic_validation_failure": 2,
+            "unnecessary_clarification": 2,
+            "wrong_action": 2,
+            "wrong_goal_split": 1,
+            "wrong_target": 2
+          }
+        }
+      },
+      "primary_by_category": {
+        "B_MULTI_TARGET": {
+          "total": 8,
+          "exact": 5,
+          "unsafe": 3,
+          "core_intent_exact": 8,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.625,
+          "unsafe_rate": 0.375,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "F_CROSS_TURN": {
+          "total": 8,
+          "exact": 3,
+          "unsafe": 4,
+          "core_intent_exact": 7,
+          "core_intent_unsafe": 1,
+          "exact_accuracy": 0.375,
+          "unsafe_rate": 0.5,
+          "core_intent_accuracy": 0.875,
+          "core_intent_unsafe_rate": 0.125
+        },
+        "G_AMBIGUOUS_INCOMPLETE": {
+          "total": 6,
+          "exact": 2,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 0.3333333333333333,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        },
+        "H_PARAPHRASE": {
+          "total": 6,
+          "exact": 6,
+          "unsafe": 0,
+          "core_intent_exact": 6,
+          "core_intent_unsafe": 0,
+          "exact_accuracy": 1.0,
+          "unsafe_rate": 0.0,
+          "core_intent_accuracy": 1.0,
+          "core_intent_unsafe_rate": 0.0
+        }
+      },
+      "provenance_coverage": {
+        "desired_outcome": {
+          "covered": 35,
+          "total": 46,
+          "coverage": 0.7608695652173914
+        },
+        "formal_source_span": {
+          "covered": 0,
+          "total": 46,
+          "coverage": 0.0
+        },
+        "hard_constraints": {
+          "covered": 43,
+          "total": 46,
+          "coverage": 0.9347826086956522
+        },
+        "target_reference": {
+          "covered": 40,
+          "total": 46,
+          "coverage": 0.8695652173913043
+        },
+        "temporal_expression": {
+          "covered": 39,
+          "total": 46,
+          "coverage": 0.8478260869565217
+        }
+      },
+      "first_bad_state": {
+        "Interpreter": 9,
+        "Objective projection": 3,
+        "TargetResolver": 4
+      },
+      "top_failure_clusters": [
+        {
+          "cluster": "B_MULTI_TARGET:wrong_time",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_violation",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:constraint_lost",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_target",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_action",
+          "count": 3
+        },
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+          "count": 3
+        },
+        {
+          "cluster": "F_CROSS_TURN:wrong_goal_split",
+          "count": 2
+        },
+        {
+          "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:semantic_validation_failure",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_action",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:wrong_target",
+          "count": 2
+        },
+        {
+          "cluster": "H_PARAPHRASE:unnecessary_clarification",
+          "count": 2
+        },
+        {
+          "cluster": "B_MULTI_TARGET:missing_goal",
+          "count": 1
+        },
+        {
+          "cluster": "B_MULTI_TARGET:wrong_goal_split",
+          "count": 1
+        },
+        {
+          "cluster": "F_CROSS_TURN:missing_clarification",
+          "count": 1
+        }
+      ]
+    },
+    "metric_delta": {
+      "UNKNOWN_should_have_been_used": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "constraint_lost": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      },
+      "constraint_violation": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      },
+      "exact_semantic_success": {
+        "before": 29,
+        "after": 30,
+        "delta": 1
+      },
+      "extra_goal": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "missing_clarification": {
+        "before": 2,
+        "after": 1,
+        "delta": -1
+      },
+      "missing_goal": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      },
+      "premature_commitment": {
+        "before": 1,
+        "after": 0,
+        "delta": -1
+      },
+      "semantic_validation_failure": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "target_ambiguity_missed": {
+        "before": 1,
+        "after": 0,
+        "delta": -1
+      },
+      "unnecessary_clarification": {
+        "before": 2,
+        "after": 2,
+        "delta": 0
+      },
+      "wrong_action": {
+        "before": 7,
+        "after": 7,
+        "delta": 0
+      },
+      "wrong_goal_split": {
+        "before": 5,
+        "after": 5,
+        "delta": 0
+      },
+      "wrong_publication": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      },
+      "wrong_target": {
+        "before": 9,
+        "after": 8,
+        "delta": -1
+      },
+      "wrong_time": {
+        "before": 3,
+        "after": 3,
+        "delta": 0
+      }
+    },
+    "paraphrase_before": {
+      "groups": 6,
+      "consistent_groups": 4,
+      "inconsistent_groups": 2,
+      "consistency": 0.6666666666666666,
+      "rows": [
+        {
+          "case_id": "H01",
+          "variant_count": 4,
+          "consistent": false,
+          "signatures": [
+            [
+              "UPDATE_SCHEDULE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "java 学习",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "UPDATE_SCHEDULE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "java 学习",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "UPDATE_SCHEDULE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "java 学习",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H02",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H03",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H04",
+          "variant_count": 4,
+          "consistent": false,
+          "signatures": [
+            [
+              "CREATE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "redis",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "MULTI_OBJECTIVE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "NONE",
+              true,
+              2,
+              "",
+              [
+                [
+                  "redis",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ],
+                [
+                  "redis 这篇",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "REVISE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "MISSING",
+              true,
+              1,
+              "",
+              [
+                [
+                  "redis",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H05",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H06",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    "paraphrase_after": {
+      "groups": 6,
+      "consistent_groups": 4,
+      "inconsistent_groups": 2,
+      "consistency": 0.6666666666666666,
+      "rows": [
+        {
+          "case_id": "H01",
+          "variant_count": 4,
+          "consistent": false,
+          "signatures": [
+            [
+              "UPDATE_SCHEDULE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "java 学习",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "UPDATE_SCHEDULE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "java 学习",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "UPDATE_SCHEDULE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "java 学习",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H02",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "CREATE",
+              "DRAFT_ONLY",
+              "NONE",
+              false,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "java",
+                  "DRAFT_ONLY",
+                  "NONE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H03",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H04",
+          "variant_count": 4,
+          "consistent": false,
+          "signatures": [
+            [
+              "CREATE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "NONE",
+              false,
+              1,
+              "NONE",
+              [
+                [
+                  "redis",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "MULTI_OBJECTIVE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "NONE",
+              true,
+              2,
+              "",
+              [
+                [
+                  "redis",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ],
+                [
+                  "redis 这篇",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ],
+            [
+              "REVISE",
+              "SCHEDULED",
+              "FUTURE",
+              true,
+              "MISSING",
+              true,
+              1,
+              "",
+              [
+                [
+                  "redis",
+                  "SCHEDULED_PUBLISH",
+                  "FUTURE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H05",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ],
+            [
+              "DELETE",
+              "NONE",
+              "NONE",
+              false,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "DELETE_DRAFT",
+                  "NONE"
+                ]
+              ]
+            ]
+          ]
+        },
+        {
+          "case_id": "H06",
+          "variant_count": 4,
+          "consistent": true,
+          "signatures": [
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ],
+            [
+              "PUBLISH_NOW",
+              "IMMEDIATE",
+              "NOW",
+              true,
+              "RESOLVED",
+              false,
+              1,
+              "RESOLVED",
+              [
+                [
+                  "agent memory",
+                  "IMMEDIATE_PUBLISH",
+                  "NOW"
+                ]
+              ]
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "artifacts": {
+    "results": "D:\\agent\\green-book\\artifacts\\semantic_phase2_certification_replay_final_20260824\\results.json",
+    "report": "D:\\agent\\green-book\\artifacts\\semantic_phase2_certification_replay_final_20260824\\report.json"
+  }
+}

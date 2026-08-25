@@ -1,0 +1,20 @@
+[
+  {
+    "name": "semantic-confirmation-two-publications",
+    "turns": [
+      {"text": "请写两篇帖子并执行：第一篇标题是 GB-STABLE-R1-CONFIRM-JAVA，Java 后端面试实践，立即发布；第二篇标题是 GB-STABLE-R1-CONFIRM-AGENT，Agent 工程实践，五分钟后发布。", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  },
+  {
+    "name": "semantic-confirmation-two-schedules",
+    "turns": [
+      {"text": "请创建并安排两篇内容：GB-STABLE-R1-CONFIRM-REDIS 介绍 Redis 缓存，十分钟后发布；GB-STABLE-R1-CONFIRM-SPRING 介绍 Spring Boot，十五分钟后发布。", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  },
+  {
+    "name": "semantic-confirmation-mixed-publication",
+    "turns": [
+      {"text": "请处理两个独立目标：创建 GB-STABLE-R1-CONFIRM-AI 的 AI 学习草稿并立即发布，同时创建 GB-STABLE-R1-CONFIRM-PYTHON 的 Python 学习草稿并安排五分钟后发布。", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  }
+]

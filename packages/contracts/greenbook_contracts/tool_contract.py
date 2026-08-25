@@ -8,11 +8,13 @@ approval, retry, or timeout catalog.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .tool_result import ToolResult
+from .user_activity import UserActivityMapping, activity_mapping_for_semantic_action
 
 
 class PermissionPolicy(BaseModel):
@@ -21,6 +23,29 @@ class PermissionPolicy(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     required_scopes: tuple[str, ...] = ()
+
+
+class SemanticAction(StrEnum):
+    """Business operation vocabulary, independent from Goal/Task mutations."""
+
+    SEARCH_POSTS = "SEARCH_POSTS"
+    GET_POST = "GET_POST"
+    LIST_OWN_POSTS = "LIST_OWN_POSTS"
+    CREATE_DRAFT = "CREATE_DRAFT"
+    GET_DRAFT = "GET_DRAFT"
+    LIST_DRAFTS = "LIST_DRAFTS"
+    UPDATE_DRAFT = "UPDATE_DRAFT"
+    DELETE_DRAFT = "DELETE_DRAFT"
+    DELETE_POST = "DELETE_POST"
+    CREATE_SCHEDULE = "CREATE_SCHEDULE"
+    GET_SCHEDULE = "GET_SCHEDULE"
+    UPDATE_SCHEDULE = "UPDATE_SCHEDULE"
+    CANCEL_SCHEDULE = "CANCEL_SCHEDULE"
+    PUBLISH_NOW = "PUBLISH_NOW"
+    LIST_COMMENTS = "LIST_COMMENTS"
+    REPLY_COMMENT = "REPLY_COMMENT"
+    GET_POST_PERFORMANCE = "GET_POST_PERFORMANCE"
+    GET_ACCOUNT_SUMMARY = "GET_ACCOUNT_SUMMARY"
 
 
 class RetryPolicy(BaseModel):
@@ -41,6 +66,9 @@ class SideEffectMetadata(BaseModel):
     has_side_effect: bool = False
     idempotent: bool = True
     destructive: bool = False
+    # Resource conflict semantics.  READ is safe to share; WRITE/CREATE and
+    # CONTROL are serialized when they address the same business resource.
+    access_mode: str = "READ"
     external_systems: tuple[str, ...] = ()
 
 
@@ -71,6 +99,9 @@ class ToolMetadata(BaseModel):
     provider: str = "mcp"
     tags: tuple[str, ...] = ()
     policy: ToolPolicyMetadata = Field(default_factory=ToolPolicyMetadata)
+    semantic_action: SemanticAction | None = None
+    # Backend-owned product projection. The frontend never maps tool names.
+    user_activity: UserActivityMapping | None = None
 
 
 class ToolRegistry:
@@ -115,6 +146,14 @@ class ToolContract(BaseModel):
     output_schema: type[BaseModel] = ToolResult
     operations: tuple[str, ...] = ()
     policy: ToolPolicyMetadata = Field(default_factory=ToolPolicyMetadata)
+    semantic_action: SemanticAction | None = None
+    user_activity: UserActivityMapping | None = None
+    # Additional read-only capabilities this tool also serves.  A single
+    # read-retrieval tool (e.g. community.get_post) legitimately serves both
+    # its own detail capability and the broader search capability it completes
+    # (search -> read post details).  Write capabilities must never be added
+    # here.
+    serves: tuple[str, ...] = ()
 
     @property
     def metadata(self) -> ToolMetadata:
@@ -123,11 +162,18 @@ class ToolContract(BaseModel):
         return ToolMetadata(
             name=self.name,
             description=self.description,
-            capabilities=(self.capability,),
+            capabilities=(self.capability,) + tuple(self.serves),
             input_schema=self.input_schema.model_json_schema(),
             output_schema=self.output_schema.model_json_schema(),
             provider=self.category,
             policy=self.policy,
+            semantic_action=self.semantic_action,
+            user_activity=(
+                self.user_activity
+                or activity_mapping_for_semantic_action(
+                    self.semantic_action.value if self.semantic_action is not None else None
+                )
+            ),
         )
 
     @property
@@ -144,7 +190,6 @@ _TRANSIENT_ERRORS = (
     "NETWORK_ERROR",
     "RATE_LIMIT",
     "TEMPORARY_UNAVAILABLE",
-    "CREATOR_UNAVAILABLE",
     "JAVA_BACKEND_UNAVAILABLE",
 )
 
@@ -156,6 +201,7 @@ def _policy(
     has_side_effect: bool = False,
     idempotent: bool = True,
     destructive: bool = False,
+    access_mode: str | None = None,
     max_attempts: int = 1,
     external_systems: tuple[str, ...] = (),
     timeout_seconds: float = 120.0,
@@ -172,6 +218,9 @@ def _policy(
             has_side_effect=has_side_effect,
             idempotent=idempotent,
             destructive=destructive,
+            access_mode=access_mode or (
+                "CONTROL" if destructive else ("WRITE" if has_side_effect else "READ")
+            ),
             external_systems=external_systems,
         ),
         timeout_seconds=timeout_seconds,
@@ -188,25 +237,35 @@ TOOL_POLICY_CATALOG: dict[str, ToolPolicyMetadata] = {
         "IDEMPOTENT_WRITE",
         has_side_effect=True,
         max_attempts=2,
-        external_systems=("creator", "java"),
-        timeout_seconds=600.0,
+        external_systems=("java",),
+        timeout_seconds=120.0,
     ),
-    "content.build_strategy": _policy(
+    "content.update_draft": _policy(
         "IDEMPOTENT_WRITE",
         has_side_effect=True,
         max_attempts=2,
-        external_systems=("creator",),
-        timeout_seconds=600.0,
+        external_systems=("java",),
+    ),
+    "content.delete_draft": _policy(
+        "DESTRUCTIVE_WRITE",
+        requires_approval=True,
+        has_side_effect=True,
+        idempotent=False,
+        destructive=True,
+        max_attempts=1,
+        external_systems=("java",),
+    ),
+    "community.delete_post": _policy(
+        "DESTRUCTIVE_WRITE",
+        requires_approval=True,
+        has_side_effect=True,
+        idempotent=False,
+        destructive=True,
+        max_attempts=1,
+        external_systems=("java",),
     ),
     "content.get_draft": _policy("READ"),
     "content.list_drafts": _policy("READ"),
-    "content.revise_draft": _policy(
-        "IDEMPOTENT_WRITE",
-        has_side_effect=True,
-        max_attempts=2,
-        external_systems=("creator", "java"),
-        timeout_seconds=600.0,
-    ),
     "publication.schedule": _policy(
         "IDEMPOTENT_WRITE",
         has_side_effect=True,
@@ -248,8 +307,38 @@ TOOL_POLICY_CATALOG: dict[str, ToolPolicyMetadata] = {
 }
 
 
+TOOL_SEMANTIC_ACTIONS: dict[str, SemanticAction] = {
+    "community.search_public_posts": SemanticAction.SEARCH_POSTS,
+    "community.get_post": SemanticAction.GET_POST,
+    "community.list_own_posts": SemanticAction.LIST_OWN_POSTS,
+    "content.create_draft": SemanticAction.CREATE_DRAFT,
+    "content.get_draft": SemanticAction.GET_DRAFT,
+    "content.list_drafts": SemanticAction.LIST_DRAFTS,
+    "content.update_draft": SemanticAction.UPDATE_DRAFT,
+    "content.delete_draft": SemanticAction.DELETE_DRAFT,
+    "community.delete_post": SemanticAction.DELETE_POST,
+    "publication.schedule": SemanticAction.CREATE_SCHEDULE,
+    "publication.get_status": SemanticAction.GET_SCHEDULE,
+    "publication.update_schedule": SemanticAction.UPDATE_SCHEDULE,
+    "publication.cancel_schedule": SemanticAction.CANCEL_SCHEDULE,
+    "publication.publish_now": SemanticAction.PUBLISH_NOW,
+    "interaction.list_comments": SemanticAction.LIST_COMMENTS,
+    "interaction.send_reply": SemanticAction.REPLY_COMMENT,
+    "analytics.get_post_performance": SemanticAction.GET_POST_PERFORMANCE,
+    "analytics.get_account_summary": SemanticAction.GET_ACCOUNT_SUMMARY,
+}
+
+
+def semantic_action_for_tool(name: str) -> SemanticAction:
+    try:
+        return TOOL_SEMANTIC_ACTIONS[name]
+    except KeyError as exc:
+        raise RuntimeError(f"Missing semantic action for tool {name}") from exc
+
+
 __all__ = [
     "PermissionPolicy",
+    "SemanticAction",
     "RetryPolicy",
     "SideEffectMetadata",
     "ToolPolicyMetadata",
@@ -257,4 +346,6 @@ __all__ = [
     "ToolRegistry",
     "ToolContract",
     "TOOL_POLICY_CATALOG",
+    "TOOL_SEMANTIC_ACTIONS",
+    "semantic_action_for_tool",
 ]

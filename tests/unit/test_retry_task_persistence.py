@@ -6,12 +6,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
-
 from greenbook_agent_core.execution.persistence import execution_metadata
 from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
 from greenbook_agent_core.execution.retry_task import RetryTask, RetryTaskStatus
 from greenbook_agent_core.execution.retry_task_store import PostgresRetryTaskStore
-
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 
@@ -73,3 +71,25 @@ def test_expired_claim_is_recovered_after_worker_restart(engine) -> None:
     )
     assert recovered[0].task_id == task.task_id
     assert recovered[0].claimed_by == "worker-b"
+
+
+def test_release_consumes_budget_and_task_eventually_cancels(engine) -> None:
+    """An always-undispatchable retry task must terminate: every release
+    consumes one unit of retry budget and the zero-budget guard cancels the
+    task instead of looping forever (design goal 0813)."""
+    store = PostgresRetryTaskStore(engine)
+    task = store.create(_task())  # retry_budget=1
+
+    # First claim -> release (retry not applied): budget 1 -> 0.
+    claimed = store.claim_due(NOW, worker_id="worker-a", lease_seconds=30)
+    assert claimed[0].task_id == task.task_id
+    released = store.release(claimed[0].task_id, worker_id="worker-a")
+    assert released is not None
+    assert released.retry_budget == 0
+
+    # Next poll: the zero-budget guard cancels the task instead of re-claiming.
+    again = store.claim_due(NOW, worker_id="worker-a", lease_seconds=30)
+    assert again == []
+    cancelled = store.get(task.task_id)
+    assert cancelled is not None
+    assert cancelled.status == RetryTaskStatus.CANCELLED

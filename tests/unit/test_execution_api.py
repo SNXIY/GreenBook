@@ -13,7 +13,6 @@ from greenbook_agent_core.execution.events import EventType, ExecutionEvent
 from greenbook_agent_core.execution.repository import ExecutionRepository
 from greenbook_agent_core.execution.runtime_manager import RuntimeManager
 from greenbook_agent_core.execution.state_manager import ExecutionStateManager
-from tests.plan_factory import GoalPlanFactory
 from greenbook_agent_core.planning.validation import PlanValidator
 
 from apps.agent_api.greenbook_agent_api.api.runtime_routes import (
@@ -22,6 +21,7 @@ from apps.agent_api.greenbook_agent_api.api.runtime_routes import (
     get_execution_steps,
     stream_execution_events,
 )
+from tests.plan_factory import GoalPlanFactory
 
 
 class _Request:

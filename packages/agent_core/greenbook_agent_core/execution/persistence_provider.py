@@ -59,8 +59,12 @@ class RuntimePersistence:
     lease_manager: Any
     artifact_store: Any
     result_projection_store: Any
+    # Public-safe, durable Activity projection. This is intentionally
+    # separate from the internal ExecutionEventStore.
+    user_activity_store: Any
     bind: Any | None = None
     owns_bind: bool = False
+    observation_store: Any | None = None
 
     def close(self) -> None:
         """Dispose a database bind owned by this provider, if any."""
@@ -119,6 +123,7 @@ class RuntimePersistenceFactory:
 
     @classmethod
     def _memory(cls) -> RuntimePersistence:
+        from ..activity.store import MemoryUserActivityStore
         from ..artifact.store import MemoryArtifactStore
         from .result_projection import MemoryExecutionResultProjectionStore
         return RuntimePersistence(
@@ -132,6 +137,8 @@ class RuntimePersistenceFactory:
             lease_manager=ExecutionLeaseManager(),
             artifact_store=MemoryArtifactStore(),
             result_projection_store=MemoryExecutionResultProjectionStore(),
+            user_activity_store=MemoryUserActivityStore(),
+            observation_store=None,
         )
 
     @classmethod
@@ -142,9 +149,11 @@ class RuntimePersistenceFactory:
         create_tables: bool,
         owns_bind: bool,
     ) -> RuntimePersistence:
+        from ..activity.store import PostgresUserActivityStore
         from ..artifact.store import PostgresArtifactStore
+        from .action_observation import PostgresActionObservationStore
         from .result_projection import PostgresExecutionResultProjectionStore
-        return RuntimePersistence(
+        persistence = RuntimePersistence(
             storage=cls.POSTGRES,
             execution_repository=PostgresExecutionRepository(
                 bind,
@@ -179,9 +188,18 @@ class RuntimePersistenceFactory:
                 bind,
                 create_tables=create_tables,
             ),
+            user_activity_store=PostgresUserActivityStore(
+                bind,
+                create_tables=create_tables,
+            ),
             bind=bind,
             owns_bind=owns_bind,
         )
+        persistence.observation_store = PostgresActionObservationStore(
+            bind,
+            create_tables=create_tables,
+        )
+        return persistence
 
     @staticmethod
     def _database_url() -> str:

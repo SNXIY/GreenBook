@@ -10,6 +10,7 @@ import { AgentIcon } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
 import type { FeedItem } from "@/types/knowpost";
 import styles from "./HomePage.module.css";
+import { userFacingErrorMessage } from "@/services/userFacingError";
 
 type FeedMode = "recommend" | "following";
 
@@ -21,7 +22,9 @@ const HomePage = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(() =>
+    new URLSearchParams(window.location.search).get("assistant") === "1"
+  );
   const size = 20;
 
   const fetchPage = useCallback(async (currentPage: number) => {
@@ -44,7 +47,7 @@ const HomePage = () => {
       setHasMore(!!resp.hasMore);
       setPage(currentPage + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载失败");
+      setError(userFacingErrorMessage(err, "内容暂时无法加载，请稍后重试。"));
     } finally {
       setLoading(false);
     }

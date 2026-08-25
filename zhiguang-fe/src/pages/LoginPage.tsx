@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { LoginRequest } from "@/types/auth";
 import { authService } from "@/services/authService";
 import styles from "./LoginPage.module.css";
+import { userFacingErrorMessage } from "@/services/userFacingError";
 
 type LocationState = {
   from?: string;
@@ -43,7 +44,7 @@ const LoginPage = () => {
       const payload: LoginRequest = { identifierType: "PHONE", identifier, code };
       await login(payload);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "登录失败，请稍后重试";
+      const message = userFacingErrorMessage(err, "登录暂时无法完成，请稍后重试。");
       setError(message);
     } finally {
       setSubmitting(false);
@@ -65,7 +66,7 @@ const LoginPage = () => {
       });
       setCountdown(Math.max(1, response.expireSeconds ?? 300));
     } catch (err) {
-      const info = err instanceof Error ? err.message : "验证码发送失败";
+      const info = userFacingErrorMessage(err, "验证码暂时无法发送，请稍后重试。");
       setError(info);
     } finally {
       setSendingCode(false);

@@ -20,6 +20,12 @@ class MemoryRepository(Protocol):
     def search(self, query: MemoryQuery) -> list[MemoryRecord] | Awaitable[list[MemoryRecord]]: ...
     def touch(self, memory_id: str) -> MemoryRecord | None | Awaitable[MemoryRecord | None]: ...
     def delete(self, memory_id: str) -> Any: ...
+    def find_by_source(
+        self,
+        user_id: str,
+        source_type: str,
+        source_id: str,
+    ) -> MemoryRecord | None | Awaitable[MemoryRecord | None]: ...
 
 
 class InMemoryMemoryRepository:
@@ -42,6 +48,21 @@ class InMemoryMemoryRepository:
 
     def find_by_id(self, memory_id: str) -> MemoryRecord | None:
         return self.get(memory_id)
+
+    def find_by_source(
+        self,
+        user_id: str,
+        source_type: str,
+        source_id: str,
+    ) -> MemoryRecord | None:
+        for item in self._records.values():
+            if (
+                item.user_id == user_id
+                and item.source_type == source_type
+                and item.source_id == source_id
+            ):
+                return item.model_copy(deep=True)
+        return None
 
     def search(self, query: MemoryQuery) -> list[MemoryRecord]:
         values = [item for item in self._records.values() if _matches(item, query)]
@@ -219,6 +240,28 @@ class PostgresMemoryRepository:
                 {"memory_id": memory_id},
             )
             await session.commit()
+
+    async def find_by_source(
+        self,
+        user_id: str,
+        source_type: str,
+        source_id: str,
+    ) -> MemoryRecord | None:
+        async with self._session_factory() as session:
+            result = await session.execute(
+                sa.text(
+                    "SELECT * FROM agent_memories "
+                    "WHERE user_id = :user_id AND source_type = :source_type "
+                    "AND source_id = :source_id LIMIT 1"
+                ),
+                {
+                    "user_id": user_id,
+                    "source_type": source_type,
+                    "source_id": source_id,
+                },
+            )
+            row = result.mappings().first()
+        return _row_record(row) if row else None
 
 
 def _matches(item: MemoryRecord, query: MemoryQuery) -> bool:

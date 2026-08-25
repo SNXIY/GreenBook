@@ -21,6 +21,7 @@ class ToolInvocationContext(BaseModel):
     task_id: str = ""
     execution_id: str = ""
     step_id: str = ""
+    goal_id: str | None = None
     capability: str = ""
 
     # ── tool ──
@@ -35,6 +36,11 @@ class ToolInvocationContext(BaseModel):
     idempotency_key: str = ""
     timeout_seconds: float = 60.0
 
+    # ── ownership correlation ──
+    # The Objective that initiated this invocation; carried into the durable
+    # Operation so a verified Resource binds to the SAME Objective.
+    objective_id: str | None = None
+
     # ── timing ──
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     trace_context: TraceContext = Field(default_factory=TraceContext)
@@ -46,12 +52,14 @@ class ToolInvocationContext(BaseModel):
         task_id: str = "",
         execution_id: str = "",
         step_id: str = "",
+        goal_id: str | None = None,
         capability: str = "",
         tool_name: str = "",
         tool_args: dict[str, Any] | None = None,
         user_id: str = "",
         timeout_seconds: float = 60.0,
         trace_context: TraceContext | None = None,
+        objective_id: str | None = None,
     ) -> ToolInvocationContext:
         """Factory that auto-generates a stable idempotency key."""
         args = tool_args or {}
@@ -66,6 +74,7 @@ class ToolInvocationContext(BaseModel):
             task_id=task_id,
             execution_id=execution_id,
             step_id=step_id,
+            goal_id=goal_id,
             capability=capability,
             tool_name=tool_name,
             tool_args=dict(args),
@@ -73,6 +82,7 @@ class ToolInvocationContext(BaseModel):
             timeout_seconds=timeout_seconds,
             idempotency_key=f"invoke:{tool_name}:{digest}",
             trace_context=trace_context or TraceContext(),
+            objective_id=objective_id,
         )
         invocation.trace_context = invocation.trace_context.with_updates(
             task_id=task_id,

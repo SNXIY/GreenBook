@@ -1,0 +1,20 @@
+[
+  {
+    "name": "scheduler-publish-java",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHEDULER-JAVA 的 Java 学习草稿，并安排五分钟后发布"}
+    ]
+  },
+  {
+    "name": "scheduler-publish-agent",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHEDULER-AGENT 的 Agent 学习草稿，过五分钟发出去"}
+    ]
+  },
+  {
+    "name": "scheduler-publish-redis",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHEDULER-REDIS 的 Redis 学习草稿，五分钟后上线"}
+    ]
+  }
+]

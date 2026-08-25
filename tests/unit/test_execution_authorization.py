@@ -6,12 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
-
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.execution.repository import ExecutionRepository
 from greenbook_agent_core.execution.runtime_manager import RuntimeManager
 from greenbook_agent_core.execution.state_manager import ExecutionStateManager
-from tests.plan_factory import GoalPlanFactory
 from greenbook_agent_core.planning.validation import PlanValidator
 
 from apps.agent_api.greenbook_agent_api.api.runtime_routes import (
@@ -20,6 +18,7 @@ from apps.agent_api.greenbook_agent_api.api.runtime_routes import (
 from apps.agent_api.greenbook_agent_api.services.execution_authorizer import (
     ExecutionAuthorizer,
 )
+from tests.plan_factory import GoalPlanFactory
 
 
 class _TaskProvider:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -52,7 +51,16 @@ def test_goal_and_external_clients_do_not_cross_runtime_implementation_boundarie
     goal_imports = _imports(ROOT / "packages" / "agent_core" / "greenbook_agent_core" / "goal")
     assert not any("ExecutionWorker" in imported for imported in goal_imports)
 
-    creator_imports = _imports(ROOT / "packages" / "creator_client" / "greenbook_creator_client")
     java_imports = _imports(ROOT / "packages" / "java_client" / "greenbook_java_client")
-    assert not any(imported.startswith("greenbook_agent_core") for imported in creator_imports)
     assert not any(imported.startswith("greenbook_agent_core") for imported in java_imports)
+
+
+def test_worker_and_core_do_not_depend_on_api_implementation() -> None:
+    forbidden = ("greenbook_agent_api", "apps.agent_api")
+    worker_imports = _imports(ROOT / "apps" / "agent_worker")
+    core_imports = _imports(ROOT / "packages" / "agent_core" / "greenbook_agent_core")
+    assert not any(
+        imported == prefix or imported.startswith(prefix + ".")
+        for imported in worker_imports + core_imports
+        for prefix in forbidden
+    )

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "L2-natural-historical-state-isolation",
+    "session": "L2",
+    "conversation_title": "内容创作与发布安排",
+    "turns": [
+      {"text": "你好，先帮我梳理一下今天的内容安排，不需要修改已有帖子。"},
+      {"text": "请分别写一篇 Java 后端稳定性文章和一篇 Agent 工程实践文章，都先保存为草稿。", "hitl": "confirm"},
+      {"text": "刚才失败的那篇 Agent 文章再写一次，先保存为草稿。"},
+      {"text": "把刚才补写好的 Agent 工程实践文章安排到明天上午九点发布。", "hitl": "clarify", "candidate_index": 0, "continue_after_waiting": true},
+      {"text": "把 Agent 工程实践文章的发布时间改到明天上午十点。", "hitl": "confirm"},
+      {"text": "取消 Agent 工程实践文章的定时发布。"},
+      {"text": "把刚才取消定时的 Agent 草稿直接发布。", "hitl": "approve"},
+      {"text": "把之前保存的 Java 后端稳定性草稿直接发布。", "hitl": "approve"},
+      {"text": "帮我搜索 Agent 工程实践相关的帖子。"},
+      {"text": "总结刚才搜索到的 Agent 文章，告诉我主要观点。"},
+      {"text": "再写一篇 Redis 缓存实践文章，先保存为草稿。"},
+      {"text": "给刚才保存的 Redis 草稿补充一段关于缓存失效的实践建议。"},
+      {"text": "把刚才修改过的 Redis 草稿安排到明天晚上九点发布。", "hitl": "confirm"},
+      {"text": "把刚才安排好的 Redis 文章直接发布。", "hitl": "approve"}
+    ]
+  }
+]

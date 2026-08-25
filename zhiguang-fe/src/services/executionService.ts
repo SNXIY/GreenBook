@@ -179,6 +179,52 @@ export const streamExecution = async (
 
 export const streamExecutionEvents = streamExecution;
 
+export type AgentRunEvent = {
+  event_id: number;
+  run_id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
+export const subscribeRunEvents = async (
+  token: string,
+  runId: string,
+  onEvent: (event: AgentRunEvent) => void | Promise<void>,
+  signal?: AbortSignal
+): Promise<void> => {
+  const response = await fetch(
+    `${baseUrl}/api/v1/agent/runs/${encodeURIComponent(runId)}/stream`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+      credentials: "omit"
+    }
+  );
+  if (!response.ok || !response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (!signal?.aborted) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    buffer += decoder.decode(chunk.value, { stream: true });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) {
+      const parsed = parseEventFrame(frame);
+      if (!parsed) continue;
+      await onEvent({
+        event_id: 0,
+        run_id: runId,
+        event_type: String((parsed as { event_type?: string }).event_type || ""),
+        payload: (parsed as { payload?: Record<string, unknown> }).payload || {},
+        created_at: ""
+      });
+    }
+  }
+};
+
 export const waitForExecution = async (
   token: string,
   executionId: string,

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import statistics
+import math
+
 from .analyzer import FailureAnalyzer
 from .badcase import BadCase
 from .models import AgentEvaluationMetrics, CategoryMetrics, EvalResult, EvaluationReport
@@ -121,6 +124,18 @@ class EvaluationMetricsCalculator:
             context_continuity=rate("context_continuity", default=1.0),
             average_latency_ms=rate("latency_ms"),
             average_tool_call_count=rate("tool_call_count"),
+            objective_success_rate=rate("objective_success_rate"),
+            duplicate_write_count=sum(result.metrics.get("duplicate_write_count", 0.0) for result in results),
+            clarification_accuracy=rate("clarification_accuracy", default=1.0),
+            avg_actionloop_iterations=rate("avg_actionloop_iterations"),
+            replan_count=sum(result.metrics.get("replan_count", 0.0) for result in results),
+            semantic_state_accuracy=rate("semantic_state"),
+            objective_count_accuracy=rate("objective_count"),
+            temporal_resolution_accuracy=rate("temporal_resolution"),
+            unsafe_action_rate=rate("unsafe_action", default=0.0),
+            p50_latency=statistics.median([result.metrics.get("latency_ms", result.duration_ms) for result in results]),
+            p95_latency=sorted(result.metrics.get("latency_ms", result.duration_ms) for result in results)[max(0, math.ceil(len(results) * 0.95) - 1)],
+            avg_llm_calls=rate("llm_calls"),
         )
 
 

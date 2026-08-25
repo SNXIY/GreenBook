@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import pytest
-
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.execution.invocation import ExecutionResult
 from greenbook_agent_core.execution.models import ExecutionStatus, StepStatus
 from greenbook_agent_core.execution.repository import ExecutionRepository
 from greenbook_agent_core.execution.state_manager import ExecutionStateManager
 from greenbook_agent_core.execution.worker import ExecutionWorker, RunOutcome
-from tests.plan_factory import GoalPlanFactory
 from greenbook_agent_core.planning.validation import PlanValidator
+
+from tests.plan_factory import GoalPlanFactory
 
 
 class _Executor:

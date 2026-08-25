@@ -82,6 +82,16 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- Execute the versioned MySQL migrations during application startup. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+
         <!-- MyBatis Spring Boot Starter：MyBatis 集成与 Mapper 扫描 -->
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>

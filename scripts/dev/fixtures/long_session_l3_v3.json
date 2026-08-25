@@ -1,0 +1,17 @@
+[
+  {
+    "name": "L3-natural-multi-failure-recovery-v3",
+    "session": "L3",
+    "conversation_title": "多目标失败隔离与恢复",
+    "turns": [
+      {"text": "请分别写一篇 Java 后端稳定性文章和一篇 Agent 工程实践文章，都先保存为草稿。", "hitl": "confirm"},
+      {"text": "再分别写一篇 Redis 缓存实践文章和一篇 Python 工程实践文章，都先保存为草稿。", "hitl": "confirm"},
+      {"text": "刚才失败的 Python 文章再写一次，仍然保存为草稿。", "hitl": "confirm"},
+      {"text": "把失败的 Agent 工程实践文章重新保存为草稿。", "hitl": "confirm"},
+      {"text": "把刚才重试成功的 Agent 草稿安排到明天晚上十一点发布。", "hitl": "confirm"},
+      {"text": "把这个 Agent 草稿的定时发布时间改到明天晚上十点。", "hitl": "confirm"},
+      {"text": "取消 Agent 文章的定时发布。"},
+      {"text": "", "action": "reload"}
+    ]
+  }
+]

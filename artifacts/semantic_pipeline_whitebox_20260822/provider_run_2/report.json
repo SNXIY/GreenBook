@@ -1,0 +1,309 @@
+{
+  "status": "COMPLETED",
+  "run_id": "20260822T184152",
+  "dataset": {
+    "path": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "version": "2026-08-22.freeze-1",
+    "primary_case_count": 19,
+    "category_counts": {
+      "B_MULTI_TARGET": 4,
+      "C_TARGET_REFERENCE": 3,
+      "E_NEGATIVE_CONSTRAINT": 1,
+      "F_CROSS_TURN": 6,
+      "G_AMBIGUOUS_INCOMPLETE": 5
+    }
+  },
+  "summary": {
+    "primary_case_count": 19,
+    "evaluated_utterance_count": 19,
+    "exact_semantic_success": 1,
+    "exact_semantic_accuracy": 0.05263157894736842,
+    "primary_exact_semantic_success": 1,
+    "primary_exact_semantic_accuracy": 0.05263157894736842,
+    "unsafe_semantic_error_count": 7,
+    "unsafe_semantic_error_rate": 0.3684210526315789,
+    "primary_unsafe_semantic_error_count": 7,
+    "primary_unsafe_semantic_error_rate": 0.3684210526315789,
+    "metrics": {
+      "UNKNOWN_should_have_been_used": 2,
+      "constraint_lost": 3,
+      "constraint_violation": 3,
+      "exact_semantic_success": 1,
+      "extra_goal": 1,
+      "missing_goal": 2,
+      "target_ambiguity_missed": 2,
+      "unnecessary_clarification": 3,
+      "wrong_action": 5,
+      "wrong_goal_split": 3,
+      "wrong_publication": 5,
+      "wrong_target": 9,
+      "wrong_time": 4
+    },
+    "by_category": {
+      "B_MULTI_TARGET": {
+        "total": 4,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 2,
+        "metrics": {
+          "unnecessary_clarification": 2,
+          "wrong_target": 2,
+          "wrong_time": 3
+        }
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 3,
+        "exact": 1,
+        "exact_accuracy": 0.3333333333333333,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 1,
+          "target_ambiguity_missed": 1,
+          "wrong_publication": 1,
+          "wrong_target": 1
+        }
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 1,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 1,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "wrong_publication": 1
+        }
+      },
+      "F_CROSS_TURN": {
+        "total": 6,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 4,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "constraint_lost": 3,
+          "constraint_violation": 3,
+          "extra_goal": 1,
+          "missing_goal": 1,
+          "unnecessary_clarification": 1,
+          "wrong_action": 3,
+          "wrong_goal_split": 2,
+          "wrong_publication": 2,
+          "wrong_target": 2,
+          "wrong_time": 1
+        }
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 5,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 0,
+        "metrics": {
+          "missing_goal": 1,
+          "target_ambiguity_missed": 1,
+          "wrong_action": 2,
+          "wrong_goal_split": 1,
+          "wrong_publication": 1,
+          "wrong_target": 4
+        }
+      }
+    },
+    "primary_by_category": {
+      "B_MULTI_TARGET": {
+        "total": 4,
+        "exact": 0,
+        "unsafe": 2,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 0.5
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 3,
+        "exact": 1,
+        "unsafe": 0,
+        "exact_accuracy": 0.3333333333333333,
+        "unsafe_rate": 0.0
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 1,
+        "exact": 0,
+        "unsafe": 1,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 1.0
+      },
+      "F_CROSS_TURN": {
+        "total": 6,
+        "exact": 0,
+        "unsafe": 4,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 0.6666666666666666
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 5,
+        "exact": 0,
+        "unsafe": 0,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 0.0
+      }
+    },
+    "provenance_coverage": {
+      "desired_outcome": {
+        "covered": 16,
+        "total": 19,
+        "coverage": 0.8421052631578947
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 19,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 16,
+        "total": 19,
+        "coverage": 0.8421052631578947
+      },
+      "target_reference": {
+        "covered": 15,
+        "total": 19,
+        "coverage": 0.7894736842105263
+      },
+      "temporal_expression": {
+        "covered": 16,
+        "total": 19,
+        "coverage": 0.8421052631578947
+      }
+    },
+    "first_bad_state": {
+      "Interpreter": 8,
+      "Normalization": 1,
+      "Objective projection": 1,
+      "TargetResolver": 8
+    },
+    "top_failure_clusters": [
+      {
+        "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+        "count": 4
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_time",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_violation",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_lost",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_action",
+        "count": 3
+      },
+      {
+        "cluster": "B_MULTI_TARGET:unnecessary_clarification",
+        "count": 2
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_target",
+        "count": 2
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_target",
+        "count": 2
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_publication",
+        "count": 2
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_goal_split",
+        "count": 2
+      },
+      {
+        "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_action",
+        "count": 2
+      },
+      {
+        "cluster": "C_TARGET_REFERENCE:wrong_publication",
+        "count": 1
+      },
+      {
+        "cluster": "C_TARGET_REFERENCE:target_ambiguity_missed",
+        "count": 1
+      },
+      {
+        "cluster": "C_TARGET_REFERENCE:wrong_target",
+        "count": 1
+      },
+      {
+        "cluster": "E_NEGATIVE_CONSTRAINT:wrong_publication",
+        "count": 1
+      }
+    ]
+  },
+  "paraphrase": {
+    "groups": 0,
+    "consistent_groups": 0,
+    "inconsistent_groups": 0,
+    "consistency": 0.0,
+    "rows": []
+  },
+  "cost": {
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "temperature": 0.0,
+    "calls": 19,
+    "input_tokens": 110446,
+    "output_tokens": 5250,
+    "total_tokens": 115696,
+    "latency_ms_sum": 44002.44,
+    "latency_ms_avg": 2315.92,
+    "benchmark_wall_ms": 44700.25,
+    "provider_error_count": 0,
+    "calls_per_primary_case": 1.0
+  },
+  "provenance": {
+    "formal_source_span_contract": false,
+    "observed_fields": [
+      "raw_input",
+      "goal",
+      "target.reference",
+      "items.temporal_text",
+      "constraints"
+    ],
+    "method": "diagnostic in-band/source-substring checks; no new provenance model",
+    "coverage": {
+      "desired_outcome": {
+        "covered": 16,
+        "total": 19,
+        "coverage": 0.8421052631578947
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 19,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 16,
+        "total": 19,
+        "coverage": 0.8421052631578947
+      },
+      "target_reference": {
+        "covered": 15,
+        "total": 19,
+        "coverage": 0.7894736842105263
+      },
+      "temporal_expression": {
+        "covered": 16,
+        "total": 19,
+        "coverage": 0.8421052631578947
+      }
+    }
+  },
+  "artifacts": {
+    "dataset": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "results": "D:\\agent\\green-book\\artifacts\\semantic_pipeline_whitebox_20260822\\provider_run_2\\results.json",
+    "report": "D:\\agent\\green-book\\artifacts\\semantic_pipeline_whitebox_20260822\\provider_run_2\\report.json",
+    "snapshots": "D:\\agent\\green-book\\artifacts\\semantic_pipeline_whitebox_20260822\\provider_run_2\\snapshots"
+  }
+}

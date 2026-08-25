@@ -25,6 +25,9 @@ public interface ScheduledPublicationMapper {
 
     List<ScheduledPublicationRecord> findByUser(@Param("userId") Long userId);
 
+    int countActiveByUserAndDraft(@Param("userId") Long userId,
+                                  @Param("draftId") Long draftId);
+
     int updateRunAt(@Param("id") Long id,
                     @Param("userId") Long userId,
                     @Param("runAt") Instant runAt,

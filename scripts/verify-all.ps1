@@ -39,13 +39,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Invoke-ProjectCheck -Name "Agent Runtime Python tests" -Path $Root -Command {
-  uv run ruff check packages/agent_core apps/agent_api apps/agent_worker services/greenbook_mcp packages/contracts packages/security packages/java_client packages/creator_client
+  uv run ruff check packages/agent_core apps/agent_api apps/agent_worker services/greenbook_mcp packages/contracts packages/security packages/java_client
   if ($LASTEXITCODE -ne 0) {
     throw "Agent Runtime Ruff check failed."
-  }
-  uv run ruff check scripts/run_p0_e2e.py --select F
-  if ($LASTEXITCODE -ne 0) {
-    throw "P0 harness Ruff check failed."
   }
   uv run pytest -q
 }
@@ -60,14 +56,6 @@ Invoke-ProjectCheck -Name "Frontend typecheck and build" -Path "$Root\zhiguang-f
     throw "Frontend typecheck failed."
   }
   npm run build
-}
-
-Invoke-ProjectCheck -Name "Creator Service tests" -Path "$Root\creator-agent" -Command {
-  uv run ruff check app --select F,I
-  if ($LASTEXITCODE -ne 0) {
-    throw "Creator Ruff check failed."
-  }
-  uv run pytest -q
 }
 
 Write-Host ""

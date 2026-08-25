@@ -1,0 +1,12 @@
+[
+  {
+    "name": "search-empty-fix",
+    "turns": [
+      {"text": "最近有哪些 Python 和 AI 相关帖子"},
+      {"text": "有没有高质量的 Agent 工程实践"},
+      {"text": "搜索 Python 初学者内容"},
+      {"text": "搜 Agent memory 相关帖子"},
+      {"text": "搜一些完全不存在的 GB-STABLE-EMPTY-QUERY 内容"}
+    ]
+  }
+]

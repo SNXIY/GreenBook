@@ -17,6 +17,9 @@ public interface KnowPostMapper {
 
     KnowPost findById(@Param("id") Long id);
 
+    /** Serialize draft deletion and schedule creation for the same post. */
+    KnowPost findByIdForUpdate(@Param("id") Long id);
+
     int updateContent(KnowPost post);
 
     int updateMetadata(KnowPost post);
@@ -52,6 +55,11 @@ public interface KnowPostMapper {
 
     List<KnowPostDetailRow> searchPublicForAgent(@Param("query") String query,
                                                     @Param("limit") int limit);
+
+    /** 词元感知检索：按多个词元做 OR 召回并按字段加权相关性打分排序。 */
+    List<KnowPostDetailRow> searchPublicForAgentTokens(@Param("query") String query,
+                                                        @Param("tokens") List<String> tokens,
+                                                        @Param("limit") int limit);
 
     List<KnowPost> listOwnPostsForAgent(
             @Param("creatorId") long creatorId,

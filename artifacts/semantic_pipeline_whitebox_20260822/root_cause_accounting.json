@@ -1,0 +1,217 @@
+{
+  "definition": {
+    "raw_core_intent_exact": "raw provider fields; goal count, action/outcome, semantic target reference, publication, temporal expression, hard constraints; canonical IDs, aggregate aliases, and optional metadata ignored",
+    "core_intent_exact": "same fields after deterministic resolution/projection; safe clarification is accepted when no unsafe mutation is possible",
+    "core_intent_unsafe": "wrong resource/action/publication/time or hard-constraint violation that could reach a write; safe clarification and evaluator-only mismatches excluded",
+    "root_class": "A prompt structural gap; B model/provider semantic variation including context-induced overgrounding; C deterministic system/projection; D TemporalResolver; E truth/evaluator."
+  },
+  "metrics": {
+    "primary_total": 60,
+    "primary_existing_evaluator_exact": 41,
+    "primary_existing_evaluator_unsafe": 6,
+    "primary_raw_core_intent_exact": 55,
+    "primary_core_intent_exact": 52,
+    "primary_raw_core_intent_unsafe": 3,
+    "primary_core_intent_unsafe": 3,
+    "root_counts": {
+      "A": 0,
+      "B": 7,
+      "C": 3,
+      "D": 0,
+      "E": 9
+    },
+    "raw_core_intent_accuracy": 0.9166666666666666,
+    "core_intent_accuracy": 0.8666666666666667,
+    "raw_core_intent_unsafe_rate": 0.05,
+    "core_intent_unsafe_rate": 0.05,
+    "context_induced_subset": 3,
+    "context_induced_cases": [
+      "F01",
+      "F03",
+      "F07"
+    ],
+    "raw_provider_core_misunderstanding_cases": [
+      "E07",
+      "F01",
+      "F03",
+      "F06",
+      "F07",
+      "F08",
+      "G06"
+    ],
+    "raw_provider_core_misunderstanding_count": 7
+  },
+  "rows": [
+    {
+      "case_id": "B02",
+      "first_bad_state": "TurnCoordinator._resolve_delta_objective_target",
+      "root_class": "C",
+      "note": "raw business fields correct; three owners are rejected as one ambiguous turn",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": false,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "B03",
+      "first_bad_state": "Evaluator aggregate temporal comparison",
+      "root_class": "E",
+      "note": "Java item NOW and Agent item NONE are preserved; top aggregate NOW is compared with truth NONE",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "B05",
+      "first_bad_state": "TurnCoordinator._resolve_delta_objective_target",
+      "root_class": "C",
+      "note": "two correct deltas resolve to two owners, then the multi-owner gate clarifies",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": false,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "B07",
+      "first_bad_state": "Evaluator aggregate temporal comparison",
+      "root_class": "E",
+      "note": "per-item NOW/NONE is preserved; top aggregate NOW is not a core error",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "C04",
+      "first_bad_state": "Benchmark truth/evaluator publication comparison",
+      "root_class": "E",
+      "note": "state keeps SCHEDULED plus UNRESOLVED time; truth conflicts with other unresolved-time cases",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "C05",
+      "first_bad_state": "Evaluator action-family comparison",
+      "root_class": "E",
+      "note": "title mutation plus immediate publish is present in TaskDelta; canonical family PUBLISH_NOW is not a loss of intent",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "C06",
+      "first_bad_state": "TargetResolver generic-label normalization in delta path",
+      "root_class": "C",
+      "note": "???? is retained but delta label matching yields zero instead of two candidates",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": false,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "E07",
+      "first_bad_state": "Provider raw structured output",
+      "root_class": "B",
+      "note": "QUERY/show request is emitted with DRAFT_ONLY publication",
+      "raw_core_intent_exact": false,
+      "core_intent_exact": false,
+      "core_intent_unsafe": true
+    },
+    {
+      "case_id": "F01",
+      "first_bad_state": "Context-exposed canonical identity copied by provider",
+      "root_class": "B",
+      "note": "raw target copies schedule-java/task-java; Java schedule is business-correct but resolver ownership is violated",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "F02",
+      "first_bad_state": "Evaluator safe-clarification comparison",
+      "root_class": "E",
+      "note": "missing replacement title is correctly clarified; truth expects an executable mutation",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "F03",
+      "first_bad_state": "Context-exposed canonical identity/metadata copied by provider",
+      "root_class": "B",
+      "note": "raw target copies task-agent; owner/action are correct, evaluator expects draft identity and NEW_OBJECTIVE metadata",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "F06",
+      "first_bad_state": "Provider raw retry lifecycle output",
+      "root_class": "B",
+      "note": "existing-resource retry with title change is emitted as CREATE_TASK, risking duplicate creation",
+      "raw_core_intent_exact": false,
+      "core_intent_exact": false,
+      "core_intent_unsafe": true
+    },
+    {
+      "case_id": "F07",
+      "first_bad_state": "Context-induced retry publication carryover",
+      "root_class": "B",
+      "note": "failed context exposes CREATE_DRAFT/DRAFT_ONLY and raw retry incorrectly carries DRAFT_ONLY",
+      "raw_core_intent_exact": false,
+      "core_intent_exact": false,
+      "core_intent_unsafe": true
+    },
+    {
+      "case_id": "F08",
+      "first_bad_state": "Provider raw structured reconciliation omission",
+      "root_class": "B",
+      "note": "raw safely asks for clarification but omits a structured UNKNOWN/reconcile reference",
+      "raw_core_intent_exact": false,
+      "core_intent_exact": false,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "G01",
+      "first_bad_state": "Evaluator safe-clarification target comparison",
+      "root_class": "E",
+      "note": "targetless clarification is safe; truth distinguishes NONE from NOT_FOUND",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "G03",
+      "first_bad_state": "Evaluator safe-clarification action comparison",
+      "root_class": "E",
+      "note": "scheduled intent plus missing target/time is correctly clarified",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "G04",
+      "first_bad_state": "Benchmark truth/evaluator publication default comparison",
+      "root_class": "E",
+      "note": "plain write remains UNKNOWN/NONE per semantic contract; truth demands product Draft default",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "G05",
+      "first_bad_state": "Evaluator safe-clarification action/target comparison",
+      "root_class": "E",
+      "note": "future expression is retained and unresolved target safely clarifies",
+      "raw_core_intent_exact": true,
+      "core_intent_exact": true,
+      "core_intent_unsafe": false
+    },
+    {
+      "case_id": "G06",
+      "first_bad_state": "Provider raw structured ambiguity omission",
+      "root_class": "B",
+      "note": "raw ambiguity text names multiple tasks but no structured target reference is emitted",
+      "raw_core_intent_exact": false,
+      "core_intent_exact": false,
+      "core_intent_unsafe": false
+    }
+  ]
+}

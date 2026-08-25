@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
@@ -17,11 +18,8 @@ from pydantic import ValidationError
 
 from greenbook_agent_core.goal.models import GoalTree
 from greenbook_agent_core.llm_compat import (
-    STRUCTURED_OUTPUT_RETRY_MAX_TOKENS,
-    add_json_schema_instruction,
-    has_structured_payload,
-    retry_json_object,
-    structured_provider_options,
+    extract_top_level_json,
+    structured_call,
 )
 from greenbook_agent_core.planning.contracts import PlanningDecision, PlanningDecisionType
 
@@ -90,29 +88,57 @@ class DynamicPlanner:
             )
             try:
                 decision = PlanningDecision.model_validate(_response_payload(response))
-            except ValueError as exc:
-                # DeepSeek currently rejects ``json_schema`` and normally
-                # succeeds with ``json_object``.  Under a long reasoning
-                # prompt it can occasionally return an empty content field
-                # without an HTTP error.  Give the provider one explicit
-                # JSON-only retry before failing closed; do not invent a
-                # planning decision locally.
-                if "no structured response" not in str(exc).lower():
-                    raise
-                response = await _structured_call(
-                    client,
-                    model if model is not None else self._model,
-                    payload,
-                    retry=True,
-                )
-                try:
-                    decision = PlanningDecision.model_validate(_response_payload(response))
-                except ValidationError as retry_exc:
-                    raise ValueError(
-                        "Dynamic Planner output is not a PlanningDecision."
-                    ) from retry_exc
-            except ValidationError as exc:
-                raise ValueError("Dynamic Planner output is not a PlanningDecision.") from exc
+            except (ValueError, ValidationError) as exc:
+                # Bounded structured-output recovery: give the model one explicit
+                # schema repair before failing closed.  A planner JSON/schema
+                # error must never leak a Pydantic trace to the user or kill the
+                # Run (design 0813, §21).  The repair is schema-only, not a replan.
+                summary = str(exc)
+                if "no structured response" not in summary.lower():
+                    repair_payload = dict(payload)
+                    repair_payload["contract_repair"] = {
+                        "validation_error": summary[:1000],
+                        "instruction": (
+                            "Return only valid JSON matching the PlanningDecision "
+                            "schema. insert_nodes entries must be TaskNode objects "
+                            "with exactly task_id and capability; do not include "
+                            "Goal-only fields like description, goal_type, children, "
+                            "required_capabilities, or target. Do not explain."
+                        ),
+                    }
+                    try:
+                        response = await _structured_call(
+                            client,
+                            model if model is not None else self._model,
+                            repair_payload,
+                        )
+                        decision = PlanningDecision.model_validate(
+                            _response_payload(response)
+                        )
+                    except (ValueError, ValidationError):
+                        return PlanningDecision(
+                            decision=PlanningDecisionType.ASK_HUMAN,
+                            reason="The replan decision could not be validated; please confirm the next step.",
+                        )
+                else:
+                    # DeepSeek under a long prompt occasionally returns an empty
+                    # content field without an HTTP error.  Give the provider one
+                    # explicit JSON-only retry before failing closed.
+                    response = await _structured_call(
+                        client,
+                        model if model is not None else self._model,
+                        payload,
+                        retry=True,
+                    )
+                    try:
+                        decision = PlanningDecision.model_validate(
+                            _response_payload(response)
+                        )
+                    except (ValueError, ValidationError):
+                        return PlanningDecision(
+                            decision=PlanningDecisionType.ASK_HUMAN,
+                            reason="The replan decision could not be validated; please confirm the next step.",
+                        )
             decision = await self._repair_empty_observation(
                 payload,
                 decision,
@@ -128,6 +154,9 @@ class DynamicPlanner:
             )
 
         decision = self._evidence_fallback(payload)
+        broadened = _broaden_empty_search(payload)
+        if broadened is not None:
+            decision = broadened
         return _enforce_empty_observation_policy(payload, decision)
 
     async def _repair_empty_observation(
@@ -166,6 +195,18 @@ class DynamicPlanner:
         ]
         if not failed_tool and not failed_arguments and not candidates:
             return decision
+
+        # ── Deterministic query broadening for empty searches ────────────
+        # A community search that returns zero rows is usually a phrasing
+        # problem ("Java 后端 面试" vs the community's "Java 学习路线图"),
+        # not missing content.  Walk a bounded widening ladder — drop
+        # trailing tokens, then fall back to the broadest single token —
+        # before trusting the LLM (or giving up with EVIDENCE_INSUFFICIENT).
+        # The next AgentLoop iteration replays the search through
+        # ``preferred_tool`` without an extra LLM round trip.
+        broadened = _broaden_empty_search(payload)
+        if broadened is not None:
+            return broadened
 
         if decision.decision == PlanningDecisionType.SELECT_ALTERNATIVE_TOOL:
             return decision if decision.tool_name in candidates else PlanningDecision(
@@ -256,6 +297,20 @@ class DynamicPlanner:
         )
         if not isinstance(failed_arguments, Mapping):
             failed_arguments = {}
+        if failure_kind in {
+            "PERMANENT_INPUT",
+            "FIELD_TOO_LONG",
+            "INVALID_DRAFT_METADATA",
+            "VALIDATION_ERROR",
+            "INVALID_ARGUMENT",
+        }:
+            return PlanningDecision(
+                decision=PlanningDecisionType.ASK_HUMAN,
+                reason=(
+                    "The action arguments are permanently invalid; the runtime "
+                    "will not retry the same side effect or invent a correction."
+                ),
+            )
         if failure_kind not in {
             "DEPENDENCY_UNAVAILABLE",
             "TIMEOUT",
@@ -362,6 +417,7 @@ class DynamicPlanner:
     def apply(goal_tree: GoalTree, decision: PlanningDecision) -> GoalTree:
         """Apply a typed, non-executing plan mutation to a GoalTree copy."""
 
+        _validate_insertion_publication_semantics(goal_tree, decision)
         candidate = goal_tree.model_copy(deep=True)
         if decision.decision == PlanningDecisionType.INSERT_STEP:
             existing = {node.task_id for node in candidate.task_nodes}
@@ -444,6 +500,22 @@ class DynamicPlanner:
         if isinstance(last_result, Mapping) and (
             last_result.get("ok") is False or last_result.get("success") is False
         ):
+            failure_kind = str(
+                last_result.get("code") or latest.get("failure_kind") or ""
+            ).upper()
+            if failure_kind in {
+                "PERMANENT_INPUT",
+                "FIELD_TOO_LONG",
+                "INVALID_DRAFT_METADATA",
+                "VALIDATION_ERROR",
+                "INVALID_ARGUMENT",
+            }:
+                return PlanningDecision(
+                    decision=PlanningDecisionType.ASK_HUMAN,
+                    reason=(
+                        "The action arguments are invalid; same-argument retry is forbidden."
+                    ),
+                )
             tool_name = str(
                 last_result.get("tool_name")
                 or latest.get("tool_name")
@@ -485,6 +557,101 @@ class DynamicPlanner:
         )
 
 
+def _validate_insertion_publication_semantics(
+    goal_tree: GoalTree,
+    decision: PlanningDecision,
+) -> None:
+    """Reject an INSERT_STEP that changes a Goal's publication semantics.
+
+    Replan is a local execution-structure mutation. It must never introduce a
+    publication capability the Goal did not declare: a DRAFT_ONLY Goal cannot
+    gain SCHEDULE_PUBLISH or PUBLISH_NOW, a scheduled Goal cannot gain
+    PUBLISH_NOW, and an immediate-publish Goal cannot gain SCHEDULE_PUBLISH.
+    Mirrors GoalCompiler._validate_step_semantics so every path that changes
+    the GoalTree preserves semantic monotonicity.
+    """
+
+    if decision.decision != PlanningDecisionType.INSERT_STEP:
+        return
+    goals_by_id = {goal.goal_id: goal for goal in goal_tree.all_goals()}
+    for node in decision.insert_nodes:
+        capability = str(getattr(node, "capability", "") or "").strip().upper()
+        if capability not in {"SCHEDULE_PUBLISH", "PUBLISH_NOW"}:
+            continue
+        goal = goals_by_id.get(str(getattr(node, "goal_id", "") or ""))
+        intent = _goal_publication_intent(goal) if goal is not None else ""
+        if intent == "DRAFT_ONLY" and capability in {"SCHEDULE_PUBLISH", "PUBLISH_NOW"}:
+            raise ValueError(
+                f"INSERT_STEP '{node.task_id}' introduces {capability} into a DRAFT_ONLY goal."
+            )
+        if intent == "SCHEDULED_PUBLISH" and capability == "PUBLISH_NOW":
+            raise ValueError(
+                f"INSERT_STEP '{node.task_id}' introduces PUBLISH_NOW into a scheduled goal."
+            )
+        if intent == "IMMEDIATE_PUBLISH" and capability == "SCHEDULE_PUBLISH":
+            raise ValueError(
+                f"INSERT_STEP '{node.task_id}' introduces SCHEDULE_PUBLISH into an immediate-publish goal."
+            )
+
+
+def _goal_publication_intent(goal: Any) -> str:
+    """Normalize a Goal's publication intent (field or constraints form)."""
+
+    value = str(getattr(goal, "publication_intent", "") or "").strip()
+    if not value:
+        for item in getattr(goal, "constraints", ()) or ():
+            if isinstance(item, Mapping) and item.get("publication_intent") not in (None, ""):
+                value = str(item["publication_intent"]).strip()
+                break
+    normalized = value.upper().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "DRAFT": "DRAFT_ONLY",
+        "SAVE_DRAFT": "DRAFT_ONLY",
+        "DO_NOT_PUBLISH": "DRAFT_ONLY",
+        "NO_PUBLISH": "DRAFT_ONLY",
+        "SCHEDULE": "SCHEDULED_PUBLISH",
+        "SCHEDULE_PUBLISH": "SCHEDULED_PUBLISH",
+        "IMMEDIATE": "IMMEDIATE_PUBLISH",
+        "PUBLISH_NOW": "IMMEDIATE_PUBLISH",
+        "NOW": "IMMEDIATE_PUBLISH",
+    }
+    return aliases.get(normalized, normalized)
+
+
+_PLANNER_PROMPT = (
+    "You are GreenBook Dynamic Planner. Return only a typed "
+    "PlanningDecision. Use GoalTree and runtime evidence; "
+    "never execute tools or reinterpret the user message. "
+    "Treat an EMPTY read result as evidence, not as success: inspect "
+    "result_status, resource_count, missing_required_reference, "
+    "failure_kind, and available_fallback_capabilities. For a safe "
+    "read failure or empty result, choose SELECT_ALTERNATIVE_TOOL, "
+    "RETRY_WITH_NEW_ARGS, a bounded lower-scope step, or ASK_HUMAN "
+    "according to the supplied ToolMetadata. Do not choose a tool "
+    "merely because it is first in the catalog, and never invent a "
+    "missing resource identifier. "
+    "When a read returned a non-empty result whose topic only partially "
+    "matches the Goal, prefer to proceed with the available evidence "
+    "(extract the related themes and continue) or a materially changed "
+    "query scope, rather than ASK_HUMAN. ASK_HUMAN is for Goals with no "
+    "usable evidence at all or a genuine approval need — not for imperfect "
+    "topic matches."
+    "For DEPENDENCY_UNAVAILABLE, TIMEOUT, TRANSIENT_NETWORK, or "
+    "RATE_LIMITED failures, prefer a different listed read-only "
+    "candidate; if none is semantically suitable, a retry is allowed "
+    "only with explicit changed arguments that adjust scope. Never "
+    "blindly repeat the failed tool. "
+    "When an external side effect may already have been sent, "
+    "re-observe or reconcile before retrying. For destructive "
+    "or non-idempotent failures, ask for human input instead "
+    "of blindly repeating the tool. Preserve independent "
+    "parallel work. Represent conditional outcomes as typed "
+    "INSERT_STEP, REMOVE, REORDER, or SELECT_ALTERNATIVE_TOOL "
+    "decisions based on runtime evidence; never emit an "
+    "executable condition string or a fixed workflow template."
+)
+
+
 async def _structured_call(
     client: Any,
     model: str,
@@ -492,85 +659,22 @@ async def _structured_call(
     *,
     retry: bool = False,
 ) -> Any:
-    kwargs = {
-        "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are GreenBook Dynamic Planner. Return only a typed "
-                    "PlanningDecision. Use GoalTree and runtime evidence; "
-                "never execute tools or reinterpret the user message. "
-                "Treat an EMPTY read result as evidence, not as success: inspect "
-                "result_status, resource_count, missing_required_reference, "
-                "failure_kind, and available_fallback_capabilities. For a safe "
-                "read failure or empty result, choose SELECT_ALTERNATIVE_TOOL, "
-                "RETRY_WITH_NEW_ARGS, a bounded lower-scope step, or ASK_HUMAN "
-                "according to the supplied ToolMetadata. Do not choose a tool "
-                "merely because it is first in the catalog, and never invent a "
-                "missing resource identifier. "
-                "For DEPENDENCY_UNAVAILABLE, TIMEOUT, TRANSIENT_NETWORK, or "
-                "RATE_LIMITED failures, prefer a different listed read-only "
-                "candidate; if none is semantically suitable, a retry is allowed "
-                "only with explicit changed arguments that adjust scope. Never "
-                "blindly repeat the failed tool. "
-                "When an external side effect may already have been sent, "
-                "re-observe or reconcile before retrying. For destructive "
-                "or non-idempotent failures, ask for human input instead "
-                "of blindly repeating the tool. Preserve independent "
-                "parallel work. Represent conditional outcomes as typed "
-                "INSERT_STEP, REMOVE, REORDER, or SELECT_ALTERNATIVE_TOOL "
-                "decisions based on runtime evidence; never emit an "
-                "executable condition string or a fixed workflow template."
-                ),
-            },
-            {"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)},
-        ],
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "greenbook_planning_decision",
-                "strict": True,
-                "schema": PlanningDecision.model_json_schema(),
-            },
-        },
-        "temperature": 0.0,
-        **structured_provider_options(client, model),
-    }
-    if retry:
-        kwargs["response_format"] = {"type": "json_object"}
-        kwargs["messages"] = add_json_schema_instruction(
-            kwargs["messages"],
-            PlanningDecision.model_json_schema(),
-        )
-        kwargs["max_tokens"] = STRUCTURED_OUTPUT_RETRY_MAX_TOKENS
-        response = await client.chat.completions.create(**kwargs)
-        if not has_structured_payload(response):
-            response = await retry_json_object(
-                client,
-                kwargs,
-                PlanningDecision.model_json_schema(),
-            )
-        return response
-    try:
-        return await client.chat.completions.create(**kwargs)
-    except Exception as exc:
-        if "response_format" not in str(exc).lower() and "json_schema" not in str(exc).lower():
-            raise
-        kwargs["response_format"] = {"type": "json_object"}
-        kwargs["messages"] = add_json_schema_instruction(
-            kwargs["messages"],
-            PlanningDecision.model_json_schema(),
-        )
-        kwargs["max_tokens"] = STRUCTURED_OUTPUT_RETRY_MAX_TOKENS
-        response = await client.chat.completions.create(**kwargs)
-    if not has_structured_payload(response):
-        response = await retry_json_object(
-            client,
-            kwargs,
-            PlanningDecision.model_json_schema(),
-        )
-    return response
+    """Route the planner call through the canonical llm_compat adapter.
+
+    The typed request/response contract and the repair semantics live here;
+    the provider-compatibility fallbacks (json_schema → json_object,
+    response-format 400 retry, empty-content retry) are shared with
+    AgentLoop / ToolSelector / CommandInterpreter / GoalDecomposer.
+    """
+    return await structured_call(
+        client,
+        model,
+        _PLANNER_PROMPT,
+        "greenbook_planning_decision",
+        PlanningDecision.model_json_schema(),
+        payload,
+        retry=retry,
+    )
 
 
 def _response_payload(response: Any) -> Any:
@@ -588,10 +692,16 @@ def _response_payload(response: Any) -> Any:
             if isinstance(item, Mapping)
         ).strip()
         if text:
-            return json.loads(text)
+            try:
+                return json.loads(extract_top_level_json(text))
+            except json.JSONDecodeError as exc:
+                raise ValueError("Dynamic Planner returned invalid JSON.") from exc
     if not isinstance(content, str) or not content.strip():
         raise ValueError("Dynamic Planner returned no structured response.")
-    return json.loads(content)
+    try:
+        return json.loads(extract_top_level_json(content))
+    except json.JSONDecodeError as exc:
+        raise ValueError("Dynamic Planner returned invalid JSON.") from exc
 
 
 def _policy_for_tool(values: Sequence[Any], tool_name: str) -> Mapping[str, Any] | None:
@@ -647,6 +757,107 @@ def _arguments_change_scope(
             previous.get("query", "")
         ).strip().casefold()
     return dict(candidate) != dict(previous)
+
+
+_SEARCH_TOOL_MARKERS = ("search", "find")
+
+
+def _is_search_tool(tool_name: str) -> bool:
+    """True for read-only search tools (community.search_public_posts, …)."""
+
+    name = (tool_name or "").strip().casefold()
+    return any(marker in name for marker in _SEARCH_TOOL_MARKERS)
+
+
+def _broaden_empty_search(
+    payload: Mapping[str, Any],
+) -> PlanningDecision | None:
+    """Return a bounded RETRY_WITH_NEW_ARGS for an EMPTY search, or None.
+
+    The next AgentLoop iteration replays the search through the preferred
+    tool without an extra LLM round trip.  When the widening ladder is
+    exhausted (or the failed read is not a query search) this returns None
+    so the normal planner/fallback decision path applies.
+    """
+
+    if not _empty_observation_requires_adaptation(payload):
+        return None
+    latest = _latest_observation(payload)
+    last_result = latest.get("last_result") or {}
+    if not isinstance(last_result, Mapping):
+        last_result = {}
+    failed_tool = str(
+        last_result.get("tool_name") or latest.get("tool_name") or ""
+    )
+    failed_arguments = last_result.get("tool_arguments") or {}
+    if not isinstance(failed_arguments, Mapping):
+        failed_arguments = {}
+    if not _is_search_tool(failed_tool) or "query" not in failed_arguments:
+        return None
+    broadened = _next_broadened_search_query(
+        str(failed_arguments.get("query") or ""),
+        tried=_tried_search_queries(payload),
+    )
+    if broadened is None:
+        return None
+    return PlanningDecision(
+        decision=PlanningDecisionType.RETRY_WITH_NEW_ARGS,
+        tool_name=failed_tool,
+        arguments={**dict(failed_arguments), "query": broadened},
+        reason=(
+            f"Search returned no results for "
+            f"{failed_arguments.get('query')!r}; retrying with "
+            f"broader query {broadened!r}."
+        ),
+    )
+
+
+def _tried_search_queries(payload: Mapping[str, Any]) -> set[str]:
+    """Collect every search query already attempted across observations."""
+
+    tried: set[str] = set()
+    for obs in (payload.get("observations") or []):
+        if hasattr(obs, "model_dump"):
+            obs = obs.model_dump(mode="json")
+        if not isinstance(obs, Mapping):
+            continue
+        result = obs.get("last_result") or {}
+        if not isinstance(result, Mapping):
+            result = {}
+        args = result.get("tool_arguments") or result.get("arguments") or {}
+        if isinstance(args, Mapping):
+            query = args.get("query")
+            if query:
+                tried.add(str(query).strip().casefold())
+    return tried
+
+
+def _next_broadened_search_query(
+    current: str,
+    tried: set[str],
+) -> str | None:
+    """Walk a deterministic widening ladder for an empty search query.
+
+    ``"Java 后端 面试"`` → ``"Java 后端"`` → ``"Java"`` (or a single
+    remaining token).  The ladder only drops or keeps tokens that were
+    already in the user's query — it never fabricates terms — and stops
+    once the broadest single token has been tried.
+    """
+
+    raw = (current or "").strip()
+    tokens = [t for t in re.split(r"[\s\u3000,，;；、]+", raw) if t]
+    if len(tokens) <= 1:
+        return None
+    # 1) drop trailing tokens one at a time (specific → general)
+    for width in range(len(tokens) - 1, 0, -1):
+        candidate = " ".join(tokens[:width])
+        if candidate.casefold() not in tried:
+            return candidate
+    # 2) fall back to the single broadest token
+    for token in tokens:
+        if token.casefold() not in tried:
+            return token
+    return None
 
 
 def _enforce_empty_observation_policy(

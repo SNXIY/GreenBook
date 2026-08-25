@@ -8,6 +8,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tongji.common.exception.BusinessException;
 import com.tongji.common.exception.ErrorCode;
+import com.tongji.agentfacade.contract.DraftMetadataContract;
 import com.tongji.knowpost.id.SnowflakeIdGenerator;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPost;
@@ -108,30 +109,6 @@ public class KnowPostServiceImpl implements KnowPostService {
         return id;
     }
 
-    /**
-     * 接收创作 Agent handoff：创建 AI_ASSISTED 草稿并写入正文。
-     */
-    @Transactional
-    public long createAiDraft(long creatorId, String title, String bodyMarkdown, String description, String contentSha256) {
-        long id = createDraft(creatorId, "AI_ASSISTED");
-        String objectKey = "knowposts/" + id + "/content.md";
-        String etag = ossStorageService.putTextObject(objectKey, bodyMarkdown, "text/markdown");
-        byte[] bytes = bodyMarkdown == null ? new byte[0] : bodyMarkdown.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        String sha = (contentSha256 == null || contentSha256.isBlank())
-                ? sha256Hex(bytes)
-                : contentSha256;
-        confirmContent(creatorId, id, objectKey, etag, (long) bytes.length, sha);
-        String desc = description;
-        if (desc == null || desc.isBlank()) {
-            desc = bodyMarkdown == null ? "" : bodyMarkdown.replaceAll("\\s+", " ").trim();
-            if (desc.length() > 50) {
-                desc = desc.substring(0, 50);
-            }
-        }
-        updateMetadata(creatorId, id, title, null, null, null, "public", false, desc);
-        return id;
-    }
-
     private static String sha256Hex(byte[] bytes) {
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
@@ -179,6 +156,7 @@ public class KnowPostServiceImpl implements KnowPostService {
      */
     @Transactional
     public void updateMetadata(long creatorId, long id, String title, Long tagId, List<String> tags, List<String> imgUrls, String visible, Boolean isTop, String description) {
+        validateDescription(description);
         invalidateCache(id);
 
         KnowPost post = KnowPost.builder()
@@ -202,6 +180,17 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
 
         invalidateCache(id);
+    }
+
+    private static void validateDescription(String description) {
+        if (description != null
+                && description.codePointCount(0, description.length())
+                > DraftMetadataContract.DESCRIPTION_MAX_LENGTH) {
+            throw new BusinessException(
+                    ErrorCode.FIELD_TOO_LONG,
+                    "field=description; maxLength=" + DraftMetadataContract.DESCRIPTION_MAX_LENGTH
+                            + "; actualLength=" + description.codePointCount(0, description.length()));
+        }
     }
 
     /**

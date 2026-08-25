@@ -20,6 +20,9 @@ class ExecutionStepInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     step_id: str
+    # Preserves the logical business goal assigned by the validated plan.
+    # This is projection metadata; workers still execute the canonical step.
+    goal_id: str | None = None
     ordinal: int = 0
     capability: str = ""
     tool_name: str = ""
@@ -86,6 +89,7 @@ class ExecutionInput(BaseModel):
             step_values = [
                 ExecutionStepInput(
                     step_id=self.step_id,
+                    goal_id=self.goal_id or None,
                     capability=self.capability,
                     tool_name=self.tool_name,
                     arguments=dict(self.arguments),
@@ -108,6 +112,7 @@ class ExecutionInput(BaseModel):
         plan_steps = [
             PlanStep(
                 step_id=item.step_id,
+                goal_id=item.goal_id,
                 ordinal=item.ordinal or index + 1,
                 capability=item.capability,
                 tool_name=item.tool_name,
@@ -158,6 +163,7 @@ class ExecutionInput(BaseModel):
         steps = [
             ExecutionStepInput(
                 step_id=str(getattr(item, "step_id", "")),
+                goal_id=str(getattr(item, "goal_id", "") or "") or None,
                 ordinal=int(getattr(item, "ordinal", 0) or 0),
                 capability=str(getattr(item, "capability", "")),
                 tool_name=str(getattr(item, "tool_name", "") or ""),

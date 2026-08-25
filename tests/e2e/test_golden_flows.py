@@ -164,11 +164,11 @@ class TestErrorHandling:
     def session(self, auth: AuthContext) -> SessionContext:
         return SessionContext(conversation_id="conv-1", user_id=auth.user_id, tenant_id=auth.tenant_id)
 
-    async def test_creator_unavailable_is_readable_and_retryable(self, session: SessionContext) -> None:
-        """Creator不可用时错误可读且可安全重试."""
+    async def test_dependency_unavailable_is_readable_and_retryable(self, session: SessionContext) -> None:
+        """下游不可用时错误可读且可安全重试."""
         from greenbook_contracts.tool_result import ToolResult
 
-        r = ToolResult.dependency_unavailable("Creator Service unreachable")
+        r = ToolResult.dependency_unavailable("Downstream service unreachable")
         assert r.retryable is True
         assert r.request_sent is False
         assert r.code == "DEPENDENCY_UNAVAILABLE"

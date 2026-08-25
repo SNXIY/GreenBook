@@ -1,0 +1,15 @@
+[
+  {
+    "name": "view-summarize-fresh-java-post-zh",
+    "turns": [
+      {
+        "text": "\u641c\u7d22 Java \u5b66\u4e60\u7cfb\u7edf\u8def\u7ebf\u56fe\u76f8\u5173\u7684\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 3
+      },
+      {
+        "text": "\u603b\u7ed3\u8fd9\u7bc7\u5e16\u5b50\uff0c\u544a\u8bc9\u6211\u91cd\u70b9\u6709\u54ea\u4e9b"
+      }
+    ]
+  }
+]

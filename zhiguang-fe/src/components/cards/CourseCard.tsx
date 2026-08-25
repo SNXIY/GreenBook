@@ -7,6 +7,7 @@ import { HeartIcon } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
 import { knowpostService } from "@/services/knowpostService";
 import type { KnowpostDetailResponse, VisibleScope } from "@/types/knowpost";
+import { userFacingErrorMessage } from "@/services/userFacingError";
 import styles from "./CourseCard.module.css";
 
 const renderEmHighlightedText = (text: string): ReactNode => {
@@ -90,8 +91,7 @@ const CourseCard = ({
       const d = await knowpostService.detail(id, tokens?.accessToken ?? undefined);
       setDetail(d);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "加载详情失败";
-      setMenuError(msg);
+      setMenuError(userFacingErrorMessage(e, "内容详情暂时无法加载。"));
     } finally {
       setMenuLoading(false);
     }
@@ -132,8 +132,7 @@ const CourseCard = ({
       setMenuOpen(false);
       onChanged?.("top", { isTop });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "设置置顶失败";
-      setMenuError(msg);
+      setMenuError(userFacingErrorMessage(e, "置顶设置暂时无法完成。"));
     } finally {
       setMenuLoading(false);
     }
@@ -151,8 +150,7 @@ const CourseCard = ({
       setMenuOpen(false);
       onChanged?.("visibility", { visible });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "设置可见性失败";
-      setMenuError(msg);
+      setMenuError(userFacingErrorMessage(e, "可见范围暂时无法修改。"));
     } finally {
       setMenuLoading(false);
     }
@@ -170,8 +168,7 @@ const CourseCard = ({
       setMenuOpen(false);
       onChanged?.("delete");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "删除失败";
-      setMenuError(msg);
+      setMenuError(userFacingErrorMessage(e, "删除暂时无法完成，请稍后重试。"));
     } finally {
       setMenuLoading(false);
     }
@@ -254,12 +251,12 @@ const CourseCard = ({
       ) : null}
       {editable ? (
         <>
-          <button ref={buttonRef} type="button" className={styles.menuButton} onClick={() => toggleMenu(id)} aria-haspopup="true" aria-expanded={menuOpen} title="编辑">
+          <button ref={buttonRef} type="button" className={styles.menuButton} onClick={() => toggleMenu(id)} aria-haspopup="true" aria-expanded={menuOpen} aria-label="打开内容操作菜单" title="编辑">
             ⋯
           </button>
           {menuOpen ? (
             <div ref={menuRef} className={styles.menuList} role="menu">
-              {menuError ? <div style={{ color: "var(--color-danger)", padding: 6 }}>{menuError}</div> : null}
+              {menuError ? <div style={{ color: "var(--color-danger)", padding: 6 }} role="alert">{menuError}</div> : null}
               <button type="button" className={styles.menuItem} onClick={() => handleSetTop(id, !(detail?.isTop))} disabled={menuLoading}>
                 {detail?.isTop ? "取消置顶" : "置顶"}
               </button>

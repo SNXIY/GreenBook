@@ -21,7 +21,12 @@ class ExecutionResultProjection(BaseModel):
     conversation_id: str
     run_id: str = ""
     trace_id: str = ""
+    # Immutable Objective correlation carried by the queue envelope.
+    objective_id: str = ""
     status: str = ""
+    # Task-level completion (COMPLETED / IN_PROGRESS / FAILED / ...) derived
+    # from Goal satisfaction, not from this single Execution's terminal state.
+    task_status: str = ""
     artifacts: list[dict[str, Any]] = Field(default_factory=list)
     schedule: dict[str, Any] | None = None
     next_actions: list[str] = Field(default_factory=list)
@@ -36,6 +41,8 @@ class ExecutionResultProjectionStore(Protocol):
     def get(self, execution_id: str) -> ExecutionResultProjection | None: ...
 
     def get_by_run_id(self, run_id: str) -> ExecutionResultProjection | None: ...
+
+    def list_by_run_id(self, run_id: str) -> list[ExecutionResultProjection]: ...
 
 
 class MemoryExecutionResultProjectionStore:
@@ -63,6 +70,13 @@ class MemoryExecutionResultProjectionStore:
                 return projection.model_copy(deep=True)
         return None
 
+    def list_by_run_id(self, run_id: str) -> list[ExecutionResultProjection]:
+        return [
+            projection.model_copy(deep=True)
+            for projection in self._items.values()
+            if projection.run_id == run_id
+        ]
+
 
 result_projection_metadata = sa.MetaData()
 
@@ -74,7 +88,9 @@ execution_result_projections = sa.Table(
     sa.Column("conversation_id", sa.String(128), nullable=False),
     sa.Column("run_id", sa.String(128), nullable=False, default=""),
     sa.Column("trace_id", sa.String(128), nullable=False, default=""),
+    sa.Column("objective_id", sa.String(128), nullable=False, default=""),
     sa.Column("status", sa.String(32), nullable=False, default=""),
+    sa.Column("task_status", sa.String(32), nullable=False, default=""),
     sa.Column("artifacts", sa.JSON, nullable=False, default=list),
     sa.Column("schedule", sa.JSON),
     sa.Column("next_actions", sa.JSON, nullable=False, default=list),
@@ -92,6 +108,16 @@ class PostgresExecutionResultProjectionStore:
         self._bind = bind
         if create_tables:
             result_projection_metadata.create_all(bind)
+            if getattr(bind, "dialect", None) is not None and bind.dialect.name == "postgresql":
+                with bind.begin() as connection:
+                    connection.exec_driver_sql(
+                        "ALTER TABLE assistant_execution_result_projections "
+                        "ADD COLUMN IF NOT EXISTS task_status VARCHAR(32) NOT NULL DEFAULT ''"
+                    )
+                    connection.exec_driver_sql(
+                        "ALTER TABLE assistant_execution_result_projections "
+                        "ADD COLUMN IF NOT EXISTS objective_id VARCHAR(128) NOT NULL DEFAULT ''"
+                    )
 
     def _connect(self):
         if isinstance(self._bind, sa.engine.Connection):
@@ -163,6 +189,18 @@ class PostgresExecutionResultProjectionStore:
                 )
             ).mappings().first()
         return ExecutionResultProjection.model_validate(dict(row)) if row else None
+
+    def list_by_run_id(self, run_id: str) -> list[ExecutionResultProjection]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                sa.select(execution_result_projections)
+                .where(execution_result_projections.c.run_id == run_id)
+                .order_by(
+                    execution_result_projections.c.created_at,
+                    execution_result_projections.c.execution_id,
+                )
+            ).mappings().all()
+        return [ExecutionResultProjection.model_validate(dict(row)) for row in rows]
 
 
 class _ConnectionContext:

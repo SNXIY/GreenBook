@@ -72,8 +72,6 @@ def _argument_key_for_resource(kind: Any) -> str | None:
         "DRAFT": "draft_id",
         "SCHEDULE": "schedule_id",
         "COMMENT": "parent_comment_id",
-        "CREATOR_TASK": "strategy_task_id",
-        "CREATOR_ARTIFACT": "strategy_artifact_id",
     }.get(normalized)
 
 
@@ -256,9 +254,19 @@ class ExecutionWorker:
                     return RunOutcome.FAILED
                 if any(s.status == StepStatus.RUNNING for s in ex.steps):
                     return RunOutcome.WAITING_ASYNC
-                # A non-terminal execution with no ready step and no running
-                # step is a broken dependency/state graph, not a long task.
-                # Surface it as a failure instead of leaving RUNNING forever.
+                # A retryable failure that still has retry budget is waiting
+                # for the external retry worker, not stalled: keep the
+                # execution RUNNING instead of failing it in the same pass.
+                if any(
+                    s.status == StepStatus.FAILED_RETRYABLE
+                    and s.retry_count < s.max_retries
+                    for s in ex.steps
+                ):
+                    return RunOutcome.WAITING_ASYNC
+                # A non-terminal execution with no ready step, no running
+                # step, and no pending retry is a broken dependency/state
+                # graph, not a long task.  Surface it as a failure instead of
+                # leaving RUNNING forever.
                 self._state.fail_execution(
                     execution_id,
                     error_code="EXECUTION_STALLED",
@@ -371,6 +379,9 @@ class ExecutionWorker:
         constraints: dict[str, Any] = dict(
             step_ex.checkpoint_data.get("constraints", {})
         )
+        resume_arguments = step_ex.checkpoint_data.get("resume_arguments")
+        if isinstance(resume_arguments, dict):
+            constraints.update(resume_arguments)
         # Walk ALL transitive ancestors (not just direct depends_on)
         visited: set[str] = set()
         queue: list[str] = list(step_ex.depends_on)
@@ -396,6 +407,7 @@ class ExecutionWorker:
 
         plan_step = PlanStep(
             step_id=step_ex.step_id,
+            goal_id=str(getattr(step_ex, "goal_id", "") or "") or None,
             capability=step_ex.capability,
             tool_name=step_ex.tool_name,
             ordinal=step_ex.ordinal,
@@ -458,6 +470,7 @@ class ExecutionWorker:
                     step_id=step_ex.step_id,
                     tool_name=result.tool_name,
                     evidence=evidence,
+                    objective_id=self._execution_objective_id(execution_id),
                 )
             if step_ex.retry_count > 0:
                 if self._metrics is not None:
@@ -527,6 +540,13 @@ class ExecutionWorker:
         else:
             failure = self._failure_from_result(result)
             step_ex.checkpoint_data["last_observation"] = observation
+            failure_state = (result.tool_result or {}).get("state")
+            if isinstance(failure_state, dict):
+                resume_arguments = failure_state.get("resume_arguments")
+                if isinstance(resume_arguments, dict) and resume_arguments:
+                    step_ex.checkpoint_data["resume_arguments"] = dict(
+                        resume_arguments
+                    )
             self._repo.save(self._state._require_execution(execution_id))
             decision = self._failure_decision_engine.decide(
                 failure,
@@ -562,6 +582,7 @@ class ExecutionWorker:
                     tool_name=result.tool_name,
                     evidence=evidence,
                     failure=failure,
+                    objective_id=self._execution_objective_id(execution_id),
                 )
             retry_decision = self._retry_decision_engine.decide_for_step(
                 failure,
@@ -569,6 +590,55 @@ class ExecutionWorker:
                 evidence=evidence,
                 source="worker_failure",
             )
+
+            # A write whose downstream outcome is unknown must never be
+            # converted into a terminal FAILED/COMPLETED claim or replayed by
+            # the ordinary retry path.  Preserve the running step and put the
+            # enclosing execution behind the durable reconciliation boundary.
+            # A later reconciler may prove success or failure from the Java
+            # business source of truth; until then the user-visible state is
+            # explicitly WAITING_HUMAN / result unknown.
+            if decision.reconciliation_required:
+                stored_execution = self._state._require_execution(execution_id)
+                stored_step = next(
+                    (
+                        item for item in stored_execution.steps
+                        if item.step_execution_id == sid
+                    ),
+                    step_ex,
+                )
+                stored_step.checkpoint_data["reconciliation_required"] = True
+                stored_step.checkpoint_data["reconciliation_error_code"] = result.error_code
+                stored_step.checkpoint_data["reconciliation_operation_id"] = (
+                    operation.operation_id if operation is not None else ""
+                )
+                self._repo.save(stored_execution)
+                self._append_event(
+                    EventType.STEP_FAILED,
+                    execution_id=execution_id,
+                    step_id=step_ex.step_id,
+                    payload={
+                        "step_execution_id": sid,
+                        "retryable": False,
+                        "error_code": result.error_code,
+                        "error_message": result.error_message,
+                        "failure_category": decision.category.value,
+                        "recovery_action": decision.action.value,
+                        "recovery_reason": decision.reason,
+                        "reconciliation_required": True,
+                        "tool_name": result.tool_name,
+                        "observation": observation,
+                    },
+                    evidence=evidence,
+                    operation_id=operation.operation_id if operation is not None else "",
+                )
+                self._state.mark_reconciliation_required(
+                    execution_id,
+                    sid,
+                    operation_id=operation.operation_id if operation is not None else "",
+                )
+                self._record_step_metrics(step_ex, "RESULT_UNKNOWN", step_started)
+                return RunOutcome.WAITING_HUMAN
 
             if decision.action == RecoveryAction.REQUEST_USER_INPUT:
                 self._state.pause_execution(execution_id)
@@ -709,34 +779,10 @@ class ExecutionWorker:
                     ),
                     step_ex,
                 )
-                reaction = await self._request_replan(
-                    ex,
-                    step_ex,
-                    result,
-                    observation,
-                )
-                if reaction is not None and reaction.decision in {
-                    PlanningDecisionType.SELECT_ALTERNATIVE_TOOL,
-                    PlanningDecisionType.RETRY_WITH_NEW_ARGS,
-                }:
-                    self._apply_replan(
-                        ex,
-                        step_ex,
-                        reaction,
-                        observation,
-                        current_step_completed=False,
-                    )
-                    self._record_step_metrics(step_ex, "FAILED_REPLANNED", step_started)
-                    return RunOutcome.COMPLETED
-                if reaction is not None and reaction.decision == PlanningDecisionType.ASK_HUMAN:
-                    self._state.wait_for_human(
-                        execution_id,
-                        step_execution_id=sid,
-                        reason=reaction.reason or "Runtime failure requires human input.",
-                        payload={"observation": observation},
-                    )
-                    self._record_step_metrics(step_ex, "FAILED_WAITING_HUMAN", step_started)
-                    return RunOutcome.WAITING_HUMAN
+                # Permanent input/auth/conflict/server failures are not
+                # planner failures.  A semantic correction must come from a
+                # new AgentLoop action; Worker/DynamicPlanner must not invent
+                # arguments or replay a side effect.
                 ex_store = self._repo.find_by_id(execution_id)
                 if ex_store is not None:
                     skipped = self._scheduler.mark_skipped_downstream(
@@ -744,10 +790,19 @@ class ExecutionWorker:
                     if skipped:
                         self._repo.save(ex_store)
                         self._state._update_execution_status(execution_id)
-                self._record_step_metrics(step_ex, "FAILED_RETRYABLE", step_started)
+                self._record_step_metrics(step_ex, "FAILED", step_started)
 
             if not retry_decision.allowed:
                 self._record_step_metrics(step_ex, "FAILED", step_started)
+            else:
+                # A retryable failure was recorded and (when a scheduler is
+                # configured) a retry task was scheduled.  This is not a
+                # terminal step outcome: the execution must wait for the
+                # external retry worker to reset the step and re-dispatch
+                # instead of being frozen by the main loop's "no ready step"
+                # branch (which would otherwise fail the execution as
+                # EXECUTION_STALLED in the same pass).
+                return RunOutcome.WAITING_ASYNC
 
         return RunOutcome.COMPLETED  # step-level done
 
@@ -878,6 +933,7 @@ class ExecutionWorker:
         replacement = StepExecution(
             execution_id=execution.execution_id,
             step_id=new_step_id,
+            goal_id=str(getattr(step, "goal_id", "") or "") or None,
             capability=capability_name,
             tool_name=tool_name,
             arguments=dict(decision.arguments or {}),
@@ -993,8 +1049,21 @@ class ExecutionWorker:
             return None
         return evidence.model_dump(mode="json")
 
-    async def resume_after_approval(self, execution_id: str) -> RunOutcome:
-        """Resume a WAITING_APPROVAL execution after user approves."""
+    async def resume_after_approval(
+        self,
+        execution_id: str,
+        *,
+        approved: bool = False,
+    ) -> RunOutcome:
+        """Resume only after the durable approval boundary confirms approval.
+
+        ``ApprovalRuntimeService`` owns the authenticated approval record and
+        passes ``approved=True`` for the direct in-process path. Queue-based
+        approval resumes transition the durable step before this method is
+        called by the normal worker loop. The Worker must never auto-approve.
+        """
+        if not approved:
+            return RunOutcome.FAILED
         ex = self._state._require_execution(execution_id)
         if ex.status != ExecutionStatus.WAITING_APPROVAL:
             return RunOutcome.FAILED
@@ -1007,8 +1076,9 @@ class ExecutionWorker:
         if waiting is None:
             return RunOutcome.FAILED
 
-        # TODO: Phase 4.2 — check approval decision from DB
-        # For now, auto-approve (test-friendly)
+        # ApprovalRuntimeService is the durable decision owner; this direct
+        # path is entered only after it has authenticated and validated the
+        # approval request.
         self._state.approve_and_resume(execution_id, waiting.step_execution_id)
 
         # Execute the resumed step
@@ -1055,10 +1125,25 @@ class ExecutionWorker:
 
     # ── helpers ─────────────────────────────────────────────────
 
+    def _execution_objective_id(self, execution_id: str) -> str | None:
+        """Read the durable correlation id from the loaded PlanExecution.
+
+        The Worker's single source of truth is the persisted PlanExecution, never
+        the in-process ToolInvocationContext (a separate execution context)."""
+        try:
+            ex = self._state._require_execution(execution_id)
+            return str(getattr(ex, "objective_id", "") or "") or None
+        except Exception:  # noqa: BLE001 - best-effort; None stays compatible
+            return None
+
     def init_from_plan(
         self,
         executable: ExecutablePlan,
         task_id: str = "",
+        objective_id: str | None = None,
+        *,
+        execution_id: str | None = None,
+        dispatch_payload: dict[str, object] | None = None,
     ) -> PlanExecution:
         """Create + persist a PlanExecution from an ExecutablePlan."""
         plan = TaskPlan(
@@ -1067,7 +1152,13 @@ class ExecutionWorker:
             plan_source=executable.plan_source,
             steps=executable.steps,
         )
-        return self._state.init_execution(plan, executable)
+        return self._state.init_execution(
+            plan,
+            executable,
+            objective_id=objective_id,
+            execution_id=execution_id,
+            dispatch_payload=dispatch_payload,
+        )
 
 
 def _now() -> str:

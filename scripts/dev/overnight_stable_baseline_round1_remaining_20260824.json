@@ -1,0 +1,70 @@
+[
+  {
+    "name": "view-python-recovery-20260824",
+    "turns": [
+      {
+        "text": "搜索 Python 和 AI 相关帖子",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      }
+    ]
+  },
+  {
+    "name": "view-spring-recovery-20260824",
+    "turns": [
+      {
+        "text": "搜索 Spring Boot 入门内容",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      }
+    ]
+  },
+  {
+    "name": "view-summarize-recovery-20260824",
+    "turns": [
+      {
+        "text": "搜索 Java 学习相关帖子",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      },
+      {
+        "text": "总结这篇帖子，告诉我重点有哪些"
+      }
+    ]
+  },
+  {
+    "name": "search-empty-recovery-20260824",
+    "turns": [
+      {
+        "text": "搜索完全不存在的 GB-STABLE-R1-EMPTY-20260824 内容"
+      }
+    ]
+  },
+  {
+    "name": "scheduler-java-recovery-20260824",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-RECOVERY-SCHED-JAVA-20260824 的 Java 学习草稿，并安排明天晚上六点发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "scheduler-agent-recovery-20260824",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-RECOVERY-SCHED-AGENT-20260824 的 Agent 学习草稿，并安排明天晚上六点发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "scheduler-redis-recovery-20260824",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-RECOVERY-SCHED-REDIS-20260824 的 Redis 学习草稿，并安排明天晚上六点发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  }
+]

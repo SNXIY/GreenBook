@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from greenbook_agent_core.execution.events import EventType, ExecutionEvent
 from greenbook_agent_core.execution.evidence import ExecutionEvidence
 from greenbook_agent_core.execution.persistent_stores import PostgresExecutionEventStore

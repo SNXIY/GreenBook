@@ -17,7 +17,6 @@ from .retry_task import RetryTask, RetryTaskStatus
 from .retry_task_store import RetryTaskStore, RetryTaskStoreProtocol
 
 if TYPE_CHECKING:
-    from .models import StepExecution
     from .retry_manager import RetryManager
 
 
@@ -140,34 +139,6 @@ class RetryScheduler:
             lease_seconds=self._lease_seconds,
             limit=limit,
         )
-
-    def dispatch_due(
-        self,
-        *,
-        retry_manager: RetryManager,
-        now: datetime | None = None,
-    ) -> list[tuple[RetryTask, StepExecution]]:
-        """Dispatch due tasks through RetryManager's common safety gate.
-
-        This only prepares steps for a future Worker pass.  It does not call a
-        tool and does not introduce a new Execution state.
-        """
-
-        dispatched: list[tuple[RetryTask, StepExecution]] = []
-        for task in self.due(now, worker_id=self._worker_id):
-            try:
-                step = retry_manager.retry_step(
-                    task.execution_id,
-                    task.step_id,
-                    source="retry_scheduler",
-                    user_requested_retry=False,
-                )
-            except Exception:
-                self._task_store.release(task.task_id, worker_id=self._worker_id)
-                raise
-            self._task_store.complete(task.task_id, worker_id=self._worker_id)
-            dispatched.append((task, step))
-        return dispatched
 
     def pending(self) -> list[RetryTask]:
         """Return pending tasks without claiming them."""

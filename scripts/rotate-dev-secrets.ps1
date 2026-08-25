@@ -21,16 +21,10 @@ function New-GreenBookSecret {
 }
 
 $jwtSecret = New-GreenBookSecret
-$creatorProxySecret = New-GreenBookSecret
-$creatorHandoffSecret = New-GreenBookSecret
 $agentSecret = New-GreenBookSecret
 
 $replacementValues = @{
   "JWT_SECRET" = $jwtSecret
-  "GREENBOOK_CREATOR_AGENT_SHARED_SECRET" = $creatorProxySecret
-  "GREENBOOK_CREATOR_COMMUNITY_SHARED_SECRET" = $creatorProxySecret
-  "GREENBOOK_CREATOR_HANDOFF_SHARED_SECRET" = $creatorHandoffSecret
-  "GREENBOOK_CREATOR_PUBLICATION_SHARED_SECRET" = $creatorHandoffSecret
   "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" = $agentSecret
 }
 
@@ -55,4 +49,4 @@ if ($missing.Count -gt 0) {
 [IO.File]::WriteAllLines($EnvFile, $updated, [Text.UTF8Encoding]::new($false))
 Write-Host "Rotated application JWT and service-to-service secrets in .env."
 Write-Host "API keys and database passwords were not changed."
-Write-Host "Restart all four applications. Existing login tokens are now invalid."
+Write-Host "Restart all applications. Existing login tokens are now invalid."

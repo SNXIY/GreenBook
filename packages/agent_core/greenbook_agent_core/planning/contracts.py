@@ -29,6 +29,9 @@ class PlanStep(BaseModel):
     parallelizable: bool = False
     constraints: dict[str, Any] = Field(default_factory=dict)
     goal_id: str | None = None
+    # Ephemeral progress in the disposable work plan; Objective/Execution are
+    # the authoritative business and runtime state.
+    status: str = "PENDING"
 
 
 class TaskPlan(BaseModel):

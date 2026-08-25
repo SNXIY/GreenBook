@@ -1,6 +1,4 @@
 param(
-  [ValidateSet("Direct", "CreatorDraft")]
-  [string]$Scenario = "Direct",
   [switch]$HealthOnly,
   [ValidateSet("PHONE", "EMAIL")]
   [string]$IdentifierType = "",
@@ -20,7 +18,6 @@ if (Test-Path -LiteralPath $EnvFile) {
 }
 
 $JavaBaseUrl = "http://127.0.0.1:8080"
-$CreatorBaseUrl = "http://127.0.0.1:8092"
 $AgentBaseUrl = "http://127.0.0.1:8094"
 $FrontendBaseUrl = "http://127.0.0.1:5173"
 
@@ -44,7 +41,12 @@ function Invoke-JsonRequest {
   }
   if ($null -ne $Body) {
     $parameters.ContentType = "application/json; charset=utf-8"
-    $parameters.Body = $Body | ConvertTo-Json -Depth 12 -Compress
+    # Windows PowerShell may encode a string request body through the active
+    # console/code-page encoding.  That silently turns non-ASCII input into
+    # question marks before FastAPI can parse it.  Send the JSON bytes with an
+    # explicit UTF-8 boundary instead.
+    $json = $Body | ConvertTo-Json -Depth 12 -Compress
+    $parameters.Body = [System.Text.Encoding]::UTF8.GetBytes($json)
   }
   return Invoke-RestMethod @parameters
 }
@@ -89,26 +91,8 @@ function Wait-AgentRun {
   throw "Agent run $RunId did not finish within $TimeoutSeconds seconds."
 }
 
-function Find-CreatedDraftId {
-  param([Parameter(Mandatory = $true)][object]$Run)
-
-  foreach ($step in @($Run.steps)) {
-    if ([string]$step.tool_name -ne "creator.create_draft") {
-      continue
-    }
-    if ($null -ne $step.output.result.draft_id) {
-      return [string]$step.output.result.draft_id
-    }
-    if ($null -ne $step.output.draft_id) {
-      return [string]$step.output.draft_id
-    }
-  }
-  return ""
-}
-
 Write-Host "Checking live GreenBook services..."
 Assert-Health -Name "Java backend" -Uri "$JavaBaseUrl/actuator/health"
-Assert-Health -Name "Creator Service" -Uri "$CreatorBaseUrl/actuator/health/ready"
 Assert-Health -Name "GreenBook Agent API" -Uri "$AgentBaseUrl/health"
 Assert-Health -Name "Frontend" -Uri $FrontendBaseUrl
 
@@ -158,18 +142,11 @@ if ([string]$me.role -ne "USER") {
   throw "E2E account must have USER role; actual role is $($me.role)."
 }
 
-$creatorStatus = Invoke-JsonRequest -Method GET `
-  -Uri "$CreatorBaseUrl/api/v1/creator/status" `
-  -Headers $authHeaders
-if ([string]$creatorStatus.status -ne "READY") {
-  throw "Creator did not accept the Java JWT."
-}
-
 $conversation = Invoke-JsonRequest -Method POST `
   -Uri "$AgentBaseUrl/api/v1/agent/conversations" `
   -Headers $authHeaders `
   -Body @{
-    title = "E2E $Scenario"
+    title = "E2E Direct"
     surface = "HOME"
   }
 $conversationId = [string]$conversation.conversation_id
@@ -177,12 +154,7 @@ if ([string]::IsNullOrWhiteSpace($conversationId)) {
   throw "Agent did not create a conversation."
 }
 
-$prompt = if ($Scenario -eq "CreatorDraft") {
-  "Create a short GREEN-BOOK integration-test draft. Its title must contain E2E-$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()). Create the draft only and do not publish it."
-}
-else {
-  "Answer briefly: is the GREEN-BOOK community service online? Do not call any tools."
-}
+$prompt = "Answer briefly: is the GREEN-BOOK community service online? Do not call any tools."
 
 $accepted = Invoke-JsonRequest -Method POST `
   -Uri "$AgentBaseUrl/api/v1/agent/conversations/$conversationId/messages" `
@@ -199,7 +171,6 @@ if ([string]::IsNullOrWhiteSpace($runId)) {
   throw "Agent did not accept the E2E run."
 }
 
-$createdDraftId = ""
 try {
   Write-Host "Waiting for Agent run $runId..."
   $run = Wait-AgentRun -RunId $runId -Headers $authHeaders
@@ -209,41 +180,13 @@ try {
   if ([string]::IsNullOrWhiteSpace([string]$run.final_response)) {
     throw "Agent completed without a final response."
   }
-
-  if ($Scenario -eq "Direct") {
-    if ([string]$run.execution_path -ne "DIRECT") {
-      throw "Direct scenario unexpectedly used execution path $($run.execution_path)."
-    }
-  }
-  else {
-    if (@("CREATOR", "ORCHESTRATED") -notcontains [string]$run.execution_path) {
-      throw "Creator scenario unexpectedly used execution path $($run.execution_path)."
-    }
-    $createdDraftId = Find-CreatedDraftId -Run $run
-    if ([string]::IsNullOrWhiteSpace($createdDraftId)) {
-      throw "Creator scenario completed without a Java draft id."
-    }
-    $status = Invoke-JsonRequest -Method GET `
-      -Uri "$JavaBaseUrl/api/v1/knowposts/$createdDraftId/publish-status" `
-      -Headers $authHeaders
-    if ([string]$status.status -ne "draft") {
-      throw "Creator handoff produced unexpected Java status $($status.status)."
-    }
+  if ([string]$run.execution_path -ne "DIRECT") {
+    throw "Direct scenario unexpectedly used execution path $($run.execution_path)."
   }
 
-  Write-Host "GreenBook $Scenario E2E scenario passed."
+  Write-Host "GreenBook Direct E2E scenario passed."
   Write-Host "Run: $runId | path: $($run.execution_path) | model calls: $($run.budget.model_calls)"
 }
 finally {
-  if (-not [string]::IsNullOrWhiteSpace($createdDraftId)) {
-    Write-Host "Removing E2E draft $createdDraftId..."
-    try {
-      $null = Invoke-JsonRequest -Method DELETE `
-        -Uri "$JavaBaseUrl/api/v1/knowposts/$createdDraftId" `
-        -Headers $authHeaders
-    }
-    catch {
-      Write-Warning "Could not remove E2E draft $createdDraftId. Delete it manually."
-    }
-  }
+  Write-Host "E2E run finished. No draft was created by this scenario."
 }

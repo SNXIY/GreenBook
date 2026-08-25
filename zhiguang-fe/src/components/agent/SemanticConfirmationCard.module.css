@@ -1,0 +1,353 @@
+.card {
+  align-self: flex-start;
+  display: grid;
+  gap: 14px;
+  width: min(100%, 480px);
+  margin: 10px 0 14px;
+  padding: 16px;
+  border: 1px solid var(--color-primary-border);
+  border-radius: 18px;
+  background: linear-gradient(145deg, var(--color-surface-raised), var(--color-primary-soft));
+  box-shadow: var(--shadow-sm);
+  animation: confirmationIn 220ms var(--ease-out);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.iconBadge,
+.objectiveNumber {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.iconBadge {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.headingCopy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.eyebrow {
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.headingCopy h3 {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.headingCopy p,
+.modifyHint,
+.progress,
+.success,
+.cancelled,
+.stale {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--color-warning-strong);
+  background: var(--color-warning-soft);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stateCONFIRMED,
+.stateWORKING {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.stateCANCELLED,
+.stateSTALE {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.stateMODIFYING {
+  color: var(--color-info);
+  background: var(--color-info-soft);
+}
+
+.objectives {
+  display: grid;
+  gap: 9px;
+}
+
+.objective {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.objectiveNumber {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.objectiveBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.objectiveBody h4 {
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.facts > div {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.facts dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--color-text-subtle);
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.timezone {
+  color: var(--color-text-subtle);
+}
+
+.sideEffect {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--color-warning-strong);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.actions,
+.modifyActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions button,
+.modifyActions button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform 120ms var(--ease-out), background-color 180ms var(--ease-out), border-color 180ms var(--ease-out), opacity 180ms var(--ease-out);
+}
+
+.actions button:active,
+.modifyActions button:active {
+  transform: scale(0.97);
+}
+
+.actions button:disabled,
+.modifyActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primaryButton {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.secondaryButton {
+  color: var(--color-primary);
+  border-color: var(--color-primary-border) !important;
+  background: var(--color-surface);
+}
+
+.cancelButton {
+  color: var(--color-danger);
+  border-color: var(--color-danger-border) !important;
+  background: transparent;
+}
+
+.modifyForm {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.modifyForm label {
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.modifyForm textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 11px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  line-height: 1.5;
+}
+
+.modifyForm textarea:focus-visible {
+  outline: 3px solid rgba(23, 107, 82, 0.2);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
+}
+
+.modifyHint {
+  color: var(--color-text-subtle);
+}
+
+.modifyActions {
+  justify-content: flex-end;
+}
+
+.error,
+.stale {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.progress,
+.success,
+.cancelled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.success {
+  color: var(--color-success);
+  font-weight: 650;
+}
+
+.cancelled {
+  color: var(--color-text-muted);
+}
+
+.pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 0 rgba(23, 107, 82, 0.24);
+  animation: confirmationPulse 1.6s var(--ease-out) infinite;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primaryButton:not(:disabled):hover {
+    background: var(--color-primary-hover);
+  }
+
+  .secondaryButton:not(:disabled):hover {
+    border-color: var(--color-primary) !important;
+    background: var(--color-surface-soft);
+  }
+
+  .cancelButton:not(:disabled):hover {
+    background: var(--color-danger-soft);
+  }
+}
+
+@media (max-width: 560px) {
+  .card {
+    width: 100%;
+    padding: 14px;
+  }
+
+  .header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .state {
+    grid-column: 2;
+    width: fit-content;
+  }
+
+  .actions button,
+  .modifyActions button {
+    flex: 1 1 132px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .pulse {
+    animation: none;
+  }
+}
+
+@keyframes confirmationIn {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes confirmationPulse {
+  70% { box-shadow: 0 0 0 8px rgba(23, 107, 82, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(23, 107, 82, 0); }
+}

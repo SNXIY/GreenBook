@@ -1,0 +1,26 @@
+[
+  {
+    "name": "search-java-probe-zh",
+    "turns": [
+      {"text": "搜几篇 Java 学习相关帖子"}
+    ]
+  },
+  {
+    "name": "search-agent-probe-zh",
+    "turns": [
+      {"text": "搜一些 Agent 学习相关帖子"}
+    ]
+  },
+  {
+    "name": "search-java-explicit-zh",
+    "turns": [
+      {"text": "搜索 Java 学习相关帖子"}
+    ]
+  },
+  {
+    "name": "search-agent-explicit-zh",
+    "turns": [
+      {"text": "搜索 Agent 学习相关帖子"}
+    ]
+  }
+]

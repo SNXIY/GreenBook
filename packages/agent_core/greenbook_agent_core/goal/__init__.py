@@ -3,6 +3,14 @@
 from .compiler import GoalCompilationError, GoalCompiler
 from .decomposer import GoalDecomposer, GoalDecompositionError, LLMGoalDecomposer
 from .models import Goal, GoalTree, TaskNode
+from .ready_work import (
+    ReadyWork,
+    WorkAccess,
+    access_mode,
+    resource_conflict,
+    resource_keys,
+    select_ready_work,
+)
 
 __all__ = [
     "Goal",
@@ -12,5 +20,11 @@ __all__ = [
     "GoalDecompositionError",
     "GoalTree",
     "LLMGoalDecomposer",
+    "ReadyWork",
     "TaskNode",
+    "WorkAccess",
+    "access_mode",
+    "resource_conflict",
+    "resource_keys",
+    "select_ready_work",
 ]

@@ -9,13 +9,9 @@ from typing import Any
 from greenbook_contracts.tool_contract import ToolMetadata, ToolRegistry
 from pydantic import ValidationError
 
+from greenbook_agent_core.execution.observation import observation_evidence
 from greenbook_agent_core.goal.models import Goal
-from greenbook_agent_core.llm_compat import (
-    add_json_schema_instruction,
-    has_structured_payload,
-    retry_json_object,
-    structured_provider_options,
-)
+from greenbook_agent_core.llm_compat import structured_call
 
 from .actions import SelectedTool
 from .state import Observation
@@ -27,6 +23,78 @@ class ToolSelectionError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+def validate_arguments_against_schema(
+    tool_name: str,
+    arguments: Mapping[str, Any],
+    input_schema: Any,
+) -> None:
+    """Validate tool arguments against the tool's declared JSON Schema.
+
+    Lightweight structural check over the JSON-Schema subset emitted by
+    ``ToolMetadata``: required properties, and property type compatibility.
+    This is the last validation before an in-loop (SYNC) tool call — the
+    durable Worker path additionally binds against the same schema.  A
+    mismatch raises ``ToolSelectionError`` so the AgentLoop re-reasons with a
+    controlled failure instead of sending malformed arguments downstream.
+    """
+    schema = input_schema
+    if schema is None:
+        return
+    if isinstance(schema, type) and hasattr(schema, "model_validate"):
+        # Some callers carry a pydantic model class as the schema.
+        try:
+            schema.model_validate(dict(arguments))
+            return
+        except Exception as exc:
+            raise ToolSelectionError(
+                "TOOL_ARGUMENT_SCHEMA_INVALID",
+                f"Tool '{tool_name}' arguments failed schema validation: {exc}",
+            ) from exc
+    if not isinstance(schema, Mapping):
+        return
+    if schema.get("type") not in (None, "object"):
+        # Non-object schemas are not expected for tool arguments.
+        return
+    properties = schema.get("properties") or {}
+    if not isinstance(properties, Mapping):
+        return
+    for required in schema.get("required") or ():
+        if required not in arguments:
+            raise ToolSelectionError(
+                "TOOL_ARGUMENT_MISSING",
+                f"Tool '{tool_name}' is missing required argument '{required}'.",
+            )
+    for name, value in arguments.items():
+        if name not in properties:
+            continue
+        prop = properties[name]
+        if not isinstance(prop, Mapping):
+            continue
+        expected = prop.get("type")
+        if not expected or value is None:
+            continue
+        if expected == "string" and not isinstance(value, str):
+            raise ToolSelectionError(
+                "TOOL_ARGUMENT_TYPE_INVALID",
+                f"Tool '{tool_name}' argument '{name}' must be a string.",
+            )
+        if expected in {"integer", "number"} and not isinstance(value, (int, float)):
+            raise ToolSelectionError(
+                "TOOL_ARGUMENT_TYPE_INVALID",
+                f"Tool '{tool_name}' argument '{name}' must be numeric.",
+            )
+        if expected == "boolean" and not isinstance(value, bool):
+            raise ToolSelectionError(
+                "TOOL_ARGUMENT_TYPE_INVALID",
+                f"Tool '{tool_name}' argument '{name}' must be a boolean.",
+            )
+        if expected == "array" and not isinstance(value, (list, tuple)):
+            raise ToolSelectionError(
+                "TOOL_ARGUMENT_TYPE_INVALID",
+                f"Tool '{tool_name}' argument '{name}' must be an array.",
+            )
 
 
 class ToolSelector:
@@ -69,6 +137,39 @@ class ToolSelector:
                     "TOOL_NOT_IN_CATALOG",
                     f"Requested tool '{requested_tool}' is not in ToolMetadata catalog.",
                 )
+            # Capability consistency: the requested tool must serve the Goal's
+            # CURRENT semantic step.  A model may drift across steps (observed:
+            # a GENERATE_CONTENT step calling community.get_post, which
+            # silently produced no draft and the Goal failed with
+            # EVIDENCE_INSUFFICIENT).  Python refuses the mismatch instead of
+            # executing a semantically wrong tool.  Tools without capability
+            # annotations cannot be checked and stay allowed.
+            declared = {str(value).upper() for value in (metadata.capabilities or ())}
+            current_task = observation.current_task
+            current_capability = (
+                str(current_task.get("capability") or "")
+                if isinstance(current_task, Mapping)
+                else ""
+            ).upper()
+            if declared and current_capability:
+                step_tools = {
+                    str(item.name)
+                    for item in catalog
+                    if current_capability
+                    in {str(value).upper() for value in (item.capabilities or ())}
+                }
+                if step_tools and metadata.name not in step_tools:
+                    raise ToolSelectionError(
+                        "TOOL_CAPABILITY_MISMATCH",
+                        f"Requested tool '{requested_tool}' does not serve the "
+                        f"current capability '{current_capability}' "
+                        f"(allowed: {sorted(step_tools)}).",
+                    )
+            validate_arguments_against_schema(
+                metadata.name,
+                dict(requested_arguments or {}),
+                metadata.input_schema,
+            )
             return SelectedTool(
                 tool_name=metadata.name,
                 arguments=dict(requested_arguments or {}),
@@ -104,6 +205,11 @@ class ToolSelector:
                 "TOOL_NOT_IN_CATALOG",
                 f"LLM selected unavailable tool '{selected.tool_name}'.",
             )
+        validate_arguments_against_schema(
+            metadata.name,
+            dict(selected.arguments or {}),
+            metadata.input_schema,
+        )
         selected.metadata = metadata
         return selected
 
@@ -120,48 +226,26 @@ class ToolSelector:
             "observation": observation.model_dump(mode="json"),
             "tool_metadata": [_metadata_payload(item) for item in catalog],
             "candidate_tool_names": [item.name for item in catalog],
+            "read_evidence_constraints": _read_evidence_constraints(observation, catalog),
         }
-        kwargs = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": _SELECTOR_PROMPT},
-                {
-                    "role": "user",
-                    "content": json.dumps(request, ensure_ascii=False, default=str),
-                },
-            ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "greenbook_selected_tool",
-                    "strict": True,
-                    "schema": SelectedTool.model_json_schema(),
-                },
-            },
-            "temperature": 0.0,
-            **structured_provider_options(client, model),
-        }
-        try:
-            response = await client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            if "response_format" not in str(exc).lower() and "json_schema" not in str(exc).lower():
-                raise
-            kwargs["response_format"] = {"type": "json_object"}
-            kwargs["messages"] = add_json_schema_instruction(
-                kwargs["messages"],
-                SelectedTool.model_json_schema(),
-            )
-            response = await client.chat.completions.create(**kwargs)
-        if not has_structured_payload(response):
-            response = await retry_json_object(
-                client,
-                kwargs,
-                SelectedTool.model_json_schema(),
-            )
+        response = await structured_call(
+            client,
+            model,
+            _SELECTOR_PROMPT,
+            "greenbook_selected_tool",
+            SelectedTool.model_json_schema(),
+            request,
+        )
         return response
 
 
 def _normalize_catalog(value: Sequence[ToolMetadata] | ToolRegistry | Any) -> list[ToolMetadata]:
+    # Fast path: an already-materialized ToolMetadata list is the common
+    # in-process case; avoid rebuilding it on every select call.
+    if isinstance(value, (list, tuple)) and value and all(
+        isinstance(item, ToolMetadata) for item in value
+    ):
+        return list(value)
     if isinstance(value, ToolRegistry):
         return value.list()
     list_metadata = getattr(value, "list_tool_metadata", None)
@@ -238,8 +322,53 @@ tool that is not in the catalog. Do not choose by list position. Do not emit
 capability names, Agent names, or execution plans. The candidate_tool_names
 field is a semantic metadata projection; if it is non-empty, select from that
 set. Policy is enforced by ToolPolicyGate after selection and must never be
-bypassed by the model.
+bypassed by the model. Treat read_evidence_constraints as a hard runtime
+boundary: do not select a read-only tool again for the same already-consumed
+scope. An EMPTY read may be retried only with materially changed,
+evidence-bounded arguments. Existing SUCCESS evidence should be consumed by
+the AgentLoop rather than refreshed speculatively.
 """
+
+
+def _read_evidence_constraints(
+    observation: Observation,
+    catalog: Sequence[ToolMetadata],
+) -> dict[str, Any]:
+    """Project consumed read evidence without choosing a replacement tool."""
+
+    metadata_by_name = {str(item.name): item for item in catalog}
+    consumed: list[dict[str, Any]] = []
+    for result in observation.tool_results:
+        tool_name = str(result.get("tool_name") or "")
+        metadata = metadata_by_name.get(tool_name)
+        if metadata is None:
+            continue
+        policy = metadata.policy
+        side_effect = policy.side_effect
+        if (
+            policy.requires_approval
+            or side_effect.has_side_effect
+            or side_effect.destructive
+            or str(side_effect.access_mode).upper() != "READ"
+        ):
+            continue
+        evidence = observation_evidence(result)
+        if evidence["result_status"] not in {"SUCCESS", "EMPTY"}:
+            continue
+        consumed.append(
+            {
+                "tool_name": tool_name,
+                "capabilities": list(metadata.capabilities),
+                "arguments": dict(result.get("tool_arguments") or {}),
+                "result_status": evidence["result_status"],
+                "resource_count": evidence["resource_count"],
+            }
+        )
+    return {
+        "consumed_read_evidence": consumed,
+        "same_scope_read_redispatch": "FORBIDDEN",
+        "empty_result_requires_material_scope_change": True,
+    }
 
 
 __all__ = ["ToolSelectionError", "ToolSelector"]

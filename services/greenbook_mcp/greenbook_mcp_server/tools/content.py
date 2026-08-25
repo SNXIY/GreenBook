@@ -1,59 +1,128 @@
-"""Content tools — create and revise drafts via Creator Service + Java Facade.
+"""Content tools — create and manage drafts via the Java Agent Facade.
 
-content.create_draft:
+content.create_draft (assistant-first, lightweight):
   1. Receive topic + optional reference posts
-  2. Create Creator Task
-  3. Wait for Creator to complete
-  4. Get FinalContent
-  5. Call Java POST /drafts with Idempotency-Key
-  6. Verify via GET /drafts/{draftId}
-  7. Update SessionContext.active_draft_id
+  2. Generate the draft body with the host LLM in one round trip
+  3. Call Java POST /drafts with Idempotency-Key
+  4. Update SessionContext.active_draft_id
 
-content.revise_draft:
-  1. Resolve draftId from SessionContext
-  2. Java GET /drafts/{draftId}
-  3. Get DraftResponse.updatedAt
-  4. Submit current content to Creator revise
-  5. Java PUT /drafts/{draftId} with expectedVersion=updatedAt
-  6. Handle HTTP 409 DRAFT_VERSION_CONFLICT
-  7. Verify via GET again
+content.get_draft / list_drafts: read drafts from the Java facade.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime
 from typing import Any
 
-from greenbook_contracts.tool_result import ResourceRef, ToolResult
-from greenbook_creator_client.client import extract_creator_document
+from greenbook_contracts.tool_result import OperationReceipt, ResourceRef, ToolResult
 from greenbook_java_client.models import (
+    DESCRIPTION_MAX_LENGTH,
     AgentDraftCreateRequest,
     AgentDraftUpdateRequest,
     DraftResponse,
 )
+from pydantic import ValidationError
 
 from ..context import ToolContext
 
 logger = logging.getLogger(__name__)
 
 
-def _latest_creator_artifact_id(ctx: ToolContext) -> str | None:
-    """Resolve the latest Creator artifact in the existing session projection."""
-
-    candidates = [
-        entity
-        for entity in ctx.session.recent_entities
-        if entity.kind == "CREATOR_ARTIFACT" and entity.entity_id
-    ]
-    if not candidates:
-        return None
-    latest = max(
-        candidates,
-        key=lambda entity: entity.timestamp or datetime.min.replace(tzinfo=UTC),
+def _draft_ref(draft_id: str, version: int | None = None) -> ResourceRef:
+    return ResourceRef(
+        ref=f"draft:{draft_id}",
+        kind="DRAFT",
+        resource_id=draft_id,
+        version=version,
     )
-    return latest.entity_id
+
+
+def _operation_receipt(
+    *,
+    operation_id: str,
+    semantic_action: str,
+    draft: DraftResponse | None = None,
+    result_known: bool,
+    status: str,
+    observed_state: dict[str, Any] | None = None,
+    verification_evidence: dict[str, Any] | None = None,
+    request_sent: bool = True,
+    downstream_accepted: bool = True,
+    side_effect_started: bool = True,
+) -> OperationReceipt:
+    """Build the common evidence envelope for a draft write.
+
+    The ToolResult's ``ok`` is therefore reserved for verified business
+    postconditions, not merely for a Java response body being received.
+    """
+
+    ref = _draft_ref(draft.draft_id, draft.version) if draft is not None else None
+    return OperationReceipt(
+        operation_id=operation_id,
+        semantic_action=semantic_action,
+        resource_ref=ref,
+        idempotency_key=operation_id,
+        request_sent=request_sent,
+        downstream_accepted=downstream_accepted,
+        side_effect_started=side_effect_started,
+        result_known=result_known,
+        observed_state=observed_state,
+        verification_evidence=verification_evidence,
+        status=status,
+    )
+
+
+def _draft_payload(draft: DraftResponse) -> dict[str, Any]:
+    return {
+        "draft_id": draft.draft_id,
+        "title": draft.title,
+        "content": draft.content,
+        "summary": draft.summary,
+        "status": draft.status,
+        "version": draft.version,
+        "updated_at": draft.updated_at.isoformat() if draft.updated_at else None,
+    }
+
+
+def _unknown_after_write(
+    *,
+    ctx: ToolContext,
+    operation_id: str,
+    semantic_action: str,
+    draft: DraftResponse | None,
+    message: str,
+    verification_evidence: dict[str, Any] | None = None,
+    receipt_id: str | None = None,
+) -> ToolResult[Any]:
+    """Return a reconciliation-required result after an accepted write."""
+
+    refs = [_draft_ref(draft.draft_id, draft.version)] if draft is not None else []
+    receipt = _operation_receipt(
+        operation_id=operation_id,
+        semantic_action=semantic_action,
+        draft=draft,
+        result_known=False,
+        status="RESULT_UNKNOWN",
+        observed_state=_draft_payload(draft) if draft is not None else None,
+        verification_evidence=verification_evidence,
+    )
+    return ToolResult.result_unknown(
+        message,
+        trace_id=ctx.trace_id,
+        receipt_id=receipt_id,
+        resource_refs=refs,
+        operation_receipt=receipt,
+        state={
+            "semantic_action": semantic_action,
+            "operation_id": operation_id,
+            "downstream_accepted": True,
+            "side_effect_started": True,
+            "result_known": False,
+        },
+    )
+
+
 
 
 def normalize_text_artifact(
@@ -63,23 +132,23 @@ def normalize_text_artifact(
     fallback_content: str,
     fallback_summary: str | None = None,
 ) -> AgentDraftCreateRequest | None:
-    """Map a Creator document to the Java text-only draft contract.
+    """Map a generated document to the Java text-only draft contract.
 
-    Creator artifacts may contain provider-specific media metadata.  The Java
+    Generated artifacts may carry provider-specific media metadata.  The Java
     Agent Facade draft request intentionally receives only text fields here;
     no local path, artifact id, cover, or upload flag can cross this boundary.
     """
-    title = str(document.get("title") or fallback_title).strip()[:256]
+    title = str(document.get("title") or fallback_title).strip()
     content = str(document.get("body_markdown") or fallback_content).strip()
     summary_value = document.get("description") or fallback_summary
-    summary = str(summary_value).strip()[:200] if summary_value else None
+    summary = str(summary_value).strip() if summary_value else None
     if not title or not content:
         return None
     return AgentDraftCreateRequest(title=title, content=content, summary=summary)
 
 
 def _reference_notes(references: list[dict[str, Any]] | None) -> str:
-    """Serialize only trusted reference fields into a Creator brief."""
+    """Serialize only trusted reference fields into the generation brief."""
 
     compact = [
         {
@@ -97,237 +166,138 @@ def _reference_notes(references: list[dict[str, Any]] | None) -> str:
     )[:12_000]
 
 
-async def build_strategy(
+_DRAFT_WRITE_PROMPT = """你是一位中文技术社区（GreenBook 知光）的内容作者。
+
+根据「创作要求」与可选的「参考笔记」直接写出一篇完整的帖子正文。要求：
+- 用中文撰写，结构清晰（可含小标题与列表），篇幅 800~1500 字；
+- 基于参考笔记提炼观点时保持真实，不编造引用中没有的事实；
+- 直接输出一篇可发布的成稿，不要提问、不要解释创作过程。
+只返回一个 JSON 对象：{"title": 标题, "body_markdown": 正文}，不要输出其他内容。
+"""
+
+
+async def _direct_generate(
     ctx: ToolContext,
-    instruction: str,
-    references: list[dict[str, Any]] | None = None,
-    constraints: dict[str, Any] | None = None,
-) -> ToolResult[Any]:
-    """Run Creator's existing BUILD_STRATEGY task without creating a Java draft."""
-
-    trace_id = ctx.trace_id
-    creator_result = await ctx.creator.create_task(
-        kind="BUILD_STRATEGY",
-        goal=instruction,
-        constraints={
-            "interaction_mode": "AUTO",
-            "format": "POST",
-            "tone": "PRACTICAL",
-            "audience": "GreenBook community users",
-            **(constraints or {}),
-        },
-        reference_notes=_reference_notes(references),
-        bearer_token=ctx.auth.raw_access_token,
-        idempotency_key=ctx.idempotency_key(
-            "build_strategy",
-            scope=f"{instruction}|{json.dumps(constraints or {}, sort_keys=True)}",
-        ),
-        trace_id=trace_id,
-    )
-    if not creator_result.ok:
-        return creator_result
-
-    task_id = str((creator_result.data or {}).get("task_id", ""))
-    if not task_id:
-        return ToolResult.internal_error(
-            "Creator returned a strategy task without task_id",
-            trace_id=trace_id,
-        )
-
-    wait_result = await ctx.creator.wait_for_completion(
-        task_id,
-        bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
-    )
-    if not wait_result.ok:
-        return wait_result
-
-    snapshot = wait_result.data or {}
-    artifact_id = str(snapshot.get("final_artifact_id") or "")
-    if not artifact_id:
-        return ToolResult.creator_unavailable(
-            "Creator completed without a strategy artifact",
-            trace_id=trace_id,
-        )
-
-    artifact_result = await ctx.creator.get_artifact(
-        task_id,
-        artifact_id,
-        bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
-    )
-    if not artifact_result.ok:
-        return artifact_result
-
-    artifact = dict(artifact_result.data or {})
-    artifact_kind = str(artifact.get("kind") or "TOPIC_OPTIONS")
-    strategy = artifact.get("content") or {}
-    ctx.session.record_entity(
-        ref=f"creator-task:{task_id}",
-        kind="CREATOR_TASK",
-        entity_id=task_id,
-        label="Creator content strategy",
-        status="COMPLETED",
-        run_id=ctx.agent_run_id,
-    )
-    ctx.session.record_entity(
-        ref=f"artifact:{artifact_id}",
-        kind="CREATOR_ARTIFACT",
-        entity_id=artifact_id,
-        label="Creator content strategy",
-        status="COMPLETED",
-        run_id=ctx.agent_run_id,
-    )
-    return ToolResult.success(
-        {
-            "creator_task_id": task_id,
-            "creator_artifact_id": artifact_id,
-            "artifact_kind": artifact_kind,
-            "strategy": strategy,
-        },
-        trace_id=trace_id,
-        receipt_id=creator_result.receipt_id,
-        resource_refs=[
-            ResourceRef(ref=f"creator-task:{task_id}", kind="CREATOR_TASK", resource_id=task_id),
-            ResourceRef(
-                ref=f"artifact:{artifact_id}",
-                kind="CREATOR_ARTIFACT",
-                resource_id=artifact_id,
-            ),
-        ],
-    )
-
-
-async def create_draft(
-    ctx: ToolContext,
+    *,
     title: str,
     instruction: str,
-    references: list[dict[str, Any]] | None = None,
-    strategy_task_id: str | None = None,
-    strategy_artifact_id: str | None = None,
-    summary: str | None = None,
-) -> ToolResult[Any]:
-    """Create a new draft via Creator Service → Java Facade."""
-    trace_id = ctx.trace_id
-    refs = references or []
+    reference_notes: str,
+    summary: str | None,
+) -> dict[str, str] | None:
+    """Generate a complete draft body in one host-LLM round trip.
 
-    # Build reference notes from search results and, when the plan contains a
-    # Creator strategy step, fetch that exact artifact rather than asking the
-    # Creator to reconstruct strategy from the user message.
-    reference_notes = _reference_notes(refs)
-    if bool(strategy_task_id) != bool(strategy_artifact_id):
-        return ToolResult.validation_error(
-            "A strategy_task_id and strategy_artifact_id must be supplied together.",
-            user_message="创作步骤缺少完整的策略产物引用。",
-        )
-    if strategy_task_id and strategy_artifact_id:
-        strategy_result = await ctx.creator.get_artifact(
-            strategy_task_id,
-            strategy_artifact_id,
-            bearer_token=ctx.auth.raw_access_token,
-            trace_id=trace_id,
-        )
-        if not strategy_result.ok:
-            return strategy_result
-        strategy_payload = (strategy_result.data or {}).get("content")
-        if isinstance(strategy_payload, dict):
-            strategy_notes = json.dumps(
-                strategy_payload,
-                ensure_ascii=False,
-                sort_keys=True,
-            )[:12_000]
-            reference_notes = (
-                f"{reference_notes}\n\n" if reference_notes else ""
-            ) + "Creator strategy artifact:\n" + strategy_notes
+    Assistant-first lightweight path: no creator profile / strategy /
+    outline / review pipeline.  Falls back to None on any failure so the
+    caller receives a clean failure.
+    """
+    if ctx.llm is None:
+        return None
+    try:
+        from greenbook_agent_core.llm_compat import structured_call
+        from greenbook_agent_core.observability.run_metrics import llm_category_scope
 
-    # Step 1: Submit Creator task with AUTO interaction mode
-    idempotency_key = ctx.idempotency_key(
-        "create_draft",
-        scope=(
-            f"{title}|{instruction}|{summary or ''}|"
-            f"{strategy_task_id or ''}|{strategy_artifact_id or ''}"
-        ),
-    )
-
-    creator_result = await ctx.creator.create_task(
-        kind="CREATE_CONTENT",
-        goal=instruction,
-        constraints={
-            "interaction_mode": "AUTO",
-            "format": "POST",
-            "target_length": 1200,
-            "tone": "PRACTICAL",
-            "audience": "知光知识社区用户",
-        },
-        reference_notes=reference_notes,
-        bearer_token=ctx.auth.raw_access_token,
-        idempotency_key=idempotency_key,
-        trace_id=trace_id,
-    )
-    if not creator_result.ok:
-        return creator_result
-
-    creator_data = creator_result.data or {}
-    task_id = str(creator_data.get("task_id", ""))
-    if not task_id:
-        return ToolResult.internal_error("Creator returned a task without task_id", trace_id=trace_id)
-
-    # Step 2: Wait for Creator completion
-    wait_result = await ctx.creator.wait_for_completion(
-        task_id,
-        bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
-        deadline_seconds=240.0,
-    )
-    if not wait_result.ok:
-        return wait_result
-
-    snapshot = wait_result.data or {}
-    final_artifact_id = str(snapshot.get("final_artifact_id") or "")
-
-    # Step 3: Get the finalized artifact
-    document: dict[str, str | None] = {"title": title, "description": summary, "body_markdown": instruction}
-    creator_artifact_id: str | None = None
-
-    if not final_artifact_id:
-        return ToolResult.creator_unavailable(
-            "Creator completed without a final artifact",
-            trace_id=trace_id,
-        )
-
-    if final_artifact_id:
-        artifact_result = await ctx.creator.get_artifact(
-            task_id, final_artifact_id,
-            bearer_token=ctx.auth.raw_access_token,
-            trace_id=trace_id,
-        )
-        if not artifact_result.ok:
-            return artifact_result
-        doc = extract_creator_document(artifact_result.data or {})
-        document = {
-            "title": doc["title"] or title,
-            "description": doc["description"] or summary,
-            "body_markdown": doc["body_markdown"] or instruction,
+        schema = {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "body_markdown": {"type": "string"},
+            },
+            "required": ["title", "body_markdown"],
+            "additionalProperties": False,
         }
-        creator_artifact_id = final_artifact_id
+        with llm_category_scope("CREATOR"):
+            response = await structured_call(
+                ctx.llm,
+                ctx.model or "deepseek-chat",
+                _DRAFT_WRITE_PROMPT,
+                "greenbook_draft",
+                schema,
+                {
+                    "instruction": instruction,
+                    "title_hint": title,
+                    "summary": summary or "",
+                    "reference_notes": reference_notes[:8000] or "",
+                },
+            )
+        payload = _draft_response_payload(response)
+        if not isinstance(payload, dict):
+            return None
+        body = str(payload.get("body_markdown") or payload.get("content") or "").strip()
+        generated_title = str(payload.get("title") or "").strip()
+        if not body:
+            return None
+        return {
+            "title": generated_title or title,
+            "body_markdown": body,
+        }
+    except Exception:
+        logger.warning("direct_draft_generation_failed", exc_info=True)
+        return None
 
-    # Step 4: Call Java Agent Facade POST /drafts.  Creator publication
-    # handoff is intentionally not used here: that endpoint creates a
-    # second Java draft, which would make one Agent operation produce
-    # duplicate drafts.  The Agent owns this single handoff to the
-    # Java Agent Facade; Creator remains the content-generation service.
-    java_create = normalize_text_artifact(
-        document,
-        fallback_title=title,
-        fallback_content=instruction,
-        fallback_summary=summary,
-    )
+
+def _draft_response_payload(response: Any) -> Any:
+    message = response.choices[0].message
+    parsed = getattr(message, "parsed", None)
+    if parsed is not None:
+        return parsed.model_dump(mode="python") if hasattr(parsed, "model_dump") else parsed
+    content = getattr(message, "content", None)
+    if isinstance(content, dict):
+        return content
+    if not isinstance(content, str) or not content.strip():
+        return None
+    import re as _re
+
+    text = content.strip()
+    match = _re.search(r"\{.*\}", text, _re.DOTALL)
+    if match is None:
+        return None
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
+
+
+async def _save_draft_via_java(
+    ctx: ToolContext,
+    *,
+    title: str,
+    instruction: str,
+    summary: str | None,
+    document: dict[str, str | None],
+    idempotency_key: str,
+    trace_id: str,
+) -> ToolResult[Any]:
+    """Persist a generated document through the Java Agent Facade."""
+    try:
+        java_create = normalize_text_artifact(
+            document,
+            fallback_title=title,
+            fallback_content=instruction,
+            fallback_summary=(
+                summary
+                if summary is not None and len(summary) <= DESCRIPTION_MAX_LENGTH
+                else None
+            ),
+        )
+    except ValidationError as exc:
+        error = exc.errors()[0] if exc.errors() else {}
+        field = str((error.get("loc") or ["summary"])[0])
+        return ToolResult.permanent_input(
+            "FIELD_TOO_LONG",
+            f"{field} exceeds {DESCRIPTION_MAX_LENGTH} characters",
+            user_message="生成的草稿信息不符合发布要求，系统无法保存草稿。",
+            state={
+                "field": field,
+                "max_length": DESCRIPTION_MAX_LENGTH,
+                "actual_length": len(str(document.get("description") or summary or "")),
+                "boundary": "python_java_contract",
+            },
+        )
     if java_create is None:
         return ToolResult.validation_error(
-            "Creator returned an empty text document.",
-            user_message="创作结果缺少标题或正文，未创建草稿。",
+            "Generated document has no title or body.",
+            user_message="生成结果缺少标题或正文，未创建草稿。",
         )
-
     draft_result = await ctx.java.create_draft(
         java_create,
         bearer_token=ctx.auth.raw_access_token,
@@ -339,69 +309,120 @@ async def create_draft(
     )
     if not draft_result.ok:
         return draft_result
-
     draft = draft_result.data
     if not isinstance(draft, DraftResponse):
         return ToolResult.internal_error("Unexpected draft response type", trace_id=trace_id)
 
-    draft_id = draft.draft_id
-
-    # Step 5: Verify via GET /drafts/{draftId}
-    verify_result = await ctx.java.get_draft(
-        draft_id,
+    verified_result = await ctx.java.get_draft(
+        draft.draft_id,
         bearer_token=ctx.auth.raw_access_token,
         trace_id=trace_id,
         conversation_id=ctx.conversation_id,
     )
-    if not verify_result.ok:
-        return ToolResult.internal_error(
-            f"Draft {draft_id} created but GET verification failed: {verify_result.message}",
-            trace_id=trace_id,
+    if not verified_result.ok or not isinstance(verified_result.data, DraftResponse):
+        return _unknown_after_write(
+            ctx=ctx,
+            operation_id=idempotency_key,
+            semantic_action="CREATE_DRAFT",
+            draft=draft,
+            message=f"Draft {draft.draft_id} was created but could not be verified",
+            receipt_id=draft_result.receipt_id,
+            verification_evidence={"get_draft_ok": verified_result.ok},
+        )
+    verified = verified_result.data
+    if (
+        verified.draft_id != draft.draft_id
+        or verified.status != "draft"
+        or verified.title != java_create.title
+        or verified.content != java_create.content
+    ):
+        return _unknown_after_write(
+            ctx=ctx,
+            operation_id=idempotency_key,
+            semantic_action="CREATE_DRAFT",
+            draft=verified,
+            message=f"Draft {draft.draft_id} postcondition verification mismatch",
+            receipt_id=draft_result.receipt_id,
+            verification_evidence={
+                "expected_title": java_create.title,
+                "actual_title": verified.title,
+                "expected_content": java_create.content,
+                "actual_content": verified.content,
+                "expected_status": "draft",
+                "actual_status": verified.status,
+            },
         )
 
-    # Step 6: Update SessionContext
-    ctx.session.active_draft_id = draft_id
+    ctx.session.active_draft_id = draft.draft_id
     ctx.session.record_entity(
-        ref=f"draft:{draft_id}", kind="DRAFT", entity_id=draft_id,
+        ref=f"draft:{draft.draft_id}", kind="DRAFT", entity_id=draft.draft_id,
         label=draft.title, status="READY", run_id=ctx.agent_run_id,
     )
-    if creator_artifact_id:
-        ctx.session.record_entity(
-            ref=f"artifact:{creator_artifact_id}",
-            kind="CREATOR_ARTIFACT",
-            entity_id=creator_artifact_id,
-            label=document.get("title") or draft.title,
-            status="COMPLETED",
-            run_id=ctx.agent_run_id,
-        )
-
-    resource_refs = [
-        ResourceRef(ref=f"draft:{draft_id}", kind="DRAFT", resource_id=draft_id),
-        ResourceRef(ref=f"task:{task_id}", kind="CREATOR_TASK", resource_id=task_id),
-    ]
-    if creator_artifact_id:
-        resource_refs.append(
-            ResourceRef(ref=f"artifact:{creator_artifact_id}", kind="CREATOR_ARTIFACT", resource_id=creator_artifact_id)
-        )
-
-    return ToolResult.success(
-        {
-            "draft_id": draft_id,
-            "title": draft.title,
-            "content": draft.content,
-            "summary": draft.summary,
-            "status": draft.status,
-            "version": draft.version,
-            "updated_at": draft.updated_at.isoformat() if draft.updated_at else None,
-            "creator_task_id": task_id,
-            "creator_artifact_id": creator_artifact_id,
-            "strategy_task_id": strategy_task_id,
-            "strategy_artifact_id": strategy_artifact_id,
+    receipt = _operation_receipt(
+        operation_id=idempotency_key,
+        semantic_action="CREATE_DRAFT",
+        draft=verified,
+        result_known=True,
+        status="COMPLETED",
+        observed_state=_draft_payload(verified),
+        verification_evidence={
+            "draft_id_matches": True,
+            "status": verified.status,
+            "title_matches": True,
+            "content_matches": True,
         },
+    )
+    payload = _draft_payload(verified)
+    payload["generation"] = "assistant_direct"
+    return ToolResult.success(
+        payload,
         trace_id=trace_id,
         receipt_id=draft_result.receipt_id,
-        resource_refs=resource_refs,
+        resource_refs=[_draft_ref(verified.draft_id, verified.version)],
+        operation_receipt=receipt,
     )
+
+
+
+async def create_draft(
+    ctx: ToolContext,
+    title: str,
+    instruction: str,
+    references: list[dict[str, Any]] | None = None,
+    summary: str | None = None,
+) -> ToolResult[Any]:
+    """Create a new draft: one host-LLM call writes the body, then Java persists.
+
+    Lightweight assistant-first design (prompt + model + MCP): no separate creator service, no profile / strategy / outline / review pipeline.
+    """
+    trace_id = ctx.trace_id
+    reference_notes = _reference_notes(references or [])
+    idempotency_key = ctx.idempotency_key(
+        "create_draft",
+        scope=f"{title}|{instruction}|{summary or ''}",
+    )
+    document = await _direct_generate(
+        ctx,
+        title=title,
+        instruction=instruction,
+        reference_notes=reference_notes,
+        summary=summary,
+    )
+    if document is None:
+        return ToolResult.internal_error(
+            "Draft generation produced no document", trace_id=trace_id
+        )
+    return await _save_draft_via_java(
+        ctx,
+        title=title,
+        instruction=instruction,
+        summary=summary,
+        document=document,
+        idempotency_key=idempotency_key,
+        trace_id=trace_id,
+    )
+
+
 
 
 async def get_draft(
@@ -450,293 +471,263 @@ async def list_drafts(
     return result
 
 
-async def revise_draft(
+async def update_draft(
     ctx: ToolContext,
-    draft_id: str,
-    revision_instruction: str,
+    draft_id: str | None = None,
     title: str | None = None,
-    revision_scope: str = "FULL_REVISION",
-    expected_version: str | None = None,
+    content: str | None = None,
 ) -> ToolResult[Any]:
-    """Revise an existing draft via Creator Service → Java Facade.
+    """Partially update one draft and verify only the requested mutation.
 
-    Uses expectedVersion=updatedAt from Java for optimistic concurrency control.
+    Fields omitted by the user are deliberately not included in the Java
+    request, so a title-only or body-only request cannot overwrite the other
+    field with planner/session data.
     """
-    trace_id = ctx.trace_id
 
-    # Step 1: Resolve draft_id
     resolved_id = draft_id or ctx.session.active_draft_id
     if not resolved_id:
         resolved_id, candidates = ctx.session.resolve_active_draft_id()
         if not resolved_id and candidates:
             return ToolResult.validation_error(
-                "Multiple drafts found. Please specify which one to revise.",
-                user_message="当前会话有多个草稿，请问您要修改哪一个？",
+                "Multiple drafts found; an explicit draft target is required.",
+                user_message="There are multiple drafts in this conversation. Please specify which draft to update.",
             )
         if not resolved_id:
-            return ToolResult.not_found("No draft to revise. Create one first.")
+            return ToolResult.not_found("No draft to update.")
 
-    # Step 2: GET current draft from Java
-    current = await ctx.java.get_draft(
+    current_result = await ctx.java.get_draft(
         resolved_id,
         bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
+        trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
     )
-    if not current.ok:
-        return current
+    if not current_result.ok or not isinstance(current_result.data, DraftResponse):
+        return current_result
+    current = current_result.data
+    if current.status != "draft":
+        return ToolResult.business_rejected(
+            f"Draft {resolved_id} is in status {current.status}",
+            user_message="Only a draft can be edited.",
+        )
+    if current.updated_at is None:
+        return ToolResult.failure(
+            "DRAFT_VERSION_UNAVAILABLE",
+            f"Draft {resolved_id} has no authoritative update version",
+            "The current draft version could not be confirmed. Please refresh and try again.",
+            request_sent=False,
+        )
 
-    draft_data = current.data
-    if not isinstance(draft_data, DraftResponse):
-        return ToolResult.internal_error("Unexpected draft response type", trace_id=trace_id)
-
-    current_updated_at = draft_data.updated_at
-    current_content = draft_data.content or ""
-    current_title = draft_data.title or ""
-    source_creator_artifact_id = _latest_creator_artifact_id(ctx)
-    normalized_scope = str(revision_scope or "FULL_REVISION").strip().upper()
-    if normalized_scope == "FULL_REVISION" and title:
-        instruction_text = str(revision_instruction or "").lower()
-        if "标题" in instruction_text or "title" in instruction_text:
-            normalized_scope = "TITLE_ONLY"
-
-    # Step 3: Submit Creator revise task
+    expected_version = current.updated_at.isoformat()
     idempotency_key = ctx.idempotency_key(
-        "revise_draft",
-        scope=f"{resolved_id}|{revision_instruction}",
+        "update_draft",
+        scope=f"{resolved_id}|{expected_version}|{title or ''}|{content or ''}",
     )
-
-    creator_result = await ctx.creator.create_task(
-        kind="IMPROVE_DRAFT",
-        goal=f"Revise the following draft: {revision_instruction}",
-        constraints={
-            "interaction_mode": "AUTO",
-            "format": "POST",
-            "target_length": 1200,
-            "tone": "PRACTICAL",
-            "revision_scope": normalized_scope,
-            "revision_instruction": revision_instruction,
-            "requested_title": title,
-            "source_artifact_id": source_creator_artifact_id,
-            "draft": {
-                "title": current_title,
-                "body_markdown": current_content,
-                "source_artifact_id": source_creator_artifact_id,
-            },
-        },
+    request = AgentDraftUpdateRequest.model_validate(
+        {
+            "title": title,
+            "content": content,
+            "expectedVersion": expected_version,
+        }
+    )
+    result = await ctx.java.update_draft(
+        resolved_id,
+        request,
         bearer_token=ctx.auth.raw_access_token,
         idempotency_key=idempotency_key,
-        trace_id=trace_id,
-    )
-    if not creator_result.ok:
-        return creator_result
-
-    creator_data = creator_result.data or {}
-    task_id = str(creator_data.get("task_id", ""))
-    if not task_id:
-        return ToolResult.internal_error("Creator returned a task without task_id", trace_id=trace_id)
-
-    # Step 4: Wait for Creator completion
-    wait_result = await ctx.creator.wait_for_completion(
-        task_id,
-        bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
-    )
-    if not wait_result.ok:
-        return wait_result
-
-    snapshot = wait_result.data or {}
-    final_artifact_id = str(snapshot.get("final_artifact_id") or "")
-
-    # Step 5: Get revised content.  A completed Creator task without a final
-    # artifact is a dependency failure; never use the user's instruction as
-    # the new post body.
-    if not final_artifact_id:
-        return ToolResult.creator_unavailable(
-            "Creator completed without a final revision artifact",
-            trace_id=trace_id,
-        )
-
-    artifact_result = await ctx.creator.get_artifact(
-        task_id,
-        final_artifact_id,
-        bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
-    )
-    if not artifact_result.ok:
-        return artifact_result
-
-    doc = extract_creator_document(artifact_result.data or {})
-    revised_title = doc["title"] or title or current_title
-    revised_content = doc["body_markdown"]
-    revised_summary = doc["description"]
-    if not revised_content:
-        return ToolResult.validation_error(
-            "Creator returned an empty revised document",
-            user_message="创作服务没有返回有效的修改后正文，本次尚未保存修改。",
-        )
-
-    # Step 6: Re-read the draft after the potentially long Creator operation.
-    # The Java response is the only canonical optimistic-lock version.  Never
-    # let a model-produced ``expected_version`` override it: model output can
-    # contain a locally invented timestamp or precision that Java does not
-    # persist.  Comparing the two Java reads still rejects a real concurrent
-    # edit while allowing the normal Creator-backed revision to proceed.
-    latest = await ctx.java.get_draft(
-        resolved_id,
-        bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
-        conversation_id=ctx.conversation_id,
-    )
-    if not latest.ok:
-        return latest
-    latest_data = latest.data
-    if not isinstance(latest_data, DraftResponse):
-        return ToolResult.internal_error(
-            "Unexpected draft response type while checking revision version",
-            trace_id=trace_id,
-        )
-
-    latest_updated_at = latest_data.updated_at
-    if current_updated_at != latest_updated_at:
-        return ToolResult.conflict(
-            "DRAFT_VERSION_CONFLICT: the draft changed while Creator was revising it; "
-            "the revision was not applied.",
-            trace_id=trace_id,
-        )
-
-    expected_version_str = latest_updated_at.isoformat() if latest_updated_at else None
-    if expected_version and expected_version != expected_version_str:
-        logger.warning(
-            "Ignoring non-canonical model expected_version for draft %s; "
-            "using Java updatedAt=%s",
-            resolved_id,
-            expected_version_str,
-        )
-
-    update_request = AgentDraftUpdateRequest(
-        title=revised_title,
-        content=revised_content,
-        summary=revised_summary,
-        expectedVersion=expected_version_str,
-    )
-
-    update_result = await ctx.java.update_draft(
-        resolved_id,
-        update_request,
-        bearer_token=ctx.auth.raw_access_token,
-        idempotency_key=idempotency_key,
-        trace_id=trace_id,
+        trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
         agent_run_id=ctx.agent_run_id,
         tool_call_id=ctx.tool_call_id,
     )
+    if not result.ok:
+        return result
 
-    # Handle DRAFT_VERSION_CONFLICT
-    if not update_result.ok and update_result.code == "DRAFT_VERSION_CONFLICT":
-        return update_result  # Do not auto-override
-
-    if not update_result.ok:
-        return update_result
-
-    # Step 7: Verify via GET
-    verify_result = await ctx.java.get_draft(
+    verified_result = await ctx.java.get_draft(
         resolved_id,
         bearer_token=ctx.auth.raw_access_token,
-        trace_id=trace_id,
+        trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
     )
-    if not verify_result.ok:
-        return ToolResult.internal_error(
-            f"Draft {resolved_id} updated but GET verification failed",
-            trace_id=trace_id,
+    returned = result.data if isinstance(result.data, DraftResponse) else current
+    if not verified_result.ok or not isinstance(verified_result.data, DraftResponse):
+        return _unknown_after_write(
+            ctx=ctx,
+            operation_id=idempotency_key,
+            semantic_action="UPDATE_DRAFT",
+            draft=returned,
+            message=f"Draft {resolved_id} was updated but could not be verified",
+            receipt_id=result.receipt_id,
+            verification_evidence={"get_draft_ok": verified_result.ok},
+        )
+    verified = verified_result.data
+    mismatches: dict[str, Any] = {}
+    if verified.draft_id != resolved_id:
+        mismatches["draft_id"] = {"expected": resolved_id, "actual": verified.draft_id}
+    if verified.status != "draft":
+        mismatches["status"] = {"expected": "draft", "actual": verified.status}
+    if title is not None and verified.title != title:
+        mismatches["title"] = {"expected": title, "actual": verified.title}
+    if content is not None and verified.content != content:
+        mismatches["content"] = {"expected": content, "actual": verified.content}
+    if mismatches:
+        return _unknown_after_write(
+            ctx=ctx,
+            operation_id=idempotency_key,
+            semantic_action="UPDATE_DRAFT",
+            draft=verified,
+            message=f"Draft {resolved_id} postcondition verification mismatch",
+            receipt_id=result.receipt_id,
+            verification_evidence=mismatches,
         )
 
-    # Step 8: Update session context
     ctx.session.active_draft_id = resolved_id
     ctx.session.record_entity(
-        ref=f"draft:{resolved_id}", kind="DRAFT", entity_id=resolved_id,
-        label=revised_title, status="READY", run_id=ctx.agent_run_id,
-    )
-    ctx.session.record_entity(
-        ref=f"artifact:{final_artifact_id}",
-        kind="CREATOR_ARTIFACT",
-        entity_id=final_artifact_id,
-        label=revised_title,
-        status="COMPLETED",
+        ref=f"draft:{resolved_id}",
+        kind="DRAFT",
+        entity_id=resolved_id,
+        label=verified.title,
+        status="READY",
         run_id=ctx.agent_run_id,
     )
-
-    # Step 9: If active_schedule_id exists, confirm it still points to same draft
-    if ctx.session.active_schedule_id:
-        schedule_result = await ctx.java.get_schedule(
-            ctx.session.active_schedule_id,
-            bearer_token=ctx.auth.raw_access_token,
-            trace_id=trace_id,
-            conversation_id=ctx.conversation_id,
-        )
-        if (
-            schedule_result.ok
-            and schedule_result.data
-            and schedule_result.data.draft_id != resolved_id
-        ):
-            logger.warning(
-                "Schedule %s draft_id mismatch after revise: expected=%s actual=%s",
-                ctx.session.active_schedule_id, resolved_id,
-                schedule_result.data.draft_id,
-            )
-
-    updated = verify_result.data
-    if isinstance(updated, DraftResponse):
-        resource_refs = [
-            ResourceRef(
-                ref=f"draft:{resolved_id}",
-                kind="DRAFT",
-                resource_id=resolved_id,
-                version=updated.version,
-            ),
-            ResourceRef(
-                ref=f"task:{task_id}",
-                kind="CREATOR_TASK",
-                resource_id=task_id,
-            ),
-            ResourceRef(
-                ref=f"artifact:{final_artifact_id}",
-                kind="CREATOR_ARTIFACT",
-                resource_id=final_artifact_id,
-            ),
-        ]
-        if source_creator_artifact_id:
-            resource_refs.append(
-                ResourceRef(
-                    ref=f"artifact-parent:{source_creator_artifact_id}",
-                    kind="CREATOR_ARTIFACT_PARENT",
-                    resource_id=source_creator_artifact_id,
-                )
-            )
-        return ToolResult.success(
-            {
-                "draft_id": resolved_id,
-                "title": updated.title,
-                "content": updated.content,
-                "status": updated.status,
-                "version": updated.version,
-                "updated_at": updated.updated_at.isoformat() if updated.updated_at else None,
-                "creator_task_id": task_id,
-                "creator_artifact_id": final_artifact_id,
-                "source_creator_artifact_id": source_creator_artifact_id,
-                "revision_scope": normalized_scope,
-            },
-            trace_id=trace_id,
-            resource_refs=resource_refs,
-        )
-
-    verified_data = verify_result.data
-    if verified_data is None:
-        return ToolResult.result_unknown("Updated draft could not be verified", trace_id=trace_id)
-    payload = (
-        verified_data.model_dump(mode="json")
-        if hasattr(verified_data, "model_dump")
-        else verified_data
+    receipt = _operation_receipt(
+        operation_id=idempotency_key,
+        semantic_action="UPDATE_DRAFT",
+        draft=verified,
+        result_known=True,
+        status="COMPLETED",
+        observed_state=_draft_payload(verified),
+        verification_evidence={"requested_fields_match": True},
     )
-    return ToolResult.success(payload, trace_id=trace_id)
+    return ToolResult.success(
+        _draft_payload(verified),
+        trace_id=ctx.trace_id,
+        receipt_id=result.receipt_id,
+        resource_refs=[_draft_ref(verified.draft_id, verified.version)],
+        operation_receipt=receipt,
+    )
+
+
+async def delete_draft(
+    ctx: ToolContext,
+    draft_id: str | None = None,
+) -> ToolResult[Any]:
+    """Soft-delete one draft only after approval and authoritative read-back."""
+
+    if not ctx.approval_granted:
+        return ToolResult.failure(
+            "APPROVAL_REQUIRED",
+            "content.delete_draft requires explicit user approval",
+            "Deleting a draft needs your confirmation.",
+            request_sent=False,
+        )
+
+    resolved_id = draft_id or ctx.session.active_draft_id
+    if not resolved_id:
+        resolved_id, candidates = ctx.session.resolve_active_draft_id()
+        if not resolved_id and candidates:
+            return ToolResult.validation_error(
+                "Multiple drafts found; an explicit draft target is required.",
+                user_message="There are multiple drafts in this conversation. Please specify which draft to delete.",
+            )
+        if not resolved_id:
+            return ToolResult.not_found("No draft to delete.")
+
+    current_result = await ctx.java.get_draft(
+        resolved_id,
+        bearer_token=ctx.auth.raw_access_token,
+        trace_id=ctx.trace_id,
+        conversation_id=ctx.conversation_id,
+    )
+    if not current_result.ok or not isinstance(current_result.data, DraftResponse):
+        return current_result
+    current = current_result.data
+    if current.status == "deleted":
+        return ToolResult.success(
+            {"draft_id": resolved_id, "status": "deleted", "already_deleted": True},
+            trace_id=ctx.trace_id,
+            resource_refs=[_draft_ref(resolved_id, current.version)],
+            operation_receipt=_operation_receipt(
+                operation_id=ctx.idempotency_key("delete_draft", scope=resolved_id),
+                semantic_action="DELETE_DRAFT",
+                draft=current,
+                result_known=True,
+                status="COMPLETED",
+                observed_state=_draft_payload(current),
+                verification_evidence={"already_deleted": True},
+                request_sent=False,
+                downstream_accepted=False,
+                side_effect_started=False,
+            ),
+        )
+    if current.status != "draft":
+        return ToolResult.business_rejected(
+            f"Draft {resolved_id} is in status {current.status}",
+            user_message="Only a draft can be deleted.",
+        )
+
+    idempotency_key = ctx.idempotency_key("delete_draft", scope=resolved_id)
+    result = await ctx.java.delete_draft(
+        resolved_id,
+        bearer_token=ctx.auth.raw_access_token,
+        idempotency_key=idempotency_key,
+        trace_id=ctx.trace_id,
+        conversation_id=ctx.conversation_id,
+        agent_run_id=ctx.agent_run_id,
+        tool_call_id=ctx.tool_call_id,
+    )
+    if not result.ok:
+        return result
+
+    verified_result = await ctx.java.get_draft(
+        resolved_id,
+        bearer_token=ctx.auth.raw_access_token,
+        trace_id=ctx.trace_id,
+        conversation_id=ctx.conversation_id,
+    )
+    if not verified_result.ok or not isinstance(verified_result.data, DraftResponse):
+        return _unknown_after_write(
+            ctx=ctx,
+            operation_id=idempotency_key,
+            semantic_action="DELETE_DRAFT",
+            draft=current,
+            message=f"Draft {resolved_id} deletion was accepted but could not be verified",
+            receipt_id=result.receipt_id,
+            verification_evidence={"get_draft_ok": verified_result.ok},
+        )
+    verified = verified_result.data
+    if verified.status != "deleted":
+        return _unknown_after_write(
+            ctx=ctx,
+            operation_id=idempotency_key,
+            semantic_action="DELETE_DRAFT",
+            draft=verified,
+            message=f"Draft {resolved_id} deletion postcondition verification mismatch",
+            receipt_id=result.receipt_id,
+            verification_evidence={"expected_status": "deleted", "actual_status": verified.status},
+        )
+
+    if ctx.session.active_draft_id == resolved_id:
+        ctx.session.active_draft_id = None
+    ctx.session.record_entity(
+        ref=f"draft:{resolved_id}",
+        kind="DRAFT",
+        entity_id=resolved_id,
+        label=verified.title,
+        status="DELETED",
+        run_id=ctx.agent_run_id,
+    )
+    return ToolResult.success(
+        {"draft_id": resolved_id, "status": "deleted"},
+        trace_id=ctx.trace_id,
+        receipt_id=result.receipt_id,
+        resource_refs=[_draft_ref(resolved_id, verified.version)],
+        operation_receipt=_operation_receipt(
+            operation_id=idempotency_key,
+            semantic_action="DELETE_DRAFT",
+            draft=verified,
+            result_known=True,
+            status="COMPLETED",
+            observed_state=_draft_payload(verified),
+            verification_evidence={"status": "deleted"},
+        ),
+    )

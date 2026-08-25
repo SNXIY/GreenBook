@@ -1,0 +1,14 @@
+[
+  {
+    "name": "view-spring-result-retry",
+    "turns": [
+      {"text": "搜索 Spring Boot 入门内容", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-python-result-retry",
+    "turns": [
+      {"text": "搜索 Python 和 AI 相关帖子", "ui_action": "click_search_first"}
+    ]
+  }
+]

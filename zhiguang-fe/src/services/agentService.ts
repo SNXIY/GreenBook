@@ -1,14 +1,17 @@
 import type {
   AgentConversation,
   AgentMessage,
-  AgentMemory,
   AgentMemoryProfile,
-  AgentEpisode,
+  AgentMemoryRecord,
   AgentRun,
   AgentRunListItem,
-  AgentRunAccepted,
-  AgentScheduledAction
+  AgentRunAccepted
 } from "@/types/agent";
+import type {
+  SemanticConfirmationControl,
+  SemanticConfirmationControlResponse
+} from "@/types/semanticConfirmation";
+import { getDisplayTimezone } from "@/utils/dateTime";
 
 const baseUrl = (
   (import.meta.env.VITE_GREENBOOK_AGENT_URL as string | undefined)
@@ -22,6 +25,16 @@ type RequestOptions = {
   headers?: Record<string, string>;
   signal?: AbortSignal;
 };
+
+export class AgentApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AgentApiError";
+    this.status = status;
+  }
+}
 
 const request = async <T>(path: string, options: RequestOptions): Promise<T> => {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -44,7 +57,7 @@ const request = async <T>(path: string, options: RequestOptions): Promise<T> => 
     } catch {
       // Keep the original response.
     }
-    throw new Error(message);
+    throw new AgentApiError(message, response.status);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -93,7 +106,7 @@ export const agentService = {
         content,
         context_post_id: contextPostId,
         context_comment_id: contextCommentId,
-        client_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
+        client_timezone: getDisplayTimezone(),
         command
       }
     }
@@ -105,77 +118,16 @@ export const agentService = {
   listRuns: (token: string, signal?: AbortSignal) =>
     request<AgentRunListItem[]>("/api/v1/agent/runs?limit=30", { token, signal }),
 
-  cancelRun: (token: string, runId: string) =>
-    request<AgentRun>(`/api/v1/agent/runs/${runId}/cancel`, {
-      method: "POST",
-      token
-    }),
-
-  interruptRun: (token: string, runId: string) =>
-    request<AgentRun>(`/api/v1/agent/runs/${runId}/interrupt`, {
-      method: "POST",
-      token
-    }),
-
-  resumeRun: (token: string, runId: string) =>
-    request<AgentRun>(`/api/v1/agent/runs/${runId}/resume`, {
-      method: "POST",
-      token
-    }),
-
-  retryRun: (token: string, runId: string) =>
-    request<AgentRun>(`/api/v1/agent/runs/${runId}/retry`, {
-      method: "POST",
-      token
-    }),
-
-  listMemories: (token: string, signal?: AbortSignal) =>
-    request<AgentMemory[]>("/api/v1/agent/memories", { token, signal }),
-
-  saveMemory: (token: string, key: string, value: string) =>
-    request<AgentMemory>("/api/v1/agent/memories", {
-      method: "POST",
-      token,
-      body: { key, value }
-    }),
-
-  deleteMemory: (token: string, memoryId: string) =>
-    request<void>(`/api/v1/agent/memories/${memoryId}`, {
-      method: "DELETE",
-      token
-    }),
-
   getMemoryProfile: (token: string, signal?: AbortSignal) =>
     request<AgentMemoryProfile>("/api/v1/agent/memory/settings", {
       token,
       signal
     }),
 
-  updateMemoryProfile: (
-    token: string,
-    profile: Pick<AgentMemoryProfile, "episodic_enabled" | "semantic_enabled">
-  ) => request<AgentMemoryProfile>("/api/v1/agent/memory/settings", {
-    method: "PUT",
-    token,
-    body: profile
-  }),
-
-  listEpisodes: (token: string, signal?: AbortSignal) =>
-    request<AgentEpisode[]>("/api/v1/agent/memory/episodes?limit=10", {
+  listMemoryRecords: (token: string, signal?: AbortSignal) =>
+    request<AgentMemoryRecord[]>("/api/v1/agent/memory/records?limit=20", {
       token,
       signal
-    }),
-
-  deleteEpisode: (token: string, episodeId: string) =>
-    request<void>(`/api/v1/agent/memory/episodes/${episodeId}`, {
-      method: "DELETE",
-      token
-    }),
-
-  clearEpisodes: (token: string) =>
-    request<{ deleted: number }>("/api/v1/agent/memory/episodes", {
-      method: "DELETE",
-      token
     }),
 
   decideApproval: (
@@ -193,14 +145,20 @@ export const agentService = {
     }
   ),
 
-  scheduledActions: (token: string) =>
-    request<AgentScheduledAction[]>("/api/v1/agent/scheduled-actions", { token }),
-
-  cancelScheduledAction: (token: string, actionId: string) =>
-    request<AgentScheduledAction>(`/api/v1/agent/scheduled-actions/${actionId}`, {
-      method: "DELETE",
-      token
-    })
+  controlSemanticConfirmation: (
+    token: string,
+    taskId: string,
+    control: SemanticConfirmationControl,
+    signal?: AbortSignal
+  ) => request<SemanticConfirmationControlResponse>(
+    `/api/v1/agent/tasks/${encodeURIComponent(taskId)}/semantic-confirmation`,
+    {
+      method: "POST",
+      token,
+      body: control,
+      signal
+    }
+  )
 };
 
 export const waitForAgentRun = async (
@@ -215,7 +173,7 @@ export const waitForAgentRun = async (
   while (!signal?.aborted) {
     const run = await agentService.getRun(token, runId, signal);
     onUpdate(run);
-    if (["COMPLETED", "FAILED", "CANCELLED", "WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(run.status)) return run;
+    if (["COMPLETED", "PARTIAL_SUCCESS", "FAILED", "CANCELLED", "WAITING_APPROVAL", "WAITING_HUMAN", "WAITING_USER", "PAUSED"].includes(run.status)) return run;
     await new Promise<void>((resolve, reject) => {
       const timer = window.setTimeout(resolve, 800);
       signal?.addEventListener("abort", () => {

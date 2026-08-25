@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-from greenbook_contracts.tool_result import ResourceRef, ToolResult
+from greenbook_contracts.tool_result import OperationReceipt, ResourceRef, ToolResult
 
 
 def test_success():
@@ -70,7 +69,21 @@ def test_result_unknown():
     r = ToolResult.result_unknown("uncertain")
     assert r.code == "RESULT_UNKNOWN"
     assert r.retryable is False
-    assert r.request_sent is True
+    assert r.request_sent is None
+    assert r.state["side_effect_started"] is True
+    assert r.state["side_effect_state"] == "POSSIBLE"
+    assert r.state["result_known"] is False
+
+    receipt = OperationReceipt(
+        operation_id="op-1",
+        semantic_action="UPDATE_DRAFT",
+        result_known=True,
+        status="COMPLETED",
+    )
+    uncertain = ToolResult.result_unknown("uncertain", operation_receipt=receipt)
+    assert uncertain.operation_receipt is not None
+    assert uncertain.operation_receipt.result_known is False
+    assert uncertain.operation_receipt.status == "RESULT_UNKNOWN"
 
 
 def test_request_not_sent():
@@ -83,6 +96,8 @@ def test_request_not_sent():
 def test_internal_error():
     r = ToolResult.internal_error("boom", trace_id="t1")
     assert r.code == "INTERNAL_ERROR"
+    assert r.retryable is False
+    assert r.request_sent is False
     assert r.trace_id == "t1"
 
 

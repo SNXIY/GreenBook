@@ -1,0 +1,38 @@
+[
+  {
+    "name": "delete-reject-life-draft",
+    "turns": [
+      {"text": "删除标题为 GB-STABLE-R1-LIFE-JAVA-UPDATED 的草稿", "hitl": "reject"}
+    ]
+  },
+  {
+    "name": "delete-reject-target-draft",
+    "turns": [
+      {"text": "删除标题为 GB-STABLE-R1-TARGET-A 的草稿", "hitl": "reject"}
+    ]
+  },
+  {
+    "name": "delete-reject-hitl-draft",
+    "turns": [
+      {"text": "删除标题以 GB-STABLE-R1-HITL-A 开头的草稿", "hitl": "reject"}
+    ]
+  },
+  {
+    "name": "delete-approve-life-draft",
+    "turns": [
+      {"text": "删除标题为 GB-STABLE-R1-LIFE-JAVA-UPDATED 的草稿", "hitl": "approve"}
+    ]
+  },
+  {
+    "name": "delete-approve-target-draft",
+    "turns": [
+      {"text": "删除标题为 GB-STABLE-R1-TARGET-A 的草稿", "hitl": "approve"}
+    ]
+  },
+  {
+    "name": "delete-approve-hitl-draft",
+    "turns": [
+      {"text": "删除标题以 GB-STABLE-R1-HITL-A 开头的草稿", "hitl": "approve"}
+    ]
+  }
+]

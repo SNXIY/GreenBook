@@ -12,11 +12,14 @@ import type {
   CounterResponse,
   PublishStatusResponse,
   PostTaskItem,
+  AgentDraft,
+  ScheduledPublication,
   VisibleScope
 } from "@/types/knowpost";
 
 const KNOWPOST_PREFIX = "/api/v1/knowposts";
 const STORAGE_PREFIX = "/api/v1/storage";
+const AGENT_FACADE_PREFIX = "/api/v1/agent";
 
 export const knowpostService = {
   createDraft: () =>
@@ -93,6 +96,12 @@ export const knowpostService = {
       accessToken
     })
   ,
+
+  myDrafts: (accessToken: string) =>
+    apiFetch<AgentDraft[]>(`${AGENT_FACADE_PREFIX}/me/drafts`, { accessToken }),
+
+  mySchedules: (accessToken: string) =>
+    apiFetch<ScheduledPublication[]>(`${AGENT_FACADE_PREFIX}/publications/schedules`, { accessToken }),
 
   // 获取知文详情（公开内容无需鉴权；非公开需要作者凭证）
   detail: (id: string, accessToken?: string) =>

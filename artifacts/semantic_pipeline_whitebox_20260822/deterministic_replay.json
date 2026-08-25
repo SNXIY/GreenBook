@@ -1,0 +1,121 @@
+{
+  "case_count": 19,
+  "all_repeated_equal": true,
+  "provider_calls": 38,
+  "rows": [
+    {
+      "case_id": "B02",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "B03",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "B05",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "B07",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "C04",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "C05",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "C06",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "E07",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "F01",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "F02",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "F03",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "F06",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "F07",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "F08",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "G01",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "G03",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "G04",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "G05",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    },
+    {
+      "case_id": "G06",
+      "repeat_equal": true,
+      "calls_a": 1,
+      "calls_b": 1
+    }
+  ]
+}

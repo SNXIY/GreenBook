@@ -6,7 +6,10 @@ import Tag from "@/components/common/Tag";
 import SectionHeader from "@/components/common/SectionHeader";
 import { ArrowRightIcon } from "@/components/icons/Icon";
 import AuthStatus from "@/features/auth/AuthStatus";
+import AgentPanel from "@/components/agent/AgentPanel";
+import { AgentIcon } from "@/components/icons/Icon";
 import styles from "./CourseDetailPage.module.css";
+import homeStyles from "./HomePage.module.css";
 import { knowpostService } from "@/services/knowpostService";
 import { useAuth } from "@/context/AuthContext";
 import type { KnowpostDetailResponse } from "@/types/knowpost";
@@ -15,6 +18,7 @@ import remarkGfm from "remark-gfm";
 import LikeFavBar from "@/components/common/LikeFavBar";
 import FollowButton from "@/components/common/FollowButton";
 import CommentSection from "@/components/comments/CommentSection";
+import { userFacingErrorMessage } from "@/services/userFacingError";
 
 const CourseDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +37,7 @@ const CourseDetailPage = () => {
   const [showNavLeft, setShowNavLeft] = useState(false);
   const [showNavRight, setShowNavRight] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
   // 从头像 URL 推断作者 ID（示例：.../avatars/3-xxxx.jpg → 3）
   const parseAvatarUserId = (url?: string): number | undefined => {
     if (!url) return undefined;
@@ -71,7 +76,7 @@ const CourseDetailPage = () => {
           }
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "加载失败";
+        const msg = userFacingErrorMessage(err, "内容暂时无法加载，请稍后重试。");
         if (!cancelled) setError(msg);
       }
     };
@@ -146,7 +151,8 @@ const CourseDetailPage = () => {
   };
 
   return (
-    <AppLayout
+    <>
+      <AppLayout
       header={
         <MainHeader
           headline={detail?.title ?? ""}
@@ -157,7 +163,7 @@ const CourseDetailPage = () => {
       variant="cardless"
     >
       <article className={styles.detailCard}>
-        {error ? <div style={{ color: "var(--color-danger)" }}>{error}</div> : null}
+        {error ? <div style={{ color: "var(--color-danger)" }} role="alert">{error}</div> : null}
         {detail?.images?.length ? (
           <div ref={rowRef} className={styles.imageRow}>
             {(detail.images.slice(0, visibleCount)).map((src, idx) => {
@@ -280,7 +286,27 @@ const CourseDetailPage = () => {
           </div>
         ) : null}
       </article>
-    </AppLayout>
+      </AppLayout>
+      <button
+      className={homeStyles.agentTrigger}
+      type="button"
+      onClick={() => setAgentOpen(true)}
+      aria-label="打开 GreenBook Agent"
+      aria-haspopup="dialog"
+    >
+      <span><AgentIcon width={23} height={23} aria-hidden="true" /></span>
+      <span className={homeStyles.agentLabel}>
+        <strong>GreenBook Agent</strong>
+        <small>总结这篇内容，提炼关键点</small>
+      </span>
+      </button>
+      <AgentPanel
+        open={agentOpen}
+        onClose={() => setAgentOpen(false)}
+        contextPostId={id}
+        surface="POST"
+      />
+    </>
   );
 };
 

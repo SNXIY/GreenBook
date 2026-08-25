@@ -7,7 +7,6 @@ This file describes the current runtime only. Historical architecture decisions 
 ```text
 zhiguang-fe                         Frontend
 apps/backend                        Java Community Backend
-creator-agent                       GreenBook Creator Service
 apps/agent_api                  Agent API
 apps/agent_worker               Agent queue/execution worker
 packages/agent_core             Agent intelligence and execution contracts
@@ -32,7 +31,7 @@ User/API
   -> ExecutionSubmissionService
   -> Queue / Worker
   -> ToolRuntime / MCP
-  -> Java Backend or Creator Service
+  -> Java Backend
 ```
 
 ## Layer boundaries
@@ -53,7 +52,7 @@ User/API
 
 ## Retired surfaces
 
-The Moderation product, `moderation-agent`, `community-assistant-agent`, old Intent contracts, `/api/v1/assistant-tools`, and workflow-template routing are retired. Historical migration files may mention them, but they are not active callers or startup services.
+The Moderation product, `moderation-agent`, `community-assistant-agent`, the standalone Creator Service (`creator-agent`, `packages/creator_client`), old Intent contracts, `/api/v1/assistant-tools`, and workflow-template routing are retired. Historical migration files may mention them, but they are not active callers or startup services. Content generation is now assistant-first: the host LLM writes drafts directly via `content.create_draft` and Java persists them.
 
 ## Important retained assets
 

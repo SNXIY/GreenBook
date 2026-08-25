@@ -106,6 +106,23 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional
+    public void notifyPostPublished(String eventId, long userId, long postId, Long scheduleId) {
+        KnowPost post = knowPostMapper.findById(postId);
+        String title = "你的帖子已发布成功";
+        String content = post == null || post.getTitle() == null || post.getTitle().isBlank()
+                ? title
+                : trim(post.getTitle(), 80);
+        String extra = scheduleId == null
+                ? toJson(Map.of("postId", String.valueOf(postId)))
+                : toJson(Map.of("postId", String.valueOf(postId), "scheduleId", String.valueOf(scheduleId)));
+        // System notification: actorId 0 is rendered as a placeholder, not a user.
+        saveNotification(eventId, userId, 0L, "PUBLISHED",
+                "post", String.valueOf(postId), "post", String.valueOf(postId),
+                title, content, extra, false);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public NotificationPageResponse list(long receiverId, Long cursor, int size) {
         int limit = Math.min(Math.max(size, 1), 50) + 1;

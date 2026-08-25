@@ -13,7 +13,6 @@ class DataProvenance(StrEnum):
 
     PERSONAL_DATA = "PERSONAL_DATA"
     COMMUNITY_DATA = "COMMUNITY_DATA"
-    CREATOR_RESEARCH = "CREATOR_RESEARCH"
     MODEL_INFERENCE = "MODEL_INFERENCE"
 
 
@@ -22,6 +21,41 @@ class ResourceRef(BaseModel):
     kind: str
     resource_id: str
     version: int | None = None
+    # Optional read provenance metadata.  Existing callers may continue to
+    # construct the compact ref/kind/id form used by write receipts.
+    title: str | None = None
+    label: str | None = None
+    source: str | None = None
+    tool: str | None = None
+
+    @property
+    def resource_type(self) -> str:
+        """Compatibility name for callers that use resource_type terminology."""
+        return self.kind
+
+
+class OperationReceipt(BaseModel):
+    """Evidence envelope for one business operation.
+
+    A successful HTTP submission is not equivalent to a completed user
+    operation.  Write tools attach this receipt so callers can distinguish a
+    verified postcondition from an accepted-but-unverified downstream write.
+    ``operation_id`` is normally the retry-stable idempotency key.
+    """
+
+    operation_id: str
+    semantic_action: str
+    task_id: str | None = None
+    objective_id: str | None = None
+    resource_ref: ResourceRef | None = None
+    idempotency_key: str | None = None
+    request_sent: bool | None = None
+    downstream_accepted: bool = False
+    side_effect_started: bool = False
+    result_known: bool = False
+    observed_state: dict[str, Any] | None = None
+    verification_evidence: dict[str, Any] | None = None
+    status: str = "PLANNED"
 
 
 class ToolResult[T](BaseModel):
@@ -43,6 +77,7 @@ class ToolResult[T](BaseModel):
     trace_id: str | None = Field(default=None)
     receipt_id: str | None = Field(default=None)
     resource_refs: list[ResourceRef] = Field(default_factory=list)
+    operation_receipt: OperationReceipt | None = None
 
     @classmethod
     def failure(
@@ -54,6 +89,7 @@ class ToolResult[T](BaseModel):
         retryable: bool = False,
         request_sent: bool | None = False,
         trace_id: str | None = None,
+        state: dict[str, Any] | None = None,
     ) -> ToolResult[T]:
         return cls(
             ok=False,
@@ -63,18 +99,7 @@ class ToolResult[T](BaseModel):
             retryable=retryable,
             request_sent=request_sent,
             trace_id=trace_id,
-        )
-
-    @classmethod
-    def creator_unavailable(
-        cls, message: str = "", *, trace_id: str | None = None
-    ) -> ToolResult[T]:
-        return cls.failure(
-            "CREATOR_UNAVAILABLE",
-            message or "Creator Service is unavailable",
-            "创作服务暂时不可用，尚未保存草稿，可以安全重试。",
-            retryable=True,
-            trace_id=trace_id,
+            state=state,
         )
 
     @classmethod
@@ -112,6 +137,7 @@ class ToolResult[T](BaseModel):
         receipt_id: str | None = None,
         resource_refs: list[ResourceRef] | None = None,
         provenance: list[DataProvenance] | None = None,
+        operation_receipt: OperationReceipt | None = None,
     ) -> ToolResult[T]:
         return cls(
             ok=True,
@@ -122,6 +148,7 @@ class ToolResult[T](BaseModel):
             trace_id=trace_id,
             receipt_id=receipt_id,
             resource_refs=resource_refs or [],
+            operation_receipt=operation_receipt,
         )
 
     # ── Client-side failures (request not sent) ──────────
@@ -152,6 +179,24 @@ class ToolResult[T](BaseModel):
             user_message=user_message or "The request contains invalid parameters.",
             retryable=False,
             request_sent=False,
+        )
+
+    @classmethod
+    def permanent_input(
+        cls,
+        code: str = "PERMANENT_INPUT",
+        message: str = "",
+        *,
+        user_message: str = "The request contains invalid input.",
+        state: dict[str, Any] | None = None,
+    ) -> ToolResult[T]:
+        return cls.failure(
+            code,
+            message,
+            user_message,
+            retryable=False,
+            request_sent=False,
+            state=state,
         )
 
     @classmethod
@@ -252,8 +297,32 @@ class ToolResult[T](BaseModel):
 
     @classmethod
     def result_unknown(
-        cls, message: str = "", *, trace_id: str | None = None
+        cls,
+        message: str = "",
+        *,
+        trace_id: str | None = None,
+        state: dict[str, Any] | None = None,
+        receipt_id: str | None = None,
+        resource_refs: list[ResourceRef] | None = None,
+        operation_receipt: OperationReceipt | None = None,
     ) -> ToolResult[T]:
+        # ``RESULT_UNKNOWN`` is only valid when the delivery boundary is
+        # ambiguous and a side effect may already have started.  Keep that
+        # evidence attached to the result instead of relying on callers to
+        # remember to add it to ``state``.
+        resolved_state = dict(state or {})
+        resolved_state.setdefault("side_effect_started", True)
+        resolved_state.setdefault("side_effect_state", "POSSIBLE")
+        resolved_state.setdefault("result_known", False)
+        resolved_receipt = operation_receipt
+        if operation_receipt is not None:
+            resolved_receipt = operation_receipt.model_copy(
+                update={
+                    "side_effect_started": True,
+                    "result_known": False,
+                    "status": "RESULT_UNKNOWN",
+                }
+            )
         return cls(
             ok=False,
             code="RESULT_UNKNOWN",
@@ -263,8 +332,12 @@ class ToolResult[T](BaseModel):
                 "Checking actual status — please do not repeat the operation."
             ),
             retryable=False,
-            request_sent=True,
+            request_sent=None,
             trace_id=trace_id,
+            state=resolved_state,
+            receipt_id=receipt_id,
+            resource_refs=resource_refs or [],
+            operation_receipt=resolved_receipt,
         )
 
     @classmethod
@@ -287,7 +360,23 @@ class ToolResult[T](BaseModel):
             code="INTERNAL_ERROR",
             message=message,
             user_message="An internal error occurred. Please try again later.",
-            retryable=True,
+            # An agent/runtime defect is not a transient transport failure.
+            # Retrying it can repeat an already-started handler and hides the
+            # original defect from the durable boundary.
+            retryable=False,
             request_sent=False,
+            trace_id=trace_id,
+        )
+
+    @classmethod
+    def server_failure(
+        cls, message: str = "", *, trace_id: str | None = None
+    ) -> ToolResult[T]:
+        return cls.failure(
+            "SERVER_FAILURE",
+            message or "Java returned an internal server failure",
+            "社区服务暂时无法完成这项操作，请稍后再试。",
+            retryable=False,
+            request_sent=True,
             trace_id=trace_id,
         )

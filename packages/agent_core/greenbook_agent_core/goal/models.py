@@ -25,6 +25,15 @@ class Goal(BaseModel):
     required_capabilities: list[str] = Field(default_factory=list)
     dependencies: list[str] = Field(default_factory=list)
     constraints: list[dict[str, Any]] = Field(default_factory=list)
+    # These fields keep business semantics attached to the logical Goal
+    # instead of leaving operation/time/publication intent in the command's
+    # request-wide scalar fields.  ``constraints`` remains supported for
+    # backwards-compatible GoalTree payloads; the compiler normalizes both
+    # representations before creating a PlanStep.
+    semantic_operation: str = ""
+    target: dict[str, Any] = Field(default_factory=dict)
+    temporal_constraint: dict[str, Any] = Field(default_factory=dict)
+    publication_intent: str = ""
     expected_outputs: list[str] = Field(default_factory=list)
 
 
@@ -120,6 +129,15 @@ class GoalTree(BaseModel):
             self.root = self.goals[0]
         if self.root is None:
             raise ValueError("GoalTree requires a root Goal")
+        # Some structured-output providers use the literal label ``root``
+        # for the parent reference while assigning the actual root a stable
+        # semantic id.  Normalize that wire alias only when the root is
+        # unambiguous; all other unknown parent references remain invalid.
+        root_id = self.root.goal_id
+        if root_id != "root":
+            for goal in self.all_goals():
+                if goal.parent_goal == "root":
+                    goal.parent_goal = root_id
         return self
 
     def all_goals(self) -> list[Goal]:

@@ -1,37 +1,79 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import AgentMarkdown from "@/components/content/AgentMarkdown";
 import {
   AgentIcon,
   CheckIcon,
-  ClockIcon,
   CloseIcon,
   SearchIcon,
   SendIcon
 } from "@/components/icons/Icon";
-import { agentService, waitForAgentRun } from "@/services/agentService";
+import { AgentApiError, agentService, waitForAgentRun } from "@/services/agentService";
 import { executionService, waitForExecution } from "@/services/executionService";
-import {
-  runtimeExecutionButtonLabels,
-  runtimeExecutionStatusLabel,
-  runtimeStepLabel,
-  runtimeStepStatusLabel
-} from "@/services/runtimeExecutionLabels";
 import type {
   AgentConversation,
-  AgentEpisode,
-  AgentMemory,
   AgentMemoryProfile,
+  AgentMemoryRecord,
   AgentMessage,
   AgentExecutionResultPart,
-  AgentClarificationCandidate,
   AgentRun,
   AgentMessagePart,
+  AgentToolPart,
   AgentTargetClarificationPart,
-  AgentToolPart
+  AgentUnderstanding,
+  AgentUserFacingInteractionPart
 } from "@/types/agent";
 import type { Execution } from "@/types/execution";
+import type { UserFacingTargetClarification } from "./userFacingResult";
+import { formatBusinessDateTime, getDisplayTimezone } from "@/utils/dateTime";
+import {
+  canSubmitNaturalLanguage,
+  isComposerDisabled,
+  type ComposerState
+} from "./agentComposerState";
+import AgentResultGroup from "./AgentResultCards";
+import {
+  AgentApprovalCard,
+  // LEGACY_FALLBACK: the ordinary panel keeps these branches disabled below.
+  AgentExecutionActivityCard,
+  AgentExecutionActivityGroup,
+  AgentRunActivityCard
+} from "./AgentActivityCards";
+import { subscribeRunEvents } from "../../services/executionService";
+import type { AgentRunEvent } from "../../services/executionService";
+import { RUN_EVENT } from "../../services/runEvents";
+import {
+  capabilityActiveLabel,
+  projectAgentRunToUserFacingInteraction,
+  projectAgentRunArtifactsToUserFacingInteractions,
+  projectPendingApprovalFallback,
+  projectAgentMessageToUserFacingInteractions,
+  dedupeTerminalAgentMessages,
+  projectUserFacingInteractionPart,
+  projectTargetClarification,
+  isTargetClarificationResolved,
+  userFacingDisplayText,
+  userFacingMessage,
+  userFacingStatusLabel
+} from "./userFacingResult";
+import {
+  mergeUserActivityEvents,
+  subscribeUserActivities,
+  userActivityService
+} from "@/services/userActivityService";
+import type { UserActivityEvent } from "@/types/userActivity";
+import {
+  buildSemanticConfirmationControl,
+  projectSemanticConfirmation,
+  selectLatestSemanticConfirmationEvents,
+  semanticConfirmationErrorMessage,
+  semanticConfirmationKey,
+  type SemanticConfirmationPayload,
+  type SemanticConfirmationViewState
+} from "@/types/semanticConfirmation";
+import UserActivityCluster from "./UserActivityCluster";
+import SemanticConfirmationCard from "./SemanticConfirmationCard";
 import styles from "./AgentPanel.module.css";
 
 type Props = {
@@ -41,12 +83,6 @@ type Props = {
   surface?: "HOME" | "POST";
 };
 
-const SUGGESTIONS = [
-  "明天上午八点发布一篇关于如何学好 Java 的帖子",
-  "帮我找几篇时间管理的帖子并总结共同方法",
-  "结合社区内容，创作一篇适合新人的学习复盘"
-];
-
 const ACTIVE_RUN_STATUSES = new Set([
   "QUEUED",
   "RUNNING",
@@ -55,11 +91,67 @@ const ACTIVE_RUN_STATUSES = new Set([
   "WAITING_LANE",
   "WAITING_APPROVAL",
   "WAITING_HUMAN",
+  "WAITING_USER",
   "PAUSED"
 ]);
 
+/** User-facing label for a restored run: waiting states are NOT "处理中". */
+function restoredRunTitle(item: { status?: string | null; goal?: string | null }): string {
+  return runItemTitle(item);
+}
+
+/** Label for one concurrent run card by status (waiting ≠ 处理中). */
+function runItemTitle(item: { status?: string | null; title?: string | null; goal?: string | null }): string {
+  const status = item.status || "";
+  if (status === "WAITING_USER" || status === "WAITING_HUMAN") {
+    return "等待你确认";
+  }
+  if (status === "WAITING_APPROVAL") {
+    return "等待审批";
+  }
+  if (status === "PAUSED") {
+    return "已暂停";
+  }
+  return item.title || userFacingMessage(item.goal || "") || "正在处理一项事情";
+}
+
+type ConcurrentRunView = {
+  title: string;
+  status: string;
+  error?: string | null;
+  follow_up_of?: string | null;
+};
+
+/** @deprecated LEGACY_FALLBACK for historical Run-event consumers only. */
+type ConcurrentRunActivity = {
+  current: string | null;
+  done: Array<{ title: string; count?: number; runAt?: string }>;
+};
+
+/** One queued mid-turn follow-up, shown as a hint on its parent card. */
+type FollowUpHint = {
+  followUpRunId: string;
+  message: string;
+};
+
 const agentMessageCount = (items: AgentMessage[]) =>
   items.filter(item => item.role === "assistant").length;
+
+const isExecutionResultPart = (
+  part: AgentMessagePart
+): part is AgentExecutionResultPart => part.type === "execution_result";
+
+const isUserFacingInteractionPart = (
+  part: AgentMessagePart
+): part is AgentUserFacingInteractionPart => part.type === "user_facing_interaction";
+
+const isTerminalExecution = (status: string): boolean =>
+  ["COMPLETED", "FAILED", "CANCELLED"].includes(String(status).toUpperCase());
+
+const isApprovalPending = (execution?: Execution | null, run?: AgentRun | null): boolean =>
+  ["WAITING_APPROVAL", "WAITING_HUMAN"].includes(String(execution?.status).toUpperCase())
+  || ["WAITING_APPROVAL", "WAITING_HUMAN"].includes(String(run?.status).toUpperCase())
+  || ["PENDING", "WAITING_APPROVAL", "WAITING_HUMAN"].includes(String(run?.approval?.status).toUpperCase());
 
 const upsertExecution = (items: Execution[], next: Execution): Execution[] => {
   const current = items.findIndex(item => item.execution_id === next.execution_id);
@@ -71,27 +163,25 @@ const refreshMessagesAfterExecution = async (
   token: string,
   conversationId: string,
   previousAgentCount: number,
+  expectedExecutionIds: string[] = [],
   signal?: AbortSignal
 ): Promise<{ messages: AgentMessage[]; projected: boolean }> => {
   let latest: AgentMessage[] = [];
   for (let attempt = 0; attempt < 20; attempt += 1) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     latest = await agentService.listMessages(token, conversationId, signal);
-    if (agentMessageCount(latest) > previousAgentCount) {
+    const projected = expectedExecutionIds.length
+      ? latest.some(message => (message.parts || []).some(part =>
+        isExecutionResultPart(part)
+        && expectedExecutionIds.includes(part.execution.execution_id)
+      ))
+      : agentMessageCount(latest) > previousAgentCount;
+    if (projected) {
       return { messages: latest, projected: true };
     }
     await new Promise(resolve => window.setTimeout(resolve, 200));
   }
   return { messages: latest, projected: false };
-};
-
-const toolLabel = (tool: string) => {
-  if (tool.includes("search")) return "检索社区";
-  if (tool.includes("summarize") || tool.includes("get_post")) return "阅读帖子";
-  if (tool.includes("creator")) return "调用Creator Service";
-  if (tool.includes("schedule")) return "安排定时发布";
-  if (tool.includes("publish")) return "发布帖子";
-  return "执行工具";
 };
 
 const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) => {
@@ -101,19 +191,55 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [content, setContent] = useState("");
   const [run, setRun] = useState<AgentRun | null>(null);
+  const [concurrentRuns, setConcurrentRuns] = useState<Record<string, ConcurrentRunView>>({});
+  // LEGACY_FALLBACK: no Phase 2 ordinary-user rendering reads this state.
+  const [concurrentActivities, setConcurrentActivities] = useState<Record<string, ConcurrentRunActivity>>({});
+  const [userActivities, setUserActivities] = useState<UserActivityEvent[]>([]);
+  const [semanticConfirmationStates, setSemanticConfirmationStates] = useState<
+    Record<string, SemanticConfirmationViewState>
+  >({});
+  const [semanticConfirmationErrors, setSemanticConfirmationErrors] = useState<Record<string, string>>({});
+  const [resolvedApprovalActivityIds, setResolvedApprovalActivityIds] = useState<
+    Record<string, "APPROVED" | "REJECTED" | "COMPLETED">
+  >({});
+  // Mid-turn injection: keyed by the parent run id; rendered as a hint on the
+  // parent card ("已收到你的补充…") instead of a second parallel card.
+  const [followUpHints, setFollowUpHints] = useState<Record<string, FollowUpHint>>({});
+  // First-step visibility: what the agent understood, shown before it keeps
+  // executing so a wrong understanding can be stopped early.
+  const [understanding, setUnderstanding] = useState<AgentUnderstanding | null>(null);
   const [execution, setExecution] = useState<Execution | null>(null);
   const [executions, setExecutions] = useState<Execution[]>([]);
-  const [memories, setMemories] = useState<AgentMemory[]>([]);
-  const [episodes, setEpisodes] = useState<AgentEpisode[]>([]);
+  // LEGACY_FALLBACK state for disabled Run/Execution heuristic branches.
+  const pendingCapability: string | null = null;
+  const runActivity = {
+    current: null as string | null,
+    done: [] as Array<{ title: string; count?: number }>
+  };
   const [memoryProfile, setMemoryProfile] = useState<AgentMemoryProfile | null>(null);
-  const [memoryKey, setMemoryKey] = useState("");
-  const [memoryValue, setMemoryValue] = useState("");
+  const [memoryRecords, setMemoryRecords] = useState<AgentMemoryRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [composerState, setComposerState] = useState<ComposerState>("READY");
+  const [projectionPending, setProjectionPending] = useState(false);
+  const [runsHydrated, setRunsHydrated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const runControllerRef = useRef<AbortController | null>(null);
+  const runControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const activityCursorRef = useRef(0);
+  const semanticActionKeysRef = useRef<Set<string>>(new Set());
+  const semanticModifySupersededKeysRef = useRef<Set<string>>(new Set());
+
+  const mergeUserActivities = useCallback((incoming: UserActivityEvent[]) => {
+    if (!incoming.length) return;
+    activityCursorRef.current = Math.max(
+      activityCursorRef.current,
+      ...incoming.map(item => item.sequence)
+    );
+    setUserActivities(previous => mergeUserActivityEvents(previous, incoming));
+  }, []);
 
   useEffect(() => {
     if (!open || !token || authLoading) return;
@@ -121,6 +247,8 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     const prepare = async () => {
       setLoading(true);
       setError(null);
+      setProjectionPending(false);
+      setRunsHydrated(false);
       try {
         const existing = await agentService.listConversations(
           token,
@@ -133,60 +261,147 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         }, controller.signal);
         if (controller.signal.aborted) return;
         setConversation(current);
-        const [nextMessages, nextMemories, nextEpisodes, nextMemoryProfile] = await Promise.all([
+        const [nextMessages, nextMemoryProfile] = await Promise.all([
           agentService.listMessages(token, current.conversation_id, controller.signal),
-          agentService.listMemories(token, controller.signal),
-          agentService.listEpisodes(token, controller.signal),
           agentService.getMemoryProfile(token, controller.signal)
         ]);
         setMessages(nextMessages);
-        setMemories(nextMemories);
-        setEpisodes(nextEpisodes);
         setMemoryProfile(nextMemoryProfile);
+        try {
+          const records = await agentService.listMemoryRecords(token, controller.signal);
+          if (!controller.signal.aborted) setMemoryRecords(records ?? []);
+        } catch {
+          // Memory records are optional UI enrichment; failure must not block chat.
+        }
 
         // The execution card is transient UI state. Restore it from the
         // conversation's active run so reopening the panel does not leave
         // only the optimistic user message visible.
-        const activeRun = (await agentService.listRuns(token, controller.signal))
+        const activeRuns = (await agentService.listRuns(token, controller.signal))
           .filter(item => item.conversation_id === current.conversation_id)
-          .filter(item => item.execution_id && ACTIVE_RUN_STATUSES.has(item.status))
-          .sort((left, right) => right.updated_at.localeCompare(left.updated_at))[0];
-        if (activeRun?.execution_id && !controller.signal.aborted) {
+          .filter(item => ACTIVE_RUN_STATUSES.has(item.status))
+          .sort((left, right) =>
+            (right.created_at || "").localeCompare(left.created_at || "")
+          );
+        const restoredViews = Object.fromEntries(activeRuns.map(item => [
+          item.run_id,
+          {
+            title: restoredRunTitle(item),
+            status: item.status,
+            error: item.error,
+            follow_up_of: item.follow_up_of
+          }
+        ]));
+        if (!controller.signal.aborted) {
+          setConcurrentRuns(restoredViews);
+          setRunsHydrated(true);
+        }
+        // Mid-turn follow-ups whose parent is still active restore as hints on
+        // the parent card; standalone follow-ups (parent already terminal)
+        // stay as their own card because they start executing immediately.
+        const restoredHints: Record<string, FollowUpHint> = {};
+        const restoredIds = new Set(activeRuns.map(item => item.run_id));
+        for (const item of activeRuns) {
+          if (!item.follow_up_of) continue;
+          if (restoredIds.has(item.follow_up_of)) {
+            restoredHints[item.follow_up_of] = {
+              followUpRunId: item.run_id,
+              message: item.goal || "补充指令"
+            };
+          }
+        }
+        if (!controller.signal.aborted && Object.keys(restoredHints).length) {
+          setFollowUpHints(previous => ({ ...previous, ...restoredHints }));
+        }
+        const activeRun = activeRuns[0];
+        if (activeRun && !controller.signal.aborted) {
           const activeStatus = activeRun.status as string;
-          if (activeStatus === "PAUSED" || activeStatus === "WAITING_APPROVAL" || activeStatus === "WAITING_HUMAN") {
+          if (activeStatus === "WAITING_APPROVAL" || activeStatus === "WAITING_HUMAN") {
+            if (activeRun.execution_id) {
+              const snapshot = await executionService.get(token, activeRun.execution_id, controller.signal);
+              setExecution(snapshot);
+              setExecutions([snapshot]);
+            }
+            try {
+              setRun(await agentService.getRun(token, activeRun.run_id, controller.signal));
+            } catch {
+              // The activity snapshot can still be restored from the execution projection.
+            }
+          } else if (activeStatus === "PAUSED" && activeRun.execution_id) {
             const snapshot = await executionService.get(token, activeRun.execution_id, controller.signal);
             setExecution(snapshot);
             setExecutions([snapshot]);
-          } else {
+          } else if (activeRun.execution_id) {
             void waitForExecution(
               token,
               activeRun.execution_id,
-              setExecution,
+              snapshot => {
+                setExecution(snapshot);
+                if (isTerminalExecution(snapshot.status)) setProjectionPending(true);
+              },
               undefined,
               controller.signal
             ).then(async completed => {
               if (controller.signal.aborted) return;
               setExecutions([completed]);
-              if (completed.status === "COMPLETED" || completed.status === "CANCELLED") {
+              if (["COMPLETED", "FAILED", "CANCELLED"].includes(completed.status)) {
+                setProjectionPending(true);
                 const refreshed = await refreshMessagesAfterExecution(
                   token,
                   current.conversation_id,
                   agentMessageCount(nextMessages),
+                  [completed.execution_id],
                   controller.signal
                 );
                 setMessages(refreshed.messages);
-                if (refreshed.projected) setExecution(completed);
+                setRun(null);
+                if (refreshed.projected) {
+                  setExecution(null);
+                  setExecutions([]);
+                  setProjectionPending(false);
+                } else {
+                  setExecution(completed);
+                }
               }
             }).catch(caught => {
               if (!controller.signal.aborted && (caught as DOMException)?.name !== "AbortError") {
-                setError(caught instanceof Error ? caught.message : "执行状态暂时无法更新");
+                setError(friendlyClientError(caught));
+              }
+            });
+          } else {
+            try {
+              setRun(await agentService.getRun(token, activeRun.run_id, controller.signal));
+            } catch {
+              setError("任务状态暂时无法恢复，请稍后刷新对话。");
+              return;
+            }
+            void waitForAgentRun(
+              token,
+              activeRun.run_id,
+              setRun,
+              controller.signal
+            ).then(async completed => {
+              if (controller.signal.aborted) return;
+              if (completed.status === "COMPLETED" || completed.status === "CANCELLED") {
+                setMessages(await agentService.listMessages(
+                  token,
+                  current.conversation_id,
+                  controller.signal
+                ));
+                setRun(null);
+              } else {
+                setRun(completed);
+              }
+            }).catch(caught => {
+              if (!controller.signal.aborted && (caught as DOMException)?.name !== "AbortError") {
+                setError(friendlyClientError(caught));
               }
             });
           }
         }
       } catch (caught) {
         if (!controller.signal.aborted) {
-          setError(caught instanceof Error ? caught.message : "Agent暂时无法连接");
+          setError(friendlyClientError(caught));
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -195,6 +410,51 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     void prepare();
     return () => controller.abort();
   }, [authLoading, contextPostId, open, surface, token]);
+
+  // User progress comes from the durable Activity projection, not Run/Event/
+  // Step heuristics.  SSE is the low-latency path; cursor polling is a
+  // deliberate fallback for proxies that buffer or disconnect streams.
+  useEffect(() => {
+    if (!open || !token || !conversation) return;
+    const controller = new AbortController();
+    activityCursorRef.current = 0;
+    setUserActivities([]);
+    setSemanticConfirmationStates({});
+    setSemanticConfirmationErrors({});
+    semanticActionKeysRef.current.clear();
+    semanticModifySupersededKeysRef.current.clear();
+    setResolvedApprovalActivityIds({});
+
+    const sync = async () => {
+      try {
+        const response = await userActivityService.list(
+          token,
+          conversation.conversation_id,
+          activityCursorRef.current,
+          controller.signal
+        );
+        mergeUserActivities(response.items);
+      } catch {
+        // The SSE reconnect loop and next poll will recover.  A transport
+        // failure must not be rendered as a failed business operation.
+      }
+    };
+
+    void sync();
+    void subscribeUserActivities(
+      token,
+      conversation.conversation_id,
+      event => mergeUserActivities([event]),
+      { signal: controller.signal }
+    ).catch(() => {
+      // Abort and polling fallback are both expected terminal paths here.
+    });
+    const pollingFallback = window.setInterval(() => void sync(), 4_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(pollingFallback);
+    };
+  }, [conversation, mergeUserActivities, open, token]);
 
   useEffect(() => {
     if (!open) return;
@@ -208,19 +468,279 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       runControllerRef.current?.abort();
+      runControllersRef.current.forEach(controller => controller.abort());
+      runControllersRef.current.clear();
     };
   }, [onClose, open]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [execution?.events?.length, execution?.steps?.length, execution?.status, messages, run?.steps.length, run?.status]);
+  }, [messages, userActivities]);
+
+  useEffect(() => {
+    const trackedExecutionIds = new Set([
+      ...(execution?.execution_id ? [execution.execution_id] : []),
+      ...executions.map(item => item.execution_id)
+    ]);
+    if (!open || !projectionPending || !token || !conversation || !trackedExecutionIds.size) return;
+
+    let cancelled = false;
+    let syncing = false;
+    const reconcile = async () => {
+      if (cancelled || syncing) return;
+      syncing = true;
+      try {
+        const latest = await agentService.listMessages(token, conversation.conversation_id);
+        if (cancelled) return;
+        const projectedExecutionIds = new Set(
+          latest.flatMap(message => (message.parts || [])
+            .filter(isExecutionResultPart)
+            .map(part => part.execution.execution_id))
+        );
+        const resolvedExecutionIds = [...trackedExecutionIds].filter(id => projectedExecutionIds.has(id));
+        if (!resolvedExecutionIds.length) return;
+        setMessages(latest);
+        setExecution(current => current && projectedExecutionIds.has(current.execution_id) ? null : current);
+        setExecutions(current => current.filter(item => !projectedExecutionIds.has(item.execution_id)));
+        if ([...trackedExecutionIds].every(id => projectedExecutionIds.has(id))) {
+          setProjectionPending(false);
+        }
+      } catch {
+        // The next reconciliation pass will pick up the projection once it is available.
+      } finally {
+        syncing = false;
+      }
+    };
+
+    void reconcile();
+    const timer = window.setInterval(() => void reconcile(), 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [conversation, execution?.execution_id, executions, open, projectionPending, token]);
+
+  // ── mid-turn follow-up (nanobot-style injection) ─────────────────────
+  // A message sent while a working Run is active is queued behind it
+  // (payload.follow_up_of). It renders as a hint on the parent card and only
+  // starts executing once the parent reaches a terminal state.
+
+  /**
+   * LEGACY_FALLBACK: historical Run-event heuristic retained only for old
+   * callers during rollout. New ordinary-user paths subscribe exclusively to
+   * UserActivityEvent below and must not call this function.
+   */
+  const applyRunActivity = (runId: string, event: AgentRunEvent) => {
+    if (event.event_type === RUN_EVENT.SEMANTIC_ACTION) {
+      const phase = String(event.payload?.phase || "STARTED");
+      if (phase === "SUCCEEDED" || phase === "FAILED") {
+        setConcurrentActivities(previous => ({
+          ...previous,
+          [runId]: {
+            ...(previous[runId] || { current: null, done: [] }),
+            current: null
+          }
+        }));
+        return;
+      }
+      const action = String(event.payload?.semantic_action || "");
+      const label = action ? capabilityActiveLabel(action) || action : "";
+      setConcurrentRuns(previous => ({
+        ...previous,
+        [runId]: {
+          ...(previous[runId] || { title: "正在处理一项事情", status: "RUNNING" }),
+          title: label || previous[runId]?.title || "正在处理一项事情",
+          status: "RUNNING"
+        }
+      }));
+      setConcurrentActivities(previous => ({
+        ...previous,
+        [runId]: {
+          ...(previous[runId] || { current: null, done: [] }),
+          current: label || previous[runId]?.current || null
+        }
+      }));
+      return;
+    }
+    if (event.event_type === RUN_EVENT.PARTIAL_RESULT) {
+      const title = String(event.payload?.title || "");
+      const count = event.payload?.count;
+      const runAt = String(event.payload?.run_at || "");
+      setConcurrentActivities(previous => ({
+        ...previous,
+        [runId]: {
+          current: null,
+          done: [...(previous[runId]?.done || []), {
+            title,
+            count: typeof count === "number" ? count : undefined,
+            runAt: runAt || undefined
+          }]
+        }
+      }));
+      return;
+    }
+    if (event.event_type === RUN_EVENT.FOLLOW_UP_QUEUED) {
+      const followUpRunId = String(event.payload?.follow_up_run_id || "");
+      const message = String(event.payload?.message || "");
+      if (followUpRunId) {
+        setFollowUpHints(previous => ({
+          ...previous,
+          [runId]: { followUpRunId, message }
+        }));
+      }
+    }
+  };
+
+  const attachFollowUpRun = (followUpRunId: string) => {
+    if (!token || !conversation) return;
+    if (runControllersRef.current.has(followUpRunId)) return;
+    const controller = new AbortController();
+    runControllersRef.current.set(followUpRunId, controller);
+    setConcurrentRuns(previous => ({
+      ...previous,
+      [followUpRunId]: { title: "处理你的补充指令…", status: "ACCEPTED", error: null }
+    }));
+    setConcurrentActivities(previous => ({
+      ...previous,
+      [followUpRunId]: { current: null, done: [] }
+    }));
+    // User progress is delivered by the conversation-scoped Activity stream;
+    // do not attach a per-Run heuristic subscription for new follow-ups.
+    void waitForAgentRun(
+      token,
+      followUpRunId,
+      next => setConcurrentRuns(previous => ({
+        ...previous,
+        [followUpRunId]: {
+          ...(previous[followUpRunId] || { title: "处理你的补充指令…" }),
+          status: next.status,
+          error: next.error
+        }
+      })),
+      controller.signal
+    ).then(async completed => {
+      if (controller.signal.aborted) return;
+      if (completed.status === "FAILED") {
+        setError(null);
+        setConcurrentRuns(previous => ({
+          ...previous,
+          [followUpRunId]: {
+            ...(previous[followUpRunId] || { title: "这项事情" }),
+            status: completed.status,
+            error: completed.error
+          }
+        }));
+        return;
+      }
+      if (["WAITING_APPROVAL", "WAITING_HUMAN", "WAITING_USER", "PAUSED"].includes(completed.status)) {
+        // A waiting run has already produced the durable assistant message
+        // (for example a target clarification). Refresh it before returning
+        // so the live panel can render the actual user action, not only the
+        // activity placeholder.
+        try {
+          setMessages(await agentService.listMessages(
+            token,
+            conversation.conversation_id,
+            controller.signal
+          ));
+        } catch {
+          // Keep the durable run/activity projection if message sync is
+          // temporarily unavailable; the next panel sync can recover it.
+        }
+        setRun(completed);
+        return;
+      }
+      setMessages(await agentService.listMessages(
+        token,
+        conversation.conversation_id,
+        controller.signal
+      ));
+      setConcurrentRuns(previous => {
+        const next = { ...previous };
+        delete next[followUpRunId];
+        return next;
+      });
+      setConcurrentActivities(previous => {
+        const next = { ...previous };
+        delete next[followUpRunId];
+        return next;
+      });
+      maybeAttachFollowUps([followUpRunId]);
+    }).catch(caught => {
+      if ((caught as DOMException)?.name !== "AbortError") {
+        setError(friendlyClientError(caught));
+      }
+    }).finally(() => {
+      runControllersRef.current.delete(followUpRunId);
+    });
+  };
+
+  const maybeAttachFollowUps = (explicitTerminalParents: string[] = []) => {
+    const terminal = new Set(explicitTerminalParents);
+    for (const [parentRunId, hint] of Object.entries(followUpHints)) {
+      if (!terminal.has(parentRunId) && concurrentRuns[parentRunId]) continue;
+      setFollowUpHints(previous => {
+        const next = { ...previous };
+        delete next[parentRunId];
+        return next;
+      });
+      void attachFollowUpRun(hint.followUpRunId);
+    }
+  };
+
+  const registerFollowUpHint = (parentRunId: string, followUpRunId: string, message: string) => {
+    if (!concurrentRuns[parentRunId]) {
+      // The parent already finished (or its card was dismissed); start the
+      // queued follow-up immediately as its own card.
+      void attachFollowUpRun(followUpRunId);
+      return;
+    }
+    setFollowUpHints(previous => ({
+      ...previous,
+      [parentRunId]: { followUpRunId, message }
+    }));
+  };
+
+  // Restored mid-turn hints: the parent card restored from listRuns has a
+  // frozen snapshot; poll the durable run list and start the follow-up once
+  // the parent reaches a terminal state (including panel reopen mid-work).
+  useEffect(() => {
+    if (!open || !token || !Object.keys(followUpHints).length) return;
+    const controller = new AbortController();
+    const poll = async () => {
+      try {
+        const runs = await agentService.listRuns(token, controller.signal);
+        const terminalParents = Object.keys(followUpHints).filter(parentRunId => {
+          const parent = runs.find(item => item.run_id === parentRunId);
+          return !parent || !ACTIVE_RUN_STATUSES.has(parent.status);
+        });
+        if (!terminalParents.length) return;
+        setConcurrentRuns(previous => {
+          const next = { ...previous };
+          for (const parentRunId of terminalParents) delete next[parentRunId];
+          return next;
+        });
+        maybeAttachFollowUps(terminalParents);
+      } catch {
+        // Transient; the next poll retries.
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 2000);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [open, token, followUpHints]);
 
   const send = async (
     suggestion?: string,
     commandOverride?: Record<string, unknown>
   ) => {
     const prompt = (suggestion ?? content).trim();
-    if (!prompt || !token || !conversation || loading) return;
+    if (!token || !conversation) return;
+    if (!canSubmitNaturalLanguage(prompt, composerState, true)) return;
+    const approvalPendingBeforeSend = isApprovalPending(execution, run);
     const optimistic: AgentMessage = {
       message_id: crypto.randomUUID(),
       role: "user",
@@ -231,14 +751,25 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     const previousAgentCount = agentMessageCount(messages);
     setMessages(previous => [...previous, optimistic]);
     setContent("");
-    setRun(null);
-    setExecution(null);
-    setExecutions([]);
+    setUnderstanding(null);
+    if (!approvalPendingBeforeSend) {
+      if (!Object.keys(concurrentRuns).length) {
+        setRun(null);
+        setExecution(null);
+        setExecutions([]);
+      }
+    } else if (run?.approval || isApprovalPending(null, run)) {
+      // Keep the approval projection visible while a natural-language
+      // follow-up is being submitted. The approval buttons are disabled by
+      // `loading`, but the composer remains a separate interaction surface.
+      setExecution(null);
+      setExecutions([]);
+    }
+    setProjectionPending(false);
     setError(null);
+    setComposerState("SUBMITTING");
     setLoading(true);
-    runControllerRef.current?.abort();
     const controller = new AbortController();
-    runControllerRef.current = controller;
     try {
       const accepted = await agentService.send(
         token,
@@ -248,9 +779,113 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         undefined,
         commandOverride
       );
+      // Show the first decided semantic action as an immediate business
+      // activity while the execution snapshot is still on its way.
       const executionIds = accepted.execution_ids?.length
         ? accepted.execution_ids
         : accepted.execution_id ? [accepted.execution_id] : [];
+      if (accepted.follow_up_of) {
+        // Mid-turn injection: another Run is still working in this
+        // conversation. Queue behind it — no separate card; the parent card
+        // shows a "已收到你的补充" hint and the follow-up starts afterwards.
+        setComposerState("READY");
+        setLoading(false);
+        registerFollowUpHint(accepted.follow_up_of, accepted.run_id, prompt);
+        return;
+      }
+      if (accepted.status === "ACCEPTED" && accepted.created_at) {
+        // Immediate accept: the Run is durably accepted; Agent reasoning runs
+        // in the background. Subscribe to run events for meaningful activity
+        // and keep the composer usable while the Run is being processed.
+        setComposerState("READY");
+        setLoading(false);
+        setConcurrentRuns(previous => ({
+          ...previous,
+          [accepted.run_id]: {
+            // A durable Run was accepted, but no business action has started
+            // yet.  Do not turn an internal capability guess into user UI.
+            title: "请求已收到",
+            status: accepted.status,
+            error: null
+          }
+        }));
+        runControllersRef.current.set(accepted.run_id, controller);
+        // Conversation-wide UserActivity SSE/polling is already active.
+        // Legacy per-Run event subscription intentionally does not feed the
+        // ordinary user-facing panel anymore.
+        try {
+          const completed = await waitForAgentRun(
+            token,
+            accepted.run_id,
+            next => setConcurrentRuns(previous => ({
+              ...previous,
+              [accepted.run_id]: {
+                ...(previous[accepted.run_id] || { title: "正在处理一项事情" }),
+                status: next.status,
+                error: next.error
+              }
+            })),
+            controller.signal
+          );
+          if (completed.status === "FAILED") {
+            // The run-keyed concurrent item is the terminal projection for a
+            // 202-accepted Run. Rendering the generic alert as well creates a
+            // second copy of the same failure; keep the stable run card as
+            // the single terminal surface.
+            setError(null);
+            setConcurrentRuns(previous => ({
+              ...previous,
+              [accepted.run_id]: {
+                ...(previous[accepted.run_id] || { title: "这项事情" }),
+                status: completed.status,
+                error: completed.error
+              }
+            }));
+            runControllersRef.current.delete(accepted.run_id);
+            // The parent failed terminally: queued follow-ups can now run.
+            maybeAttachFollowUps([accepted.run_id]);
+            return;
+          }
+          if (["WAITING_APPROVAL", "WAITING_HUMAN", "WAITING_USER", "PAUSED"].includes(completed.status)) {
+            try {
+              setMessages(await agentService.listMessages(
+                token,
+                conversation.conversation_id,
+                controller.signal
+              ));
+            } catch {
+              // Keep the waiting run visible; message polling can recover.
+            }
+            setRun(completed);
+            runControllersRef.current.delete(accepted.run_id);
+            return;
+          }
+          setMessages(await agentService.listMessages(
+            token,
+            conversation.conversation_id,
+            controller.signal
+          ));
+          setConcurrentRuns(previous => {
+            const next = { ...previous };
+            delete next[accepted.run_id];
+            return next;
+          });
+          setConcurrentActivities(previous => {
+            const next = { ...previous };
+            delete next[accepted.run_id];
+            return next;
+          });
+          if (run?.run_id === accepted.run_id) setRun(null);
+          // The parent finished: start any mid-turn follow-ups queued behind it.
+          maybeAttachFollowUps([accepted.run_id]);
+        } catch (caught) {
+          if ((caught as DOMException)?.name !== "AbortError") {
+            setError(friendlyClientError(caught));
+          }
+        }
+        runControllersRef.current.delete(accepted.run_id);
+        return;
+      }
       if (executionIds.length) {
         const completedExecutions = await Promise.all(executionIds.map(executionId =>
           waitForExecution(
@@ -258,37 +893,46 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             executionId,
             snapshot => {
               setExecutions(previous => upsertExecution(previous, snapshot));
-              if (executionIds.length === 1) setExecution(snapshot);
+              if (executionIds.length === 1) {
+                setExecution(snapshot);
+                if (isTerminalExecution(snapshot.status)) setProjectionPending(true);
+              }
             },
             undefined,
             controller.signal
           )
         ));
+        const waitingForAction = completedExecutions.some(item =>
+          ["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(item.status)
+        );
+        if (!waitingForAction) setProjectionPending(true);
         setExecutions(completedExecutions);
         setExecution(completedExecutions[0] ?? null);
-        if (completedExecutions.some(item =>
-          ["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(item.status)
-        )) {
+        if (waitingForAction) {
+          setProjectionPending(false);
           try {
             setRun(await agentService.getRun(token, accepted.run_id, controller.signal));
           } catch {
-            // Keep the Runtime card when the compatibility projection is unavailable.
+            // Keep the activity card when the compatibility projection is unavailable.
           }
           return;
         }
+        setProjectionPending(true);
         const refreshed = await refreshMessagesAfterExecution(
           token,
           conversation.conversation_id,
           previousAgentCount,
+          executionIds,
           controller.signal
         );
         setMessages(refreshed.messages);
         setRun(null);
         if (refreshed.projected) {
-          setExecution(completedExecutions[0] ?? null);
+          setExecution(null);
+          setExecutions([]);
+          setProjectionPending(false);
         } else {
           setExecution(completedExecutions[0] ?? null);
-          setError("任务已完成，结果仍在同步，请稍后重试。");
         }
         return;
       }
@@ -308,9 +952,18 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         controller.signal
       );
       if (completed.status === "FAILED") {
-        throw new Error(completed.error || "Agent任务执行失败");
+        throw new Error(completed.error || "任务执行失败");
       }
-      if (["WAITING_APPROVAL", "PAUSED"].includes(completed.status)) {
+      if (["WAITING_APPROVAL", "WAITING_HUMAN", "WAITING_USER", "PAUSED"].includes(completed.status)) {
+        try {
+          setMessages(await agentService.listMessages(
+            token,
+            conversation.conversation_id,
+            controller.signal
+          ));
+        } catch {
+          // Keep the waiting run visible; message polling can recover.
+        }
         setRun(completed);
         return;
       }
@@ -322,6 +975,146 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
       }
     } finally {
       setLoading(false);
+      setComposerState("READY");
+    }
+  };
+
+  const semanticControlError = (caught: unknown): string =>
+    semanticConfirmationErrorMessage(caught instanceof AgentApiError ? caught.status : undefined);
+
+  const beginSemanticAction = (
+    key: string,
+    nextState: SemanticConfirmationViewState
+  ): boolean => {
+    if (semanticActionKeysRef.current.has(key)) return false;
+    const current = semanticConfirmationStates[key];
+    if (current === "CONFIRMING" || current === "CANCELLING") return false;
+    semanticActionKeysRef.current.add(key);
+    setSemanticConfirmationStates(previous => ({ ...previous, [key]: nextState }));
+    setSemanticConfirmationErrors(previous => {
+      if (!(key in previous)) return previous;
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
+    return true;
+  };
+
+  const handleSemanticConfirm = async (
+    event: UserActivityEvent,
+    payload: SemanticConfirmationPayload
+  ) => {
+    const key = semanticConfirmationKey(event, payload);
+    if (!beginSemanticAction(key, "CONFIRMING")) return;
+    const taskId = event.task_id?.trim();
+    if (!token || !taskId) {
+      semanticActionKeysRef.current.delete(key);
+      setSemanticConfirmationStates(previous => ({ ...previous, [key]: "STALE" }));
+      setSemanticConfirmationErrors(previous => ({
+        ...previous,
+        [key]: semanticConfirmationErrorMessage()
+      }));
+      return;
+    }
+    try {
+      const response = await agentService.controlSemanticConfirmation(
+        token,
+        taskId,
+        buildSemanticConfirmationControl(payload, "CONFIRM")
+      );
+      setSemanticConfirmationStates(previous => ({
+        ...previous,
+        [key]: response.resume_queued ? "WORKING" : "CONFIRMED"
+      }));
+    } catch (caught) {
+      setSemanticConfirmationStates(previous => ({
+        ...previous,
+        [key]: caught instanceof AgentApiError && caught.status === 409 ? "STALE" : "WAITING_CONFIRMATION"
+      }));
+      setSemanticConfirmationErrors(previous => ({ ...previous, [key]: semanticControlError(caught) }));
+    } finally {
+      semanticActionKeysRef.current.delete(key);
+    }
+  };
+
+  const handleSemanticCancel = async (
+    event: UserActivityEvent,
+    payload: SemanticConfirmationPayload
+  ) => {
+    const key = semanticConfirmationKey(event, payload);
+    if (!beginSemanticAction(key, "CANCELLING")) return;
+    const taskId = event.task_id?.trim();
+    if (!token || !taskId) {
+      semanticActionKeysRef.current.delete(key);
+      setSemanticConfirmationStates(previous => ({ ...previous, [key]: "STALE" }));
+      setSemanticConfirmationErrors(previous => ({
+        ...previous,
+        [key]: semanticConfirmationErrorMessage()
+      }));
+      return;
+    }
+    try {
+      await agentService.controlSemanticConfirmation(
+        token,
+        taskId,
+        buildSemanticConfirmationControl(payload, "CANCEL")
+      );
+      setSemanticConfirmationStates(previous => ({ ...previous, [key]: "CANCELLED" }));
+    } catch (caught) {
+      setSemanticConfirmationStates(previous => ({
+        ...previous,
+        [key]: caught instanceof AgentApiError && caught.status === 409 ? "STALE" : "WAITING_CONFIRMATION"
+      }));
+      setSemanticConfirmationErrors(previous => ({ ...previous, [key]: semanticControlError(caught) }));
+    } finally {
+      semanticActionKeysRef.current.delete(key);
+    }
+  };
+
+  const handleSemanticModify = async (
+    event: UserActivityEvent,
+    payload: SemanticConfirmationPayload,
+    modification: string
+  ) => {
+    const key = semanticConfirmationKey(event, payload);
+    // Once the typed MODIFY CAS has superseded the frozen snapshot, retries
+    // only re-submit the user's compilation input.  Replaying the old CAS
+    // would correctly produce a 409 and would not help the user recover.
+    if (semanticModifySupersededKeysRef.current.has(key)) {
+      await send(modification);
+      return;
+    }
+    if (!beginSemanticAction(key, "MODIFYING")) return;
+    const taskId = event.task_id?.trim();
+    if (!token || !taskId) {
+      semanticActionKeysRef.current.delete(key);
+      setSemanticConfirmationStates(previous => ({ ...previous, [key]: "STALE" }));
+      setSemanticConfirmationErrors(previous => ({
+        ...previous,
+        [key]: semanticConfirmationErrorMessage()
+      }));
+      return;
+    }
+    try {
+      const response = await agentService.controlSemanticConfirmation(
+        token,
+        taskId,
+        buildSemanticConfirmationControl(payload, "MODIFY", modification)
+      );
+      if (!response.requires_new_compilation) return;
+      semanticModifySupersededKeysRef.current.add(key);
+      // The old snapshot is now permanently non-executable.  This is the
+      // only normal-language submission in this flow, and it creates the new
+      // semantic version through the existing compilation path.
+      await send(modification);
+    } catch (caught) {
+      setSemanticConfirmationStates(previous => ({
+        ...previous,
+        [key]: caught instanceof AgentApiError && caught.status === 409 ? "STALE" : "MODIFYING"
+      }));
+      setSemanticConfirmationErrors(previous => ({ ...previous, [key]: semanticControlError(caught) }));
+    } finally {
+      semanticActionKeysRef.current.delete(key);
     }
   };
 
@@ -334,6 +1127,9 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     if (!token || !run?.approval || loading) return;
     setLoading(true);
     setError(null);
+    const previousAgentCount = agentMessageCount(messages);
+    let approvedExecution: Execution | null = null;
+    let projected = true;
     try {
       const updated = await agentService.decideApproval(
         token,
@@ -347,16 +1143,19 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         const controller = new AbortController();
         runControllerRef.current = controller;
         if (execution) {
-          const completed = await waitForExecution(
+          approvedExecution = await waitForExecution(
             token,
             execution.execution_id,
-            setExecution,
+            snapshot => {
+              setExecution(snapshot);
+              if (isTerminalExecution(snapshot.status)) setProjectionPending(true);
+            },
             undefined,
             controller.signal
           );
-          if (completed.status === "FAILED") {
-            const failedStep = completed.steps?.find(step => step.error_message);
-            throw new Error(failedStep?.error_message || "Runtime publish failed");
+          if (approvedExecution.status === "FAILED") {
+            const failedStep = approvedExecution.steps?.find(step => step.error_message);
+            throw new Error(failedStep?.error_message || "发布未完成");
           }
         } else {
           const completed = await waitForAgentRun(
@@ -370,11 +1169,91 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
           }
         }
       }
-      setMessages(await agentService.listMessages(token, run.conversation_id));
+      if (approvedExecution) {
+        setProjectionPending(true);
+        const refreshed = await refreshMessagesAfterExecution(
+          token,
+          run.conversation_id,
+          previousAgentCount,
+          approvedExecution ? [approvedExecution.execution_id] : []
+        );
+        projected = refreshed.projected;
+        setMessages(refreshed.messages);
+      } else {
+        setMessages(await agentService.listMessages(token, run.conversation_id));
+      }
       setRun(null);
-      setExecution(null);
+      if (approvedExecution && !projected) {
+        setExecution(approvedExecution);
+        setProjectionPending(true);
+      } else {
+        setExecution(null);
+        setExecutions([]);
+        setProjectionPending(false);
+      }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "审批操作失败");
+      setError(friendlyClientError(caught));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Activity-native approval path.  The visible request and identifiers come
+   * from the durable public Activity contract; Run polling here is only the
+   * command transport needed by the existing approval endpoint, never a
+   * source for a user-facing business completion claim.
+   */
+  const decideActivityApproval = async (
+    activity: UserActivityEvent,
+    decision: "APPROVE" | "REJECT"
+  ) => {
+    const approvalId = typeof activity.safe_payload.approval_id === "string"
+      ? activity.safe_payload.approval_id.trim()
+      : "";
+    if (!token || !activity.run_id || !approvalId || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await agentService.decideApproval(
+        token,
+        activity.run_id,
+        approvalId,
+        decision,
+        // The durable approval service is the authority; the current route
+        // accepts this compatibility field but does not use a Run version.
+        0
+      );
+      // The decision itself is now durable.  Keep the historical waiting
+      // Activity visible, but prevent a second click from resubmitting it.
+      setResolvedApprovalActivityIds(previous => ({
+        ...previous,
+        [activity.activity_id]: decision === "APPROVE" ? "APPROVED" : "REJECTED"
+      }));
+      if (decision === "APPROVE") {
+        const controller = new AbortController();
+        runControllerRef.current = controller;
+        const settled = await waitForAgentRun(
+          token,
+          activity.run_id,
+          () => undefined,
+          controller.signal
+        );
+        if (settled.status === "FAILED") {
+          throw new Error(settled.error || "审批后的操作没有完成");
+        }
+      }
+      if (conversation) {
+        setMessages(await agentService.listMessages(
+          token,
+          conversation.conversation_id
+        ));
+      }
+      // Do not add a synthetic “approved” or “completed” Activity here.
+      // The worker must still emit an observed Runtime result, which the
+      // backend projector will persist and stream in its normal order.
+    } catch (caught) {
+      setError(friendlyClientError(caught));
     } finally {
       setLoading(false);
     }
@@ -389,23 +1268,17 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         const updated = await executionService.cancel(token, execution.execution_id);
         setExecution(previous => previous ? { ...previous, ...updated } : updated);
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Runtime cancel failed");
+        setError(friendlyClientError(caught));
       } finally {
         setLoading(false);
       }
       return;
     }
-    if (!token || !run || ["COMPLETED", "FAILED", "CANCELLED"].includes(run.status)) return;
-    runControllerRef.current?.abort();
-    setLoading(true);
-    setError(null);
-    try {
-      setRun(await agentService.cancelRun(token, run.run_id));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "取消任务失败");
-    } finally {
-      setLoading(false);
-    }
+    if (!token || !run || ["COMPLETED", "PARTIAL_SUCCESS", "FAILED", "CANCELLED"].includes(run.status)) return;
+    // A compatibility Run without a canonical Execution cannot be cancelled
+    // through the Runtime control API (no such endpoint exists).  Surface a
+    // clear message instead of firing a request that always 404s.
+    setError("该任务暂不支持直接取消，请等待执行完成或联系管理员。");
   };
 
   const interruptRun = async () => {
@@ -414,20 +1287,15 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         const updated = await executionService.pause(token, execution.execution_id);
         setExecution(previous => previous ? { ...previous, ...updated } : updated);
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Runtime pause failed");
+        setError(friendlyClientError(caught));
       }
       return;
     }
     if (!token || !run || !["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY", "WAITING_LANE"].includes(run.status)) return;
-    runControllerRef.current?.abort();
-    setError(null);
-    try {
-      setRun(await agentService.interruptRun(token, run.run_id));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "暂停任务失败");
-    } finally {
-      setLoading(false);
-    }
+    // No run-level pause endpoint exists; the canonical Execution control API
+    // is the only supported pause path (handled above when an execution is
+    // present).  Do not fire a request that always 404s.
+    setError("该任务暂不支持直接暂停，请稍后在执行详情中操作。");
   };
 
   const continueRun = async (mode: "resume" | "retry") => {
@@ -442,7 +1310,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
           const failedStep = execution.steps?.find(step =>
             step.status === "FAILED" || step.status === "FAILED_RETRYABLE"
           );
-          if (!failedStep) throw new Error("No retryable Runtime step");
+          if (!failedStep) throw new Error("没有可重试的步骤");
           await executionService.retryStep(token, execution.execution_id, failedStep.step_id);
         }
         const controller = new AbortController();
@@ -450,33 +1318,41 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         const completed = await waitForExecution(
           token,
           execution.execution_id,
-          setExecution,
+          snapshot => {
+            setExecution(snapshot);
+            if (isTerminalExecution(snapshot.status)) setProjectionPending(true);
+          },
           undefined,
           controller.signal
         );
         if (completed.status === "FAILED") {
           const failedStep = completed.steps?.find(step => step.error_message);
-          throw new Error(failedStep?.error_message || "Runtime execution failed");
+          throw new Error(failedStep?.error_message || "任务执行未完成");
         }
         if (["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(completed.status)) return;
         if (conversation) {
+          setProjectionPending(true);
           const refreshed = await refreshMessagesAfterExecution(
             token,
             conversation.conversation_id,
             agentMessageCount(messages),
+            [completed.execution_id],
             controller.signal
           );
           setMessages(refreshed.messages);
           if (!refreshed.projected) {
             setExecution(completed);
-            setError("任务已完成，结果仍在同步，请稍后重试。");
             return;
           }
+          setExecution(null);
+          setExecutions([]);
+          setProjectionPending(false);
+          return;
         }
         setExecution(completed);
       } catch (caught) {
         if ((caught as DOMException)?.name !== "AbortError") {
-          setError(caught instanceof Error ? caught.message : "Runtime resume failed");
+          setError(friendlyClientError(caught));
         }
       } finally {
         setLoading(false);
@@ -484,98 +1360,76 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
       return;
     }
     if (!token || !run) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const queued = mode === "resume"
-        ? await agentService.resumeRun(token, run.run_id)
-        : await agentService.retryRun(token, run.run_id);
-      setRun(queued);
-      const controller = new AbortController();
-      runControllerRef.current = controller;
-      const completed = await waitForAgentRun(token, run.run_id, setRun, controller.signal);
-      if (completed.status === "FAILED") throw new Error(completed.error || "任务执行失败");
-      if (["WAITING_APPROVAL", "PAUSED"].includes(completed.status)) return;
-      setMessages(await agentService.listMessages(token, run.conversation_id));
-      setRun(null);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "任务恢复失败");
-    } finally {
-      setLoading(false);
-    }
+    // No run-level resume/retry endpoint exists; a compatibility Run without
+    // a canonical Execution cannot be resumed from the panel.  Fail with a
+    // clear message instead of firing a request that always 404s.
+    setError("该任务暂不支持在此恢复/重试，请在执行详情中操作。");
   };
 
-  const saveMemory = async () => {
-    if (!token || !memoryKey.trim() || !memoryValue.trim()) return;
-    try {
-      const saved = await agentService.saveMemory(
-        token,
-        memoryKey.trim(),
-        memoryValue.trim()
-      );
-      setMemories(previous => [
-        saved,
-        ...previous.filter(item => item.memory_id !== saved.memory_id && item.key !== saved.key)
-      ]);
-      setMemoryKey("");
-      setMemoryValue("");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "偏好保存失败");
+  const projectedExecutionIds = new Set(
+    messages.flatMap(message =>
+      (message.parts || [])
+        .filter(isExecutionResultPart)
+        .map(part => part.execution.execution_id)
+    )
+  );
+  const pendingExecutions = executions.filter(item =>
+    !["COMPLETED", "FAILED", "CANCELLED"].includes(item.status)
+      || !projectedExecutionIds.has(item.execution_id)
+  );
+  const fallbackExecution = execution
+    && (!["COMPLETED", "FAILED", "CANCELLED"].includes(execution.status)
+      || !projectedExecutionIds.has(execution.execution_id))
+    ? execution
+    : null;
+  const visibleExecution = pendingExecutions[0] || fallbackExecution;
+  const approvalInteraction = run
+    ? projectAgentRunToUserFacingInteraction(run)
+    : null;
+  const approvalFallbackInteraction = projectPendingApprovalFallback(run, execution);
+  const visibleApprovalInteraction = approvalInteraction || approvalFallbackInteraction;
+  const hasDurableApprovalActivity = userActivities.some(event =>
+    event.status === "WAITING_APPROVAL"
+    && (!run?.run_id || event.run_id === run.run_id)
+  );
+  const latestMessage = messages[messages.length - 1];
+  const latestAssistantHasProjection = latestMessage?.role === "assistant"
+    && latestMessage.parts?.some(part => isExecutionResultPart(part) || isUserFacingInteractionPart(part));
+  // LEGACY_FALLBACK: only while the Activity feed is unavailable.  New
+  // approvals are rendered from NEEDS_APPROVAL Activity below.
+  const runArtifactInteractions = run && visibleApprovalInteraction && !latestAssistantHasProjection
+    && userActivities.length === 0
+    ? projectAgentRunArtifactsToUserFacingInteractions(run)
+    : [];
+  const concurrentRunItems = Object.entries(concurrentRuns);
+  const semanticConfirmationEvents = selectLatestSemanticConfirmationEvents(userActivities);
+  const approvalResolutionByActivityId = { ...resolvedApprovalActivityIds };
+  if (runsHydrated) {
+    const activeApprovalRunIds = new Set([
+      ...Object.keys(concurrentRuns),
+      ...(run?.run_id ? [run.run_id] : [])
+    ]);
+    for (const activity of userActivities) {
+      if (
+        activity.activity_type === "NEEDS_APPROVAL"
+        && activity.status === "WAITING_APPROVAL"
+        && activity.run_id
+        && !activeApprovalRunIds.has(activity.run_id)
+      ) {
+        approvalResolutionByActivityId[activity.activity_id] ||= "COMPLETED";
+      }
     }
-  };
-
-  const deleteMemory = async (memoryId: string) => {
-    if (!token) return;
-    if (!window.confirm("删除这条Agent偏好？删除后无法恢复。")) return;
-    try {
-      await agentService.deleteMemory(token, memoryId);
-      setMemories(previous => previous.filter(item => item.memory_id !== memoryId));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "偏好删除失败");
-    }
-  };
-
-  const updateMemoryProfile = async (
-    field: "episodic_enabled" | "semantic_enabled",
-    enabled: boolean
-  ) => {
-    if (!token || !memoryProfile) return;
-    const next = {
-      episodic_enabled: memoryProfile.episodic_enabled,
-      semantic_enabled: memoryProfile.semantic_enabled,
-      [field]: enabled
-    };
-    if (!next.episodic_enabled) next.semantic_enabled = false;
-    if (field === "semantic_enabled" && enabled) next.episodic_enabled = true;
-    try {
-      setMemoryProfile(await agentService.updateMemoryProfile(token, next));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "记忆设置更新失败");
-    }
-  };
-
-  const deleteEpisode = async (episodeId: string) => {
-    if (!token || !window.confirm("删除这条任务记忆？删除后无法恢复。")) return;
-    try {
-      await agentService.deleteEpisode(token, episodeId);
-      setEpisodes(previous => previous.filter(item => item.episode_id !== episodeId));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "任务记忆删除失败");
-    }
-  };
-
-  const clearEpisodes = async () => {
-    if (!token || !episodes.length) return;
-    if (!window.confirm(
-      `清空全部任务记忆？当前列表显示 ${episodes.length} 条，删除后无法恢复。`
-    )) return;
-    try {
-      await agentService.clearEpisodes(token);
-      setEpisodes([]);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "任务记忆清空失败");
-    }
-  };
+  }
+  const regularUserActivities = userActivities.filter(event =>
+    event.activity_type !== "NEEDS_SEMANTIC_CONFIRMATION"
+  );
+  // LEGACY_FALLBACK: historical Run/Execution/Step cards remain compiled for
+  // rollback only.  The normal panel renders durable UserActivityEvent below.
+  const showLiveActivity = false;
+  const composerLocked = isComposerDisabled(
+    composerState,
+    Boolean(token && conversation)
+  );
 
   if (!open) return null;
 
@@ -630,44 +1484,8 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
           <>
             <div className={styles.thread} ref={scrollRef} aria-live="polite">
               <details className={styles.memorySettings}>
-                <summary>Agent记忆 <small>可查看、关闭和删除</small></summary>
-                {memories.length ? (
-                  <div className={styles.memoryList}>
-                    {memories.map(memory => (
-                      <div key={memory.memory_id}>
-                        <span><strong>{memory.key}</strong>{memory.value}</span>
-                        <button type="button" onClick={() => void deleteMemory(memory.memory_id)}>删除</button>
-                      </div>
-                    ))}
-                  </div>
-                ) : <p>尚未保存偏好；偏好只会在你主动添加时保存。</p>}
-                <form className={styles.memoryForm} onSubmit={event => {
-                  event.preventDefault();
-                  void saveMemory();
-                }}>
-                  <input
-                    aria-label="偏好名称"
-                    name="agent-memory-key"
-                    autoComplete="off"
-                    placeholder="例如：写作语气…"
-                    value={memoryKey}
-                    onChange={event => setMemoryKey(event.target.value)}
-                  />
-                  <input
-                    aria-label="偏好内容"
-                    name="agent-memory-value"
-                    autoComplete="off"
-                    placeholder="例如：简洁、少用术语…"
-                    value={memoryValue}
-                    onChange={event => setMemoryValue(event.target.value)}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!memoryKey.trim() || !memoryValue.trim()}
-                  >
-                    保存
-                  </button>
-                </form>
+                <summary>Agent记忆 <small>当前为只读</small></summary>
+                <p className={styles.memoryNote}>记忆写入功能暂未开放，偏好会在对话中被自动记录。</p>
                 {memoryProfile ? (
                   <div className={styles.episodeSettings}>
                     <div className={styles.memoryControls}>
@@ -675,10 +1493,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                         <input
                           type="checkbox"
                           checked={memoryProfile.episodic_enabled}
-                          onChange={event => void updateMemoryProfile(
-                            "episodic_enabled",
-                            event.target.checked
-                          )}
+                          disabled
                         />
                         记住非敏感任务摘要
                       </label>
@@ -686,11 +1501,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                         <input
                           type="checkbox"
                           checked={memoryProfile.semantic_enabled}
-                          disabled={!memoryProfile.episodic_enabled}
-                          onChange={event => void updateMemoryProfile(
-                            "semantic_enabled",
-                            event.target.checked
-                          )}
+                          disabled
                         />
                         按语义召回相关任务
                       </label>
@@ -698,36 +1509,23 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                     <p>
                       任务记忆保留 {memoryProfile.retention_days} 天；密钥、密码等敏感请求不会自动保存。
                     </p>
-                    {episodes.length ? (
-                      <>
-                        <div className={styles.episodeList}>
-                          {episodes.map(episode => (
-                            <div key={episode.episode_id}>
-                              <span>
-                                <strong>{episode.goal}</strong>
-                                <small>
-                                  {new Date(episode.occurred_at).toLocaleString()}
-                                  {episode.recall_count ? ` · 已召回 ${episode.recall_count} 次` : ""}
-                                </small>
+                    {memoryRecords.length > 0 ? (
+                      <div className={styles.memoryRecords}>
+                        <div className={styles.memoryRecordsTitle}>最近记住的内容</div>
+                        <ul>
+                          {memoryRecords.slice(0, 6).map(record => (
+                            <li key={record.memory_id}>
+                              <span className={styles.memoryType}>
+                                {record.memory_type === "SEMANTIC" ? "偏好" : "任务"}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => void deleteEpisode(episode.episode_id)}
-                              >
-                                删除
-                              </button>
-                            </div>
+                              <span className={styles.memoryContent}>{record.content}</span>
+                            </li>
                           ))}
-                        </div>
-                        <button
-                          className={styles.clearMemoryButton}
-                          type="button"
-                          onClick={() => void clearEpisodes()}
-                        >
-                          清空任务记忆
-                        </button>
-                      </>
-                    ) : <p>完成非敏感任务后，相关摘要会显示在这里。</p>}
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className={styles.memoryNote}>还没有记住任何内容，完成一些任务后这里会显示。</p>
+                    )}
                   </div>
                 ) : null}
               </details>
@@ -735,21 +1533,20 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                 <div className={styles.welcome}>
                   <span className={styles.eyebrow}>社区任务Agent</span>
                   <h3>从一句话开始，后面的步骤交给我</h3>
-                  <p>我会展示执行进度和真实结果。涉及创作时调用 Creator Service，帖子数据与发布权限仍由 GreenBook 负责。</p>
-                  <div className={styles.suggestions}>
-                    {SUGGESTIONS.map(item => (
-                      <button key={item} type="button" onClick={() => void send(item)}>
-                        <span>{item}</span>
-                        <SendIcon width={16} height={16} aria-hidden="true" />
-                      </button>
-                    ))}
-                  </div>
+                  <p>我会在需要时查找社区内容、生成草稿或安排发布，并用简单的状态告诉你进展。</p>
+                  <p className={styles.naturalLanguageHint}>例如：“帮我找几篇关于 Agent 的帖子并总结共同方法”</p>
                 </div>
               ) : null}
 
-              {messages.map(message => {
+              {dedupeTerminalAgentMessages(messages).map((message, messageIndex, renderedMessages) => {
                 const resultParts = message.parts?.filter(isExecutionResultPart) ?? [];
+                const userFacingParts = message.parts?.filter(isUserFacingInteractionPart) ?? [];
+                const userFacingInteractions = [
+                  ...projectAgentMessageToUserFacingInteractions(resultParts),
+                  ...userFacingParts.map(projectUserFacingInteractionPart)
+                ];
                 const clarificationParts = message.parts?.filter(isClarificationPart) ?? [];
+                const hasStructuredUserFacingResult = resultParts.length > 0 || userFacingParts.length > 0;
                 return (
                   <article
                     className={message.role === "user" ? styles.userMessage : styles.agentMessage}
@@ -758,231 +1555,257 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                   {message.role === "assistant" ? (
                     <span className={styles.messageAuthor}><AgentIcon width={16} height={16} aria-hidden="true" /> GreenBook Agent</span>
                   ) : null}
-                  <div className={styles.messageText}>
-                    {message.role === "assistant"
-                      ? <AgentMarkdown content={
-                          resultParts.length
-                            ? structuredResultLead(resultParts)
-                            : message.content
-                        } />
-                      : message.content}
-                  </div>
-                  {resultParts.length ? (
-                    <ExecutionResultGroup
-                      parts={resultParts}
-                      onCompose={composeFollowUp}
+                  {message.role === "assistant" && hasStructuredUserFacingResult ? null : (
+                    <div className={styles.messageText}>
+                      {message.role === "assistant"
+                        ? <AgentMarkdown content={userFacingMessage(message.content)} />
+                        : message.content}
+                    </div>
+                  )}
+                  {userFacingInteractions.length ? (
+                    <AgentResultGroup
+                      interactions={userFacingInteractions}
+                      disabled={loading}
                     />
                   ) : null}
                   {clarificationParts.map(part => (
-                    <TargetClarificationPart
-                      key={String(part.command.command_id ?? message.message_id)}
-                      part={part}
-                      disabled={loading}
-                      onSelect={(candidate, command) => {
-                        const label = candidate.label || `目标 ${candidate.identity}`;
-                        void send(`选择：${label}`, command);
-                      }}
-                    />
+                    (() => {
+                      if (isTargetClarificationResolved(renderedMessages, messageIndex)) {
+                        return null;
+                      }
+                      const clarification = projectTargetClarification(part);
+                      return (
+                        <TargetClarificationPart
+                          key={String(part.command.command_id ?? message.message_id)}
+                          clarification={clarification.clarification}
+                          disabled={loading}
+                          onSelect={identity => {
+                            const candidate = part.candidates.find(item => item.identity === identity);
+                            if (!candidate) return;
+                            const selectedTaskChanges = Array.isArray(part.command.task_changes)
+                              ? part.command.task_changes.map(change => {
+                                if (!change || typeof change !== "object" || Array.isArray(change)) {
+                                  return change;
+                                }
+                                const delta = change as Record<string, unknown>;
+                                const existingReference = delta.target_reference;
+                                const targetReference = existingReference
+                                  && typeof existingReference === "object"
+                                  && !Array.isArray(existingReference)
+                                  ? existingReference as Record<string, unknown>
+                                  : {};
+                                return {
+                                  ...delta,
+                                  target_reference: {
+                                    ...targetReference,
+                                    ...(candidate.resource_id
+                                      ? {
+                                        id: candidate.resource_id,
+                                        resource_id: candidate.resource_id
+                                      }
+                                      : {}),
+                                    ...(candidate.task_id ? { task_id: candidate.task_id } : {})
+                                  }
+                                };
+                              })
+                              : undefined;
+                            const label = userFacingDisplayText(
+                              candidate.label,
+                              `目标 ${candidate.type.toLowerCase()}`
+                            );
+                            void send(`选择：${label}`, {
+                              ...part.command,
+                              target: {
+                                ...(part.command.target ?? {}),
+                                id: candidate.resource_id,
+                                task_id: candidate.task_id,
+                                resource_id: candidate.resource_id,
+                                artifact_id: candidate.artifact_id,
+                                execution_id: candidate.execution_id
+                              },
+                              ...(selectedTaskChanges ? { task_changes: selectedTaskChanges } : {})
+                            });
+                          }}
+                        />
+                      );
+                    })()
                   ))}
-                  {message.parts?.some(isToolPart) ? (
-                    <details className={styles.executionDetails}>
-                      <summary>查看本次执行记录</summary>
-                      <div className={styles.toolParts}>
-                        {message.parts.filter(isToolPart).map(part => (
-                          <ToolPart part={part} key={`${part.tool}-${part.label}`} />
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
                   </article>
                 );
               })}
 
-              {executions.length > 1 ? (
-                <MultiExecutionCard executions={executions} />
-              ) : null}
+              {semanticConfirmationEvents.map(event => {
+                const payload = projectSemanticConfirmation(event);
+                if (!payload) return null;
+                const key = semanticConfirmationKey(event, payload);
+                const state = semanticConfirmationStates[key] || "WAITING_CONFIRMATION";
+                return (
+                  <SemanticConfirmationCard
+                    key={key}
+                    event={event}
+                    state={state}
+                    disabled={loading || state === "CONFIRMING" || state === "CANCELLING"}
+                    error={semanticConfirmationErrors[key]}
+                    onConfirm={handleSemanticConfirm}
+                    onCancel={handleSemanticCancel}
+                    onModify={handleSemanticModify}
+                  />
+                );
+              })}
 
-              {execution && executions.length <= 1 ? (
-                <article className={styles.runCard} data-execution-id={execution.execution_id}>
-                  <div className={styles.runHeading}>
-                    <span
-                      className={execution.status === "COMPLETED"
-                        ? styles.completedDot
-                        : execution.control_state === "CANCELLED"
-                          ? styles.stopped
-                          : styles.pulse}
-                      aria-hidden="true"
-                    />
-                    <strong>
-                      Runtime 执行 · {execution.control_state === "PAUSING"
-                        ? "正在暂停"
-                        : execution.control_state === "RESUMING"
-                          ? "正在继续"
-                          : runtimeExecutionStatusLabel(execution.status)}
-                    </strong>
-                    {(execution.control_state === "RUNNING"
-                      && ["PENDING", "RUNNING", "WAITING_HUMAN", "WAITING_APPROVAL"].includes(execution.status)) ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void interruptRun()}>
-                        {runtimeExecutionButtonLabels.pause}
-                      </button>
-                    ) : null}
-                    {execution.control_state === "PAUSED" ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void continueRun("resume")}>
-                        {runtimeExecutionButtonLabels.resume}
-                      </button>
-                    ) : null}
-                    {execution.status === "FAILED" ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void continueRun("retry")}>
-                        {runtimeExecutionButtonLabels.retry}
-                      </button>
-                    ) : null}
-                    {execution.control_state !== "CANCELLED"
-                      && !["COMPLETED", "FAILED", "CANCELLED"].includes(execution.status) ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void cancelRun()}>
-                        {runtimeExecutionButtonLabels.cancel}
-                      </button>
-                    ) : null}
-                  </div>
-                  <p className={styles.executionSummary} aria-live="polite">
-                    {executionProgressSummary(execution)}
-                  </p>
-                  {execution.status === "FAILED" ? (
-                    <FailureNotice execution={execution} />
-                  ) : null}
-                  <details className={styles.executionProcess}>
-                    <summary>
-                      <span>查看执行过程</span>
-                      <small>{execution.completed_steps}/{execution.total_steps} 步</small>
-                    </summary>
-                    <div className={styles.steps}>
-                      {execution.steps?.map(step => (
-                        <div className={styles.step} key={step.step_execution_id || step.step_id}>
-                          <span className={styles.stepIcon} aria-hidden="true">
-                            {step.status === "COMPLETED"
-                              ? <CheckIcon width={15} height={15} />
-                              : step.capability?.includes("schedule")
-                                ? <ClockIcon width={15} height={15} />
-                                : <SearchIcon width={15} height={15} />}
-                          </span>
-                          <span>{runtimeStepLabel(step.capability || step.step_id)}</span>
-                          <small>{runtimeStepStatusLabel(step.status)}</small>
-                        </div>
-                      ))}
-                    </div>
-                    <small className={styles.executionRecordHint}>
-                      完整任务记录可在任务中心查看。
-                    </small>
-                  </details>
-                </article>
-              ) : null}
+              <UserActivityCluster
+                activities={regularUserActivities}
+                disabled={loading}
+                resolvedApprovalActivityIds={approvalResolutionByActivityId}
+                onApprovalDecision={decideActivityApproval}
+              />
 
-              {run ? (
-                <article className={styles.runCard}>
-                  <div className={styles.runHeading}>
-                    <span className={run.status === "CANCELLED" ? styles.stopped : styles.pulse} aria-hidden="true" />
-                    <strong>{run.summary || "正在理解并执行任务"}</strong>
-                    {!run.approval && ["QUEUED", "RUNNING", "RETRYING", "WAITING_DEPENDENCY", "WAITING_LANE"].includes(run.status) ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void interruptRun()}>
-                        暂停
-                      </button>
-                    ) : null}
-                    {run.status === "PAUSED" ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void continueRun("resume")}>
-                        继续
-                      </button>
-                    ) : null}
-                    {run.status === "FAILED" ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void continueRun("retry")}>
-                        重试
-                      </button>
-                    ) : null}
-                    {!run.approval && !["COMPLETED", "FAILED", "CANCELLED", "PAUSED"].includes(run.status) ? (
-                      <button className={styles.cancelRun} type="button" onClick={() => void cancelRun()}>
-                        停止
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className={styles.steps}>
-                    {run.steps.map(step => (
-                      <div className={styles.step} key={step.step_id}>
-                        <span className={styles.stepIcon} aria-hidden="true">
-                          {step.status === "COMPLETED"
-                            ? <CheckIcon width={15} height={15} />
-                            : step.tool_name?.includes("schedule")
-                              ? <ClockIcon width={15} height={15} />
-                              : <SearchIcon width={15} height={15} />}
-                        </span>
-                        <span>
-                          {step.label}
-                          {step.agent_name ? <small> · {step.agent_name}</small> : null}
-                        </span>
-                        <small>
-                          {step.status === "COMPLETED"
-                            ? "完成"
-                            : step.status === "FAILED"
-                              ? "失败"
-                              : step.status === "CANCELLED"
-                                ? "已停止"
-                                : step.status === "WAITING_DEPENDENCY"
-                                  ? "等待依赖"
-                                  : "执行中"}
-                        </small>
-                      </div>
+              {understanding && showLiveActivity ? (
+                <section className={styles.understandingCard} aria-live="polite">
+                  <strong>{understanding.summary}</strong>
+                  <ul className={styles.understandingList}>
+                    {understanding.tasks.map((task, index) => (
+                      <li key={index}>
+                        {task.description || `任务 ${index + 1}`}
+                        {task.requires_search ? "（需要先搜索）" : ""}
+                        {task.publish_at ? (
+                          <> · {formatBusinessDateTime(task.publish_at, getDisplayTimezone()) ?? task.publish_at} 发布</>
+                        ) : null}
+                      </li>
                     ))}
-                  </div>
-                  {run.approval ? (
-                    <div className={styles.approval}>
-                      <div>
-                        <strong>
-                          {run.approval.action.includes("delete")
-                            ? "删除前需要你确认"
-                            : "发布前需要你确认"}
-                        </strong>
-                        <p>{run.approval.description}</p>
-                        {typeof run.approval.preview.draft_id === "string"
-                          ? <small>草稿号 {run.approval.preview.draft_id}</small>
-                          : null}
-                        {Array.isArray(run.approval.preview.items)
-                          ? <small>将安排 {run.approval.preview.items.length} 篇草稿</small>
-                          : null}
-                        {Array.isArray(run.approval.preview.post_ids)
-                          ? <small>将软删除你的 {run.approval.preview.post_ids.length} 篇帖子</small>
-                          : null}
-                      </div>
-                      <div className={styles.approvalActions}>
-                        <button type="button" onClick={() => void decideApproval("REJECT")}>
-                          取消
-                        </button>
-                        <button type="button" onClick={() => void decideApproval("APPROVE")}>
-                          {run.approval.action.includes("delete")
-                            ? "确认删除"
-                            : "确认发布"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                  <details className={styles.runMeta}>
-                    <summary>运行详情</summary>
-                    <span>追踪号 {run.trace_id.slice(0, 8)}</span>
-                    <span>
-                      路径 {{
-                        ROUTING: "路由中",
-                        DIRECT: "直接回答",
-                        TOOL: "单工具",
-                        CREATOR: "AI 创作",
-                        ORCHESTRATED: "完整编排"
-                      }[run.execution_path]}
-                    </span>
-                    <span>通道 {run.workload_lane === "WRITE" ? "串行写入" : run.workload_lane === "READ" ? "并发只读" : "路由中"}</span>
-                    <span>模型 {run.budget.model_calls}/{run.budget.max_model_calls}</span>
-                    <span>工具 {run.budget.tool_calls}/{run.budget.max_tool_calls}</span>
-                    <span>模型耗时 {(run.timing.model_ms / 1000).toFixed(1)}s</span>
-                    <span>工具耗时 {(run.timing.tool_ms / 1000).toFixed(1)}s</span>
-                  </details>
-                </article>
+                  </ul>
+                </section>
               ) : null}
 
-              {loading && !run ? <div className={styles.thinking}>正在建立任务…</div> : null}
+              {showLiveActivity && concurrentRunItems.length > 0 ? (
+                <section className={styles.concurrentSummary} aria-live="polite">
+                  <strong>
+                    {concurrentRunItems.every(([, item]) =>
+                      ["WAITING_USER", "WAITING_HUMAN", "WAITING_APPROVAL", "PAUSED"].includes(item.status)
+                    )
+                      ? `有 ${concurrentRunItems.length} 项内容等待你确认`
+                      : `正在处理 ${concurrentRunItems.length} 项事情`}
+                  </strong>
+                  <div className={styles.concurrentList}>
+                    {concurrentRunItems.map(([runId, item]) => {
+                      // A queued mid-turn follow-up renders as a hint on its
+                      // parent card, not as a second parallel card.
+                      const queuedAsFollowUp = Object.values(followUpHints)
+                        .some(hint => hint.followUpRunId === runId);
+                      if (queuedAsFollowUp) return null;
+                      const hint = followUpHints[runId];
+                      const activity = concurrentActivities[runId] || { current: null, done: [] };
+                      const failed = item.status === "FAILED";
+                      return (
+                        <div className={styles.concurrentItem} key={runId}>
+                          <span className={failed ? styles.concurrentFailed : styles.concurrentMarker} aria-hidden="true">
+                            {failed ? "!" : "•"}
+                          </span>
+                          <div>
+                            <strong>{failed ? "这项事情没有完成" : runItemTitle(item)}</strong>
+                            {activity.done.map((done, index) => (
+                              <div className={styles.concurrentDone} key={`${runId}-${index}`}>
+                                ✓ {done.title}
+                                {typeof done.count === "number" ? ` ${done.count} 项` : ""}
+                                {done.runAt ? (
+                                  <> · {formatBusinessDateTime(done.runAt, getDisplayTimezone()) ?? done.runAt} 发布</>
+                                ) : null}
+                              </div>
+                            ))}
+                            {activity.current && !failed ? (
+                              <div className={styles.concurrentCurrent}>• {activity.current}</div>
+                            ) : null}
+                            {hint ? (
+                              <div className={styles.followUpHint}>
+                                <span>已收到你的补充：{hint.message}</span>
+                                <small>将在当前任务完成后处理</small>
+                              </div>
+                            ) : null}
+                            {failed && item.error ? <small>这项请求暂时未完成，请稍后重试。</small> : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
+
+              {showLiveActivity && pendingExecutions.length > 1 && !visibleApprovalInteraction ? (
+                <AgentExecutionActivityGroup
+                  executions={pendingExecutions}
+                  projectionPending={projectionPending}
+                />
+              ) : null}
+
+              {showLiveActivity && pendingExecutions.length <= 1 && visibleExecution && !visibleApprovalInteraction ? (
+                <AgentExecutionActivityCard
+                  execution={visibleExecution}
+                  disabled={loading}
+                  projectionPending={projectionPending}
+                  handlers={{
+                    onPause: () => void interruptRun(),
+                    onResume: () => void continueRun("resume"),
+                    onRetry: () => void continueRun("retry"),
+                    onCancel: () => void cancelRun()
+                  }}
+                />
+              ) : null}
+
+              {runArtifactInteractions.length ? (
+                <AgentResultGroup
+                  interactions={runArtifactInteractions}
+                  disabled={loading}
+                />
+              ) : null}
+
+              {!hasDurableApprovalActivity && visibleApprovalInteraction?.kind === "APPROVAL_REQUEST" ? (
+                <AgentApprovalCard
+                  approval={visibleApprovalInteraction.approval}
+                  disabled={loading}
+                  onApprove={() => void decideApproval("APPROVE")}
+                  onReject={() => void decideApproval("REJECT")}
+                  onModify={() => {
+                    composeFollowUp("继续修改当前内容，不要发布");
+                    void decideApproval("REJECT");
+                  }}
+                />
+              ) : null}
+
+              {showLiveActivity && run && !visibleApprovalInteraction && !visibleExecution ? (
+                <AgentRunActivityCard
+                  run={run}
+                  disabled={loading}
+                  handlers={{
+                    onPause: () => void interruptRun(),
+                    onResume: () => void continueRun("resume"),
+                    onRetry: () => void continueRun("retry"),
+                    onCancel: () => void cancelRun()
+                  }}
+                />
+              ) : null}
+
+              {showLiveActivity && loading && !run && !visibleExecution && (
+                runActivity.done.length > 0 || runActivity.current || pendingCapability
+              ) ? (
+                <div className={styles.thinking}>
+                  {runActivity.done.map((item, index) => (
+                    <div key={index} className={styles.activityDone}>
+                      ✓ {item.title}{typeof item.count === "number" ? ` ${item.count} 篇` : ""}
+                    </div>
+                  ))}
+                  {runActivity.current ? (
+                    <div className={styles.activityCurrent}>
+                      • {runActivity.current}
+                    </div>
+                  ) : null}
+                  {!runActivity.current && runActivity.done.length === 0 && pendingCapability ? (
+                    <div className={styles.activityCurrent}>
+                      • {capabilityActiveLabel(pendingCapability) || "正在处理你的请求…"}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {showLiveActivity && loading && !run && !visibleExecution && runActivity.done.length === 0 && !runActivity.current && !pendingCapability ? <div className={styles.thinking}>正在理解你的请求…</div> : null}
               {error ? <div className={styles.error} role="alert">{error}</div> : null}
             </div>
 
@@ -1001,12 +1824,12 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                 name="agent-message"
                 autoComplete="off"
                 rows={2}
-                disabled={loading}
+                disabled={composerLocked}
                 aria-label="给 GreenBook Agent发送消息"
               />
               <div className={styles.composerMeta}>
                 <span>Enter 发送 · Shift + Enter 换行</span>
-                <button type="button" disabled={!content.trim() || loading} onClick={() => void send()} aria-label="发送">
+                <button type="button" disabled={!content.trim() || composerLocked} onClick={() => void send()} aria-label="发送">
                   <SendIcon width={19} height={19} />
                 </button>
               </div>
@@ -1018,10 +1841,6 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
   );
 };
 
-const isExecutionResultPart = (
-  part: AgentMessagePart
-): part is AgentExecutionResultPart => part.type === "execution_result";
-
 const isClarificationPart = (
   part: AgentMessagePart
 ): part is AgentTargetClarificationPart => part.type === "target_clarification";
@@ -1032,357 +1851,41 @@ const isToolPart = (part: AgentMessagePart): part is AgentToolPart =>
   && "tool" in part;
 
 const TargetClarificationPart = ({
-  part,
+  clarification,
   disabled,
   onSelect
 }: {
-  part: AgentTargetClarificationPart;
+  clarification: UserFacingTargetClarification;
   disabled?: boolean;
-  onSelect: (
-    candidate: AgentClarificationCandidate,
-    command: Record<string, unknown>
-  ) => void;
+  onSelect: (identity: string) => void;
 }) => (
-  <section className={styles.clarificationCard} aria-label="请选择要操作的目标">
+  <section className={styles.clarificationCard} aria-label={clarification.question}>
     <div className={styles.clarificationHeading}>
       <SearchIcon width={18} height={18} aria-hidden="true" />
       <div>
-        <strong>请选择要操作的目标</strong>
-        <small>选择后会继续原来的命令，不会创建重复任务。</small>
+        <strong>{clarification.question}</strong>
+        <small>{clarification.description}</small>
       </div>
     </div>
     <div className={styles.clarificationOptions} role="list">
-      {part.candidates.map((candidate, index) => (
+      {clarification.candidates.map((candidate, index) => (
         <button
           type="button"
           role="listitem"
           key={candidate.identity}
           disabled={disabled}
-          onClick={() => onSelect(candidate, {
-            ...part.command,
-            target: {
-              ...(part.command.target ?? {}),
-              task_id: candidate.task_id,
-              resource_id: candidate.resource_id,
-              artifact_id: candidate.artifact_id,
-              execution_id: candidate.execution_id
-            }
-          })}
+          onClick={() => onSelect(candidate.identity)}
         >
           <span className={styles.clarificationIndex}>{index + 1}</span>
           <span>
-            <strong>{candidate.label || `未命名${candidate.type.toLowerCase()}`}</strong>
-            <small>{friendlyResultStatus(candidate.status || candidate.type)}</small>
+            <strong>{candidate.label}</strong>
+            <small>{candidate.status}</small>
           </span>
         </button>
       ))}
     </div>
   </section>
 );
-
-const ExecutionResultGroup = ({
-  parts,
-  onCompose
-}: {
-  parts: AgentExecutionResultPart[];
-  onCompose: (prompt: string) => void;
-}) => {
-  if (parts.length === 1) {
-    return <ExecutionResultPart part={parts[0]} onCompose={onCompose} />;
-  }
-  const completed = parts.filter(part => part.execution.status === "COMPLETED").length;
-  const failed = parts.filter(part => part.execution.status === "FAILED").length;
-  return (
-    <section className={styles.resultGroup} aria-label="本次多任务结果">
-      <header className={styles.resultGroupHeading}>
-        <div>
-          <strong>本次任务</strong>
-          <small>
-            {completed} 项完成
-            {failed ? ` · ${failed} 项需要处理` : ""}
-          </small>
-        </div>
-        <span>{parts.length} 项</span>
-      </header>
-      <div className={styles.resultGroupItems}>
-        {parts.map((part, index) => (
-          <ExecutionResultPart
-            part={part}
-            onCompose={onCompose}
-            position={index + 1}
-            key={part.execution.execution_id}
-          />
-        ))}
-      </div>
-    </section>
-  );
-};
-
-const ExecutionResultPart = ({
-  part,
-  onCompose,
-  position
-}: {
-  part: AgentExecutionResultPart;
-  onCompose: (prompt: string) => void;
-  position?: number;
-}) => {
-  const draft = part.artifacts.find(artifact =>
-    artifact.resource_type === "DRAFT" || ["DRAFT", "POST_DRAFT", "CONTENT_DRAFT"].includes(artifact.type)
-  );
-  const scheduleArtifact = part.artifacts.find(artifact =>
-    artifact.resource_type === "SCHEDULE" || ["SCHEDULE", "PUBLICATION_SCHEDULE"].includes(artifact.type)
-  );
-  const schedule = part.schedule ?? {};
-  const runAt = scheduleArtifact?.run_at
-    ?? scheduleArtifact?.publish_time
-    ?? (typeof schedule.run_at === "string" ? schedule.run_at : null);
-  const timezone = scheduleArtifact?.timezone
-    ?? (typeof schedule.timezone === "string" ? schedule.timezone : "Asia/Shanghai");
-  const scheduleId = scheduleArtifact?.resource_id
-    ?? (typeof schedule.schedule_id === "string" ? schedule.schedule_id : null);
-  const status = scheduleArtifact?.status
-    ?? (typeof schedule.status === "string" ? schedule.status : part.execution.status);
-  const formattedRunAt = formatResultTime(runAt, timezone);
-  const failed = part.execution.status === "FAILED";
-  const cancelled = part.execution.status === "CANCELLED";
-  const subject = draft?.title || part.execution.summary || "这项任务";
-  const resultTitle = failed
-    ? "任务未完成"
-    : cancelled
-      ? "任务已取消"
-      : draft && (runAt || scheduleId)
-        ? "内容已创建并安排发布"
-        : draft
-          ? "内容创作已完成"
-          : "任务已完成";
-
-  return (
-    <section
-      className={`${styles.resultCard} ${failed ? styles.resultCardFailed : ""}`}
-      aria-label={failed ? "任务失败结果" : "任务完成结果"}
-    >
-      <div className={styles.resultHeading}>
-        <span className={failed ? styles.resultFailure : styles.resultCheck} aria-hidden="true">
-          {failed ? <CloseIcon width={16} height={16} /> : <CheckIcon width={16} height={16} />}
-        </span>
-        <div>
-          <strong>{position ? `${position}. ${resultTitle}` : resultTitle}</strong>
-          <small>{friendlyResultStatus(status)}</small>
-        </div>
-      </div>
-
-      {!failed && part.execution.summary ? (
-        <p className={styles.resultSummary}>{part.execution.summary}</p>
-      ) : null}
-
-      {draft ? (
-        <div className={styles.resultContent}>
-          <span>草稿</span>
-          <strong>{draft.title || "未命名草稿"}</strong>
-          {draft.summary || draft.content ? <p>{draft.summary || draft.content}</p> : null}
-          {draft.resource_id ? <small>草稿 ID：{draft.resource_id}</small> : null}
-        </div>
-      ) : null}
-
-      {runAt || scheduleId ? (
-        <div className={styles.scheduleSummary}>
-          <ClockIcon width={16} height={16} aria-hidden="true" />
-          <div>
-            {formattedRunAt ? <strong>{formattedRunAt}</strong> : null}
-            <small>
-              {status || "等待发布"}
-              {scheduleId ? ` · 定时任务 ${scheduleId}` : ""}
-            </small>
-          </div>
-        </div>
-      ) : null}
-
-      <div className={styles.resultActions} aria-label="结果操作">
-        {draft?.resource_id ? (
-          <Link to={`/create/manual?draftId=${encodeURIComponent(draft.resource_id)}`}>
-            查看文章
-          </Link>
-        ) : null}
-        {draft ? (
-          <button type="button" onClick={() => onCompose(`修改「${subject}」的内容`)}>
-            修改内容
-          </button>
-        ) : null}
-        {scheduleId ? (
-          <button type="button" onClick={() => onCompose(`调整「${subject}」的发布时间`)}>
-            调整发布时间
-          </button>
-        ) : null}
-        {scheduleId ? (
-          <button type="button" onClick={() => onCompose(`取消「${subject}」的发布计划`)}>
-            取消发布
-          </button>
-        ) : null}
-        <Link to="/tasks">查看任务详情</Link>
-      </div>
-
-      <details className={styles.resultExecution}>
-        <summary>查看执行详情</summary>
-        {part.execution.steps?.length ? (
-          <ol>
-            {part.execution.steps.map(step => (
-              <li key={step.step_id || step.label}>
-                <span>{runtimeStepLabel(step.label || step.step_id || "")}</span>
-                <small>{runtimeStepStatusLabel(step.status || "PENDING")}</small>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-      </details>
-    </section>
-  );
-};
-
-const MultiExecutionCard = ({ executions }: { executions: Execution[] }) => {
-  const completed = executions.filter(item => item.status === "COMPLETED").length;
-  const failed = executions.filter(item => item.status === "FAILED").length;
-  return (
-    <article className={styles.multiExecutionCard} aria-label="多任务执行状态">
-      <header className={styles.multiExecutionHeading}>
-        <div>
-          <strong>正在处理本次任务</strong>
-          <small aria-live="polite">
-            {completed}/{executions.length} 项完成
-            {failed ? ` · ${failed} 项需要处理` : ""}
-          </small>
-        </div>
-        <span>{Math.round((completed / executions.length) * 100)}%</span>
-      </header>
-      <ol className={styles.multiExecutionList}>
-        {executions.map((item, index) => (
-          <li key={item.execution_id}>
-            <span className={styles.multiExecutionIndex}>{index + 1}</span>
-            <div>
-              <strong>{item.task_id ? `任务 ${index + 1}` : "子任务"}</strong>
-              <small>{executionProgressSummary(item)}</small>
-            </div>
-            <span className={styles.multiExecutionStatus}>
-              {runtimeExecutionStatusLabel(item.status)}
-            </span>
-          </li>
-        ))}
-      </ol>
-      <details className={styles.executionProcess}>
-        <summary>查看全部执行过程</summary>
-        {executions.map((item, index) => (
-          <div className={styles.multiExecutionSteps} key={item.execution_id}>
-            <strong>任务 {index + 1}</strong>
-            {item.steps?.map(step => (
-              <span key={step.step_execution_id || step.step_id}>
-                {runtimeStepLabel(step.capability || step.step_id)}
-                <small>{runtimeStepStatusLabel(step.status)}</small>
-              </span>
-            ))}
-          </div>
-        ))}
-      </details>
-    </article>
-  );
-};
-
-const FailureNotice = ({ execution }: { execution: Execution }) => {
-  const failure = friendlyExecutionFailure(execution);
-  return (
-    <section className={styles.failureNotice} role="alert">
-      <strong>{failure.title}</strong>
-      <p>{failure.reason}</p>
-      <small>{failure.recovery}</small>
-    </section>
-  );
-};
-
-const executionProgressSummary = (execution: Execution): string => {
-  if (execution.status === "COMPLETED") return "任务已完成，结果已保存。";
-  if (execution.status === "FAILED") return "任务没有完成，已有结果不会丢失。";
-  if (execution.status === "CANCELLED" || execution.control_state === "CANCELLED") {
-    return "任务已取消，不会继续执行后续步骤。";
-  }
-  if (execution.control_state === "PAUSED" || execution.status === "PAUSED") {
-    return "任务已暂停，可以稍后继续。";
-  }
-  const step = runtimeStepLabel(execution.current_step || "");
-  return step
-    ? `正在进行：${step}`
-    : `已完成 ${execution.completed_steps}/${execution.total_steps} 个步骤`;
-};
-
-const structuredResultLead = (parts: AgentExecutionResultPart[]): string => {
-  if (parts.length > 1) {
-    const completed = parts.filter(part => part.execution.status === "COMPLETED").length;
-    const failed = parts.filter(part => part.execution.status === "FAILED").length;
-    if (failed) {
-      return `我已经处理了本次的 ${parts.length} 项任务：${completed} 项完成，${failed} 项需要你处理。`;
-    }
-    return `我已经处理完本次的 ${parts.length} 项任务，结果都整理在下面。`;
-  }
-  const part = parts[0];
-  if (part.execution.status === "FAILED") {
-    return "这项任务没有完成。我保留了已有结果，并整理了可以继续处理的方式。";
-  }
-  if (part.execution.status === "CANCELLED") {
-    return "我已经停止这项任务，后续步骤不会继续执行。";
-  }
-  return "我已经完成这项任务，生成的内容和可继续操作的选项都在下面。";
-};
-
-const friendlyResultStatus = (status: string | null | undefined): string => {
-  const labels: Record<string, string> = {
-    SCHEDULED: "已安排发布",
-    DRAFT: "草稿已保存",
-    COMPLETED: "已完成",
-    FAILED: "需要处理",
-    CANCELLED: "已取消",
-    RUNNING: "执行中",
-    QUEUED: "等待执行"
-  };
-  return labels[String(status || "").toUpperCase()] ?? "状态已更新";
-};
-
-const friendlyExecutionFailure = (execution: Execution) => {
-  const failedStep = execution.steps?.find(step =>
-    step.status === "FAILED" || step.status === "FAILED_RETRYABLE"
-  );
-  const diagnostic = `${execution.error_code || ""} ${failedStep?.error_code || ""} ${failedStep?.error_message || ""}`.toUpperCase();
-  if (/AUTH|TOKEN|PERMISSION|UNAUTHORIZED|FORBIDDEN/.test(diagnostic)) {
-    return {
-      title: "需要重新授权",
-      reason: "当前登录或服务授权已失效。",
-      recovery: "重新登录后可以从失败步骤继续。"
-    };
-  }
-  if (/VALIDATION|INVALID|REQUIRED|ARGUMENT/.test(diagnostic)) {
-    return {
-      title: "需要补充信息",
-      reason: "这项操作缺少必要信息，系统没有继续执行。",
-      recovery: "补充要求后重新提交即可。"
-    };
-  }
-  if (/TIMEOUT|UNAVAILABLE|CONNECT|CREATOR|JAVA|DEPENDENCY/.test(diagnostic)) {
-    return {
-      title: "外部服务暂时不可用",
-      reason: "任务在调用外部服务时中断，已有内容和发布时间保持不变。",
-      recovery: "可以稍后从失败步骤重试。"
-    };
-  }
-  if (/UNKNOWN_SIDE_EFFECT|RECONCILIATION/.test(diagnostic)) {
-    return {
-      title: "操作状态需要确认",
-      reason: "系统暂时无法确认外部操作是否已经生效。",
-      recovery: "请先查看任务详情，确认状态后再重试。"
-    };
-  }
-  return {
-    title: "任务暂时没有完成",
-    reason: "执行过程中遇到了问题，已有结果仍然保留。",
-    recovery: "你可以稍后重试，或在任务中心查看详情。"
-  };
-};
 
 const friendlyClientError = (caught: unknown): string => {
   const message = caught instanceof Error ? caught.message.toUpperCase() : "";
@@ -1393,43 +1896,44 @@ const friendlyClientError = (caught: unknown): string => {
   if (/FETCH|NETWORK|CONNECT|UNAVAILABLE|502|503|504/.test(message)) {
     return "服务暂时无法连接，已有任务状态不会丢失。";
   }
-  return "任务暂时无法继续。你可以稍后重试，或前往任务中心查看状态。";
+    return "任务暂时无法继续。你可以稍后重试，或前往我的内容查看状态。";
 };
 
-const formatResultTime = (runAt: string | null, timezone: string): string | null => {
-  if (!runAt) return null;
-  const parsed = new Date(runAt);
-  if (Number.isNaN(parsed.getTime())) return runAt;
-  try {
-    return parsed.toLocaleString("zh-CN", {
-      timeZone: timezone,
-      hour12: false,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  } catch {
-    return parsed.toLocaleString("zh-CN", { hour12: false });
-  }
-};
-
+/** LEGACY_FALLBACK: retained for a future developer-only inspector; not rendered by AgentPanel. */
 const ToolPart = ({ part }: { part: AgentToolPart }) => {
   const result = part.result ?? {};
-  const draftId = typeof result.draft_id === "string" ? result.draft_id : null;
   const runAt = typeof result.run_at === "string" ? result.run_at : null;
+  const timezone = getDisplayTimezone(typeof result.timezone === "string" ? result.timezone : undefined);
   const results = Array.isArray(result.results) ? result.results as Array<Record<string, unknown>> : [];
   return (
     <div className={styles.toolPart}>
-      <span><CheckIcon width={14} height={14} aria-hidden="true" /> {toolLabel(part.tool)}</span>
+      <span><CheckIcon width={14} height={14} aria-hidden="true" /></span>
       <strong>{part.label}</strong>
       {results.length ? (
         <ul>{results.slice(0, 5).map(item => <li key={String(item.id)}>{String(item.title || "未命名帖子")}</li>)}</ul>
       ) : null}
-      {draftId ? <small>草稿号 {draftId}</small> : null}
-      {runAt ? <small>计划时间 {new Date(runAt).toLocaleString("zh-CN", { hour12: false })}</small> : null}
+      {runAt ? (
+        <small>计划时间 {formatBusinessDateTime(runAt, timezone) || runAt}</small>
+      ) : null}
     </div>
+  );
+};
+
+const ToolDetails = ({ parts }: { parts: AgentToolPart[] }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className={styles.executionDetails}
+      open={open}
+      onToggle={event => setOpen(event.currentTarget.open)}
+    >
+      <summary>查看处理进度</summary>
+      {open ? (
+        <div className={styles.toolParts}>
+          {parts.map(part => <ToolPart part={part} key={`${part.tool}-${part.label}`} />)}
+        </div>
+      ) : null}
+    </details>
   );
 };
 

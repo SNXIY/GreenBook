@@ -14,13 +14,16 @@ from greenbook_agent_core.planning.contracts import PlanRevision
 
 from .models import (
     ArtifactRef,
+    Objective,
     Task,
     TaskExecutionRef,
     TaskGoal,
     TaskResourceRef,
     TaskRevision,
+    TaskConfirmationState,
     TaskStatus,
 )
+from .repository import TaskVersionConflictError
 
 # ── DB tables ────────────────────────────────────────────────────────
 
@@ -39,6 +42,12 @@ _tasks = sa.Table(
     sa.Column("priority", sa.Integer, default=0),
     sa.Column("task_type", sa.String(64), default="GOAL_DRIVEN"),
     sa.Column("execution_mode", sa.String(32), default="AUTO"),
+    sa.Column("requires_confirmation", sa.Boolean, default=False),
+    sa.Column("confirmation_state", sa.String(40), default=TaskConfirmationState.RESOLVED.value),
+    sa.Column("confirmation_version", sa.Integer, default=0),
+    sa.Column("confirmed_version", sa.Integer),
+    sa.Column("confirmation_snapshot_hash", sa.String(128)),
+    sa.Column("confirmation_resume_run_id", sa.String(128)),
     sa.Column("root_goal_id", sa.String(128)),
     sa.Column("goal_tree_version", sa.Integer, default=0),
     sa.Column("goal_tree_snapshot", JSONB, default=dict),
@@ -48,6 +57,7 @@ _tasks = sa.Table(
     sa.Column("artifacts", JSONB, default=list),
     sa.Column("depends_on", JSONB, default=list),
     sa.Column("goals", JSONB, default=list),
+    sa.Column("objectives", JSONB, default=list),
     sa.Column("revisions", JSONB, default=list),
     sa.Column("execution_refs", JSONB, default=list),
     sa.Column("resource_index", JSONB, default=list),
@@ -93,6 +103,9 @@ class TaskRepository:
                 "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS goals JSONB"
             )
             await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS objectives JSONB"
+            )
+            await conn.exec_driver_sql(
                 "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS revisions JSONB"
             )
             await conn.exec_driver_sql(
@@ -134,6 +147,24 @@ class TaskRepository:
             await conn.exec_driver_sql(
                 "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS active_execution_id VARCHAR(128)"
             )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS requires_confirmation BOOLEAN DEFAULT FALSE"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS confirmation_state VARCHAR(40) DEFAULT 'RESOLVED'"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS confirmation_version INTEGER DEFAULT 0"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS confirmed_version INTEGER"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS confirmation_snapshot_hash VARCHAR(128)"
+            )
+            await conn.exec_driver_sql(
+                "ALTER TABLE assistant_tasks ADD COLUMN IF NOT EXISTS confirmation_resume_run_id VARCHAR(128)"
+            )
 
     async def insert(self, task: Task) -> Task:
         values = {
@@ -149,6 +180,12 @@ class TaskRepository:
             "priority": task.priority,
             "task_type": task.task_type,
             "execution_mode": task.execution_mode,
+            "requires_confirmation": task.requires_confirmation,
+            "confirmation_state": task.confirmation_state.value,
+            "confirmation_version": task.confirmation_version,
+            "confirmed_version": task.confirmed_version,
+            "confirmation_snapshot_hash": task.confirmation_snapshot_hash,
+            "confirmation_resume_run_id": task.confirmation_resume_run_id,
             "root_goal_id": task.root_goal_id,
             "goal_tree_version": task.goal_tree_version,
             "goal_tree_snapshot": task.goal_tree_snapshot,
@@ -158,6 +195,7 @@ class TaskRepository:
             "artifacts": [a.model_dump(mode="json") for a in task.artifacts],
             "depends_on": task.depends_on,
             "goals": [g.model_dump(mode="json") for g in task.goals],
+            "objectives": [o.model_dump(mode="json") for o in task.objectives],
             "revisions": [r.model_dump(mode="json") for r in task.revisions],
             "execution_refs": [e.model_dump(mode="json") for e in task.execution_refs],
             "resource_index": [r.model_dump(mode="json") for r in task.resource_index],
@@ -197,18 +235,28 @@ class TaskRepository:
         rows = await self._session.execute(stmt)
         return [self._row_to_task(r) for r in rows.all() if r]
 
-    async def update(self, task_id: str, **fields: Any) -> Task | None:
+    async def update(
+        self,
+        task_id: str,
+        *,
+        expected_version: int | None = None,
+        **fields: Any,
+    ) -> Task | None:
         existing = await self.find_by_id(task_id)
         if existing is None:
             return None
-        version = existing.version
+        version = existing.version if expected_version is None else expected_version
+        if expected_version is not None and existing.version != expected_version:
+            raise TaskVersionConflictError(
+                f"Task '{task_id}' version {existing.version} != {expected_version}."
+            )
         values = {**fields, "version": version + 1,
                   "updated_at": datetime.now(UTC)}
         if "status" in values and isinstance(values["status"], TaskStatus):
             values["status"] = values["status"].value
         if isinstance(values.get("completed_at"), str):
             values["completed_at"] = datetime.fromisoformat(values["completed_at"])
-        await self._session.execute(
+        result = await self._session.execute(
             sa.update(_tasks)
             .where(sa.and_(
                 _tasks.c.task_id == uuid.UUID(task_id),
@@ -216,6 +264,11 @@ class TaskRepository:
             ))
             .values(**values)
         )
+        if result.rowcount != 1:
+            await self._session.rollback()
+            raise TaskVersionConflictError(
+                f"Task '{task_id}' changed while version {version} was being projected."
+            )
         await self._session.commit()
         return await self.find_by_id(task_id)
 
@@ -237,6 +290,18 @@ class TaskRepository:
             priority=int(d.get("priority", 0) or 0),
             task_type=str(d.get("task_type", "GOAL_DRIVEN") or "GOAL_DRIVEN"),
             execution_mode=str(d.get("execution_mode", "AUTO") or "AUTO"),
+            requires_confirmation=bool(d.get("requires_confirmation", False)),
+            confirmation_state=TaskConfirmationState(
+                d.get("confirmation_state", TaskConfirmationState.RESOLVED.value)
+                or TaskConfirmationState.RESOLVED.value
+            ),
+            confirmation_version=int(d.get("confirmation_version", 0) or 0),
+            confirmed_version=(
+                int(d["confirmed_version"])
+                if d.get("confirmed_version") is not None else None
+            ),
+            confirmation_snapshot_hash=d.get("confirmation_snapshot_hash"),
+            confirmation_resume_run_id=d.get("confirmation_resume_run_id"),
             root_goal_id=d.get("root_goal_id"),
             goal_tree_version=int(d.get("goal_tree_version", 0) or 0),
             goal_tree_snapshot=dict(d.get("goal_tree_snapshot") or {}),
@@ -250,6 +315,7 @@ class TaskRepository:
             ],
             depends_on=list(d.get("depends_on") or []),
             goals=[TaskGoal(**g) for g in (d.get("goals") or [])],
+            objectives=[Objective(**o) for o in (d.get("objectives") or [])],
             revisions=[TaskRevision(**r) for r in (d.get("revisions") or [])],
             execution_refs=[
                 TaskExecutionRef(**e) for e in (d.get("execution_refs") or [])
@@ -332,26 +398,15 @@ class TaskRegistry:
     ) -> list[Task]:
         return await self._repo.find_by_conversation(conversation_id, status=status)
 
-    async def update_task(self, task_id: str, **fields: Any) -> Task | None:
-        return await self._repo.update(task_id, **fields)
-
-    async def get_most_recent(self, conversation_id: str) -> Task | None:
-        tasks = await self.list_tasks(conversation_id)
-        return tasks[0] if tasks else None
-
-    # ── matching (simple recency for Phase 1, enhanced in Phase 2) ──
-
-    async def resolve_task(
-        self, conversation_id: str, hint: str | None = None
+    async def update_task(
+        self,
+        task_id: str,
+        *,
+        expected_version: int | None = None,
+        **fields: Any,
     ) -> Task | None:
-        """Find the task the user is most likely referring to.
-
-        Phase 1 strategy: return the most recent task (by updated_at).
-        Phase 2+ will add label / entity / semantic matching.
-        """
-        if hint:
-            tasks = await self.list_tasks(conversation_id)
-            for t in tasks:
-                if hint in t.goal or (t.goal_summary and hint in t.goal_summary):
-                    return t
-        return await self.get_most_recent(conversation_id)
+        return await self._repo.update(
+            task_id,
+            expected_version=expected_version,
+            **fields,
+        )

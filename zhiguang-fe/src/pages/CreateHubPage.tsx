@@ -29,12 +29,12 @@ const CreateHubPage = () => {
           <p>按步骤完成正文、配图和可见范围，最终内容会进入 GreenBook Agent 发布流程。</p>
           <span className={styles.cardAction}>开始写作 <ArrowRightIcon aria-hidden="true" /></span>
         </Link>
-        <Link to="/create/ai" className={`${styles.card} ${styles.aiCard}`}>
+        <Link to="/?assistant=1" className={`${styles.card} ${styles.aiCard}`}>
           <span className={styles.icon}><SparkIcon aria-hidden="true" /></span>
           <span className={styles.eyebrow}>AI 协作</span>
           <h2>和 AI 一起写</h2>
-          <p>由Creator Service 研究、搭结构并生成初稿，再回到同一发布向导补图确认。</p>
-          <span className={styles.cardAction}>打开创作Agent <ArrowRightIcon aria-hidden="true" /></span>
+          <p>在首页打开 GreenBook Agent，直接对话生成草稿、修改并定时发布。</p>
+          <span className={styles.cardAction}>打开 Agent <ArrowRightIcon aria-hidden="true" /></span>
         </Link>
       </div>
       <section className={styles.flow}>
@@ -42,14 +42,13 @@ const CreateHubPage = () => {
           <ShieldIcon aria-hidden="true" />
           <div>
             <h3>两条路径，一套正式发布流程</h3>
-            <p>图片经 Java 预签名上传到对象存储，内容来源由服务端锁定。</p>
+            <p>自己写或交给 Agent 生成，发布前都会经过确认。</p>
           </div>
         </div>
         <ol>
           <li><span>1</span><strong>完成内容</strong><small>自己写或 AI 协作</small></li>
-          <li><span>2</span><strong>补充配图</strong><small>OSS / 本地对象存储</small></li>
-          <li><span>3</span><strong>确认设置</strong><small>预览与可见范围</small></li>
-          <li><span>4</span><strong>正式发布</strong><small>确认后进入可靠执行流程</small></li>
+          <li><span>2</span><strong>确认设置</strong><small>预览与可见范围</small></li>
+          <li><span>3</span><strong>正式发布</strong><small>确认后进入可靠执行流程</small></li>
         </ol>
       </section>
     </AppLayout>

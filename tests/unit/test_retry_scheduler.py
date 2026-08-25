@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
 
-from greenbook_agent_core.execution.retry_decision import RetryDecision
-from greenbook_agent_core.execution.retry_scheduler import RetryScheduler, RetryTask
 from greenbook_agent_core.execution.failure_decision import FailureCategory
-
+from greenbook_agent_core.execution.retry_decision import RetryDecision
+from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 
@@ -91,40 +89,3 @@ def test_budget_and_deadline_are_enforced_before_enqueue() -> None:
         deadline=NOW + timedelta(seconds=5),
     ) is None
     assert scheduler.count() == 0
-
-
-def test_dispatch_due_uses_retry_manager_instead_of_executing_a_tool() -> None:
-    scheduler = RetryScheduler(now_factory=lambda: NOW)
-    task = scheduler.schedule(
-        RetryTask(
-            execution_id="execution-1",
-            step_id="step-1",
-            attempt=1,
-            next_retry_time=NOW,
-            backoff=0,
-            reason="safe retry",
-        )
-    )
-    assert task is not None
-
-    calls: list[dict[str, object]] = []
-
-    class RetryManager:
-        def retry_step(self, execution_id: str, step_id: str, **kwargs):
-            calls.append(
-                {"execution_id": execution_id, "step_id": step_id, **kwargs}
-            )
-            return SimpleNamespace(status="PENDING")
-
-    result = scheduler.dispatch_due(retry_manager=RetryManager(), now=NOW)
-    assert result[0][0].key == task.key
-    assert result[0][0].status.value == "CLAIMED"
-    assert result[0][1].status == "PENDING"
-    assert calls == [
-        {
-            "execution_id": "execution-1",
-            "step_id": "step-1",
-            "source": "retry_scheduler",
-            "user_requested_retry": False,
-        }
-    ]

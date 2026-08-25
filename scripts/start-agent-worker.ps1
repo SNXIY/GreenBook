@@ -7,6 +7,12 @@ $Root = Split-Path -Parent $PSScriptRoot
 . "$PSScriptRoot\Import-GreenBookEnv.ps1"
 Import-GreenBookRootEnv -EnvFile "$Root\.env"
 
+$configuredInProcess = (Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_IN_PROCESS_WORKER" -DefaultValue "false").Trim().ToLowerInvariant() -in @("1", "true", "yes", "on")
+if ($configuredInProcess) {
+  throw "Invalid execution topology: GREENBOOK_AGENT_IN_PROCESS_WORKER=true selects the API in-process consumer; do not start a standalone Worker."
+}
+$env:GREENBOOK_AGENT_IN_PROCESS_WORKER = "false"
+
 $python = "$Root\.venv-v2\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $python)) {
   throw "GreenBook Agent virtual environment is missing: $python"
@@ -52,7 +58,6 @@ $env:PYTHONPATH = @(
   "$Root\packages\agent_core",
   "$Root\packages\contracts",
   "$Root\packages\java_client",
-  "$Root\packages\creator_client",
   "$Root\packages\security",
   "$Root\services\greenbook_mcp",
   "$Root\apps\agent_api",

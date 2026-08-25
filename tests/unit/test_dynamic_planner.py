@@ -113,3 +113,74 @@ def test_decision_is_typed_and_plan_mutation_does_not_execute() -> None:
     updated = DynamicPlanner.apply(tree, decision)
     assert updated.task_nodes[0].inputs == {"query": "AI research"}
     assert tree.task_nodes[0].inputs == {}
+
+
+# ── Deterministic query broadening for empty searches ──────────────────
+
+
+def _empty_search_observation(query: str) -> dict:
+    return {
+        "result_status": "EMPTY",
+        "failure_kind": "EMPTY_RESULT",
+        "available_fallback_capabilities": ["SEARCH_COMMUNITY"],
+        "last_result": {
+            "tool_name": "community.search_public_posts",
+            "tool_arguments": {"query": query, "sort": "latest", "page": 1, "size": 20},
+            "ok": True,
+            "data": {"items": [], "total": 0},
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_empty_search_broadens_query_deterministically() -> None:
+    planner = DynamicPlanner()
+    decision = await planner.decide(
+        goal_tree=_tree(),
+        agent_state=AgentState(goal=_tree().root_goal),
+        observations=[_empty_search_observation("Java 后端 面试")],
+    )
+    assert decision.decision == PlanningDecisionType.RETRY_WITH_NEW_ARGS
+    assert decision.tool_name == "community.search_public_posts"
+    assert decision.arguments["query"] == "Java 后端"
+
+
+@pytest.mark.asyncio
+async def test_empty_search_walks_ladder_to_single_token() -> None:
+    planner = DynamicPlanner()
+    decision = await planner.decide(
+        goal_tree=_tree(),
+        agent_state=AgentState(goal=_tree().root_goal),
+        observations=[
+            _empty_search_observation("Java 后端 面试"),
+            _empty_search_observation("Java 后端"),
+        ],
+    )
+    assert decision.decision == PlanningDecisionType.RETRY_WITH_NEW_ARGS
+    assert decision.arguments["query"] == "Java"
+
+
+@pytest.mark.asyncio
+async def test_empty_search_does_not_loop_on_single_token() -> None:
+    planner = DynamicPlanner()
+    decision = await planner.decide(
+        goal_tree=_tree(),
+        agent_state=AgentState(goal=_tree().root_goal),
+        observations=[_empty_search_observation("Java")],
+    )
+    # The widening ladder is exhausted: never synthesize a different term.
+    assert decision.decision != PlanningDecisionType.RETRY_WITH_NEW_ARGS
+
+
+@pytest.mark.asyncio
+async def test_empty_search_keeps_non_query_arguments() -> None:
+    planner = DynamicPlanner()
+    decision = await planner.decide(
+        goal_tree=_tree(),
+        agent_state=AgentState(goal=_tree().root_goal),
+        observations=[_empty_search_observation("AI Agent 开发 核心技术")],
+    )
+    assert decision.decision == PlanningDecisionType.RETRY_WITH_NEW_ARGS
+    assert decision.arguments["query"] == "AI Agent 开发"
+    assert decision.arguments["sort"] == "latest"
+    assert decision.arguments["size"] == 20

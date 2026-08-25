@@ -52,7 +52,6 @@ class CapabilityMapper:
         """
         chains: dict[str, list[str]] = {
             "CREATE_CONTENT":     ["GENERATE_CONTENT"],
-            "IMPROVE_CONTENT":    ["IMPROVE_CONTENT"],
             "ANALYZE_COMMUNITY":  ["SEARCH_COMMUNITY"],
             "PUBLISH_CONTENT":    ["SCHEDULE_PUBLISH"],
             "MANAGE_SCHEDULE":    ["MANAGE_SCHEDULE"],

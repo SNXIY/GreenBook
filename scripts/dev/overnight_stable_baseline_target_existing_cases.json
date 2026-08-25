@@ -1,0 +1,8 @@
+[
+  {
+    "name": "clarify-existing-draft",
+    "turns": [
+      {"text": "删除 Java 草稿", "hitl_sequence": ["clarify", "approve"], "candidate_index": 0}
+    ]
+  }
+]

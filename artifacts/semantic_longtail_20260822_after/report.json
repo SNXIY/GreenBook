@@ -1,0 +1,833 @@
+{
+  "status": "COMPLETED",
+  "run_id": "20260822T163034",
+  "dataset": {
+    "path": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "version": "2026-08-22.freeze-1",
+    "primary_case_count": 60,
+    "category_counts": {
+      "A_SINGLE_ORAL": 8,
+      "B_MULTI_TARGET": 8,
+      "C_TARGET_REFERENCE": 8,
+      "D_TEMPORAL": 8,
+      "E_NEGATIVE_CONSTRAINT": 8,
+      "F_CROSS_TURN": 8,
+      "G_AMBIGUOUS_INCOMPLETE": 6,
+      "H_PARAPHRASE": 6
+    }
+  },
+  "summary": {
+    "primary_case_count": 60,
+    "evaluated_utterance_count": 78,
+    "exact_semantic_success": 43,
+    "exact_semantic_accuracy": 0.5512820512820513,
+    "primary_exact_semantic_success": 29,
+    "primary_exact_semantic_accuracy": 0.48333333333333334,
+    "unsafe_semantic_error_count": 13,
+    "unsafe_semantic_error_rate": 0.16666666666666666,
+    "primary_unsafe_semantic_error_count": 12,
+    "primary_unsafe_semantic_error_rate": 0.2,
+    "metrics": {
+      "UNKNOWN_should_have_been_used": 4,
+      "constraint_lost": 4,
+      "constraint_violation": 4,
+      "exact_semantic_success": 43,
+      "extra_goal": 1,
+      "missing_clarification": 2,
+      "missing_goal": 4,
+      "premature_commitment": 2,
+      "semantic_validation_failure": 2,
+      "target_ambiguity_missed": 2,
+      "unnecessary_clarification": 6,
+      "wrong_action": 15,
+      "wrong_goal_split": 5,
+      "wrong_publication": 10,
+      "wrong_target": 15,
+      "wrong_time": 9
+    },
+    "by_category": {
+      "A_SINGLE_ORAL": {
+        "total": 8,
+        "exact": 4,
+        "exact_accuracy": 0.5,
+        "unsafe": 2,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 2,
+          "constraint_lost": 1,
+          "constraint_violation": 1,
+          "exact_semantic_success": 4,
+          "unnecessary_clarification": 1,
+          "wrong_action": 1,
+          "wrong_publication": 2,
+          "wrong_time": 1
+        }
+      },
+      "B_MULTI_TARGET": {
+        "total": 8,
+        "exact": 4,
+        "exact_accuracy": 0.5,
+        "unsafe": 2,
+        "metrics": {
+          "exact_semantic_success": 4,
+          "semantic_validation_failure": 1,
+          "unnecessary_clarification": 1,
+          "wrong_target": 1,
+          "wrong_time": 3
+        }
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 8,
+        "exact": 6,
+        "exact_accuracy": 0.75,
+        "unsafe": 1,
+        "metrics": {
+          "exact_semantic_success": 6,
+          "wrong_action": 1,
+          "wrong_publication": 2,
+          "wrong_time": 1
+        }
+      },
+      "D_TEMPORAL": {
+        "total": 8,
+        "exact": 3,
+        "exact_accuracy": 0.375,
+        "unsafe": 1,
+        "metrics": {
+          "exact_semantic_success": 3,
+          "missing_clarification": 1,
+          "missing_goal": 1,
+          "premature_commitment": 1,
+          "wrong_action": 4,
+          "wrong_goal_split": 1,
+          "wrong_target": 1
+        }
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 8,
+        "exact": 5,
+        "exact_accuracy": 0.625,
+        "unsafe": 2,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "exact_semantic_success": 5,
+          "missing_clarification": 1,
+          "missing_goal": 1,
+          "premature_commitment": 1,
+          "wrong_action": 1,
+          "wrong_goal_split": 1,
+          "wrong_publication": 2,
+          "wrong_target": 2,
+          "wrong_time": 1
+        }
+      },
+      "F_CROSS_TURN": {
+        "total": 8,
+        "exact": 3,
+        "exact_accuracy": 0.375,
+        "unsafe": 2,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "constraint_lost": 3,
+          "constraint_violation": 3,
+          "exact_semantic_success": 3,
+          "missing_goal": 1,
+          "unnecessary_clarification": 2,
+          "wrong_action": 1,
+          "wrong_goal_split": 1,
+          "wrong_publication": 1,
+          "wrong_target": 3
+        }
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 6,
+        "exact": 1,
+        "exact_accuracy": 0.16666666666666666,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 1,
+          "missing_goal": 1,
+          "target_ambiguity_missed": 2,
+          "wrong_action": 2,
+          "wrong_goal_split": 1,
+          "wrong_target": 5
+        }
+      },
+      "H_PARAPHRASE": {
+        "total": 24,
+        "exact": 17,
+        "exact_accuracy": 0.7083333333333334,
+        "unsafe": 3,
+        "metrics": {
+          "exact_semantic_success": 17,
+          "extra_goal": 1,
+          "semantic_validation_failure": 1,
+          "unnecessary_clarification": 2,
+          "wrong_action": 5,
+          "wrong_goal_split": 1,
+          "wrong_publication": 3,
+          "wrong_target": 3,
+          "wrong_time": 3
+        }
+      }
+    },
+    "primary_by_category": {
+      "A_SINGLE_ORAL": {
+        "total": 8,
+        "exact": 4,
+        "unsafe": 2,
+        "exact_accuracy": 0.5,
+        "unsafe_rate": 0.25
+      },
+      "B_MULTI_TARGET": {
+        "total": 8,
+        "exact": 4,
+        "unsafe": 2,
+        "exact_accuracy": 0.5,
+        "unsafe_rate": 0.25
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 8,
+        "exact": 6,
+        "unsafe": 1,
+        "exact_accuracy": 0.75,
+        "unsafe_rate": 0.125
+      },
+      "D_TEMPORAL": {
+        "total": 8,
+        "exact": 3,
+        "unsafe": 1,
+        "exact_accuracy": 0.375,
+        "unsafe_rate": 0.125
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 8,
+        "exact": 5,
+        "unsafe": 2,
+        "exact_accuracy": 0.625,
+        "unsafe_rate": 0.25
+      },
+      "F_CROSS_TURN": {
+        "total": 8,
+        "exact": 3,
+        "unsafe": 2,
+        "exact_accuracy": 0.375,
+        "unsafe_rate": 0.25
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 6,
+        "exact": 1,
+        "unsafe": 0,
+        "exact_accuracy": 0.16666666666666666,
+        "unsafe_rate": 0.0
+      },
+      "H_PARAPHRASE": {
+        "total": 6,
+        "exact": 3,
+        "unsafe": 2,
+        "exact_accuracy": 0.5,
+        "unsafe_rate": 0.3333333333333333
+      }
+    },
+    "provenance_coverage": {
+      "desired_outcome": {
+        "covered": 65,
+        "total": 78,
+        "coverage": 0.8333333333333334
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 78,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 74,
+        "total": 78,
+        "coverage": 0.9487179487179487
+      },
+      "target_reference": {
+        "covered": 72,
+        "total": 78,
+        "coverage": 0.9230769230769231
+      },
+      "temporal_expression": {
+        "covered": 67,
+        "total": 78,
+        "coverage": 0.8589743589743589
+      }
+    },
+    "first_bad_state": {
+      "Interpreter": 16,
+      "Normalization": 1,
+      "Objective projection": 6,
+      "TargetResolver": 11,
+      "TemporalResolver": 1
+    },
+    "top_failure_clusters": [
+      {
+        "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+        "count": 5
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_action",
+        "count": 5
+      },
+      {
+        "cluster": "D_TEMPORAL:wrong_action",
+        "count": 4
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_time",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_lost",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_target",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_violation",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_target",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_publication",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_time",
+        "count": 3
+      },
+      {
+        "cluster": "A_SINGLE_ORAL:UNKNOWN_should_have_been_used",
+        "count": 2
+      },
+      {
+        "cluster": "A_SINGLE_ORAL:wrong_publication",
+        "count": 2
+      },
+      {
+        "cluster": "C_TARGET_REFERENCE:wrong_publication",
+        "count": 2
+      },
+      {
+        "cluster": "E_NEGATIVE_CONSTRAINT:wrong_target",
+        "count": 2
+      },
+      {
+        "cluster": "E_NEGATIVE_CONSTRAINT:wrong_publication",
+        "count": 2
+      }
+    ]
+  },
+  "paraphrase": {
+    "groups": 6,
+    "consistent_groups": 4,
+    "inconsistent_groups": 2,
+    "consistency": 0.6666666666666666,
+    "rows": [
+      {
+        "case_id": "H01",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H02",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H03",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H04",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "MULTI_OBJECTIVE",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            false,
+            "NOT_FOUND",
+            true,
+            2,
+            "NOT_FOUND",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "UNRESOLVED"
+              ],
+              [
+                "redis 这篇",
+                "SCHEDULED_PUBLISH",
+                "UNRESOLVED"
+              ]
+            ]
+          ],
+          [
+            "SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NOT_FOUND",
+            true,
+            1,
+            "NOT_FOUND",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H05",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H06",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "CREATE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "CREATE",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "CREATE",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "cost": {
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "temperature": 0.0,
+    "calls": 80,
+    "input_tokens": 399870,
+    "output_tokens": 22677,
+    "total_tokens": 422547,
+    "latency_ms_sum": 158999.45,
+    "latency_ms_avg": 1987.49,
+    "benchmark_wall_ms": 160386.49,
+    "provider_error_count": 0,
+    "calls_per_primary_case": 1.3333333333333333
+  },
+  "provenance": {
+    "formal_source_span_contract": false,
+    "observed_fields": [
+      "raw_input",
+      "goal",
+      "target.reference",
+      "items.temporal_text",
+      "constraints"
+    ],
+    "method": "diagnostic in-band/source-substring checks; no new provenance model",
+    "coverage": {
+      "desired_outcome": {
+        "covered": 65,
+        "total": 78,
+        "coverage": 0.8333333333333334
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 78,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 74,
+        "total": 78,
+        "coverage": 0.9487179487179487
+      },
+      "target_reference": {
+        "covered": 72,
+        "total": 78,
+        "coverage": 0.9230769230769231
+      },
+      "temporal_expression": {
+        "covered": 67,
+        "total": 78,
+        "coverage": 0.8589743589743589
+      }
+    }
+  },
+  "artifacts": {
+    "dataset": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "results": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_after\\results.json",
+    "report": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_after\\report.json",
+    "snapshots": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_after\\snapshots"
+  }
+}

@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
 from .builder import ContextBuilder
-from .models import ContextBudget, ContextSnapshot
+from .models import ContextBudget, ContextSnapshot, DerivedConversationContext
 
 
 class RecentEntity(BaseModel):
@@ -69,6 +69,40 @@ class SessionContext(BaseModel):
 
     def set_active_schedule(self, schedule_id: str | None) -> None:
         self.active_schedule_id = schedule_id
+
+    @property
+    def conversation_focus_task_id(self) -> str | None:
+        """Last Task explicitly selected by the user, not the latest DB update."""
+
+        focus = next(
+            (
+                item
+                for item in reversed(self.recent_entities)
+                if item.kind == "CONVERSATION_FOCUS" and item.entity_id
+            ),
+            None,
+        )
+        return focus.entity_id if focus is not None else None
+
+    def record_conversation_focus(
+        self,
+        task_id: str,
+        *,
+        label: str | None = None,
+    ) -> None:
+        """Persist a user-reference focus in the existing session JSON state."""
+
+        entity = RecentEntity(
+            ref="conversation-focus",
+            kind="CONVERSATION_FOCUS",
+            entity_id=task_id,
+            label=label,
+            timestamp=datetime.now(UTC),
+        )
+        self.recent_entities = [
+            item for item in self.recent_entities
+            if item.kind != "CONVERSATION_FOCUS"
+        ][-19:] + [entity]
 
     def resolve_active_draft_id(self) -> tuple[str | None, list[str]]:
         if self.active_draft_id:
@@ -136,6 +170,7 @@ __all__ = [
     "ContextBudget",
     "ContextBuilder",
     "ContextSnapshot",
+    "DerivedConversationContext",
     "PendingApproval",
     "RecentEntity",
     "RecentToolCall",

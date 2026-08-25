@@ -476,6 +476,9 @@ def _safe_result_projection(result: ExecutionResult) -> dict[str, Any]:
         "status": _optional_text(data.get("status")),
         "run_at": _optional_text(data.get("run_at") or data.get("publish_at")),
         "timezone": _optional_text(data.get("timezone")),
+        # Keep the schedule -> draft business relation in the body-free
+        # projection so it survives a restart and can be grouped later.
+        "draft_id": _optional_text(data.get("draft_id")),
         "receipt_id": _optional_text(
             (evidence.receipt_id if evidence is not None else None)
             or result.tool_result.get("receipt_id")

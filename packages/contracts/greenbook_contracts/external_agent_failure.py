@@ -70,8 +70,6 @@ class ExternalAgentFailure(BaseModel):
 # Canonical external failures plus aliases emitted by existing clients.
 _CLASSIFICATIONS: dict[str, tuple[str, RecoveryAction, bool]] = {
     "JAVA_BACKEND_UNAVAILABLE": ("java", RecoveryAction.RETRY, False),
-    "CREATOR_TIMEOUT": ("creator", RecoveryAction.RETRY, False),
-    "CREATOR_UNAVAILABLE": ("creator", RecoveryAction.RETRY, False),
     "MCP_TIMEOUT": ("mcp", RecoveryAction.RETRY, False),
     "MODEL_TIMEOUT": ("model", RecoveryAction.RETRY, False),
     "RATE_LIMIT": ("", RecoveryAction.WAIT_DEPENDENCY, False),
@@ -82,6 +80,61 @@ _CLASSIFICATIONS: dict[str, tuple[str, RecoveryAction, bool]] = {
     "TOO_MANY_REQUESTS": ("", RecoveryAction.WAIT_DEPENDENCY, False),
     "LLM_TIMEOUT": ("model", RecoveryAction.RETRY, False),
 }
+
+# These codes are authoritative negative responses.  They describe a known
+# rejection/no-op, not an ambiguous delivery boundary.  Keep the downstream
+# vocabulary in ``error_code``; these sets only make the recovery decision
+# deterministic at this shared contract boundary.
+_KNOWN_NON_APPLYING_CODES = frozenset({
+    "VALIDATION_ERROR",
+    "INVALID_ARGUMENT",
+    "INVALID_REQUEST",
+    "BAD_REQUEST",
+    "INVALID_TOOL_ARGUMENT",
+    "TOOL_ARGUMENT_VALIDATION_FAILED",
+    "PRE_EXECUTION_VALIDATION_FAILED",
+    "MISSING_REQUIRED_FIELD",
+    "FIELD_TOO_LONG",
+    "INVALID_DRAFT_METADATA",
+    "PERMANENT_INPUT",
+    "AUTH_FAILURE",
+    "AUTHENTICATION_FAILED",
+    "AUTHENTICATION_REQUIRED",
+    "UNAUTHORIZED",
+    "TOKEN_EXPIRED",
+    "INVALID_TOKEN",
+    "PERMISSION_DENIED",
+    "AUTHORIZATION_DENIED",
+    "FORBIDDEN",
+    "NOT_FOUND",
+    "ARTIFACT_NOT_FOUND",
+    "TASK_NOT_FOUND",
+    "DRAFT_NOT_FOUND",
+    "SCHEDULE_NOT_FOUND",
+    "CONFLICT",
+    "STATE_CONFLICT",
+    "DRAFT_VERSION_CONFLICT",
+    "IDEMPOTENCY_CONFLICT",
+    "VERSION_CONFLICT",
+    "BUSINESS_REJECTED",
+    "BUSINESS_RULE_REJECTED",
+    # Runtime/agent failures are terminal diagnostics by default.  They may
+    # opt into reconciliation only when the adapter supplies explicit
+    # POSSIBLE/CONFIRMED side-effect evidence.
+    "INTERNAL_ERROR",
+    "TOOL_EXECUTION_FAILED",
+    "RUN_FAILED",
+    "MODEL_REQUEST_FAILED",
+})
+
+_AUTH_CODES = frozenset({
+    "AUTH_FAILURE",
+    "AUTHENTICATION_FAILED",
+    "AUTHENTICATION_REQUIRED",
+    "UNAUTHORIZED",
+    "TOKEN_EXPIRED",
+    "INVALID_TOKEN",
+})
 
 
 def _state_value(result: ToolResult[Any], key: str) -> Any:
@@ -110,6 +163,8 @@ def _resolve_side_effect_state(
     result: ToolResult[Any],
     explicit: SideEffectState | str | None,
     evidence: Any = None,
+    *,
+    code: str = "",
 ) -> SideEffectState:
     raw = explicit
     if raw is None:
@@ -121,6 +176,13 @@ def _resolve_side_effect_state(
             return SideEffectState(str(raw).upper())
         except ValueError as exc:
             raise ValueError(f"Unknown side_effect_state: {raw!r}") from exc
+
+    # A known validation/business/auth response is a completed observation
+    # that the requested mutation was not applied.  ``request_sent=True``
+    # only proves that Java saw the request; it does not make a known 4xx
+    # rejection a RESULT_UNKNOWN operation.
+    if code in _KNOWN_NON_APPLYING_CODES:
+        return SideEffectState.NOT_STARTED
 
     started = _evidence_value(evidence, "side_effect_started")
     if started is None:
@@ -169,6 +231,23 @@ def _recovery_action(
         if action == RecoveryAction.WAIT_DEPENDENCY:
             return action
 
+    if code in _AUTH_CODES:
+        return RecoveryAction.REAUTH
+    if code in {
+        "INTERNAL_ERROR",
+        "TOOL_EXECUTION_FAILED",
+        "RUN_FAILED",
+        "MODEL_REQUEST_FAILED",
+    }:
+        if side_effect_state in {
+            SideEffectState.POSSIBLE,
+            SideEffectState.CONFIRMED,
+        }:
+            return RecoveryAction.RECONCILE
+        return RecoveryAction.FAIL
+    if code in _KNOWN_NON_APPLYING_CODES:
+        return RecoveryAction.FAIL
+
     # A possible/unknown write must be reconciled before any replay, even if
     # the downstream result advertised retryable=True.
     if side_effect_state in {
@@ -211,13 +290,19 @@ def normalize_external_failure(
         result,
         side_effect_state,
         evidence,
+        code=code,
     )
     action = _recovery_action(result, code, effect)
     classification = _CLASSIFICATIONS.get(code)
 
     # Authentication failures are deterministic until a new credential is
     # supplied; never preserve an unsafe retryable=True hint for them.
-    retryable = False if classification and classification[2] else bool(result.retryable)
+    retryable = (
+        False
+        if code in _KNOWN_NON_APPLYING_CODES
+        or (classification and classification[2])
+        else bool(result.retryable)
+    )
     state = result.state if isinstance(result.state, dict) else {}
     metadata = dict(state)
     if evidence_data:

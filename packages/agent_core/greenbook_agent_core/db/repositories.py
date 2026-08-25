@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -15,7 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# ── table metadata ──────────────────────────────────────────────────
+# 鈹€鈹€ table metadata 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 metadata = sa.MetaData()
 
@@ -131,12 +132,12 @@ _approvals = sa.Table(
 
 async def _ensure_tables(session: AsyncSession) -> None:
     """Create tables if they don't exist (idempotent)."""
-    # create_all needs a Connection, not a Session — use the bound engine.
+    # create_all needs a Connection, not a Session 鈥?use the bound engine.
     async with session.bind.begin() as conn:
         await conn.run_sync(metadata.create_all, checkfirst=True)
 
 
-# ── helpers ─────────────────────────────────────────────────────────
+# 鈹€鈹€ helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
@@ -155,22 +156,28 @@ def _json_dump(value: Any) -> Any:
 
 
 def _row_to_dict(row: Any, *, time_cols: tuple[str, ...] = ()) -> dict[str, Any]:
-    """Convert a Row to a plain dict, serialising UUID/datetime to strings."""
+    """Convert SQLAlchemy Row/RowMapping/dict values to a plain dict."""
     if row is None:
         return {}
-    d = dict(row._mapping)
+    if isinstance(row, Mapping):
+        d = dict(row)
+    else:
+        mapping = getattr(row, "_mapping", None)
+        if mapping is None:
+            raise TypeError(f"Unsupported database row type: {type(row)!r}")
+        d = dict(mapping)
     for col in time_cols:
         val = d.get(col)
         if isinstance(val, datetime):
             d[col] = val.isoformat()
-    # UUID columns → string (Pydantic expects str, not uuid.UUID)
+    # UUID columns 鈫?string (Pydantic expects str, not uuid.UUID)
     for key, val in d.items():
         if isinstance(val, uuid.UUID):
             d[key] = str(val)
     return d
 
 
-# ── ConversationRepository ───────────────────────────────────────────
+# 鈹€鈹€ ConversationRepository 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 class ConversationRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -272,7 +279,7 @@ class ConversationRepository:
         await self._session.commit()
 
 
-# ── MessageRepository ────────────────────────────────────────────────
+# 鈹€鈹€ MessageRepository 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 class MessageRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -350,6 +357,59 @@ class MessageRepository:
             for r in rows.all()
         ]
         return list(reversed(values)) if limit is not None else values
+
+    async def count_by_conversation(
+        self,
+        conversation_id: str,
+        *,
+        roles: tuple[str, ...] | None = None,
+    ) -> int:
+        """Count stored messages for a conversation without loading rows.
+
+        The compaction trigger must be cheap on every append: an unbounded
+        ``find_by_conversation`` call made the append path O(n) over the
+        conversation lifetime (design goal 0813 — the API stays fast even
+        for long-lived conversations).
+        """
+        stmt = sa.select(sa.func.count()).select_from(_messages).where(
+            _messages.c.conversation_id == uuid.UUID(conversation_id)
+        )
+        if roles:
+            stmt = stmt.where(_messages.c.role.in_(roles))
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())
+
+    async def trim(
+        self,
+        conversation_id: str,
+        *,
+        keep: int,
+    ) -> int:
+        """Delete all but the newest ``keep`` messages for a conversation.
+
+        The compaction path folds older messages into the durable
+        conversation summary and then trims them, so the raw message table
+        stays bounded while the model context keeps the compacted facts
+        (design goal 0813 — durable context grows as summaries, not as raw
+        rows).
+        """
+        keep = max(0, keep)
+        newest = await self._session.execute(
+            sa.select(_messages.c.message_id)
+            .where(_messages.c.conversation_id == uuid.UUID(conversation_id))
+            .order_by(_messages.c.created_at.desc())
+            .limit(keep)
+        )
+        keep_ids = [row[0] for row in newest.all()]
+        where = sa.and_(
+            _messages.c.conversation_id == uuid.UUID(conversation_id),
+            _messages.c.message_id.not_in(keep_ids),
+        )
+        if not keep_ids:
+            where = _messages.c.conversation_id == uuid.UUID(conversation_id)
+        result = await self._session.execute(sa.delete(_messages).where(where))
+        await self._session.commit()
+        return int(result.rowcount or 0)
 
     async def update_projection_by_trace(
         self,
@@ -441,7 +501,7 @@ class ContextRepository:
         return await self.get(conversation_id)
 
 
-# ── LegacyRunHistoryRepository ──────────────────────────────────────
+# 鈹€鈹€ LegacyRunHistoryRepository 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 class LegacyRunHistoryRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -526,7 +586,7 @@ class LegacyRunHistoryRepository:
 RunRepository = LegacyRunHistoryRepository
 
 
-# ── ApprovalRepository ───────────────────────────────────────────────
+# 鈹€鈹€ ApprovalRepository 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 class ApprovalRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -580,7 +640,7 @@ class ApprovalRepository:
             return None
         version = int(existing.get("version", 1))
         values = {**fields, "version": version + 1}
-        await self._session.execute(
+        result = await self._session.execute(
             sa.update(_approvals)
             .where(
                 sa.and_(
@@ -591,4 +651,41 @@ class ApprovalRepository:
             .values(**values)
         )
         await self._session.commit()
+        if result.rowcount == 0:
+            # A concurrent writer committed first: the optimistic version
+            # guard rejected this update.  Returning the stale row would let
+            # callers believe their transition succeeded (a lost update /
+            # double-execution vector), so surface the conflict instead.
+            raise _ApprovalVersionConflictError(approval_id)
         return await self.find_by_id(approval_id)
+
+
+    async def transition(self, approval_id: str, *, status: str) -> dict[str, Any] | None:
+        """Atomically flip PENDING -> ``status``; raise on a concurrent flip."""
+        result = await self._session.execute(
+            sa.update(_approvals)
+            .where(
+                sa.and_(
+                    _approvals.c.approval_id == uuid.UUID(approval_id),
+                    _approvals.c.status == "PENDING",
+                )
+            )
+            .values(
+                status=status,
+                version=_approvals.c.version + 1,
+            )
+            .returning(_approvals)
+        )
+        await self._session.commit()
+        row = result.mappings().first()
+        if row is None:
+            raise _ApprovalVersionConflictError(approval_id)
+        return _row_to_dict(row)
+
+
+class _ApprovalVersionConflictError(RuntimeError):
+    """Raised when an ApprovalRepository optimistic update matches no row."""
+
+    def __init__(self, approval_id: str) -> None:
+        super().__init__(f"Approval request was concurrently modified: {approval_id}")
+

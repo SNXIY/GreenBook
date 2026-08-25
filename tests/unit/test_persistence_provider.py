@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import sqlalchemy as sa
 import pytest
-
-from greenbook_agent_core.execution.operation_tracking import (
-    ExternalOperationRecord,
-    OperationStatus,
-)
+import sqlalchemy as sa
 from greenbook_agent_core.execution.execution_queue import (
     ExecutionQueue,
     PostgresExecutionQueue,
+)
+from greenbook_agent_core.execution.operation_tracking import (
+    ExternalOperationRecord,
+    OperationStatus,
 )
 from greenbook_agent_core.execution.persistence_provider import (
     MemoryCheckpointStore,

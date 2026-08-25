@@ -1,7 +1,11 @@
-"""ToolExecutionLedger — idempotency guard and invocation audit trail.
+"""ToolExecutionLedger — process-local invocation cache and audit trail.
 
-Phase 4.3: in-memory.  Each unique idempotency_key produces exactly
-one entry; subsequent calls with the same key return the cached result.
+This is a PROCESS-LOCAL cache only.  It is NOT the durable dedupe truth: across
+processes, restarts, or concurrent workers the durable OperationLedger owns
+dedupe and fencing.  This ledger exists only to avoid re-invoking an identical
+tool within one process; no completion verdict or business dedupe may depend on
+it.  Each unique idempotency_key produces exactly one in-memory entry; later
+calls with the same key return the cached result.
 """
 
 from __future__ import annotations

@@ -34,6 +34,9 @@ class EventType(StrEnum):
     APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
     EXECUTION_WAITING_HUMAN = "EXECUTION_WAITING_HUMAN"
     EXECUTION_PLAN_REVISED = "EXECUTION_PLAN_REVISED"
+    # Observability-only: one durable record per ActionLoop decision, keyed by
+    # run_id.  Never read by the execution state machine.
+    ACTION_LOOP_DECISION = "ACTION_LOOP_DECISION"
     EXECUTION_COMPLETED = "EXECUTION_COMPLETED"
     EXECUTION_FAILED = "EXECUTION_FAILED"
     EXECUTION_CANCELLED = "EXECUTION_CANCELLED"

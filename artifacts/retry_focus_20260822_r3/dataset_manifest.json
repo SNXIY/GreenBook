@@ -1,0 +1,16 @@
+{
+  "dataset_path": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\retry_focus.json",
+  "benchmark": "GreenBook A — Retry Semantic Focused Gate",
+  "version": "2026-08-22.retry-focus-1",
+  "primary_case_count": 12,
+  "category_counts": {
+    "RETRY_EXISTING": 4,
+    "RETRY_MODIFY": 2,
+    "RETRY_CREATE": 2,
+    "RETRY_FILTER": 2,
+    "RETRY_UNKNOWN": 1,
+    "RETRY_AMBIGUOUS": 1
+  },
+  "fixed_now": "2026-08-22T10:00:00+08:00",
+  "timezone": "Asia/Shanghai"
+}

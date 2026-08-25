@@ -36,12 +36,26 @@ class GoalPlanFactory:
         for index, value in enumerate(values, start=1):
             kind = str(value.get("type", goal_category) or goal_category).upper()
             goal_id = f"{base}-goal-{index}"
+            constraint = dict(value)
+            extra_constraints: list[dict[str, Any]] = []
+            if kind == "PUBLISH" and not any(
+                constraint.get(name)
+                for name in ("run_at", "publish_at", "scheduled_at", "publish_time")
+            ):
+                # A schedule is not executable without its time.  Keep the
+                # infrastructure fixtures explicit now that PlanValidator
+                # fails closed instead of allowing an immediate-publish
+                # fallback.
+                extra_constraints.append({
+                    "type": "run_at",
+                    "value": "2030-01-01T00:00:00Z",
+                })
             goals.append(Goal(
                 goal_id=goal_id,
                 description=str(value.get("description", kind)),
                 goal_type=kind,
                 dependencies=[previous] if previous else [],
-                constraints=[dict(value)] if value else [],
+                constraints=([constraint] if constraint else []) + extra_constraints,
             ))
             previous = goal_id
         root = Goal(

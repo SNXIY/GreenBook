@@ -36,7 +36,7 @@ GOLDEN_CASES: list[EvalCase] = [
         user_message="把刚才那篇改得更短一点",
         expected_command="MODIFY",
         expected_target={"reference": "刚才那篇", "kind": "DRAFT"},
-        expected_tools=["content.revise_draft"],
+        expected_tools=["content.create_draft"],
     ),
     EvalCase(
         case_id="community-target-java",
@@ -44,7 +44,7 @@ GOLDEN_CASES: list[EvalCase] = [
         user_message="把Java那篇改一下",
         expected_command="MODIFY",
         expected_target={"topic": "Java", "kind": "DRAFT"},
-        expected_tools=["content.revise_draft"],
+        expected_tools=["content.create_draft"],
     ),
     EvalCase(
         case_id="community-target-ambiguous",
@@ -69,7 +69,7 @@ GOLDEN_CASES: list[EvalCase] = [
         expected_task_state="COMPLETED",
     ),
     EvalCase(
-        case_id="community-creator-recovery",
+        case_id="community-draft-recovery",
         category="RECOVERY",
         user_message="参考热门文章写一篇文章",
         expected_tools=["content.create_draft"],
@@ -114,4 +114,23 @@ def golden_cases() -> list[EvalCase]:
     return [case.model_copy(deep=True) for case in GOLDEN_CASES]
 
 
-__all__ = ["GOLDEN_CASES", "golden_cases"]
+# Small, deterministic baseline used by both injected-runtime checks and the
+# live E2E report.  The cases intentionally describe behavior, not a second
+# execution platform.
+BASELINE_CASES: list[EvalCase] = [
+    EvalCase(case_id="baseline-single-step", category="SINGLE_STEP", user_message="search Java posts"),
+    EvalCase(case_id="baseline-multi-step", category="MULTI_STEP", user_message="create and schedule a Java post"),
+    EvalCase(case_id="baseline-multi-objective", category="MULTI_OBJECTIVE", user_message="create Java and Agent posts"),
+    EvalCase(case_id="baseline-cross-turn", category="CROSS_TURN", user_message="change the Java schedule"),
+    EvalCase(case_id="baseline-ambiguity", category="AMBIGUITY", user_message="change that post", expected_clarification=True),
+    EvalCase(case_id="baseline-temporal", category="TEMPORAL", user_message="publish in five minutes"),
+    EvalCase(case_id="baseline-idempotency", category="IDEMPOTENCY", user_message="retry the same publish request"),
+    EvalCase(case_id="baseline-resume", category="RESUME", user_message="resume the interrupted run"),
+]
+
+
+def baseline_cases() -> list[EvalCase]:
+    return [case.model_copy(deep=True) for case in BASELINE_CASES]
+
+
+__all__ = ["BASELINE_CASES", "GOLDEN_CASES", "baseline_cases", "golden_cases"]

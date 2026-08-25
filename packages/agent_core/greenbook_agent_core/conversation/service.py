@@ -189,14 +189,24 @@ class ConversationService:
             if execution_id:
                 message_fields["execution_id"] = execution_id
             await messages.add(conversation_id, role, content, **message_fields)
-            all_messages = await messages.find_by_conversation(conversation_id)
-            if len(all_messages) >= self._compression_threshold:
+            # Count instead of loading the whole history: the append path must
+            # stay O(recent) even for long-lived conversations.
+            count = await messages.count_by_conversation(conversation_id)
+            if count >= self._compression_threshold:
+                all_messages = await messages.find_by_conversation(
+                    conversation_id,
+                    limit=self._compression_threshold,
+                )
                 await self._compress_in_session(
                     session,
                     conversation_id,
                     conversation.get("conversation_summary"),
                     all_messages,
                 )
+                # The folded messages now live in the durable summary; trim
+                # the raw rows so each message is compacted exactly once and
+                # the table stays bounded.
+                await messages.trim(conversation_id, keep=self._recent_limit)
 
     async def list_messages(
         self,
@@ -297,16 +307,20 @@ class ConversationService:
         if conversation is None:
             raise ConversationNotFoundError(conversation_id)
         async with self._session_context_factory() as session:
-            messages = await MessageRepository(session).find_by_conversation(conversation_id)
+            messages = MessageRepository(session)
+            all_messages = await messages.find_by_conversation(conversation_id)
             value = await self._build_summary(
                 summary,
                 conversation.get("conversation_summary"),
-                messages,
+                all_messages,
             )
             await ContextRepository(session).update(
                 conversation_id,
                 conversation_summary=value,
             )
+            # An explicit full compression also trims the raw rows that were
+            # folded into the durable summary.
+            await messages.trim(conversation_id, keep=self._recent_limit)
         return value
 
     async def _compress_in_session(
@@ -341,7 +355,14 @@ class ConversationService:
 
 
 def _merge_summary(existing: str | None, additions: str, *, limit: int = 6000) -> str:
-    """Keep prior durable facts while bounding newly compacted conversation text."""
+    """Keep prior durable facts while bounding newly compacted conversation text.
+
+    Compaction can run repeatedly over retained messages (explicit
+    ``compress`` calls, or the trigger re-firing before a trim lands), so
+    lines already captured in the durable summary are not appended again —
+    repeated runs must not duplicate facts (design goal 0813 — the summary
+    grows once per fact, not once per compression).
+    """
 
     previous = (existing or "").strip()
     current = additions.strip()
@@ -349,10 +370,19 @@ def _merge_summary(existing: str | None, additions: str, *, limit: int = 6000) -
         return current[:limit]
     if not current:
         return previous[:limit]
+    existing_lines = {line.strip() for line in previous.splitlines()}
+    fresh = [
+        line.strip()
+        for line in current.splitlines()
+        if line.strip() and line.strip() not in existing_lines
+    ]
+    if not fresh:
+        return previous[:limit]
+    joined = "\n".join(fresh)
     available = max(0, limit - len(previous) - 1)
     if available == 0:
         return previous[:limit]
-    return f"{previous}\n{current[:available]}"
+    return f"{previous}\n{joined[:available]}"
 
 
 def _belongs_to(record: dict[str, Any], user_id: str, tenant_id: str) -> bool:

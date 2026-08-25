@@ -228,6 +228,38 @@ def test_resume_does_not_bypass_waiting_human_reconciliation(
     assert current.steps[0].status == StepStatus.PENDING
 
 
+def test_reconciled_step_closes_waiting_human_parent(
+    orchestrator: GoalPlanFactory,
+    validator: PlanValidator,
+    mgr: ExecutionStateManager,
+) -> None:
+    """A verified lost ACK must not leave its parent Execution waiting forever."""
+    plan = orchestrator.generate_plan(
+        task_id="reconciliation-waiting-parent",
+        goal_category="CREATE_CONTENT",
+        requirements=[{"type": "CREATE"}],
+    )
+    executable = validator.validate(plan)
+    execution = mgr.init_execution(plan, executable)
+    mgr.start_execution(execution.execution_id)
+    step = execution.steps[0]
+    mgr.wait_for_human(
+        execution.execution_id,
+        step_execution_id=step.step_execution_id,
+        reason="External acknowledgement was lost",
+    )
+
+    mgr.reconcile_step_succeeded(
+        execution.execution_id,
+        step.step_execution_id,
+        operation_id="operation-reconciled",
+    )
+
+    current = mgr.get_execution(execution.execution_id)
+    assert current.status == ExecutionStatus.COMPLETED
+    assert current.steps[0].status == StepStatus.COMPLETED
+
+
 # ── Scenario 4: approval pause and resume ───────────────────────
 
 def test_approval_pause(

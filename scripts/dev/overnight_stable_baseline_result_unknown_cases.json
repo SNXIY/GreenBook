@@ -1,0 +1,20 @@
+[
+  {
+    "name": "result-unknown-create-java",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-UNKNOWN-JAVA 的 Java 学习草稿，只保存草稿"}
+    ]
+  },
+  {
+    "name": "result-unknown-create-agent",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-UNKNOWN-AGENT 的 Agent 学习草稿，只保存草稿"}
+    ]
+  },
+  {
+    "name": "result-unknown-create-redis",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-UNKNOWN-REDIS 的 Redis 学习草稿，只保存草稿"}
+    ]
+  }
+]

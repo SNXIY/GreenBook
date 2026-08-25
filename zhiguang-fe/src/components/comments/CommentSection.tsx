@@ -7,14 +7,15 @@ import { AgentIcon, CheckIcon } from "@/components/icons/Icon";
 import { agentService, waitForAgentRun } from "@/services/agentService";
 import { waitForExecution } from "@/services/executionService";
 import {
-  runtimeExecutionMetaLabels,
-  runtimeExecutionStatusLabel,
-  runtimeStepLabel,
-  runtimeStepStatusLabel
-} from "@/services/runtimeExecutionLabels";
+  approvalPresentation,
+  projectExecutionActivity,
+  projectRunActivity
+} from "@/components/agent/userFacingResult";
 import type { AgentRun } from "@/types/agent";
 import type { Execution } from "@/types/execution";
 import styles from "./CommentSection.module.css";
+import { userFacingErrorMessage } from "@/services/userFacingError";
+import { formatBusinessDateTime } from "@/utils/dateTime";
 
 type Props = {
   postId: string;
@@ -22,8 +23,7 @@ type Props = {
 };
 
 const formatTime = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("zh-CN", { hour12: false });
+  return formatBusinessDateTime(value) ?? "";
 };
 
 const CommentSection = ({ postId, authorId }: Props) => {
@@ -50,6 +50,12 @@ const CommentSection = ({ postId, authorId }: Props) => {
   const canManageTop = !!user?.id && String(user.id) === String(authorId ?? "");
   const hotIds = new Set(hotItems.map(item => item.id));
   const normalItems = items.filter(item => !hotIds.has(item.id));
+  const agentActivities = agentExecution
+    ? projectExecutionActivity(agentExecution)
+    : agentRun
+      ? projectRunActivity(agentRun)
+      : [];
+  const approvalCopy = agentRun?.approval ? approvalPresentation(agentRun) : null;
 
   const load = useCallback(async (nextCursor?: string | null) => {
     setLoading(true);
@@ -60,7 +66,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
       setCursor(resp.nextCursor ?? null);
       setHasMore(resp.hasMore);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "评论加载失败");
+      setError(userFacingErrorMessage(err, "评论暂时无法加载，请稍后重试。"));
     } finally {
       setLoading(false);
     }
@@ -83,7 +89,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
   const finishAgentRun = async (result: AgentRun, targetCommentId: string | null) => {
     setAgentRun(result);
     if (result.status === "FAILED") {
-      throw new Error(result.error || "Agent任务执行失败");
+      throw new Error("这次没有完成，请稍后重试。");
     }
     if (result.status === "WAITING_APPROVAL") {
       setAgentExpanded(true);
@@ -136,14 +142,13 @@ const CommentSection = ({ postId, authorId }: Props) => {
           setAgentExecution
         );
         if (completed.status === "FAILED") {
-          const failedStep = completed.steps?.find(step => step.error_message);
-          throw new Error(failedStep?.error_message || "Runtime execution failed");
+          throw new Error("这次没有完成，请稍后重试。");
         }
         if (["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(completed.status)) {
           try {
             setAgentRun(await agentService.getRun(accessToken, accepted.run_id));
           } catch {
-            // Keep the Runtime execution card if the compatibility projection is unavailable.
+            // Keep the business activity card if the compatibility projection is unavailable.
           }
           return;
         }
@@ -156,7 +161,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
       const completed = await waitForAgentRun(accessToken, accepted.run_id, setAgentRun);
       await finishAgentRun(completed, commentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Agent回复失败");
+      setError(userFacingErrorMessage(err, "回复暂时无法完成，请稍后重试。"));
     } finally {
       setAgentBusy(false);
     }
@@ -188,7 +193,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
       );
       await finishAgentRun(completed, agentTargetCommentId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "发布确认失败");
+      setError(userFacingErrorMessage(err, "确认操作暂时无法完成，请稍后重试。"));
     } finally {
       setAgentBusy(false);
     }
@@ -228,7 +233,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
         void askAgent(text, created.id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "评论发布失败");
+      setError(userFacingErrorMessage(err, "评论发布暂时无法完成，请稍后重试。"));
     } finally {
       setSubmitting(false);
     }
@@ -247,7 +252,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
       liked ? await commentService.unlike(comment.id, accessToken) : await commentService.like(comment.id, accessToken);
       void loadHot();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "操作失败");
+      setError(userFacingErrorMessage(err, "操作暂时无法完成，请稍后重试。"));
     }
   };
 
@@ -264,7 +269,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
       setReplies(prev => ({ ...prev, [commentId]: resp.items }));
     } catch (err) {
       setExpandedReplies(previous => ({ ...previous, [commentId]: false }));
-      setError(err instanceof Error ? err.message : "回复加载失败");
+      setError(userFacingErrorMessage(err, "回复暂时无法加载，请稍后重试。"));
     } finally {
       setLoadingReplies(previous => ({ ...previous, [commentId]: false }));
     }
@@ -277,7 +282,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
       setItems(prev => prev.filter(item => item.id !== comment.id));
       setHotItems(prev => prev.filter(item => item.id !== comment.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除失败");
+      setError(userFacingErrorMessage(err, "删除暂时无法完成，请稍后重试。"));
     }
   };
 
@@ -288,7 +293,7 @@ const CommentSection = ({ postId, authorId }: Props) => {
       setItems(prev => prev.map(item => item.id === comment.id ? { ...item, top: !comment.top } : item));
       void loadHot();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "置顶失败");
+      setError(userFacingErrorMessage(err, "置顶暂时无法完成，请稍后重试。"));
     }
   };
 
@@ -400,41 +405,28 @@ const CommentSection = ({ postId, authorId }: Props) => {
                 ? "等待你的确认"
                 : agentBusy
                   ? "正在阅读并处理"
-                  : "查看执行进度"}
+                  : "查看处理进度"}
               <span aria-hidden="true">{agentExpanded ? "收起" : "展开"}</span>
             </small>
           </button>
           {agentExpanded ? (
             <div className={styles.agentReplyBody}>
-              {agentExecution ? (
-                <div className={styles.agentSteps} data-execution-id={agentExecution.execution_id}>
-                  <span>Runtime 执行 · {runtimeExecutionStatusLabel(agentExecution.status)}</span>
-                  <span>{runtimeExecutionMetaLabels.progress}：{Math.round(agentExecution.progress * 100)}%</span>
-                  {agentExecution.steps?.map(step => (
-                    <span key={step.step_execution_id || step.step_id}>
-                      {step.status === "COMPLETED" ? <CheckIcon width={13} height={13} aria-hidden="true" /> : <i aria-hidden="true" />}
-                      {runtimeStepLabel(step.capability || step.step_id)} · {runtimeStepStatusLabel(step.status)}
-                    </span>
-                  ))}
-                  <small>{runtimeExecutionMetaLabels.executionId}：{agentExecution.execution_id} · {runtimeExecutionMetaLabels.events}：{agentExecution.events?.length ?? 0}</small>
-                </div>
-              ) : null}
-              {agentRun?.steps.length ? (
+              {agentActivities.length ? (
                 <div className={styles.agentSteps}>
-                  {agentRun.steps.map(step => (
-                    <span key={step.step_id}>
-                      {step.status === "COMPLETED" ? <CheckIcon width={13} height={13} aria-hidden="true" /> : <i aria-hidden="true" />}
-                      {step.label}
+                  {agentActivities.map(item => (
+                    <span key={item.id}>
+                      {item.status === "complete" ? <CheckIcon width={13} height={13} aria-hidden="true" /> : <i aria-hidden="true" />}
+                      {item.label}
                     </span>
                   ))}
                 </div>
               ) : null}
-              {agentBusy && !agentRun?.steps.length ? <p className={styles.muted}>正在建立任务…</p> : null}
-              {agentRun?.approval ? (
+              {agentBusy && !agentActivities.length ? <p className={styles.muted}>正在准备回复…</p> : null}
+              {approvalCopy ? (
                 <div className={styles.agentApproval}>
                   <div>
-                    <strong>公开发布前需要你确认</strong>
-                    <p>{agentRun.approval.description}</p>
+                    <strong>{approvalCopy.actionTitle}</strong>
+                    <p>{approvalCopy.resourceTitle}。{approvalCopy.consequence}</p>
                   </div>
                   <div className={styles.approvalActions}>
                     <button type="button" disabled={agentBusy} onClick={() => void decideAgentApproval("REJECT")}>

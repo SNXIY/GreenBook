@@ -7,7 +7,7 @@ Phase 5.1: supports ToolRuntime via invoke_fn (ToolInvocationContext → dict).
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from greenbook_agent_core.capability.registry import CapabilityRegistry
@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 ToolHandler = Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]]
 # New: (ToolInvocationContext) → dict  (wraps ToolRuntime.invoke)
 InvokeFn = Callable[[ToolInvocationContext], Awaitable[dict[str, Any]]]
+
+
+class ResourceBindingError(ValueError):
+    """A step cannot bind a valid Objective-owned resource (controlled reject)."""
 
 
 class CapabilityExecutor:
@@ -54,6 +58,9 @@ class CapabilityExecutor:
         active_schedule_id: str | None = None,
         trace_context: TraceContext | None = None,
         tool_registry: Any | None = None,
+        objective_id: str | None = None,
+        objective_draft_ids: Sequence[str] | None = None,
+        objective_schedule_ids: Sequence[str] | None = None,
     ) -> None:
         self._registry = registry
         self._tool_handler = tool_handler
@@ -67,6 +74,13 @@ class CapabilityExecutor:
         self._active_draft_id = active_draft_id
         self._active_schedule_id = active_schedule_id
         self._trace_context = trace_context or TraceContext()
+        self._objective_id = objective_id
+        self._objective_draft_ids = tuple(
+            str(rid) for rid in (objective_draft_ids or ()) if rid
+        )
+        self._objective_schedule_ids = tuple(
+            str(rid) for rid in (objective_schedule_ids or ()) if rid
+        )
         self._tool_registry = tool_registry
 
     def bind_trace_context(self, context: TraceContext) -> None:
@@ -96,16 +110,20 @@ class CapabilityExecutor:
                 request_sent=False,
             )
 
-        # 2. LLM-only step — no tool call needed
+        # 2. Reasoning-backed steps belong to AgentLoop.PRODUCE_RESULT.  A
+        # Worker reaching this branch is an execution-semantics violation;
+        # returning success here would manufacture a false business result.
         if cap.is_llm_step:
-            return ExecutionResult.success(
+            return self._failure_result(
                 capability=cap.name,
                 tool_name="(llm)",
-                tool_result={"llm_step": True, "description": step.description},
-                artifact=ArtifactHandle(
-                    artifact_type=cap.output_artifact_type,
-                    summary=step.description,
-                ) if cap.output_artifact_type else None,
+                error_code="WRONG_EXECUTION_SEMANTICS",
+                error_message=(
+                    "Reasoning-backed capability reached Worker; use "
+                    "AgentLoop.PRODUCE_RESULT."
+                ),
+                retryable=False,
+                request_sent=False,
             )
 
         # 3. Use a runtime-selected tool when one is present. Legacy plans
@@ -139,7 +157,17 @@ class CapabilityExecutor:
             )
 
         # 4. Build tool args
-        tool_args = self._bound_tool_args(step)
+        try:
+            tool_args = self._bound_tool_args(step)
+        except ResourceBindingError as exc:
+            return self._failure_result(
+                capability=cap.name,
+                tool_name=tool_name,
+                error_code="INVALID_RESOURCE_BINDING",
+                error_message=str(exc),
+                retryable=False,
+                request_sent=False,
+            )
 
         # 5. Call through invoke_fn (ToolRuntime) or raw tool_handler
         try:
@@ -148,11 +176,13 @@ class CapabilityExecutor:
                     task_id=self._task_id,
                     execution_id=self._execution_id,
                     step_id=step.step_id,
+                    goal_id=str(getattr(step, "goal_id", "") or "") or None,
                     capability=cap.name,
                     tool_name=tool_name,
                     tool_args=tool_args,
                     timeout_seconds=self._timeout_for(tool_name),
                     trace_context=self._trace_context.for_step(step.step_id),
+                    objective_id=self._objective_id,
                 )
                 result = await self._invoke_fn(ctx)
             elif self._tool_handler is not None:
@@ -172,10 +202,14 @@ class CapabilityExecutor:
             return self._failure_result(
                 capability=cap.name,
                 tool_name=tool_name,
-                error_code="TOOL_EXECUTION_FAILED",
+                error_code="INTERNAL_ERROR",
                 error_message="Tool handler raised an exception",
                 retryable=False,
-                request_sent=None,
+                # The exception is raised by the local Runtime boundary.  A
+                # side-effect adapter that loses a downstream acknowledgement
+                # must return RESULT_UNKNOWN with explicit evidence instead;
+                # this generic path must not manufacture a reconcile case.
+                request_sent=False,
             )
 
         # 6. Interpret result
@@ -210,7 +244,7 @@ class CapabilityExecutor:
             capability=cap.name,
             tool_name=tool_name,
             payload=result,
-            error_code=code or "TOOL_EXECUTION_FAILED",
+            error_code=code or "INTERNAL_ERROR",
             error_message=str(result.get("user_message") or result.get("message", "")),
             retryable=bool(result.get("retryable", False)),
             request_sent=result.get("request_sent", False),
@@ -256,11 +290,144 @@ class CapabilityExecutor:
         """Bind the step at the last safe boundary before MCP invocation."""
 
         if self._argument_binder is None:
-            return self._build_tool_args(step)
-        return self._argument_binder.bind(
-            step,
-            execution_input=self._execution_input,
+            bound = self._build_tool_args(step)
+        else:
+            bound = self._argument_binder.bind(
+                step,
+                execution_input=self._execution_input,
+            )
+        return self._bind_scoped_resource_arguments(step, bound)
+
+    def _bind_scoped_resource_arguments(
+        self,
+        step: PlanStep,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Fill a missing canonical resource field from this Task's scope.
+
+        The adapter supplies a per-Task ``active_draft_id`` /
+        ``active_schedule_id`` snapshot to the Worker.  They are not
+        conversation-global fallbacks: a value is present only when that Task
+        has exactly one durable resource of the matching type.  Apply it only
+        for a field declared by the Capability contract and never override an
+        explicit plan argument.  This is a schema/capability binding rule, not
+        a tool-name-specific workflow shortcut.
+        """
+
+        capability = self._registry.get(str(getattr(step, "capability", "") or ""))
+        if capability is None:
+            return arguments
+        declared_fields = set(
+            getattr(getattr(capability, "inputs", None), "required", ()) or ()
+        ) | set(
+            getattr(getattr(capability, "inputs", None), "optional", ()) or ()
         )
+
+        # Objective-owned resource authority: a CREATE_SCHEDULE under a Business
+        # Objective must schedule that Objective's OWN Draft.  The authority is
+        # Objective.related_resource_ids (persisted), never the task-global
+        # latest/first Draft and never a cross-Objective draft_id supplied by
+        # the model.  A missing or ambiguous owned Draft is a controlled reject,
+        # so Schedule(DraftA) can never execute.
+        if (
+            self._objective_id
+            and capability.name == "SCHEDULE_PUBLISH"
+            and "draft_id" in declared_fields
+        ):
+            owned = list(self._objective_draft_ids)
+            if len(owned) == 1:
+                arguments["draft_id"] = owned[0]
+                return arguments
+            supplied = str(arguments.get("draft_id") or "")
+            if supplied and supplied in owned:
+                return arguments
+            raise ResourceBindingError(
+                "INVALID_RESOURCE_BINDING: Objective "
+                f"{self._objective_id} owns {len(owned)} draft(s); a "
+                "CREATE_SCHEDULE requires exactly one Objective-owned Draft."
+            )
+
+        # Immediate publication has the same Draft ownership invariant as
+        # scheduling. Keep it at the existing capability/resource binding
+        # boundary so PUBLISH_NOW cannot fall back to a task-global or
+        # model-guessed Draft.
+        if (
+            self._objective_id
+            and capability.name == "PUBLISH_NOW"
+            and "draft_id" in declared_fields
+        ):
+            owned = list(self._objective_draft_ids)
+            if len(owned) == 1:
+                arguments["draft_id"] = owned[0]
+                return arguments
+            supplied = str(arguments.get("draft_id") or "")
+            if supplied and supplied in owned:
+                return arguments
+            raise ResourceBindingError(
+                "INVALID_RESOURCE_BINDING: Objective "
+                f"{self._objective_id} owns {len(owned)} draft(s); "
+                "PUBLISH_NOW requires exactly one Objective-owned Draft."
+            )
+
+        # Objective-scoped mutation target: MANAGE_DRAFT / MANAGE_SCHEDULE must
+        # mutate the Objective's OWN resource, never a cross-Objective id the
+        # model supplied and never a task-global latest/first fallback.  A wrong
+        # model id is normalized to the Objective's owned resource; a missing or
+        # ambiguous owned resource is a controlled reject (no cross-objective
+        # mutation, no side effect).
+        if self._objective_id:
+            if capability.name == "MANAGE_DRAFT" and "draft_id" in declared_fields:
+                owned = list(self._objective_draft_ids)
+                if len(owned) == 1:
+                    arguments["draft_id"] = owned[0]
+                    return arguments
+                supplied = str(arguments.get("draft_id") or "")
+                if supplied and supplied in owned:
+                    return arguments
+                raise ResourceBindingError(
+                    "INVALID_RESOURCE_BINDING: Objective "
+                    f"{self._objective_id} owns {len(owned)} draft(s); "
+                    "MANAGE_DRAFT requires exactly one Objective-owned Draft."
+                )
+            if capability.name == "MANAGE_SCHEDULE" and "schedule_id" in declared_fields:
+                owned = list(self._objective_schedule_ids)
+                if len(owned) == 1:
+                    arguments["schedule_id"] = owned[0]
+                    return arguments
+                supplied = str(arguments.get("schedule_id") or "")
+                if supplied and supplied in owned:
+                    return arguments
+                raise ResourceBindingError(
+                    "INVALID_RESOURCE_BINDING: Objective "
+                    f"{self._objective_id} owns {len(owned)} schedule(s); "
+                    "MANAGE_SCHEDULE requires exactly one Objective-owned Schedule."
+                )
+            if capability.name == "CANCEL_SCHEDULE" and "schedule_id" in declared_fields:
+                owned = list(self._objective_schedule_ids)
+                if len(owned) == 1:
+                    arguments["schedule_id"] = owned[0]
+                    return arguments
+                supplied = str(arguments.get("schedule_id") or "")
+                if supplied and supplied in owned:
+                    return arguments
+                raise ResourceBindingError(
+                    "INVALID_RESOURCE_BINDING: Objective "
+                    f"{self._objective_id} owns {len(owned)} schedule(s); "
+                    "CANCEL_SCHEDULE requires exactly one Objective-owned Schedule."
+                )
+
+        scoped_values = {
+            "draft_id": self._active_draft_id,
+            "schedule_id": self._active_schedule_id,
+        }
+        for field, resource_id in scoped_values.items():
+            if (
+                field in declared_fields
+                and field not in arguments
+                and resource_id not in (None, "")
+            ):
+                arguments[field] = str(resource_id)
+        return arguments
 
     def _timeout_for(self, tool_name: str) -> float:
         """Resolve the canonical timeout used by ToolRuntime."""
@@ -313,6 +480,13 @@ class CapabilityExecutor:
         resource_key = _resource_key_for_artifact_type(artifact_type)
         if resource_key and data.get(resource_key):
             resource_id = str(data[resource_key])
+        if not resource_id:
+            expected_kind = str(artifact_type).strip().upper()
+            for ref in resource_refs:
+                if str(ref.get("kind") or "").upper() == expected_kind:
+                    resource_id = str(ref.get("resource_id") or "") or None
+                    if resource_id:
+                        break
         return ArtifactHandle(
             artifact_type=artifact_type,
             resource_id=resource_id,

@@ -19,11 +19,6 @@ export default defineConfig(({ mode }) => {
         target: "http://localhost:8080",
         changeOrigin: true
       },
-      "/creator-api": {
-        target: "http://127.0.0.1:8092",
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/creator-api/, "")
-      },
       "/agent-api": {
         target: agentTarget,
         changeOrigin: true,

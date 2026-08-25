@@ -17,6 +17,9 @@ class EvalCase(BaseModel):
     user_message: str = ""
     conversation_turns: list[dict[str, Any]] = Field(default_factory=list)
     initial_state: dict[str, Any] = Field(default_factory=dict)
+    # Explicit semantic-only setup.  It is passed as bounded context to the
+    # production interpreter; it never mutates Java or durable Runtime state.
+    setup_context: dict[str, Any] = Field(default_factory=dict)
 
     # ── conversation context and expected outputs ──
     existing_tasks: list[dict] = []
@@ -25,16 +28,28 @@ class EvalCase(BaseModel):
     expected_reference_task_id: str | None = None
     expected_command: str | None = None
     expected_target: dict[str, Any] | None = None
+    expected_semantic_state: dict[str, Any] | None = None
+    expected_objective_count: int | None = None
+    expected_temporal_resolution: bool | None = None
     expected_goals: list[str] = Field(default_factory=list)
     expected_task_state: str | None = None
+    # Runtime-only expectations.  The existing semantic fixture does not need
+    # to populate these fields; the thin Runtime adapter uses them for the
+    # small representative smoke set.
+    expected_terminal_status: str | None = None
+    expected_resource_types: list[str] = Field(default_factory=list)
+    expected_schedule: dict[str, Any] | None = None
+    expected_approval: str | bool | None = None
     expected_artifacts: list[str] = Field(default_factory=list)
     expected_side_effects: list[str] = Field(default_factory=list)
+    expected_duplicate_write_count: int | None = None
+    expected_ownership_conflicts: int | None = None
     forbidden_actions: list[str] = Field(default_factory=list)
 
     # ── expected outcome ──
     should_succeed: bool = True
     expected_status: str = "COMPLETED"               # COMPLETED | FAILED | WAITING_APPROVAL | PARTIAL | SKIPPED
-    expected_clarification: bool = False             # True when needs_clarification
+    expected_clarification: bool | None = None       # True when needs_clarification
     expected_trace_events: list[str] | None = None   # [TASK_CREATED, TOOL_INVOKED, …]
 
 
@@ -51,6 +66,7 @@ class EvalResult(BaseModel):
     case_id: str = ""
     category: str = ""
     description: str = ""
+    user_message: str = ""
     passed: bool = False
     checks: list[EvalCheck] = []
     errors: list[str] = []
@@ -83,6 +99,12 @@ class EvaluationReport(BaseModel):
     bad_cases: list = Field(default_factory=list)  # list[BadCase]
     failure_summary: dict[str, int] = Field(default_factory=dict)
     metrics: dict[str, float] = Field(default_factory=dict)
+    # Case-level bookkeeping is deliberately separate from the historical
+    # assertion list above.  One EvalCase has one status even when it has
+    # several failed assertions.
+    case_level_statuses: dict[str, str] = Field(default_factory=dict)
+    case_level_counts: dict[str, int] = Field(default_factory=dict)
+    open_assertion_count: int = 0
 
 
 class FailureCategory(StrEnum):
@@ -140,6 +162,18 @@ class AgentEvaluationMetrics(BaseModel):
     context_continuity: float = 0.0
     average_latency_ms: float = 0.0
     average_tool_call_count: float = 0.0
+    objective_success_rate: float = 0.0
+    duplicate_write_count: float = 0.0
+    clarification_accuracy: float = 0.0
+    avg_actionloop_iterations: float = 0.0
+    replan_count: float = 0.0
+    semantic_state_accuracy: float = 0.0
+    objective_count_accuracy: float = 0.0
+    temporal_resolution_accuracy: float = 0.0
+    unsafe_action_rate: float = 0.0
+    p50_latency: float = 0.0
+    p95_latency: float = 0.0
+    avg_llm_calls: float = 0.0
 
 
 __all__ = [

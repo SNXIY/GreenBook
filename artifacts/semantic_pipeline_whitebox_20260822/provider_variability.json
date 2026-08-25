@@ -1,0 +1,1911 @@
+{
+  "runs": [
+    "artifacts\\semantic_pipeline_whitebox_20260822\\provider_run_1\\results.json",
+    "artifacts\\semantic_pipeline_whitebox_20260822\\provider_run_2\\results.json",
+    "artifacts\\semantic_pipeline_whitebox_20260822\\provider_run_3\\results.json"
+  ],
+  "metrics": {
+    "cases": 19,
+    "provider_errors": 2,
+    "exact_all_three": 1,
+    "exact_any_disagreement": 0,
+    "unsafe_all_three": 5,
+    "unsafe_disagreement": 2,
+    "raw_field_stable": 4,
+    "canonical_signature_stable": 14,
+    "goal_count_disagreement": 0,
+    "publication_disagreement": 3,
+    "target_reference_disagreement": 4,
+    "canonical_disagreement": 5
+  },
+  "rows": [
+    {
+      "case_id": "B02",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": false,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "UPDATE_SCHEDULE",
+          0,
+          3,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "schedule-agent"
+            ],
+            [
+              "IDENTIFIER",
+              "Redis 面试",
+              "draft-redis"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          3,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "schedule-agent"
+            ],
+            [
+              "IDENTIFIER",
+              "Redis 面试",
+              "draft-redis"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "UPDATE_SCHEDULE",
+          0,
+          3,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "schedule-agent"
+            ],
+            [
+              "IDENTIFIER",
+              "Redis 面试",
+              "draft-redis"
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "",
+          "",
+          "",
+          false,
+          "",
+          false,
+          null,
+          ""
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "MIXED",
+          true,
+          "AMBIGUOUS",
+          true,
+          3,
+          "AMBIGUOUS"
+        ],
+        [
+          "",
+          "",
+          "",
+          false,
+          "",
+          false,
+          null,
+          ""
+        ]
+      ]
+    },
+    {
+      "case_id": "B03",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        true,
+        true,
+        true
+      ],
+      "raw_equal": true,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "CREATE",
+          "CREATE",
+          2,
+          0,
+          [
+            "DRAFT_ONLY",
+            "PUBLISH_NOW"
+          ],
+          [],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          2,
+          0,
+          [
+            "DRAFT_ONLY",
+            "PUBLISH_NOW"
+          ],
+          [],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          2,
+          0,
+          [
+            "DRAFT_ONLY",
+            "PUBLISH_NOW"
+          ],
+          [],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "NOW",
+          true,
+          "NONE",
+          false,
+          2,
+          "NONE"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "NOW",
+          true,
+          "NONE",
+          false,
+          2,
+          "NONE"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "NOW",
+          true,
+          "NONE",
+          false,
+          2,
+          "NONE"
+        ]
+      ]
+    },
+    {
+      "case_id": "B05",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": true,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          2,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "schedule-agent"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          2,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "schedule-agent"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          2,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "schedule-agent"
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "MIXED",
+          true,
+          "AMBIGUOUS",
+          true,
+          2,
+          "AMBIGUOUS"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "MIXED",
+          true,
+          "AMBIGUOUS",
+          true,
+          2,
+          "AMBIGUOUS"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "MIXED",
+          true,
+          "AMBIGUOUS",
+          true,
+          2,
+          "AMBIGUOUS"
+        ]
+      ]
+    },
+    {
+      "case_id": "B07",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        true,
+        true,
+        true
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "CREATE",
+          "CREATE",
+          3,
+          0,
+          [
+            "DRAFT_ONLY",
+            "PUBLISH_NOW"
+          ],
+          [],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          3,
+          0,
+          [
+            "DRAFT_ONLY",
+            "MIXED",
+            "PUBLISH_NOW"
+          ],
+          [],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          3,
+          0,
+          [
+            "DRAFT_ONLY",
+            "PUBLISH_NOW"
+          ],
+          [],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "NOW",
+          true,
+          "NONE",
+          false,
+          3,
+          "NONE"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "NOW",
+          true,
+          "NONE",
+          false,
+          3,
+          "NONE"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "NOW",
+          true,
+          "NONE",
+          false,
+          3,
+          "NONE"
+        ]
+      ]
+    },
+    {
+      "case_id": "C04",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": true,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "UPDATE_SCHEDULE",
+          0,
+          1,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [
+            [
+              "ACTIVE",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "ACTIVE",
+              "Java 学习",
+              "schedule-java"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "UPDATE_SCHEDULE",
+          0,
+          1,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [
+            [
+              "ACTIVE",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "ACTIVE",
+              "Java 学习",
+              "schedule-java"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "UPDATE_SCHEDULE",
+          0,
+          1,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [
+            [
+              "ACTIVE",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "ACTIVE",
+              "Java 学习",
+              "schedule-java"
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "UPDATE_SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "RESOLVED",
+          true,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "UPDATE_SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "RESOLVED",
+          true,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "UPDATE_SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "RESOLVED",
+          true,
+          1,
+          "RESOLVED"
+        ]
+      ]
+    },
+    {
+      "case_id": "C05",
+      "exact": [
+        true,
+        true,
+        true
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": true,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "MODIFY",
+          1,
+          1,
+          [
+            "IMMEDIATE_PUBLISH"
+          ],
+          [
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ],
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          1,
+          1,
+          [
+            "IMMEDIATE_PUBLISH"
+          ],
+          [
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ],
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          1,
+          1,
+          [
+            "IMMEDIATE_PUBLISH"
+          ],
+          [
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ],
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "REVISE",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "REVISE",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "REVISE",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ]
+      ]
+    },
+    {
+      "case_id": "C06",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "DELETE",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "那篇草稿",
+              ""
+            ]
+          ],
+          true,
+          "用户说'那篇草稿'，但上下文中有两个草稿（Java 帖子、Redis 帖子），无法确定具体指哪一个。"
+        ],
+        [
+          "MODIFY",
+          "DELETE",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "那篇草稿",
+              ""
+            ]
+          ],
+          true,
+          "用户说'那篇草稿'，但上下文中有两个草稿（Java 帖子、Redis 帖子），无法确定具体指哪一个。"
+        ],
+        [
+          "MODIFY",
+          "DELETE",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "那篇草稿",
+              ""
+            ]
+          ],
+          true,
+          "用户指代'那篇草稿'，但上下文中有多个草稿（Java 帖子、Redis 帖子），无法确定具体目标。"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "DELETE",
+          "NONE",
+          "NONE",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ],
+        [
+          "DELETE",
+          "NONE",
+          "NONE",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ],
+        [
+          "DELETE",
+          "NONE",
+          "NONE",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ]
+      ]
+    },
+    {
+      "case_id": "E07",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        true,
+        true,
+        true
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "QUERY",
+          "QUERY",
+          0,
+          0,
+          [
+            "DRAFT_ONLY"
+          ],
+          [
+            [
+              "NONE",
+              "RAG 草稿",
+              ""
+            ]
+          ],
+          true,
+          ""
+        ],
+        [
+          "QUERY",
+          "QUERY",
+          0,
+          0,
+          [
+            "DRAFT_ONLY"
+          ],
+          [
+            [
+              "NONE",
+              "RAG 草稿",
+              ""
+            ]
+          ],
+          true,
+          ""
+        ],
+        [
+          "QUERY",
+          "QUERY",
+          0,
+          0,
+          [
+            "DRAFT_ONLY"
+          ],
+          [
+            [
+              "NONE",
+              "RAG",
+              ""
+            ]
+          ],
+          true,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "QUERY",
+          "DRAFT_ONLY",
+          "NONE",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ],
+        [
+          "QUERY",
+          "DRAFT_ONLY",
+          "NONE",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ],
+        [
+          "QUERY",
+          "DRAFT_ONLY",
+          "NONE",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ]
+      ]
+    },
+    {
+      "case_id": "F01",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        true,
+        true,
+        true
+      ],
+      "raw_equal": false,
+      "canonical_equal": false,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "UPDATE_SCHEDULE",
+          0,
+          1,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ],
+            [
+              "IDENTIFIER",
+              "Java 学习",
+              "schedule-java"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "Java 学习",
+              ""
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "Java 学习",
+              ""
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "UPDATE_SCHEDULE",
+          "SCHEDULED",
+          "FUTURE",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "REVISE",
+          "SCHEDULED",
+          "FUTURE",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "REVISE",
+          "SCHEDULED",
+          "FUTURE",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ]
+      ]
+    },
+    {
+      "case_id": "F02",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ],
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ]
+          ],
+          true,
+          "用户未提供新标题"
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ],
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ]
+          ],
+          true,
+          "用户未提供新标题"
+        ],
+        [
+          "MODIFY",
+          "MODIFY",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ],
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ]
+          ],
+          true,
+          "用户未提供新标题，需要澄清"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "REVISE",
+          "NONE",
+          "NONE",
+          false,
+          "RESOLVED",
+          true,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "REVISE",
+          "NONE",
+          "NONE",
+          false,
+          "RESOLVED",
+          true,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "REVISE",
+          "NONE",
+          "NONE",
+          false,
+          "RESOLVED",
+          true,
+          1,
+          "RESOLVED"
+        ]
+      ]
+    },
+    {
+      "case_id": "F03",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        true,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": false,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "PUBLISH_NOW",
+          0,
+          1,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "task-agent"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "task-agent"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "PUBLISH_NOW",
+          0,
+          1,
+          [],
+          [
+            [
+              "NONE",
+              "Agent Memory",
+              "draft-agent"
+            ],
+            [
+              "NONE",
+              "Agent Memory",
+              "draft-agent"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "MODIFY",
+          "PUBLISH_NOW",
+          0,
+          1,
+          [],
+          [
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "task-agent"
+            ],
+            [
+              "IDENTIFIER",
+              "Agent Memory",
+              "task-agent"
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "PUBLISH_NOW",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ],
+        [
+          "PUBLISH_NOW",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "PUBLISH_NOW",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "NOT_FOUND",
+          true,
+          1,
+          "NOT_FOUND"
+        ]
+      ]
+    },
+    {
+      "case_id": "F06",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        true,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": false,
+      "raw_sigs": [
+        [
+          "CREATE",
+          "RETRY_PUBLISH",
+          1,
+          1,
+          [
+            "IMMEDIATE_PUBLISH"
+          ],
+          [
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "PUBLISH_NOW",
+          1,
+          1,
+          [],
+          [
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "PUBLISH_NOW",
+          1,
+          1,
+          [
+            "IMMEDIATE_PUBLISH"
+          ],
+          [
+            [
+              "FAILED",
+              "Agent Memory",
+              "draft-failed"
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "PUBLISH_NOW",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "MIXED",
+          "MIXED",
+          true,
+          "RESOLVED",
+          false,
+          2,
+          "RESOLVED"
+        ],
+        [
+          "MULTI_OBJECTIVE",
+          "IMMEDIATE",
+          "NOW",
+          true,
+          "RESOLVED",
+          false,
+          2,
+          "RESOLVED"
+        ]
+      ]
+    },
+    {
+      "case_id": "F07",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        true,
+        true,
+        true
+      ],
+      "raw_equal": false,
+      "canonical_equal": false,
+      "raw_sigs": [
+        [
+          "CREATE",
+          "CREATE",
+          1,
+          1,
+          [
+            "DRAFT_ONLY"
+          ],
+          [
+            [
+              "FAILED",
+              "Kubernetes 入门",
+              ""
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          1,
+          1,
+          [
+            "DRAFT_ONLY"
+          ],
+          [
+            [
+              "FAILED",
+              "Kubernetes 入门",
+              ""
+            ]
+          ],
+          false,
+          ""
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          1,
+          1,
+          [
+            "DRAFT_ONLY"
+          ],
+          [
+            [
+              "FAILED",
+              "",
+              ""
+            ]
+          ],
+          false,
+          ""
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "CREATE",
+          "DRAFT_ONLY",
+          "NONE",
+          false,
+          "NONE",
+          false,
+          1,
+          ""
+        ],
+        [
+          "CREATE",
+          "DRAFT_ONLY",
+          "NONE",
+          false,
+          "RESOLVED",
+          false,
+          1,
+          "RESOLVED"
+        ],
+        [
+          "CREATE",
+          "DRAFT_ONLY",
+          "NONE",
+          false,
+          "NONE",
+          false,
+          1,
+          ""
+        ]
+      ]
+    },
+    {
+      "case_id": "F08",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ]
+          ],
+          true,
+          "目标状态为 RESULT_UNKNOWN/VERIFYING_RESULT，需要先核对结果，不能直接重试。"
+        ],
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ]
+          ],
+          true,
+          "The referenced outcome is RESULT_UNKNOWN/VERIFYING_RESULT, not FAILED. Reconciliation is required before any retry."
+        ],
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [
+            [
+              "NONE",
+              "Agent Memory",
+              ""
+            ]
+          ],
+          true,
+          "目标状态为 RESULT_UNKNOWN/VERIFYING_RESULT，需要先核对结果，不能直接重试。"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "RESOLVED",
+          true,
+          null,
+          "RESOLVED"
+        ],
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "RESOLVED",
+          true,
+          null,
+          "RESOLVED"
+        ],
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "RESOLVED",
+          true,
+          null,
+          "RESOLVED"
+        ]
+      ]
+    },
+    {
+      "case_id": "G01",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [],
+          true,
+          "用户说“发一下”，但缺少明确的目标（发布什么内容）和发布方式（立即发布还是定时发布），无法确定具体操作。"
+        ],
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [],
+          true,
+          "用户说“发一下”，但缺少明确的目标（发布什么内容）和上下文，无法确定具体操作。"
+        ],
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [],
+          true,
+          "用户说“发一下”，但没有提供任何目标、内容或上下文，无法确定要发布什么。"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          null,
+          "NONE"
+        ],
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          null,
+          "NONE"
+        ],
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          null,
+          "NONE"
+        ]
+      ]
+    },
+    {
+      "case_id": "G03",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "QUERY",
+          "SCHEDULE_PUBLISH",
+          0,
+          0,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [],
+          true,
+          "用户要求安排发布，但未提供具体发布时间或目标内容，需要澄清。"
+        ],
+        [
+          "QUERY",
+          "SCHEDULE_PUBLISH",
+          0,
+          0,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [],
+          true,
+          "用户要求安排发布，但未提供具体发布时间或目标内容，需要澄清。"
+        ],
+        [
+          "QUERY",
+          "SCHEDULE_PUBLISH",
+          0,
+          0,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [],
+          true,
+          "用户要求安排发布，但未指明发布对象、具体时间或目标内容。"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "MISSING",
+          true,
+          1,
+          "NONE"
+        ],
+        [
+          "SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "MISSING",
+          true,
+          1,
+          "NONE"
+        ],
+        [
+          "SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "MISSING",
+          true,
+          1,
+          "NONE"
+        ]
+      ]
+    },
+    {
+      "case_id": "G04",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "CREATE",
+          "CREATE",
+          1,
+          0,
+          [],
+          [],
+          true,
+          "用户未指定写作主题、内容类型或发布要求，需要澄清。"
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          1,
+          0,
+          [],
+          [],
+          true,
+          "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。"
+        ],
+        [
+          "CREATE",
+          "CREATE",
+          1,
+          0,
+          [],
+          [],
+          true,
+          "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "CREATE",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          1,
+          "NONE"
+        ],
+        [
+          "CREATE",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          1,
+          "NONE"
+        ],
+        [
+          "CREATE",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          1,
+          "NONE"
+        ]
+      ]
+    },
+    {
+      "case_id": "G05",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "MODIFY",
+          "SCHEDULE_PUBLISH",
+          1,
+          0,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [],
+          true,
+          "缺少发布目标，无法确定要发布的内容"
+        ],
+        [
+          "MODIFY",
+          "SCHEDULE_PUBLISH",
+          1,
+          0,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [],
+          true,
+          "缺少发布目标（哪篇文章/草稿）以及具体时间"
+        ],
+        [
+          "MODIFY",
+          "SCHEDULE_PUBLISH",
+          1,
+          0,
+          [
+            "SCHEDULED_PUBLISH"
+          ],
+          [],
+          true,
+          "缺少发布目标（哪篇文章/草稿）以及具体时间（下午几点）"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NONE"
+        ],
+        [
+          "SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NONE"
+        ],
+        [
+          "SCHEDULE",
+          "UNRESOLVED",
+          "UNRESOLVED",
+          false,
+          "NOT_FOUND",
+          true,
+          1,
+          "NONE"
+        ]
+      ]
+    },
+    {
+      "case_id": "G06",
+      "exact": [
+        false,
+        false,
+        false
+      ],
+      "unsafe": [
+        false,
+        false,
+        false
+      ],
+      "raw_equal": false,
+      "canonical_equal": true,
+      "raw_sigs": [
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [],
+          true,
+          "用户说'刚才那个'，但上下文中有多个活动任务（Java 帖子、Redis 帖子），无法确定具体指哪一个。"
+        ],
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [],
+          true,
+          "用户说“刚才那个”，但上下文中有多个候选目标（Java 帖子、Redis 帖子），无法确定具体指哪一个。"
+        ],
+        [
+          "QUERY",
+          "",
+          0,
+          0,
+          [],
+          [],
+          true,
+          "用户说'刚才那个'，但上下文中有多个活动任务（Java 帖子和 Redis 帖子），无法确定具体指哪一个。"
+        ]
+      ],
+      "canonical_sigs": [
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          null,
+          "NONE"
+        ],
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          null,
+          "NONE"
+        ],
+        [
+          "CLARIFY",
+          "NONE",
+          "NONE",
+          false,
+          "NONE",
+          true,
+          null,
+          "NONE"
+        ]
+      ]
+    }
+  ]
+}

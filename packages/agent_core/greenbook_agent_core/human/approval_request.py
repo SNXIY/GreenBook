@@ -44,6 +44,15 @@ class ApprovalRequestStore(Protocol):
         approval_id: str,
         status: ApprovalRequestStatus,
     ) -> ApprovalRequest | None: ...
+    async def transition(
+        self,
+        approval_id: str,
+        status: ApprovalRequestStatus,
+    ) -> ApprovalRequest | None: ...
+
+
+class ApprovalTransitionConflictError(RuntimeError):
+    """Raised when a concurrent decision already transitioned the request."""
 
 
 class MemoryApprovalRequestStore:
@@ -76,6 +85,20 @@ class MemoryApprovalRequestStore:
         item = self._items.get(approval_id)
         if item is None:
             return None
+        item.status = status
+        return item.model_copy(deep=True)
+
+    async def transition(
+        self,
+        approval_id: str,
+        status: ApprovalRequestStatus,
+    ) -> ApprovalRequest | None:
+        """Atomic PENDING -> ``status`` CAS (single-process memory store)."""
+        item = self._items.get(approval_id)
+        if item is None:
+            return None
+        if item.status != ApprovalRequestStatus.PENDING:
+            raise ApprovalTransitionConflictError(approval_id)
         item.status = status
         return item.model_copy(deep=True)
 
@@ -124,6 +147,25 @@ class PostgresApprovalRequestStore:
             )
         return _from_row(row)
 
+    async def transition(
+        self,
+        approval_id: str,
+        status: ApprovalRequestStatus,
+    ) -> ApprovalRequest | None:
+        """Atomic PENDING -> ``status`` flip backed by a WHERE status='PENDING'
+        update with rowcount enforcement; a concurrent decision raises."""
+        from greenbook_agent_core.db.repositories import _ApprovalVersionConflictError
+
+        async with self._session_factory() as session:
+            try:
+                row = await ApprovalRepository(session).transition(
+                    approval_id,
+                    status=status.value,
+                )
+            except _ApprovalVersionConflictError as exc:
+                raise ApprovalTransitionConflictError(approval_id) from exc
+        return _from_row(row)
+
 
 def _from_row(row: dict[str, Any] | None) -> ApprovalRequest | None:
     if row is None:
@@ -151,6 +193,8 @@ __all__ = [
     "ApprovalRequest",
     "ApprovalRequestStatus",
     "ApprovalRequestStore",
+    "ApprovalTransitionConflictError",
     "MemoryApprovalRequestStore",
     "PostgresApprovalRequestStore",
 ]
+

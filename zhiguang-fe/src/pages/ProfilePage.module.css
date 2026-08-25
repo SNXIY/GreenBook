@@ -186,6 +186,14 @@
   gap: 12px;
 }
 
+.publishedStatus {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--color-primary-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .smallButton {
   padding: 10px 16px;
   border-radius: 12px;

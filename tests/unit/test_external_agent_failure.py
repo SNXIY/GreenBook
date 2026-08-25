@@ -40,7 +40,6 @@ def _failure(
     ("code", "dependency", "action"),
     [
         ("JAVA_BACKEND_UNAVAILABLE", "java", RecoveryAction.RETRY),
-        ("CREATOR_TIMEOUT", "creator", RecoveryAction.RETRY),
         ("MCP_TIMEOUT", "mcp", RecoveryAction.RETRY),
         ("MODEL_TIMEOUT", "model", RecoveryAction.RETRY),
         ("RATE_LIMIT", "external", RecoveryAction.WAIT_DEPENDENCY),
@@ -105,7 +104,7 @@ def test_explicit_side_effect_states_are_preserved(
     side_effect_state: SideEffectState,
 ) -> None:
     result = _failure(
-        "CREATOR_TIMEOUT",
+        "MCP_TIMEOUT",
         request_sent=None,
         side_effect_state=side_effect_state,
     )
@@ -144,6 +143,43 @@ def test_auth_failure_is_not_retryable_even_if_downstream_hint_is_unsafe() -> No
 
     assert normalized.retryable is False
     assert normalized.recovery_action is RecoveryAction.REAUTH
+
+
+def test_validation_hint_cannot_become_transport_retry() -> None:
+    normalized = normalize_external_failure(
+        _failure(
+            "TOOL_ARGUMENT_VALIDATION_FAILED",
+            request_sent=False,
+            retryable=True,
+        )
+    )
+
+    assert normalized.retryable is False
+    assert normalized.side_effect_state is SideEffectState.NOT_STARTED
+    assert normalized.recovery_action is RecoveryAction.FAIL
+
+
+def test_known_business_rejection_is_not_result_unknown() -> None:
+    normalized = normalize_external_failure(
+        _failure(
+            "BUSINESS_REJECTED",
+            request_sent=True,
+            retryable=False,
+        )
+    )
+
+    assert normalized.side_effect_state is SideEffectState.NOT_STARTED
+    assert normalized.recovery_action is RecoveryAction.FAIL
+
+
+def test_internal_error_is_not_retryable_or_reconcilable_without_evidence() -> None:
+    normalized = normalize_external_failure(
+        ToolResult.internal_error("KeyError in local runtime")
+    )
+
+    assert normalized.retryable is False
+    assert normalized.side_effect_state is SideEffectState.NOT_STARTED
+    assert normalized.recovery_action is RecoveryAction.FAIL
 
 
 def test_successful_tool_result_is_not_a_failure() -> None:

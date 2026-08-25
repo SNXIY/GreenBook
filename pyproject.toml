@@ -10,9 +10,7 @@ members = [
     "packages/agent_core",
     "packages/contracts",
     "packages/java_client",
-    "packages/creator_client",
     "packages/security",
-    "packages/observability",
     "packages/evaluation",
     "services/greenbook_mcp",
     "apps/agent_api",
@@ -23,9 +21,7 @@ members = [
 greenbook-agent-core = { workspace = true }
 greenbook-contracts = { workspace = true }
 greenbook-java-client = { workspace = true }
-greenbook-creator-client = { workspace = true }
 greenbook-security = { workspace = true }
-greenbook-observability = { workspace = true }
 greenbook-evaluation = { workspace = true }
 greenbook-mcp-server = { workspace = true }
 greenbook-agent-api = { workspace = true }
@@ -37,11 +33,9 @@ dev = [
     "greenbook-agent-core",
     "greenbook-agent-worker",
     "greenbook-contracts",
-    "greenbook-creator-client",
     "greenbook-evaluation",
     "greenbook-java-client",
     "greenbook-mcp-server",
-    "greenbook-observability",
     "greenbook-security",
     "asyncpg>=0.31",
     "pytest>=8.3",
@@ -59,6 +53,7 @@ dev = [
     "sse-starlette>=2.1",
     "tenacity>=9.0",
     "pyyaml>=6.0",
+    "bcrypt>=5.0.0",
 ]
 
 [tool.pytest.ini_options]
@@ -67,15 +62,14 @@ testpaths = ["tests"]
 markers = [
     "e2e: tests that require live external GreenBook services",
     "integration: tests that exercise persisted or cross-module integration contracts",
+    "order: deterministic ordering for live scenario suites",
 ]
 pythonpath = [
     ".",
     "packages/agent_core",
     "packages/contracts",
     "packages/java_client",
-    "packages/creator_client",
     "packages/security",
-    "packages/observability",
     "packages/evaluation",
     "services/greenbook_mcp",
     "apps/agent_api",

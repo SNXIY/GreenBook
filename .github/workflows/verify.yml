@@ -60,24 +60,5 @@ jobs:
           version: "0.11.28"
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run ruff check creator-agent/app/creator/api/routes.py tests/contract/test_runtime_devex.py
-      - run: uv run ruff check scripts/run_p0_e2e.py --select F
-      - run: uv run python -m pytest -q
-
-  creator-service:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: creator-agent
-    env:
-      DEEPSEEK_API_KEY: test-only-not-used-for-network-calls
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-          version: "0.11.28"
-          enable-cache: true
-      - run: uv sync --frozen
-      - run: uv run ruff check app/creator/api/routes.py
+      - run: uv run ruff check packages/agent_core apps/agent_api apps/agent_worker services/greenbook_mcp packages/contracts packages/security packages/java_client tests
       - run: uv run python -m pytest -q

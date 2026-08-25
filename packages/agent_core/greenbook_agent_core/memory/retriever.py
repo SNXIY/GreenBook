@@ -36,7 +36,15 @@ class MemoryRetriever:
         context: Any | None = None,
         target_query: str = "",
         limit: int = 8,
+        run_id: str = "",
+        touch: bool = True,
     ) -> list[MemoryRecord]:
+        from greenbook_agent_core.observability.run_metrics import (
+            record_memory_retrieval,
+            record_stage,
+        )
+
+        record_stage("memory_retrieval_start", run_id=run_id)
         terms = _query_terms(command, goal, context)
         terms.extend(_WORD_RE.findall(target_query.casefold()))
         terms = list(dict.fromkeys(term for term in terms if len(term) > 1))
@@ -62,6 +70,7 @@ class MemoryRetriever:
         else:
             candidates = self._repository.search(query)
         candidates = await candidates if inspect.isawaitable(candidates) else candidates
+        record_stage("memory_candidates_ready", run_id=run_id)
         values = [item if isinstance(item, MemoryRecord) else MemoryRecord.model_validate(item) for item in candidates]
         ranked = sorted(
             values,
@@ -71,15 +80,28 @@ class MemoryRetriever:
         selected = [item for item in ranked if _score(item, terms, conversation_id, task_id) > 0][:limit]
         if not selected and not terms:
             selected = ranked[:limit]
-        touched: list[MemoryRecord] = []
-        for item in selected:
-            touch = getattr(self._repository, "touch", None)
-            if callable(touch):
-                value = touch(item.memory_id)
-                value = await value if inspect.isawaitable(value) else value
-                touched.append(value or item)
-            else:
-                touched.append(item)
+        record_stage("memory_ranking_ready", run_id=run_id)
+        record_stage("memory_touch_start", run_id=run_id)
+        touched: list[MemoryRecord] = list(selected)
+        if touch:
+            touched = []
+            for item in selected:
+                touch_fn = getattr(self._repository, "touch", None)
+                if callable(touch_fn):
+                    value = touch_fn(item.memory_id)
+                    value = await value if inspect.isawaitable(value) else value
+                    touched.append(value or item)
+                else:
+                    touched.append(item)
+        record_stage("memory_touch_ready", run_id=run_id)
+        record_stage("memory_retrieval_ready", run_id=run_id)
+        record_memory_retrieval(
+            source="candidate_provider" if provider is not None else "repository",
+            candidate_count=len(values),
+            selected_count=len(touched),
+            memory_types=[str(item.memory_type) for item in touched],
+            run_id=run_id,
+        )
         return touched
 
 

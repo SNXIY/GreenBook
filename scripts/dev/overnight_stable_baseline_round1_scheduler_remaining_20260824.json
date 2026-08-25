@@ -1,0 +1,29 @@
+[
+  {
+    "name": "scheduler-java-recovery-20260824",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-RECOVERY-SCHED-JAVA-20260824 的 Java 学习草稿，并安排明天晚上六点发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "scheduler-agent-recovery-20260824",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-RECOVERY-SCHED-AGENT-20260824 的 Agent 学习草稿，并安排明天晚上六点发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "scheduler-redis-recovery-20260824",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-RECOVERY-SCHED-REDIS-20260824 的 Redis 学习草稿，并安排明天晚上六点发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  }
+]

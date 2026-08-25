@@ -49,19 +49,6 @@ try {
   Pop-Location
 }
 
-Write-Host "Checking Creator real-model and identity contracts..."
-Push-Location "$Root\creator-agent"
-try {
-  Invoke-NativeCheck -FailureMessage "Creator contract tests failed." -Command {
-    & ".\.venv\Scripts\python.exe" -m pytest `
-      tests\test_creator_identity.py `
-      tests\test_creator_model_client.py `
-      tests\test_creator_runtime_composition.py -q
-  }
-} finally {
-  Pop-Location
-}
-
 Write-Host "Checking Agent API and Worker entrypoints..."
 Push-Location $Root
 try {

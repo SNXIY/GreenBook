@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import Any
 
 from greenbook_agent_core.context import SessionContext
 from greenbook_contracts.identity import AuthContext
 from greenbook_java_client.client import JavaClient
-
-if TYPE_CHECKING:
-    from greenbook_creator_client.client import CreatorClient
 
 
 @dataclass
@@ -19,12 +16,16 @@ class ToolContext:
     auth: AuthContext
     session: SessionContext
     java: JavaClient
-    creator: CreatorClient
     trace_id: str | None = None
     conversation_id: str | None = None
     agent_run_id: str | None = None
     tool_call_id: str | None = None
     approval_granted: bool = False
+    # Lightweight content generation: the host injects its LLM client so a
+    # plain "write an article" request generates the draft directly in the
+    # assistant turn (prompt + model + MCP, no separate creator service).
+    llm: Any = None
+    model: str = ""
 
     def idempotency_key(self, operation: str, scope: str = "") -> str:
         """Return a retry-stable key scoped to the logical business request.

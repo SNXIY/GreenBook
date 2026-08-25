@@ -1,0 +1,37 @@
+[
+  {
+    "name": "lifecycle-java-update-schedule-cancel-zh",
+    "turns": [
+      {
+        "text": "\u521b\u5efa\u4e00\u7bc7\u6807\u9898\u4e3a GB-STABLE-R1-LIFE-JAVA \u7684 Java \u5b66\u4e60\u8349\u7a3f"
+      },
+      {
+        "text": "\u628a\u521a\u624d\u90a3\u7bc7\u7684\u6807\u9898\u6539\u6210 GB-STABLE-R1-LIFE-JAVA-UPDATED"
+      },
+      {
+        "text": "\u7ed9\u521a\u624d\u90a3\u7bc7\u8349\u7a3f\u8865\u5145\u4e09\u6761 Java \u5b9e\u8df5\u5efa\u8bae"
+      },
+      {
+        "text": "\u5b89\u6392\u521a\u624d\u90a3\u7bc7\u8349\u7a3f\u4e94\u5206\u949f\u540e\u53d1\u5e03"
+      },
+      {
+        "text": "\u628a\u521a\u624d\u90a3\u4e2a\u5b9a\u65f6\u6539\u5230\u5341\u5206\u949f\u540e\u53d1\u5e03"
+      },
+      {
+        "text": "\u53d6\u6d88\u521a\u624d\u90a3\u7bc7\u7684\u5b9a\u65f6\u53d1\u5e03"
+      }
+    ]
+  },
+  {
+    "name": "lifecycle-agent-publish-zh",
+    "turns": [
+      {
+        "text": "\u521b\u5efa\u4e00\u7bc7\u6807\u9898\u4e3a GB-STABLE-R1-LIFE-AGENT \u7684 Agent \u5b66\u4e60\u8349\u7a3f"
+      },
+      {
+        "text": "\u628a\u521a\u624d\u90a3\u7bc7\u8349\u7a3f\u76f4\u63a5\u53d1\u5e03",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  }
+]

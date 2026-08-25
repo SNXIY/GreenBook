@@ -1,0 +1,12 @@
+[
+  {
+    "name": "positive-search-projection",
+    "turns": [
+      {"text": "搜索 Java 学习相关帖子"},
+      {"text": "搜一些 Agent 学习相关帖子"},
+      {"text": "搜索 Redis 缓存实践"},
+      {"text": "找几篇 Spring Boot 入门内容"},
+      {"text": "搜索 Python 和 AI 相关帖子"}
+    ]
+  }
+]

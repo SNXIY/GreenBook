@@ -1,0 +1,401 @@
+{
+  "case_count": 19,
+  "replayed": 19,
+  "errors": [],
+  "rows": [
+    {
+      "case_id": "B02",
+      "objective_count": 3,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Java 学习",
+          "desired_outcome": "Java 学习",
+          "outcome": "定时发布",
+          "target": {
+            "kind": "SCHEDULE",
+            "label": "Java 学习",
+            "resource_id": "schedule-java"
+          },
+          "run_at": "2026-08-23T07:00:00Z",
+          "timezone": "Asia/Shanghai",
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        },
+        {
+          "topic": "Agent Memory",
+          "desired_outcome": "Agent Memory",
+          "outcome": "定时发布",
+          "target": {
+            "kind": "SCHEDULE",
+            "label": "Agent Memory",
+            "resource_id": "schedule-agent"
+          },
+          "run_at": "2026-08-22T02:05:00Z",
+          "timezone": "Asia/Shanghai",
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        },
+        {
+          "topic": "Redis 面试",
+          "desired_outcome": "Redis 面试",
+          "outcome": "保存为草稿",
+          "target": {
+            "kind": "DRAFT",
+            "label": "Redis 面试",
+            "resource_id": "draft-redis"
+          },
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "B03",
+      "objective_count": 2,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Java",
+          "desired_outcome": "Java",
+          "outcome": "立即发布",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        },
+        {
+          "topic": "Agent",
+          "desired_outcome": "Agent",
+          "outcome": "保存为草稿",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "DRAFT_ONLY",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "B05",
+      "objective_count": 2,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Java 学习",
+          "desired_outcome": "Java 学习",
+          "outcome": "定时发布",
+          "target": {
+            "kind": "SCHEDULE",
+            "label": "Java 学习",
+            "resource_id": "schedule-java"
+          },
+          "run_at": "2026-08-23T01:00:00Z",
+          "timezone": "Asia/Shanghai",
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        },
+        {
+          "topic": "Agent Memory",
+          "desired_outcome": "Agent Memory",
+          "outcome": "",
+          "target": {
+            "kind": "SCHEDULE",
+            "label": "Agent Memory",
+            "resource_id": "schedule-agent"
+          },
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "B07",
+      "objective_count": 3,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Java",
+          "desired_outcome": "Java",
+          "outcome": "立即发布",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        },
+        {
+          "topic": "Agent",
+          "desired_outcome": "Agent",
+          "outcome": "保存为草稿",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "DRAFT_ONLY",
+          "dependencies": [],
+          "has_real_side_effect": true
+        },
+        {
+          "topic": "Redis",
+          "desired_outcome": "Redis",
+          "outcome": "保存为草稿",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "DRAFT_ONLY",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "C04",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Java 学习",
+          "desired_outcome": "Java 学习",
+          "outcome": "定时发布",
+          "target": {
+            "kind": "SCHEDULE",
+            "label": "Java 学习",
+            "resource_id": "schedule-java"
+          },
+          "run_at": "明天下午",
+          "timezone": null,
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "C05",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Agent Memory",
+          "desired_outcome": "Agent Memory",
+          "outcome": "立即发布",
+          "target": {
+            "kind": "DRAFT",
+            "label": "Agent Memory",
+            "resource_id": "objective-failed"
+          },
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "C06",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "那篇草稿",
+          "desired_outcome": "那篇草稿",
+          "outcome": "保存为草稿",
+          "target": {
+            "kind": "DRAFT",
+            "label": "那篇草稿"
+          },
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "E07",
+      "objective_count": 0,
+      "has_real_side_effect": false,
+      "projection": []
+    },
+    {
+      "case_id": "F01",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Java 学习",
+          "desired_outcome": "Java 学习",
+          "outcome": "定时发布",
+          "target": {
+            "kind": "SCHEDULE",
+            "label": "Java 学习",
+            "resource_id": "schedule-java"
+          },
+          "run_at": "2026-08-22T02:05:00Z",
+          "timezone": "Asia/Shanghai",
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "F02",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Agent Memory",
+          "desired_outcome": "Agent Memory",
+          "outcome": "保存为草稿",
+          "target": {
+            "kind": "DRAFT",
+            "label": "Agent Memory",
+            "resource_id": "objective-agent"
+          },
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "F03",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Agent Memory",
+          "desired_outcome": "Agent Memory",
+          "outcome": "立即发布",
+          "target": {
+            "kind": "TASK",
+            "label": "Agent Memory"
+          },
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "F06",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Agent Memory",
+          "desired_outcome": "Agent Memory",
+          "outcome": "立即发布",
+          "target": {
+            "kind": "DRAFT",
+            "label": "Agent Memory",
+            "resource_id": "draft-failed"
+          },
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "F07",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "Kubernetes 入门",
+          "desired_outcome": "Kubernetes 入门",
+          "outcome": "保存为草稿",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "DRAFT_ONLY",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "F08",
+      "objective_count": 0,
+      "has_real_side_effect": false,
+      "projection": []
+    },
+    {
+      "case_id": "G01",
+      "objective_count": 0,
+      "has_real_side_effect": false,
+      "projection": []
+    },
+    {
+      "case_id": "G03",
+      "objective_count": 0,
+      "has_real_side_effect": false,
+      "projection": []
+    },
+    {
+      "case_id": "G04",
+      "objective_count": 1,
+      "has_real_side_effect": false,
+      "projection": [
+        {
+          "topic": "",
+          "desired_outcome": "",
+          "outcome": "",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "",
+          "dependencies": [],
+          "has_real_side_effect": false
+        }
+      ]
+    },
+    {
+      "case_id": "G05",
+      "objective_count": 1,
+      "has_real_side_effect": true,
+      "projection": [
+        {
+          "topic": "",
+          "desired_outcome": "",
+          "outcome": "定时发布",
+          "target": null,
+          "run_at": null,
+          "timezone": null,
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "dependencies": [],
+          "has_real_side_effect": true
+        }
+      ]
+    },
+    {
+      "case_id": "G06",
+      "objective_count": 0,
+      "has_real_side_effect": false,
+      "projection": []
+    }
+  ]
+}

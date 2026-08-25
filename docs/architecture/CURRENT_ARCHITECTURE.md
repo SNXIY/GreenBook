@@ -1,90 +1,117 @@
 # GreenBook Current Architecture
 
-This is the current architecture authority. Phase reports and audit files are
-historical records; they do not define active topology.
+This document describes the active production wiring observed in the source
+tree on 2026-08-21. Historical phase reports remain useful evidence, but they
+do not override the composition root in `apps/agent_api/greenbook_agent_api/main.py`.
 
 ## Active product surface
 
-| Surface | Location | Responsibility |
+| Surface | Location | Current responsibility |
 | --- | --- | --- |
-| Frontend | `zhiguang-fe` | User-facing Conversation, Task, Progress, Execution, Artifact, Approval, and Schedule UI |
-| Java Backend | `apps/backend` | Community data, identity, REST APIs, and Java-side Agent Tool API |
-| Agent API | `apps/agent_api` | HTTP composition root for conversation and runtime requests |
-| Agent Worker | `apps/agent_worker` | Durable queue consumer and execution worker |
-| Agent Core | `packages/agent_core` | Command, Context, Goal, Task, planning, AgentLoop, tool selection, execution, memory, and recovery contracts |
-| Creator Service | `creator-agent` | Creator-domain research, writing, quality, artifacts, and approvals |
-| MCP runtime | `services/greenbook_mcp` | MCP-compatible in-process tool registry and handlers |
+| Frontend | `zhiguang-fe` | Conversation input, durable Run/Activity projection, clarification and approval controls |
+| Agent API | `apps/agent_api` | Authenticated conversation API, immediate Run acceptance, Runner/Turn wiring, user-facing projection |
+| Agent Worker | `apps/agent_worker` | Durable queue consumer, lease/fencing, checkpoint/retry, completion projection, reconciliation |
+| Agent Core | `packages/agent_core` | Context, Command interpretation, Target/Temporal resolution, FastPath, Objective/ActionLoop, observation and satisfaction contracts |
+| MCP Tool Runtime | `services/greenbook_mcp` | Typed tool registry, policy/approval boundary, JavaClient adapters, Java verification evidence |
+| Java business backend | `apps/backend` | Community API, Draft/Schedule/Post state, scheduled publication, notifications/outbox |
 
-There is one Java owner, one Creator owner, and one GreenBook Agent Runtime.
-The MCP package is imported by the Agent API/Worker and is not a standalone
-deployment process.
+The standalone Creator Agent is not an active production entry. Content
+generation is performed through the Agent control path and persisted by Java.
+The MCP server is imported in-process by the API/Worker; it is not a second
+business runtime.
 
-## Runtime flow
+## Active request and execution flow
 
 ```text
-Conversation facts
-  -> ContextBuilder -> ContextSnapshot (bounded working projection)
-  -> CommandInterpreter -> Command
-  -> GoalDecomposer -> GoalTree
-  -> TaskManager / TaskRepository
-  -> AgentLoop (Observe -> Reason -> Act -> Reflect)
-  -> DynamicPlanner / ToolSelector
-  -> ToolPolicyGate
-  -> GoalCompiler -> planning.TaskPlan / PlanStep
-  -> ExecutionInput
-  -> ExecutionSubmissionService -> Queue
-  -> Agent Worker -> ToolRuntime / MCP
-  -> Java Backend or Creator Service
+Frontend
+  -> POST /api/v1/agent/conversations/{conversation_id}/messages
+  -> authenticate + persist AgentRun(ACCEPTED)
+  -> AgentRunner claims the Run
+  -> TurnCoordinator
+       -> bounded ContextAssembler
+       -> one CommandInterpreter pass
+       -> TargetResolver + TemporalResolver
+       -> ResolvedSemanticState
+       -> FastPathGate
+          |-- CHAT / CLARIFY / simple READ
+          |     -> FastPathExecutor -> MCP ToolRuntime -> Java READ
+          |-- simple WRITE
+          |     -> Target/temporal checks -> ActionLoop write boundary
+          |-- COMPLEX
+                -> ActionLoopExecutor
+                -> one typed semantic ActionDecision per iteration
+                -> Objective-scoped ResourceBinding and deterministic Guard
+  -> ConversationRuntimeAdapter
+       |-- READ: execute_fast_path_read -> MCP ToolRuntime -> Java
+       |-- WRITE: submit_fast_path_write / submit_tool
+                -> ExecutionInput -> RuntimeAgentService
+                -> Durable ExecutionRepository + OperationLedger
+                -> Queue -> Worker lease/fencing/checkpoint/retry
+                -> MCP ToolRuntime -> JavaClient -> Java DB
+  -> Java verification / ToolResult / Observation
+  -> ResourceBinding + deterministic Objective/Run satisfaction
+  -> completion/activity projection -> SSE/polling -> Frontend
 ```
 
-## Agent intelligence contract
+The API may use direct dispatch for the local in-memory profile, but that is a
+dispatch configuration of the same Runtime submission boundary, not a second
+business path. PostgreSQL/worker deployment uses the queue and reconciliation
+worker.
 
-- `CommandInterpreter` asks the LLM for a semantic understanding payload
-  (`goal`, `entities`, `constraints`, `references`, `ambiguity`, and
-  `required_capabilities`). The coarse `CommandType` is only an operation
-  envelope; it is not a keyword-driven Intent classifier.
-- `GoalDecomposer` turns that payload into a validated `GoalTree`. Goals may
-  form sequential or parallel dependencies, and `DynamicPlanner` can apply
-  evidence-based insert/remove/reorder/alternative-tool decisions during the
-  `AgentLoop` without becoming a workflow-template engine.
-- `AgentLoop` owns Observe/Reason/Act/Reflect. `Execution` remains the durable
-  runtime for queueing, worker delivery, checkpointing, ledger evidence,
-  retry, and recovery.
-- `ToolSelector` sees semantic `ToolMetadata`; `ToolPolicyGate` remains the
-  code-owned approval, permission, side-effect, cost, retry, and timeout gate.
-- `ConversationService` preserves durable facts and bounded summaries, while
-  `ContextBuilder` projects the current decision working set. Memory remains a
-  separate long-term retrieval boundary.
+## Control-plane owners
 
-## Ownership boundaries
+- `ContextAssembler` owns the bounded decision context; it is not business truth.
+- `CommandInterpreter` extracts the current structured user request. It does
+  not execute tools or decide Java state.
+- `TargetResolver` is the only owner of natural-language target grounding.
+- `TemporalResolver` is the only owner of natural-language publication-time
+  canonicalization. An unresolved future request cannot become publish-now.
+- `FastPathGate` answers only whether a request is sufficiently certain for a
+  short path. It is not a second intent taxonomy.
+- `ActionLoop` selects one typed semantic action at a time. It does not compile
+  a static DAG and does not own durable delivery.
+- `Objective`/`Task` are the current persisted work-item envelope. Their
+  reducer owns deterministic satisfaction until a Commitment migration is
+  justified.
+- `ActionGuard` is a thin write-admission recheck for target, temporal,
+  ownership, approval and duplicate-result facts.
+- The isolated B POC in
+  `packages/agent_core/greenbook_agent_core/turn/commitment_poc.py` models a
+  minimal Commitment/WorkItem projection, but is not production-wired or
+  persisted.
 
-- `conversation/` owns durable Conversation facts: messages, summaries, and preferences. Its service is `ConversationService`; durable data access is `ConversationRepository`.
-- `context/` owns the decision working set: `ContextBuilder`, `ContextSnapshot`, and projections. It does not persist Conversation facts.
-- `command/` understands the current user expression. It does not select tools or execute work.
-- `goal/` owns `GoalTree` and semantic goal decomposition.
-- `task/` owns Task lifecycle, priority, ownership, preemption, resume, and version history.
-- `planning/` owns `TaskPlan`, `PlanStep`, `PlanRevision`, `PlanningDecision`, and `PlanGraph`.
-- `agent/` owns the decision loop and reflection; it does not directly perform external side effects.
-- `contracts/ToolMetadata` is the single source for concrete tool policy. `Capability` is semantic catalog data only.
-- `execution/` owns `ExecutionInput`, queue/worker behavior, checkpoints, leases, retries, ledger/evidence, idempotency, artifacts, and recovery.
-- `services/greenbook_mcp` consumes shared contracts and supplies handlers; it does not redefine policy.
-- API modules compose these boundaries. Core modules do not import API routes.
+## Durable and business owners
 
-## Canonical identities and paths
+- `Execution` owns delivery progress, leases, fencing, checkpoints, retries,
+  resume and execution status.
+- `OperationLedger` owns external side-effect claim/status and keeps
+  `RESULT_UNKNOWN` on the reconciliation path; it must not blindly retry an
+  uncertain write.
+- `ResourceBinding` owns which Draft/Schedule/Post belongs to an Objective.
+- `Approval` owns human authorization/waiting for risky writes.
+- Java owns Draft, Schedule, Post, publication and notification business facts.
+- `Run`, Activity and API/Frontend objects are projections/aggregations. They
+  must not independently re-derive Java business truth.
+
+## Compatibility and legacy boundary
+
+`ConversationRuntimeAdapter` still contains compatibility code for historical
+Task/Goal snapshots and test/repair tooling. `GoalTree`, `GoalCompiler`,
+`DynamicPlanner` and the old AgentLoop are not the active TurnCoordinator
+decision path for the current API wiring. They should be retired only after
+caller-level evidence, not by deleting them during the lightweight POC.
+
+## Canonical identities and endpoints
 
 - Runtime identity: `execution_id`.
-- Public history projection: `run_id` and the retained `assistant_runs` table. `Run` is a history projection, not runtime state.
-- Agent API: `/api/v1/agent/*` on port `8094`.
-- Java Agent Tool API: `/api/v1/agent/*` on port `8080`.
-- Creator Service: port `8092`.
+- Public conversation history: `run_id` and its projection stores.
+- API: `/api/v1/agent/*` on port `8094`.
+- Java Agent Facade: `/api/v1/agent/*` on port `8080`.
 - Frontend: port `5173`.
 
-The old `/api/v1/assistant-tools` surface, retired products, IntentSpec queue
-payloads, and workflow-template routing are not active callers.
+## Persistence rule
 
-## Persistence
-
-Each domain repository remains authoritative for its own facts: Conversation,
-Task, Execution, Artifact, Memory, and Java community data. `assistant_runs`
-remains only for public history compatibility; no new execution decision is
-stored there as runtime truth.
+Each domain owns its facts: Conversation, Task/Objective, Execution,
+Operation, Approval, ResourceBinding and Java community data. The control
+layer may project and resolve these facts, but it must not create a parallel
+Draft/Schedule/Post state source.

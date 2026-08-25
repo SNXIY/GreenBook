@@ -1,0 +1,67 @@
+[
+  {
+    "name": "view-summarize-java-zh",
+    "turns": [
+      {
+        "text": "\u641c\u7d22\u793e\u533a\u4e2d\u4e0e Java \u5b66\u4e60\u76f8\u5173\u7684\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      },
+      {
+        "text": "\u603b\u7ed3\u8fd9\u7bc7\u5e16\u5b50\uff0c\u544a\u8bc9\u6211\u91cd\u70b9\u6709\u54ea\u4e9b"
+      }
+    ]
+  },
+  {
+    "name": "view-summarize-agent-zh",
+    "turns": [
+      {
+        "text": "\u641c\u7d22\u4e00\u4e9b Agent \u5b66\u4e60\u76f8\u5173\u7684\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      },
+      {
+        "text": "\u8fd9\u7bc7\u4e3b\u8981\u8bf4\u4ec0\u4e48\uff0c\u8bf7\u5148\u603b\u7ed3\u518d\u8bf4\u9002\u5408\u521d\u5b66\u8005\u5417"
+      }
+    ]
+  },
+  {
+    "name": "view-summarize-redis-zh",
+    "turns": [
+      {
+        "text": "\u641c\u4e00\u4e9b Redis \u5b66\u4e60\u76f8\u5173\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      },
+      {
+        "text": "\u7ed9\u6211\u6982\u62ec\u4e00\u4e0b\u8fd9\u4e2a\u5e16\u5b50"
+      }
+    ]
+  },
+  {
+    "name": "view-summarize-spring-zh",
+    "turns": [
+      {
+        "text": "\u641c\u7d22 Spring Boot \u5165\u95e8\u5b9e\u8df5\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      },
+      {
+        "text": "\u8fd9\u7bc7\u6587\u7ae0\u7684\u91cd\u70b9\u662f\u4ec0\u4e48"
+      }
+    ]
+  },
+  {
+    "name": "view-summarize-python-zh",
+    "turns": [
+      {
+        "text": "\u641c\u7d22 Python \u5b66\u4e60\u548c AI \u5b9e\u8df5\u76f8\u5173\u7684\u5e16\u5b50",
+        "ui_action": "click_search_first",
+        "search_index": 0
+      },
+      {
+        "text": "\u603b\u7ed3\u8fd9\u7bc7\uff0c\u5e76\u8bf4\u8bf4\u9002\u4e0d\u9002\u5408\u521d\u5b66\u8005"
+      }
+    ]
+  }
+]

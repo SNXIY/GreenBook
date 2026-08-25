@@ -1,8 +1,6 @@
 package com.tongji.knowpost.api;
 
 import com.tongji.auth.token.JwtService;
-import com.tongji.knowpost.api.dto.AiDraftCreateRequest;
-import com.tongji.knowpost.api.dto.AiDraftCreateResponse;
 import com.tongji.knowpost.api.dto.KnowPostContentConfirmRequest;
 import com.tongji.knowpost.api.dto.KnowPostDraftCreateResponse;
 import com.tongji.knowpost.api.dto.KnowPostPatchRequest;
@@ -14,22 +12,14 @@ import com.tongji.knowpost.api.dto.PublishStatusResponse;
 import com.tongji.knowpost.service.KnowPostService;
 import com.tongji.knowpost.service.KnowPostFeedService;
 import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
-import com.tongji.common.exception.BusinessException;
-import com.tongji.common.exception.ErrorCode;
-import com.tongji.user.domain.User;
-import com.tongji.user.domain.UserRole;
-import com.tongji.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
 
 @RestController
@@ -41,10 +31,6 @@ public class KnowPostController {
     private final KnowPostService service;
     private final KnowPostFeedService feedService;
     private final JwtService jwtService;
-    private final UserService userService;
-
-    @Value("${creator.handoff.shared-secret:}")
-    private String handoffSharedSecret;
 
     /**
      * 创建草稿，返回新 ID。默认类型为 image_text。
@@ -54,44 +40,6 @@ public class KnowPostController {
         long userId = jwtService.extractUserId(jwt);
         long id = service.createDraft(userId);
         return new KnowPostDraftCreateResponse(String.valueOf(id));
-    }
-
-    /**
-     * 接收创作 Agent publication handoff，创建 AI_ASSISTED 草稿。
-     * 仅允许创作 Agent 使用服务间密钥调用。普通用户不能自行声明 AI 来源。
-     */
-    @PostMapping("/ai-drafts")
-    public AiDraftCreateResponse createAiDraft(
-            @Valid @RequestBody AiDraftCreateRequest request,
-            @RequestHeader(value = "X-Creator-Handoff-Secret", required = false) String handoffSecret
-    ) {
-        if (!serviceSecretMatches(handoffSecret)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "创作 Agent 服务凭证无效");
-        }
-        User creator = userService.findById(request.creatorId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "创作者账号不存在"));
-        if (creator.getRole() == UserRole.ADMIN) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "管理员账号不能创建社区帖子");
-        }
-        long id = service.createAiDraft(
-                request.creatorId(),
-                request.title(),
-                request.bodyMarkdown(),
-                request.description(),
-                request.contentSha256()
-        );
-        return new AiDraftCreateResponse(String.valueOf(id), "draft", "AI_ASSISTED");
-    }
-
-    private boolean serviceSecretMatches(String supplied) {
-        if (handoffSharedSecret == null || handoffSharedSecret.isBlank()
-                || supplied == null || supplied.isBlank()) {
-            return false;
-        }
-        return MessageDigest.isEqual(
-                handoffSharedSecret.getBytes(StandardCharsets.UTF_8),
-                supplied.getBytes(StandardCharsets.UTF_8)
-        );
     }
 
     /**

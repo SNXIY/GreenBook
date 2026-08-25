@@ -1,0 +1,458 @@
+{
+  "status": "COMPLETED",
+  "run_id": "20260822T175833",
+  "dataset": {
+    "path": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "version": "2026-08-22.freeze-1",
+    "primary_case_count": 18,
+    "category_counts": {
+      "A_SINGLE_ORAL": 1,
+      "B_MULTI_TARGET": 4,
+      "C_TARGET_REFERENCE": 2,
+      "E_NEGATIVE_CONSTRAINT": 2,
+      "F_CROSS_TURN": 4,
+      "G_AMBIGUOUS_INCOMPLETE": 3,
+      "H_PARAPHRASE": 2
+    }
+  },
+  "summary": {
+    "primary_case_count": 18,
+    "evaluated_utterance_count": 24,
+    "exact_semantic_success": 6,
+    "exact_semantic_accuracy": 0.25,
+    "primary_exact_semantic_success": 5,
+    "primary_exact_semantic_accuracy": 0.2777777777777778,
+    "unsafe_semantic_error_count": 4,
+    "unsafe_semantic_error_rate": 0.16666666666666666,
+    "primary_unsafe_semantic_error_count": 4,
+    "primary_unsafe_semantic_error_rate": 0.2222222222222222,
+    "metrics": {
+      "UNKNOWN_should_have_been_used": 2,
+      "constraint_lost": 2,
+      "constraint_violation": 2,
+      "exact_semantic_success": 6,
+      "extra_goal": 1,
+      "missing_clarification": 1,
+      "missing_goal": 1,
+      "premature_commitment": 1,
+      "semantic_validation_failure": 3,
+      "target_ambiguity_missed": 1,
+      "unnecessary_clarification": 6,
+      "wrong_action": 4,
+      "wrong_goal_split": 2,
+      "wrong_publication": 5,
+      "wrong_target": 9,
+      "wrong_time": 4
+    },
+    "by_category": {
+      "A_SINGLE_ORAL": {
+        "total": 1,
+        "exact": 1,
+        "exact_accuracy": 1.0,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 1
+        }
+      },
+      "B_MULTI_TARGET": {
+        "total": 4,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 1,
+        "metrics": {
+          "unnecessary_clarification": 3,
+          "wrong_target": 2,
+          "wrong_time": 3
+        }
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 2,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 0,
+        "metrics": {
+          "target_ambiguity_missed": 1,
+          "wrong_publication": 1,
+          "wrong_target": 1
+        }
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 2,
+        "exact": 1,
+        "exact_accuracy": 0.5,
+        "unsafe": 1,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "exact_semantic_success": 1,
+          "missing_clarification": 1,
+          "premature_commitment": 1,
+          "wrong_publication": 1,
+          "wrong_target": 1
+        }
+      },
+      "F_CROSS_TURN": {
+        "total": 4,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 2,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "constraint_lost": 2,
+          "constraint_violation": 2,
+          "missing_goal": 1,
+          "unnecessary_clarification": 1,
+          "wrong_action": 1,
+          "wrong_goal_split": 1,
+          "wrong_publication": 1,
+          "wrong_target": 2
+        }
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 3,
+        "exact": 1,
+        "exact_accuracy": 0.3333333333333333,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 1,
+          "wrong_action": 1,
+          "wrong_publication": 1,
+          "wrong_target": 1
+        }
+      },
+      "H_PARAPHRASE": {
+        "total": 8,
+        "exact": 3,
+        "exact_accuracy": 0.375,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 3,
+          "extra_goal": 1,
+          "semantic_validation_failure": 3,
+          "unnecessary_clarification": 2,
+          "wrong_action": 2,
+          "wrong_goal_split": 1,
+          "wrong_publication": 1,
+          "wrong_target": 2,
+          "wrong_time": 1
+        }
+      }
+    },
+    "primary_by_category": {
+      "A_SINGLE_ORAL": {
+        "total": 1,
+        "exact": 1,
+        "unsafe": 0,
+        "exact_accuracy": 1.0,
+        "unsafe_rate": 0.0
+      },
+      "B_MULTI_TARGET": {
+        "total": 4,
+        "exact": 0,
+        "unsafe": 1,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 0.25
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 2,
+        "exact": 0,
+        "unsafe": 0,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 0.0
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 2,
+        "exact": 1,
+        "unsafe": 1,
+        "exact_accuracy": 0.5,
+        "unsafe_rate": 0.5
+      },
+      "F_CROSS_TURN": {
+        "total": 4,
+        "exact": 0,
+        "unsafe": 2,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 0.5
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 3,
+        "exact": 1,
+        "unsafe": 0,
+        "exact_accuracy": 0.3333333333333333,
+        "unsafe_rate": 0.0
+      },
+      "H_PARAPHRASE": {
+        "total": 2,
+        "exact": 2,
+        "unsafe": 0,
+        "exact_accuracy": 1.0,
+        "unsafe_rate": 0.0
+      }
+    },
+    "provenance_coverage": {
+      "desired_outcome": {
+        "covered": 20,
+        "total": 24,
+        "coverage": 0.8333333333333334
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 24,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 22,
+        "total": 24,
+        "coverage": 0.9166666666666666
+      },
+      "target_reference": {
+        "covered": 21,
+        "total": 24,
+        "coverage": 0.875
+      },
+      "temporal_expression": {
+        "covered": 20,
+        "total": 24,
+        "coverage": 0.8333333333333334
+      }
+    },
+    "first_bad_state": {
+      "Interpreter": 9,
+      "Normalization": 1,
+      "Objective projection": 1,
+      "TargetResolver": 7
+    },
+    "top_failure_clusters": [
+      {
+        "cluster": "B_MULTI_TARGET:unnecessary_clarification",
+        "count": 3
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_time",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:semantic_validation_failure",
+        "count": 3
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_target",
+        "count": 2
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_violation",
+        "count": 2
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_target",
+        "count": 2
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_lost",
+        "count": 2
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_action",
+        "count": 2
+      },
+      {
+        "cluster": "H_PARAPHRASE:unnecessary_clarification",
+        "count": 2
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_target",
+        "count": 2
+      },
+      {
+        "cluster": "C_TARGET_REFERENCE:wrong_publication",
+        "count": 1
+      },
+      {
+        "cluster": "C_TARGET_REFERENCE:wrong_target",
+        "count": 1
+      },
+      {
+        "cluster": "C_TARGET_REFERENCE:target_ambiguity_missed",
+        "count": 1
+      },
+      {
+        "cluster": "E_NEGATIVE_CONSTRAINT:missing_clarification",
+        "count": 1
+      },
+      {
+        "cluster": "E_NEGATIVE_CONSTRAINT:premature_commitment",
+        "count": 1
+      }
+    ]
+  },
+  "paraphrase": {
+    "groups": 2,
+    "consistent_groups": 0,
+    "inconsistent_groups": 2,
+    "consistency": 0.0,
+    "rows": [
+      {
+        "case_id": "H01",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H04",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "CREATE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "MULTI_OBJECTIVE",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            false,
+            "NOT_FOUND",
+            true,
+            2,
+            "NOT_FOUND",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "UNRESOLVED"
+              ],
+              [
+                "redis 这篇",
+                "SCHEDULED_PUBLISH",
+                "UNRESOLVED"
+              ]
+            ]
+          ],
+          [
+            "SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NOT_FOUND",
+            true,
+            1,
+            "NOT_FOUND",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "cost": {
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "temperature": 0.0,
+    "calls": 24,
+    "input_tokens": 136960,
+    "output_tokens": 6662,
+    "total_tokens": 143622,
+    "latency_ms_sum": 51736.78,
+    "latency_ms_avg": 2155.7,
+    "benchmark_wall_ms": 52438.57,
+    "provider_error_count": 0,
+    "calls_per_primary_case": 1.3333333333333333
+  },
+  "provenance": {
+    "formal_source_span_contract": false,
+    "observed_fields": [
+      "raw_input",
+      "goal",
+      "target.reference",
+      "items.temporal_text",
+      "constraints"
+    ],
+    "method": "diagnostic in-band/source-substring checks; no new provenance model",
+    "coverage": {
+      "desired_outcome": {
+        "covered": 20,
+        "total": 24,
+        "coverage": 0.8333333333333334
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 24,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 22,
+        "total": 24,
+        "coverage": 0.9166666666666666
+      },
+      "target_reference": {
+        "covered": 21,
+        "total": 24,
+        "coverage": 0.875
+      },
+      "temporal_expression": {
+        "covered": 20,
+        "total": 24,
+        "coverage": 0.8333333333333334
+      }
+    }
+  },
+  "artifacts": {
+    "dataset": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "results": "D:\\agent\\green-book\\artifacts\\residual_variability_20260822_after_run1\\results.json",
+    "report": "D:\\agent\\green-book\\artifacts\\residual_variability_20260822_after_run1\\report.json",
+    "snapshots": "D:\\agent\\green-book\\artifacts\\residual_variability_20260822_after_run1\\snapshots"
+  }
+}

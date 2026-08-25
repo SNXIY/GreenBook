@@ -3,6 +3,7 @@ import styles from "./RelationListModal.module.css";
 import { relationService } from "@/services/relationService";
 import { useAuth } from "@/context/AuthContext";
 import type { ProfileResponse } from "@/types/profile";
+import { userFacingErrorMessage } from "@/services/userFacingError";
 
 type Mode = "following" | "followers";
 
@@ -47,8 +48,7 @@ const RelationListModal = ({ open, onClose, userId, mode }: RelationListModalPro
         setOffset(list.length);
         setHasMore(list.length >= initialLimit);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "加载失败";
-        if (!cancelled) setError(msg);
+        if (!cancelled) setError(userFacingErrorMessage(e, "列表暂时无法加载，请稍后重试。"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -83,8 +83,7 @@ const RelationListModal = ({ open, onClose, userId, mode }: RelationListModalPro
       setOffset(prev => prev + list.length);
       setHasMore(list.length >= initialLimit);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "加载失败";
-      setError(msg);
+      setError(userFacingErrorMessage(e, "列表暂时无法加载，请稍后重试。"));
     } finally {
       setLoading(false);
     }
@@ -100,7 +99,7 @@ const RelationListModal = ({ open, onClose, userId, mode }: RelationListModalPro
           <button type="button" className={styles._close_1q1ln_38} onClick={onClose}>关闭</button>
         </div>
         <div className={styles._body_1q1ln_46}>
-          {error ? <div className={styles._error_1q1ln_106}>{error}</div> : null}
+          {error ? <div className={styles._error_1q1ln_106} role="alert">{error}</div> : null}
           {profiles.length === 0 && !loading ? (
             <div className={styles._empty_1q1ln_101}>暂无数据</div>
           ) : (

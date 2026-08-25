@@ -63,6 +63,16 @@ class PlanValidator:
         # 6. Approval requirements
         self._check_approval(plan)
 
+        # 7. Side-effect semantic safety.  This is a plan-boundary guard for
+        # callers that bypass GoalCompiler but still submit a typed TaskPlan.
+        # It never upgrades one publication operation into another.
+        self._check_publication_semantics(plan)
+
+        # 8. A request with several logical Goals must never resolve a
+        # publication target from shared session state.  Each side effect has
+        # to name its draft or depend on an explicitly related draft.
+        self._check_multi_goal_publication_ownership(plan)
+
         plan.is_valid = len(plan.errors) == 0
         return plan
 
@@ -199,6 +209,96 @@ class PlanValidator:
             if has_side_effect:
                 plan.has_side_effects = True
 
+    @staticmethod
+    def _check_publication_semantics(plan: ExecutablePlan) -> None:
+        for step in plan.steps:
+            values = dict(getattr(step, "constraints", {}) or {})
+            intent = str(
+                values.get("publication_intent")
+                or values.get("publication_mode")
+                or values.get("publish_mode")
+                or ""
+            ).strip().upper().replace("-", "_").replace(" ", "_")
+            if intent in {"DRAFT", "SAVE_DRAFT", "DO_NOT_PUBLISH", "NO_PUBLISH"}:
+                intent = "DRAFT_ONLY"
+            elif intent in {"SCHEDULE", "SCHEDULE_PUBLISH"}:
+                intent = "SCHEDULED_PUBLISH"
+            elif intent in {"IMMEDIATE", "PUBLISH_NOW", "NOW"}:
+                intent = "IMMEDIATE_PUBLISH"
+            has_run_at = any(
+                values.get(key) not in (None, "", [])
+                for key in (
+                    "run_at",
+                    "publish_at",
+                    "scheduled_at",
+                    "publish_time",
+                    "schedule_time",
+                )
+            )
+            if step.capability == "SCHEDULE_PUBLISH":
+                if not has_run_at:
+                    plan.add_error(
+                        step,
+                        "SCHEDULE_TIME_REQUIRED",
+                        "Scheduled publication requires an explicit run_at; "
+                        "immediate publication is not a fallback.",
+                    )
+                if intent in {"DRAFT_ONLY", "IMMEDIATE_PUBLISH"}:
+                    plan.add_error(
+                        step,
+                        "PUBLICATION_INTENT_MISMATCH",
+                        "Scheduled publication conflicts with the Goal publication intent.",
+                    )
+            if step.capability == "PUBLISH_NOW" and intent in {
+                "DRAFT_ONLY",
+                "SCHEDULED_PUBLISH",
+            }:
+                plan.add_error(
+                    step,
+                    "PUBLICATION_INTENT_MISMATCH",
+                    "Immediate publication conflicts with the Goal publication intent.",
+                )
+
+    @staticmethod
+    def _check_multi_goal_publication_ownership(plan: ExecutablePlan) -> None:
+        """Fail closed when a multi-goal publish step has no owned draft.
+
+        Single-goal legacy plans may intentionally resolve an existing active
+        draft through conversation context.  In a plan containing multiple
+        logical goals that fallback is ambiguous and can schedule or publish
+        the wrong draft, so only an explicit ``draft_id`` or an explicit
+        upstream DRAFT dependency is accepted.  That dependency may cross a
+        leaf-goal boundary when a parent business goal deliberately models
+        creation and scheduling as separate child goals.
+        """
+
+        goal_ids = {
+            str(getattr(step, "goal_id", "") or "").strip()
+            for step in plan.steps
+            if str(getattr(step, "goal_id", "") or "").strip()
+        }
+        if len(goal_ids) <= 1:
+            return
+
+        by_step_id = {step.step_id: step for step in plan.steps}
+        for step in plan.steps:
+            if step.capability not in {"SCHEDULE_PUBLISH", "PUBLISH_NOW"}:
+                continue
+            values = dict(getattr(step, "constraints", {}) or {})
+            if values.get("draft_id") not in (None, "", []):
+                continue
+            if _has_draft_upstream(
+                step,
+                by_step_id=by_step_id,
+            ):
+                continue
+            plan.add_error(
+                step,
+                "MULTI_GOAL_PUBLICATION_OWNERSHIP_REQUIRED",
+                "Publication in a multi-goal plan requires an explicit draft_id "
+                "or an explicitly related upstream draft.",
+            )
+
     def _policy_for_step(self, step, capability) -> ToolPolicyMetadata | None:
         """Resolve one tool policy from the registry or canonical catalog."""
 
@@ -275,6 +375,30 @@ def _artifact_available(
     if step is None:
         return False
     return any(dfs(dep) for dep in step.depends_on)
+
+
+def _has_draft_upstream(
+    step,
+    *,
+    by_step_id: dict[str, object],
+) -> bool:
+    """Return whether a publication step has an explicitly upstream draft."""
+
+    draft_artifacts = {"DRAFT", "POST_DRAFT", "CONTENT_DRAFT"}
+    visited: set[str] = set()
+    pending = list(getattr(step, "depends_on", ()) or ())
+    while pending:
+        step_id = pending.pop()
+        if step_id in visited:
+            continue
+        visited.add(step_id)
+        upstream = by_step_id.get(step_id)
+        if upstream is None:
+            continue
+        if str(getattr(upstream, "output_artifact_type", "") or "").upper() in draft_artifacts:
+            return True
+        pending.extend(getattr(upstream, "depends_on", ()) or ())
+    return False
 
 
 def _reaches(plan: ExecutablePlan, from_id: str, target_id: str) -> bool:

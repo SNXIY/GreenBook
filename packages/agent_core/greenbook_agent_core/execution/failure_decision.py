@@ -41,6 +41,7 @@ class FailureCategory(StrEnum):
     NOT_FOUND = "NOT_FOUND"
     STATE_CONFLICT = "STATE_CONFLICT"
     BUSINESS_REJECTED = "BUSINESS_REJECTED"
+    SERVER_FAILURE = "SERVER_FAILURE"
     UNKNOWN = "UNKNOWN"
 
 
@@ -115,10 +116,15 @@ class FailureClassifier:
     _INVALID_ARGUMENT_CODES = frozenset({
         "INVALID_ARGUMENT",
         "VALIDATION_ERROR",
+        "INVALID_REQUEST",
+        "BAD_REQUEST",
         "INVALID_TOOL_ARGUMENT",
         "TOOL_ARGUMENT_VALIDATION_FAILED",
         "PRE_EXECUTION_VALIDATION_FAILED",
         "MISSING_REQUIRED_FIELD",
+        "FIELD_TOO_LONG",
+        "INVALID_DRAFT_METADATA",
+        "PERMANENT_INPUT",
     })
     _AUTH_CODES = frozenset({
         "AUTH_FAILURE",
@@ -136,14 +142,12 @@ class FailureClassifier:
     _DEPENDENCY_CODES = frozenset({
         "DEPENDENCY_UNAVAILABLE",
         "JAVA_BACKEND_UNAVAILABLE",
-        "CREATOR_UNAVAILABLE",
         "MCP_UNAVAILABLE",
         "TEMPORARY_UNAVAILABLE",
         "SERVICE_UNAVAILABLE",
     })
     _TIMEOUT_CODES = frozenset({
         "TIMEOUT",
-        "CREATOR_TIMEOUT",
         "MCP_TIMEOUT",
         "MODEL_TIMEOUT",
         "LLM_TIMEOUT",
@@ -181,6 +185,28 @@ class FailureClassifier:
         "IDEMPOTENCY_CONFLICT",
     })
     _BUSINESS_CODES = frozenset({"BUSINESS_REJECTED", "BUSINESS_RULE_REJECTED"})
+    _SERVER_CODES = frozenset({
+        "SERVER_FAILURE",
+        "INTERNAL_ERROR",
+        "TOOL_EXECUTION_FAILED",
+        "RUN_FAILED",
+        "MODEL_REQUEST_FAILED",
+    })
+    _INTERNAL_CODES = frozenset({
+        "INTERNAL_ERROR",
+        "TOOL_EXECUTION_FAILED",
+        "RUN_FAILED",
+        "MODEL_REQUEST_FAILED",
+    })
+    _KNOWN_REJECTION_CATEGORIES = frozenset({
+        FailureCategory.INVALID_ARGUMENT,
+        FailureCategory.AUTH_FAILURE,
+        FailureCategory.PERMISSION_DENIED,
+        FailureCategory.CONTRACT_MISMATCH,
+        FailureCategory.NOT_FOUND,
+        FailureCategory.STATE_CONFLICT,
+        FailureCategory.BUSINESS_REJECTED,
+    })
 
     def classify(self, failure: ExternalAgentFailure) -> FailureClassification:
         """Return a stable classification while preserving the raw code."""
@@ -189,13 +215,26 @@ class FailureClassifier:
         code = raw_code.strip().upper()
         category = self._category_for(code)
         risk = failure.side_effect_state
-        reconciliation_required = (
-            category == FailureCategory.SIDE_EFFECT_UNKNOWN
-            or risk in {
+        known_rejection = category in self._KNOWN_REJECTION_CATEGORIES
+        ambiguous_effect = risk in {
+            SideEffectState.POSSIBLE,
+            SideEffectState.UNKNOWN,
+            SideEffectState.CONFIRMED,
+        }
+        internal_without_explicit_side_effect = (
+            code in self._INTERNAL_CODES
+            and risk not in {
                 SideEffectState.POSSIBLE,
-                SideEffectState.UNKNOWN,
                 SideEffectState.CONFIRMED,
             }
+        )
+        reconciliation_required = (
+            category == FailureCategory.SIDE_EFFECT_UNKNOWN and ambiguous_effect
+            or (
+                not known_rejection
+                and not internal_without_explicit_side_effect
+                and ambiguous_effect
+            )
         )
         transient = category in {
             FailureCategory.DEPENDENCY_UNAVAILABLE,
@@ -275,6 +314,8 @@ class FailureClassifier:
             return FailureCategory.STATE_CONFLICT
         if code in cls._BUSINESS_CODES:
             return FailureCategory.BUSINESS_REJECTED
+        if code in cls._SERVER_CODES:
+            return FailureCategory.SERVER_FAILURE
         return FailureCategory.UNKNOWN
 
     @staticmethod
@@ -288,6 +329,15 @@ class FailureClassifier:
             return ExternalRecoveryAction.WAIT_DEPENDENCY
         if category == FailureCategory.SIDE_EFFECT_UNKNOWN:
             return ExternalRecoveryAction.RECONCILE
+        raw_code = str(failure.error_code or "").strip().upper()
+        if raw_code in FailureClassifier._INTERNAL_CODES and failure.side_effect_state not in {
+            SideEffectState.POSSIBLE,
+            SideEffectState.CONFIRMED,
+        }:
+            # An internal/runtime exception is not evidence that a remote
+            # write was attempted.  Only an adapter-supplied explicit effect
+            # hint may move it to reconciliation.
+            return ExternalRecoveryAction.FAIL
         if failure.side_effect_state in {
             SideEffectState.POSSIBLE,
             SideEffectState.UNKNOWN,

@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-import sqlalchemy as sa
 import pytest
-
+import sqlalchemy as sa
 from greenbook_agent_core.execution.evidence import ExecutionEvidence
-from greenbook_agent_core.execution.operation_tracking import OperationStatus
+from greenbook_agent_core.execution.operation_tracking import (
+    ExternalOperationRecord,
+    OperationStatus,
+)
 from greenbook_agent_core.execution.persistence import execution_metadata
 from greenbook_agent_core.execution.persistent_stores import (
     PostgresExternalOperationStore,
 )
-from greenbook_agent_core.execution.operation_tracking import ExternalOperationRecord
 
 
 @pytest.fixture

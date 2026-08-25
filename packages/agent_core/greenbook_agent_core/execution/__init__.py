@@ -11,7 +11,6 @@ from .execution_queue import (
 )
 from .execution_queue_worker import ExecutionQueueWorker
 from .external_adapters import (
-    CreatorAdapter,
     ExternalOperationAdapter,
     JavaCommunityAdapter,
     MockExternalOperationAdapter,
@@ -100,7 +99,6 @@ __all__ = [
     "QueueExecutionSubmissionService",
     "RecordingExecutionSubmissionService",
     "ExternalOperationAdapter",
-    "CreatorAdapter",
     "JavaCommunityAdapter",
     "MockExternalOperationAdapter",
     "FailureCategory",

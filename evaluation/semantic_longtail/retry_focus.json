@@ -1,0 +1,65 @@
+{
+  "benchmark": "GreenBook A — Retry Semantic Focused Gate",
+  "version": "2026-08-22.retry-focus-1",
+  "timezone": "Asia/Shanghai",
+  "fixed_now": "2026-08-22T10:00:00+08:00",
+  "notes": "Focused retry evaluation artifact; not imported by production runtime.",
+  "context_library": {
+    "failed_one": {
+      "targets": [
+        {"kind": "DRAFT", "id": "draft-failed", "resource_id": "draft-failed", "task_id": "task-failed", "label": "Agent Memory", "status": "DRAFT", "created_at": "2026-08-19T10:00:00+08:00", "metadata": {"objective_id": "objective-failed"}}
+      ],
+      "active_tasks": [
+        {"task_id": "task-success", "goal": "Java 成功", "created_at": "2026-08-19T09:00:00+08:00", "updated_at": "2026-08-19T09:00:00+08:00", "objectives": [{"objective_id": "objective-success", "description": "Java 成功", "status": "COMPLETED", "related_resource_ids": ["post-success"]}], "resource_index": [{"resource_id": "post-success", "resource_kind": "POST", "objective_id": "objective-success", "label": "Java 成功"}]},
+        {"task_id": "task-failed", "goal": "Agent Memory", "created_at": "2026-08-19T10:00:00+08:00", "updated_at": "2026-08-19T10:00:00+08:00", "objectives": [{"objective_id": "objective-failed", "description": "Agent Memory", "status": "FAILED", "desired_outcome": "PUBLISH_NOW", "constraints": {"publication_intent": "IMMEDIATE_PUBLISH"}, "related_resource_ids": ["draft-failed"], "failure_code": "DEPENDENCY_FAILED"}], "resource_index": [{"resource_id": "draft-failed", "resource_kind": "DRAFT", "objective_id": "objective-failed", "label": "Agent Memory"}]}
+      ]
+    },
+    "failed_three": {
+      "targets": [
+        {"kind": "DRAFT", "id": "draft-agent-failed", "resource_id": "draft-agent-failed", "task_id": "task-agent-failed", "label": "Agent Memory", "status": "DRAFT", "created_at": "2026-08-19T10:00:00+08:00", "metadata": {"objective_id": "objective-agent-failed"}}
+      ],
+      "active_tasks": [
+        {"task_id": "task-java-success", "goal": "Java 成功", "created_at": "2026-08-19T09:00:00+08:00", "updated_at": "2026-08-19T09:00:00+08:00", "objectives": [{"objective_id": "objective-java-success", "description": "Java 成功", "status": "COMPLETED", "related_resource_ids": ["post-java"]}], "resource_index": [{"resource_id": "post-java", "resource_kind": "POST", "objective_id": "objective-java-success", "label": "Java 成功"}]},
+        {"task_id": "task-agent-failed", "goal": "Agent Memory", "created_at": "2026-08-19T10:00:00+08:00", "updated_at": "2026-08-19T10:00:00+08:00", "objectives": [{"objective_id": "objective-agent-failed", "description": "Agent Memory", "status": "FAILED", "desired_outcome": "PUBLISH_NOW", "constraints": {"publication_intent": "IMMEDIATE_PUBLISH"}, "related_resource_ids": ["draft-agent-failed"], "failure_code": "CREATE_FAILED"}], "resource_index": [{"resource_id": "draft-agent-failed", "resource_kind": "DRAFT", "objective_id": "objective-agent-failed", "label": "Agent Memory"}]},
+        {"task_id": "task-redis-success", "goal": "Redis 成功", "created_at": "2026-08-19T11:00:00+08:00", "updated_at": "2026-08-19T11:00:00+08:00", "objectives": [{"objective_id": "objective-redis-success", "description": "Redis 成功", "status": "COMPLETED", "related_resource_ids": ["post-redis"]}], "resource_index": [{"resource_id": "post-redis", "resource_kind": "POST", "objective_id": "objective-redis-success", "label": "Redis 成功"}]}
+      ]
+    },
+    "failed_no_resource": {
+      "active_tasks": [
+        {"task_id": "task-failed", "goal": "Kubernetes 入门", "created_at": "2026-08-19T10:00:00+08:00", "updated_at": "2026-08-19T10:00:00+08:00", "objectives": [{"objective_id": "objective-failed", "description": "Kubernetes 入门", "status": "FAILED", "desired_outcome": "CREATE_DRAFT", "constraints": {"publication_intent": "DRAFT_ONLY"}, "related_resource_ids": [], "failure_code": "CREATE_FAILED"}], "resource_index": []}
+      ]
+    },
+    "unknown_one": {
+      "targets": [
+        {"kind": "DRAFT", "id": "draft-agent-unknown", "resource_id": "draft-agent-unknown", "task_id": "task-agent-unknown", "label": "Agent Memory", "status": "VERIFYING_RESULT", "created_at": "2026-08-19T10:00:00+08:00", "metadata": {"objective_id": "objective-agent-unknown"}}
+      ],
+      "active_tasks": [
+        {"task_id": "task-agent-unknown", "goal": "Agent Memory", "created_at": "2026-08-19T10:00:00+08:00", "updated_at": "2026-08-19T10:00:00+08:00", "objectives": [{"objective_id": "objective-agent-unknown", "description": "Agent Memory", "status": "RESULT_UNKNOWN", "execution_statuses": ["RESULT_UNKNOWN"], "related_resource_ids": ["draft-agent-unknown"]}], "resource_index": [{"resource_id": "draft-agent-unknown", "resource_kind": "DRAFT", "objective_id": "objective-agent-unknown", "label": "Agent Memory"}]}
+      ]
+    },
+    "two_failed": {
+      "targets": [
+        {"kind": "DRAFT", "id": "draft-agent-failed", "resource_id": "draft-agent-failed", "task_id": "task-agent-failed", "label": "Agent Memory", "status": "DRAFT", "created_at": "2026-08-19T10:00:00+08:00", "metadata": {"objective_id": "objective-agent-failed"}},
+        {"kind": "DRAFT", "id": "draft-redis-failed", "resource_id": "draft-redis-failed", "task_id": "task-redis-failed", "label": "Redis 面试", "status": "DRAFT", "created_at": "2026-08-19T11:00:00+08:00", "metadata": {"objective_id": "objective-redis-failed"}}
+      ],
+      "active_tasks": [
+        {"task_id": "task-agent-failed", "goal": "Agent Memory", "created_at": "2026-08-19T10:00:00+08:00", "updated_at": "2026-08-19T10:00:00+08:00", "objectives": [{"objective_id": "objective-agent-failed", "description": "Agent Memory", "status": "FAILED", "desired_outcome": "PUBLISH_NOW", "constraints": {"publication_intent": "IMMEDIATE_PUBLISH"}, "related_resource_ids": ["draft-agent-failed"], "failure_code": "PUBLISH_FAILED"}], "resource_index": [{"resource_id": "draft-agent-failed", "resource_kind": "DRAFT", "objective_id": "objective-agent-failed", "label": "Agent Memory"}]},
+        {"task_id": "task-redis-failed", "goal": "Redis 面试", "created_at": "2026-08-19T11:00:00+08:00", "updated_at": "2026-08-19T11:00:00+08:00", "objectives": [{"objective_id": "objective-redis-failed", "description": "Redis 面试", "status": "FAILED", "desired_outcome": "PUBLISH_NOW", "constraints": {"publication_intent": "IMMEDIATE_PUBLISH"}, "related_resource_ids": ["draft-redis-failed"], "failure_code": "PUBLISH_FAILED"}], "resource_index": [{"resource_id": "draft-redis-failed", "resource_kind": "DRAFT", "objective_id": "objective-redis-failed", "label": "Redis 面试"}]}
+      ]
+    }
+  },
+  "cases": [
+    {"id": "R01", "category": "RETRY_EXISTING", "message": "失败的那个再试一下。", "context": "failed_one", "truth": {"action_family": "PUBLISH_NOW", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "RETRY_FAILED_ONLY"]}},
+    {"id": "R02", "category": "RETRY_EXISTING", "message": "刚才失败的重新来一次。", "context": "failed_one", "truth": {"action_family": "PUBLISH_NOW", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "RETRY_FAILED_ONLY"]}},
+    {"id": "R03", "category": "RETRY_EXISTING", "message": "Agent 那篇发布失败了，再发一次。", "context": "failed_one", "truth": {"action_family": "PUBLISH_NOW", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "RETRY_FAILED_ONLY"]}},
+    {"id": "R04", "category": "RETRY_EXISTING", "message": "Agent 那篇草稿已经有了，重新发布。", "context": "failed_one", "truth": {"action_family": "PUBLISH_NOW", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "HISTORICAL_RESOURCE_CONTINUITY"]}},
+    {"id": "R05", "category": "RETRY_MODIFY", "message": "失败的那个标题改成并发基础再发一次。", "context": "failed_one", "truth": {"action_family": "REVISE", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "TITLE=并发基础", "HISTORICAL_RESOURCE_CONTINUITY"]}},
+    {"id": "R06", "category": "RETRY_MODIFY", "message": "刚才那篇标题换成并发基础，重新发。", "context": "failed_one", "truth": {"action_family": "REVISE", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "TITLE=并发基础", "HISTORICAL_RESOURCE_CONTINUITY"]}},
+    {"id": "R07", "category": "RETRY_CREATE", "message": "刚才创建失败了，再试。", "context": "failed_no_resource", "truth": {"action_family": "CREATE", "publication_mode": "NONE", "temporal_kind": "NONE", "temporal_resolved": false, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Kubernetes", "publication": "RETRY_CREATE"}], "constraints": ["NEW_OBJECTIVE", "NO_RESOURCE_REUSE"]}},
+    {"id": "R08", "category": "RETRY_CREATE", "message": "失败的那个再创建一次。", "context": "failed_no_resource", "truth": {"action_family": "CREATE", "publication_mode": "NONE", "temporal_kind": "NONE", "temporal_resolved": false, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Kubernetes", "publication": "RETRY_CREATE"}], "constraints": ["NEW_OBJECTIVE", "NO_RESOURCE_REUSE"]}},
+    {"id": "R09", "category": "RETRY_FILTER", "message": "只把失败的任务重跑，成功的不要碰。", "context": "failed_three", "truth": {"action_family": "PUBLISH_NOW", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "FAILED_ONLY", "EXCLUDE_COMPLETED"]}},
+    {"id": "R10", "category": "RETRY_UNKNOWN", "message": "结果还在核对，再试一下。", "context": "unknown_one", "truth": {"action_family": "REVISE", "publication_mode": "NONE", "temporal_kind": "NONE", "temporal_resolved": false, "target_resolution": "RECONCILIATION_REQUIRED", "clarification": true, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RECONCILE_FIRST"}], "constraints": ["NO_BLIND_RETRY"]}},
+    {"id": "R11", "category": "RETRY_AMBIGUOUS", "message": "失败的那个再试一下。", "context": "two_failed", "truth": {"action_family": "PUBLISH_NOW", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "AMBIGUOUS", "clarification": true, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["FAILED_ONLY"]}},
+    {"id": "R12", "category": "RETRY_FILTER", "message": "失败的那个再发一遍，成功的别动。", "context": "failed_three", "truth": {"action_family": "PUBLISH_NOW", "publication_mode": "IMMEDIATE", "temporal_kind": "NOW", "temporal_resolved": true, "target_resolution": "RESOLVED", "clarification": false, "objective_count": 1, "goals": [{"topic": "Agent", "publication": "RETRY"}], "constraints": ["NEW_OBJECTIVE", "FAILED_ONLY", "EXCLUDE_COMPLETED"]}}
+  ]
+}

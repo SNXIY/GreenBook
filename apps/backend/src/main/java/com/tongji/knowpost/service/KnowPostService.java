@@ -16,8 +16,6 @@ public interface KnowPostService {
     /** Create an empty draft with an explicit trusted content provenance. */
     long createDraft(long creatorId, String contentOrigin);
 
-    long createAiDraft(long creatorId, String title, String bodyMarkdown, String description, String contentSha256);
-
     void confirmContent(long creatorId, long id, String objectKey, String etag, Long size, String sha256);
 
     void updateMetadata(long creatorId, long id, String title, Long tagId, List<String> tags, List<String> imgUrls, String visible, Boolean isTop, String description);

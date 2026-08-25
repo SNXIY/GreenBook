@@ -5,7 +5,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-
 from greenbook_agent_core.execution.event_store import ExecutionEventStore
 from greenbook_agent_core.execution.events import EventType, ExecutionEvent
 from greenbook_agent_core.execution.operation_tracking import (

@@ -48,26 +48,46 @@ class ExecutionCredentialBroker:
             raise RuntimeError(
                 f"Queued execution {message.execution_id} has no authenticated scope"
             )
+        timezone = str(
+            identity.get("timezone")
+            or message.payload.get("timezone")
+            or ""
+        )
+        auth = self.resolve_identity(user_id, tenant_id, timezone=timezone)
+        if auth is None:
+            raise ExecutionHandlerDeferredError("validated user credential unavailable")
+        return auth
 
+    def resolve_identity(
+        self,
+        user_id: str,
+        tenant_id: str,
+        *,
+        timezone: str = "",
+    ) -> AuthContext | None:
+        """Resolve the validated credential for an identity, or None.
+
+        Used by durable continuation so an AgentLoop resumed after the original
+        HTTP request has finished can still call Java-authenticated tools with
+        the same user's credential.  The token is kept only in process-local
+        memory (never queue/Postgres/observation), is already JWT-validated,
+        and expires on its own TTL.
+        """
+
+        if not user_id or not tenant_id:
+            return None
         key = self._key(tenant_id, user_id)
         with self._lock:
             entry = self._credentials.get(key)
             if entry is None:
-                raise ExecutionHandlerDeferredError("validated user credential unavailable")
+                return None
             auth, expires_at = entry
             if expires_at is not None and expires_at <= float(self._now()):
                 self._credentials.pop(key, None)
-                raise ExecutionHandlerDeferredError("validated user credential expired")
-            return auth.model_copy(
-                update={
-                    "timezone": str(
-                        identity.get("timezone")
-                        or message.payload.get("timezone")
-                        or auth.timezone
-                    )
-                },
-                deep=True,
-            )
+                return None
+            if timezone:
+                return auth.model_copy(update={"timezone": timezone}, deep=True)
+            return auth.model_copy(deep=True)
 
     @staticmethod
     def _key(tenant_id: str, user_id: str) -> tuple[str, str]:

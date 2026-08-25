@@ -8,13 +8,16 @@ import { notificationService } from "@/services/notificationService";
 import { emitNotificationUnreadChanged } from "@/services/notificationEvents";
 import type { NotificationItem } from "@/types/notification";
 import styles from "./NotificationsPage.module.css";
+import { userFacingErrorMessage } from "@/services/userFacingError";
+import { formatBusinessDateTime } from "@/utils/dateTime";
 
 const typeLabel: Record<string, string> = {
   LIKE: "点赞",
   FAVORITE: "收藏",
   COMMENT: "评论",
   REPLY: "回复",
-  FOLLOW: "关注"
+  FOLLOW: "关注",
+  PUBLISHED: "发布"
 };
 
 const NotificationsPage = () => {
@@ -36,7 +39,7 @@ const NotificationsPage = () => {
       setCursor(resp.nextCursor ?? null);
       setHasMore(!!resp.hasMore);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "通知加载失败");
+      setError(userFacingErrorMessage(err, "消息暂时无法加载，请稍后重试。"));
     } finally {
       setLoading(false);
     }
@@ -94,7 +97,7 @@ const NotificationsPage = () => {
         </button>
       </section>
 
-      {error ? <div className={styles.error}>{error}</div> : null}
+      {error ? <div className={styles.error} role="alert">{error}</div> : null}
 
       <div className={styles.list}>
         {items.map(item => (
@@ -105,7 +108,7 @@ const NotificationsPage = () => {
             <div className={styles.body}>
               <div className={styles.meta}>
                 <span className={styles.type}>{typeLabel[item.type] ?? item.type}</span>
-                <span>{new Date(item.createTime).toLocaleString()}</span>
+                <span>{formatBusinessDateTime(item.createTime) ?? "时间未知"}</span>
               </div>
               <Link to={targetLink(item)} className={styles.title} onClick={() => !item.read && markOneRead(item.id)}>
                 {item.actorName ? `${item.actorName} · ` : ""}

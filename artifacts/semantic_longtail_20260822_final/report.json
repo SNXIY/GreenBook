@@ -1,0 +1,704 @@
+{
+  "status": "COMPLETED",
+  "run_id": "20260822T123246",
+  "dataset": {
+    "path": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "version": "2026-08-22.freeze-1",
+    "primary_case_count": 60,
+    "category_counts": {
+      "A_SINGLE_ORAL": 8,
+      "B_MULTI_TARGET": 8,
+      "C_TARGET_REFERENCE": 8,
+      "D_TEMPORAL": 8,
+      "E_NEGATIVE_CONSTRAINT": 8,
+      "F_CROSS_TURN": 8,
+      "G_AMBIGUOUS_INCOMPLETE": 6,
+      "H_PARAPHRASE": 6
+    }
+  },
+  "summary": {
+    "primary_case_count": 60,
+    "evaluated_utterance_count": 78,
+    "exact_semantic_success": 34,
+    "exact_semantic_accuracy": 0.4358974358974359,
+    "primary_exact_semantic_success": 25,
+    "primary_exact_semantic_accuracy": 0.4166666666666667,
+    "unsafe_semantic_error_count": 13,
+    "unsafe_semantic_error_rate": 0.16666666666666666,
+    "primary_unsafe_semantic_error_count": 10,
+    "primary_unsafe_semantic_error_rate": 0.16666666666666666,
+    "metrics": {
+      "UNKNOWN_should_have_been_used": 5,
+      "constraint_lost": 4,
+      "constraint_violation": 4,
+      "exact_semantic_success": 34,
+      "missing_clarification": 3,
+      "missing_goal": 6,
+      "premature_commitment": 2,
+      "schema_parse_failure": 11,
+      "semantic_validation_failure": 4,
+      "target_ambiguity_missed": 1,
+      "unnecessary_clarification": 7,
+      "wrong_action": 8,
+      "wrong_goal_split": 5,
+      "wrong_publication": 13,
+      "wrong_target": 18,
+      "wrong_time": 8
+    },
+    "by_category": {
+      "A_SINGLE_ORAL": {
+        "total": 8,
+        "exact": 5,
+        "exact_accuracy": 0.625,
+        "unsafe": 2,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 2,
+          "constraint_lost": 1,
+          "constraint_violation": 1,
+          "exact_semantic_success": 5,
+          "unnecessary_clarification": 1,
+          "wrong_publication": 2,
+          "wrong_time": 1
+        }
+      },
+      "B_MULTI_TARGET": {
+        "total": 8,
+        "exact": 2,
+        "exact_accuracy": 0.25,
+        "unsafe": 4,
+        "metrics": {
+          "exact_semantic_success": 2,
+          "missing_clarification": 1,
+          "missing_goal": 3,
+          "semantic_validation_failure": 1,
+          "unnecessary_clarification": 1,
+          "wrong_action": 3,
+          "wrong_goal_split": 3,
+          "wrong_publication": 5,
+          "wrong_target": 1,
+          "wrong_time": 5
+        }
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 8,
+        "exact": 5,
+        "exact_accuracy": 0.625,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 5,
+          "schema_parse_failure": 1,
+          "unnecessary_clarification": 1,
+          "wrong_publication": 1,
+          "wrong_target": 1
+        }
+      },
+      "D_TEMPORAL": {
+        "total": 8,
+        "exact": 5,
+        "exact_accuracy": 0.625,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 5,
+          "schema_parse_failure": 1,
+          "wrong_target": 2
+        }
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 8,
+        "exact": 3,
+        "exact_accuracy": 0.375,
+        "unsafe": 1,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "exact_semantic_success": 3,
+          "missing_clarification": 1,
+          "premature_commitment": 1,
+          "schema_parse_failure": 3,
+          "wrong_publication": 1,
+          "wrong_target": 2
+        }
+      },
+      "F_CROSS_TURN": {
+        "total": 8,
+        "exact": 0,
+        "exact_accuracy": 0.0,
+        "unsafe": 3,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "constraint_lost": 3,
+          "constraint_violation": 3,
+          "missing_clarification": 1,
+          "missing_goal": 1,
+          "premature_commitment": 1,
+          "schema_parse_failure": 4,
+          "unnecessary_clarification": 1,
+          "wrong_action": 1,
+          "wrong_goal_split": 1,
+          "wrong_publication": 1,
+          "wrong_target": 4
+        }
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 6,
+        "exact": 2,
+        "exact_accuracy": 0.3333333333333333,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 2,
+          "missing_goal": 1,
+          "target_ambiguity_missed": 1,
+          "wrong_action": 1,
+          "wrong_goal_split": 1,
+          "wrong_publication": 1,
+          "wrong_target": 3,
+          "wrong_time": 1
+        }
+      },
+      "H_PARAPHRASE": {
+        "total": 24,
+        "exact": 12,
+        "exact_accuracy": 0.5,
+        "unsafe": 3,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "exact_semantic_success": 12,
+          "missing_goal": 1,
+          "schema_parse_failure": 2,
+          "semantic_validation_failure": 3,
+          "unnecessary_clarification": 3,
+          "wrong_action": 3,
+          "wrong_publication": 2,
+          "wrong_target": 5,
+          "wrong_time": 1
+        }
+      }
+    },
+    "primary_by_category": {
+      "A_SINGLE_ORAL": {
+        "total": 8,
+        "exact": 5,
+        "unsafe": 2,
+        "exact_accuracy": 0.625,
+        "unsafe_rate": 0.25
+      },
+      "B_MULTI_TARGET": {
+        "total": 8,
+        "exact": 2,
+        "unsafe": 4,
+        "exact_accuracy": 0.25,
+        "unsafe_rate": 0.5
+      },
+      "C_TARGET_REFERENCE": {
+        "total": 8,
+        "exact": 5,
+        "unsafe": 0,
+        "exact_accuracy": 0.625,
+        "unsafe_rate": 0.0
+      },
+      "D_TEMPORAL": {
+        "total": 8,
+        "exact": 5,
+        "unsafe": 0,
+        "exact_accuracy": 0.625,
+        "unsafe_rate": 0.0
+      },
+      "E_NEGATIVE_CONSTRAINT": {
+        "total": 8,
+        "exact": 3,
+        "unsafe": 1,
+        "exact_accuracy": 0.375,
+        "unsafe_rate": 0.125
+      },
+      "F_CROSS_TURN": {
+        "total": 8,
+        "exact": 0,
+        "unsafe": 3,
+        "exact_accuracy": 0.0,
+        "unsafe_rate": 0.375
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 6,
+        "exact": 2,
+        "unsafe": 0,
+        "exact_accuracy": 0.3333333333333333,
+        "unsafe_rate": 0.0
+      },
+      "H_PARAPHRASE": {
+        "total": 6,
+        "exact": 3,
+        "unsafe": 0,
+        "exact_accuracy": 0.5,
+        "unsafe_rate": 0.0
+      }
+    },
+    "provenance_coverage": {
+      "desired_outcome": {
+        "covered": 57,
+        "total": 78,
+        "coverage": 0.7307692307692307
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 78,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 65,
+        "total": 78,
+        "coverage": 0.8333333333333334
+      },
+      "target_reference": {
+        "covered": 58,
+        "total": 78,
+        "coverage": 0.7435897435897436
+      },
+      "temporal_expression": {
+        "covered": 69,
+        "total": 78,
+        "coverage": 0.8846153846153846
+      }
+    },
+    "first_bad_state": {
+      "Interpreter": 12,
+      "Objective projection": 4,
+      "Schema/parse": 12,
+      "TargetResolver": 13,
+      "TemporalResolver": 3
+    },
+    "top_failure_clusters": [
+      {
+        "cluster": "B_MULTI_TARGET:wrong_publication",
+        "count": 5
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_time",
+        "count": 5
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_target",
+        "count": 5
+      },
+      {
+        "cluster": "F_CROSS_TURN:schema_parse_failure",
+        "count": 4
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_target",
+        "count": 4
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_goal_split",
+        "count": 3
+      },
+      {
+        "cluster": "B_MULTI_TARGET:missing_goal",
+        "count": 3
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_action",
+        "count": 3
+      },
+      {
+        "cluster": "E_NEGATIVE_CONSTRAINT:schema_parse_failure",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_lost",
+        "count": 3
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_violation",
+        "count": 3
+      },
+      {
+        "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:semantic_validation_failure",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_action",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:unnecessary_clarification",
+        "count": 3
+      }
+    ]
+  },
+  "paraphrase": {
+    "groups": 6,
+    "consistent_groups": 2,
+    "inconsistent_groups": 4,
+    "consistency": 0.3333333333333333,
+    "rows": [
+      {
+        "case_id": "H01",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ]
+        ]
+      },
+      {
+        "case_id": "H02",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H03",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ]
+        ]
+      },
+      {
+        "case_id": "H04",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "SCHEDULE",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            false,
+            "NOT_FOUND",
+            true,
+            1,
+            "NOT_FOUND",
+            []
+          ],
+          [
+            "SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NOT_FOUND",
+            true,
+            1,
+            "NOT_FOUND",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H05",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ],
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ],
+          [
+            "DELETE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            []
+          ]
+        ]
+      },
+      {
+        "case_id": "H06",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "NONE",
+            false,
+            1,
+            "",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "NONE",
+            false,
+            1,
+            "",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "AMBIGUOUS",
+            true,
+            1,
+            "AMBIGUOUS",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NONE"
+              ]
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "cost": {
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "temperature": 0.0,
+    "calls": 107,
+    "input_tokens": 539389,
+    "output_tokens": 27288,
+    "total_tokens": 566677,
+    "latency_ms_sum": 217817.9,
+    "latency_ms_avg": 2035.68,
+    "benchmark_wall_ms": 219225.94,
+    "provider_error_count": 0,
+    "calls_per_primary_case": 1.7833333333333334
+  },
+  "provenance": {
+    "formal_source_span_contract": false,
+    "observed_fields": [
+      "raw_input",
+      "goal",
+      "target.reference",
+      "items.temporal_text",
+      "constraints"
+    ],
+    "method": "diagnostic in-band/source-substring checks; no new provenance model",
+    "coverage": {
+      "desired_outcome": {
+        "covered": 57,
+        "total": 78,
+        "coverage": 0.7307692307692307
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 78,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 65,
+        "total": 78,
+        "coverage": 0.8333333333333334
+      },
+      "target_reference": {
+        "covered": 58,
+        "total": 78,
+        "coverage": 0.7435897435897436
+      },
+      "temporal_expression": {
+        "covered": 69,
+        "total": 78,
+        "coverage": 0.8846153846153846
+      }
+    }
+  },
+  "artifacts": {
+    "dataset": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "results": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_final\\results.json",
+    "report": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_final\\report.json",
+    "snapshots": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_final\\snapshots"
+  },
+  "evaluation_revision": "evaluation-only: fail-closed error accounting, per-objective constraint matching, objective-projection first-bad-state audit"
+}

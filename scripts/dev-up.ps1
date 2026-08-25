@@ -20,9 +20,8 @@ switch ($mode) {
     docker compose ps
     Write-Host @"
 
-Middleware is ready. Start applications in five separate PowerShell terminals:
+Middleware is ready. Start applications in four separate PowerShell terminals:
   .\scripts\start-be.ps1
-  .\scripts\start-creator.ps1
   .\scripts\start-agent.ps1
   .\scripts\start-fe.ps1
 "@

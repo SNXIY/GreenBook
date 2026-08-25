@@ -148,13 +148,6 @@ def main() -> int:
         ),
         _check_worker(config_only=args.config_only, timeout=args.timeout),
         _probe_http(
-            "Creator",
-            _env_first("GREENBOOK_CREATOR_BASE_URL", default="http://127.0.0.1:8092"),
-            ("/actuator/health/ready", "/actuator/health"),
-            config_only=args.config_only,
-            timeout=args.timeout,
-        ),
-        _probe_http(
             "Java Backend",
             _env_first("GREENBOOK_JAVA_BASE_URL", default="http://127.0.0.1:8080"),
             ("/actuator/health",),

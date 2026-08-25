@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from greenbook_contracts.tool_result import DataProvenance, ToolResult
+from greenbook_contracts.tool_result import DataProvenance, ResourceRef, ToolResult
 
 from ..context import ToolContext
 
@@ -32,6 +32,15 @@ async def get_post_performance(
         return ToolResult.success(
             result.data.model_dump(mode="json"),
             trace_id=result.trace_id,
+            resource_refs=[
+                ResourceRef(
+                    ref=f"post:{post_id}",
+                    kind="POST",
+                    resource_id=post_id,
+                    source=DataProvenance.PERSONAL_DATA.value,
+                    tool="analytics.get_post_performance",
+                )
+            ],
             provenance=[DataProvenance.PERSONAL_DATA],
         )
     return _mark_source(result, DataProvenance.PERSONAL_DATA)

@@ -1,7 +1,6 @@
 """Phase 11.5-B API-boundary link completeness tests."""
 
 import pytest
-
 from greenbook_agent_api.models.runtime_context import RuntimeContext
 from greenbook_agent_api.models.runtime_result import RuntimeResult
 from greenbook_agent_api.services.runtime_linking import bind_runtime_result

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "delete-reject-a",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-DELETE-REJECT-A 的 Java 学习草稿，只保存草稿"},
+      {"text": "删除刚才创建的草稿", "hitl": "reject"}
+    ]
+  },
+  {
+    "name": "delete-reject-b",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-DELETE-REJECT-B 的 Agent 学习草稿，只保存草稿"},
+      {"text": "删除刚才创建的草稿", "hitl": "reject"}
+    ]
+  },
+  {
+    "name": "delete-reject-c",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-DELETE-REJECT-C 的 Redis 学习草稿，只保存草稿"},
+      {"text": "删除刚才创建的草稿", "hitl": "reject"}
+    ]
+  },
+  {
+    "name": "delete-approve-a",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-DELETE-APPROVE-A 的 Java 学习草稿，只保存草稿"},
+      {"text": "删除刚才创建的草稿", "hitl": "approve"}
+    ]
+  },
+  {
+    "name": "delete-approve-b",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-DELETE-APPROVE-B 的 Agent 学习草稿，只保存草稿"},
+      {"text": "删除刚才创建的草稿", "hitl": "approve"}
+    ]
+  },
+  {
+    "name": "delete-approve-c",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-DELETE-APPROVE-C 的 Redis 学习草稿，只保存草稿"},
+      {"text": "删除刚才创建的草稿", "hitl": "approve"}
+    ]
+  }
+]

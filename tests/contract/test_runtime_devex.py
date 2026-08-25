@@ -50,7 +50,6 @@ def _write_env(
                 f"GREENBOOK_AGENT_EXECUTION_QUEUE_CONSUMER={consumer}",
                 f"GREENBOOK_AGENT_WORKER_ACCESS_TOKEN={worker_token}",
                 "GREENBOOK_JAVA_BASE_URL=http://127.0.0.1:8080",
-                "GREENBOOK_CREATOR_BASE_URL=http://127.0.0.1:8092",
             ]
         ),
         encoding="utf-8",
@@ -61,7 +60,6 @@ def test_local_launcher_uses_canonical_agent_api_and_worker() -> None:
     launcher = (SCRIPTS / "start-greenbook.ps1").read_text(encoding="utf-8")
     for script in (
         "scripts\\start-be.ps1",
-        "scripts\\start-creator.ps1",
         "scripts\\start-agent.ps1",
         "scripts\\start-agent-worker.ps1",
         "scripts\\start-fe.ps1",

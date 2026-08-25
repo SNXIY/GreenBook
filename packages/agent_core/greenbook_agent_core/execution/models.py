@@ -58,6 +58,10 @@ class StepExecution(BaseModel):
     step_execution_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     execution_id: str = ""
     step_id: str = ""                  # links to PlanStep.step_id
+    # Stable semantic ownership carried into durable execution state.  This
+    # is metadata only; it lets approval/result projections bind a waiting or
+    # completed step back to the logical Goal without re-parsing text.
+    goal_id: str | None = None
     capability: str = ""
     tool_name: str = ""
     arguments: dict[str, Any] = {}
@@ -99,6 +103,10 @@ class PlanExecution(BaseModel):
     execution_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     plan_id: str = ""
     task_id: str = ""
+    # Immutable correlation: the Objective that initiated this execution.  Set at
+    # submission (init_from_plan) from RuntimeContext; persisted and reloaded by
+    # the Worker so it stays available across the Queue boundary.
+    objective_id: str | None = None
 
     # ── overall status ──
     status: ExecutionStatus = ExecutionStatus.PENDING

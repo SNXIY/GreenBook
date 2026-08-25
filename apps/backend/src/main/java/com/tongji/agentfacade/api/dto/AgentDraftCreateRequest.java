@@ -1,6 +1,7 @@
 package com.tongji.agentfacade.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import com.tongji.agentfacade.contract.DraftMetadataContract;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -14,7 +15,7 @@ public record AgentDraftCreateRequest(
         @NotBlank String content,
 
         @Schema(description = "摘要", example = "本周社区运营数据总览")
-        @Size(max = 200) String summary,
+        @Size(max = DraftMetadataContract.DESCRIPTION_MAX_LENGTH) String summary,
 
         @Schema(description = "可见性", example = "public", allowableValues = {"public", "followers", "school", "private", "unlisted"})
         @Pattern(regexp = "public|followers|school|private|unlisted") String visibility

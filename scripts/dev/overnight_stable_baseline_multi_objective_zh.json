@@ -1,0 +1,48 @@
+[
+  {
+    "name": "multi-java-draft-agent-schedule",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-MULTI-JAVA 的 Java 学习草稿，只保存草稿；再创建一篇标题为 GB-STABLE-R1-MULTI-AGENT 的 Agent 学习草稿，并安排两分钟后发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "multi-redis-draft-spring-publish",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-MULTI-REDIS 的 Redis 学习草稿，同时创建一篇标题为 GB-STABLE-R1-MULTI-SPRING 的 Spring Boot 学习帖子并立即发布",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "cross-turn-multi-create-update-schedule",
+    "turns": [
+      {"text": "创建一篇标题为 GB-STABLE-R1-CROSS-JAVA 的 Java 学习草稿，只保存草稿"},
+      {"text": "再创建一篇标题为 GB-STABLE-R1-CROSS-AGENT 的 Agent 学习草稿，只保存草稿"},
+      {"text": "把 Java 那篇正文补充一段实践建议"},
+      {"text": "把 Agent 那篇安排两分钟后发布"}
+    ]
+  },
+  {
+    "name": "cross-turn-publish-update",
+    "turns": [
+      {"text": "创建一篇标题为 GB-STABLE-R1-CROSS-REDIS 的 Redis 学习草稿，只保存草稿"},
+      {"text": "把刚才那篇标题改成 GB-STABLE-R1-CROSS-REDIS-UPDATED"},
+      {"text": "现在立即发布刚才修改过的那篇", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  },
+  {
+    "name": "cross-turn-schedule-cancel",
+    "turns": [
+      {
+        "text": "创建一篇标题为 GB-STABLE-R1-CROSS-PYTHON 的 Python 学习草稿，并安排两分钟后发布",
+        "hitl_sequence": ["confirm", "approve"]
+      },
+      {"text": "把刚才那篇改成三分钟后发布"},
+      {"text": "取消刚才那篇的定时发布"}
+    ]
+  }
+]

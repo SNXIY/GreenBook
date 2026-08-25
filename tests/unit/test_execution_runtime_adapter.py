@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.execution.checkpoint import ExecutionCheckpoint
 from greenbook_agent_core.execution.models import (
@@ -18,8 +17,9 @@ from greenbook_agent_core.execution.runtime_guard import (
 )
 from greenbook_agent_core.execution.runtime_manager import RuntimeManager
 from greenbook_agent_core.execution.state_manager import ExecutionStateManager
-from tests.plan_factory import GoalPlanFactory
 from greenbook_agent_core.planning.validation import PlanValidator
+
+from tests.plan_factory import GoalPlanFactory
 
 
 @pytest.fixture(autouse=True)

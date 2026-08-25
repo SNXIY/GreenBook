@@ -2,6 +2,26 @@ export type CreateDraftResponse = {
   id: string;
 };
 
+export type AgentDraft = {
+  draftId: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ScheduledPublication = {
+  scheduleId: string;
+  draftId: string;
+  runAt: string;
+  timezone: string;
+  status: "SCHEDULED" | "CANCELLED" | "PUBLISHED" | "FAILED" | string;
+  failureMessage?: string | null;
+  updatedAt: string;
+};
+
 export type PresignRequest = {
   scene: "knowpost_content" | "knowpost_image";
   postId: string;

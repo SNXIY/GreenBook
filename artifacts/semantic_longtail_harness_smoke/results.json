@@ -1,0 +1,379 @@
+[
+  {
+    "case_id": "A01",
+    "category": "A_SINGLE_ORAL",
+    "message": "给我整篇 Java 学习的，先存着别发。",
+    "turns": [],
+    "provider_calls_before": 0,
+    "command": {
+      "command_id": "a4dea48c-10e3-45d9-93ca-9cdf2933764f",
+      "type": "CREATE",
+      "goal": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+      "objective": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+      "first_action": "GENERATE_CONTENT",
+      "request_complexity": "SIMPLE",
+      "task_changes": [],
+      "target": null,
+      "parameters": {},
+      "entities": {},
+      "constraints": {
+        "publication_intent": "DRAFT_ONLY"
+      },
+      "semantic_operation": "CREATE",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "",
+      "needs_clarification": false,
+      "required_capabilities": [
+        "GENERATE_CONTENT"
+      ],
+      "confidence": 0.9,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "给我整篇 Java 学习的，先存着别发。",
+      "items": [
+        {
+          "title": "",
+          "topic": "Java 学习",
+          "requirements": [
+            "写一篇 Java 学习文章"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "temporal_text": "",
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ],
+      "target_resolution": null,
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "a4dea48c-10e3-45d9-93ca-9cdf2933764f",
+      "operation": "CREATE",
+      "semantic_operation": "CREATE",
+      "capabilities": [
+        "GENERATE_CONTENT"
+      ],
+      "publication_intent": "DRAFT_ONLY",
+      "target_type": "",
+      "target_reference": {},
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "NONE",
+      "run_at": null,
+      "temporal_resolved": false,
+      "constraints": {
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false
+      },
+      "dependencies": [],
+      "clarification_required": false,
+      "clarification_reason": "",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "Java 学习",
+          "requirements": [
+            "写一篇 Java 学习文章"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_text": "",
+          "temporal_kind": "NONE",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          },
+          "target_reference": {}
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "Java 学习",
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_kind": "NONE",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "CREATE",
+      "publication_mode": "DRAFT_ONLY",
+      "temporal_kind": "NONE",
+      "temporal_resolved": false,
+      "target_state": "NONE",
+      "clarification_required": false,
+      "objective_count": 1,
+      "task_expectation": "READY"
+    },
+    "target_resolution": {
+      "status": "NONE"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "Java 学习",
+        "operation": "CREATE",
+        "capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "objective": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "semantic_operation": "GENERATE_CONTENT",
+        "request_complexity": "SIMPLE",
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java 学习",
+            "requirements": [
+              "写一篇 Java 学习文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ],
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "task_changes": [],
+        "references": [],
+        "entities": {},
+        "parameters": {},
+        "ambiguity": "",
+        "needs_clarification": false,
+        "first_action": "",
+        "scope": "",
+        "risk": "",
+        "target": null
+      },
+      "schema_parse": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "objective": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "GENERATE_CONTENT",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java 学习",
+            "requirements": [
+              "写一篇 Java 学习文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "repair": {
+        "triggered": false,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java 学习",
+            "requirements": [
+              "写一篇 Java 学习文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "normalized": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "objective": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "GENERATE_CONTENT",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java 学习",
+            "requirements": [
+              "写一篇 Java 学习文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "segmentation": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "objective": "写一篇 Java 学习文章，先保存为草稿，不要发布。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "GENERATE_CONTENT",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java 学习",
+            "requirements": [
+              "写一篇 Java 学习文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "semantic_derivation": {
+        "semantic_operation": "CREATE",
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "DRAFT_ONLY",
+        "item_count": 1
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 4644,
+      "output_tokens": 198,
+      "total_tokens": 4842,
+      "latency_ms": 2298.68,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 4644,
+          "output_tokens": 198,
+          "total_tokens": 4842,
+          "latency_ms": 2298.68
+        }
+      ]
+    },
+    "latency_ms": 2306.46,
+    "evaluation": {
+      "metrics": [
+        "exact_semantic_success"
+      ],
+      "exact": true,
+      "unsafe": false,
+      "first_bad_state": "",
+      "constraint_preserved": [
+        "DO_NOT_PUBLISH"
+      ],
+      "constraint_violated": [],
+      "target_reason": ""
+    },
+    "variant_index": 0
+  }
+]

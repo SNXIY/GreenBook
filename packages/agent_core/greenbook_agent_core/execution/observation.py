@@ -23,13 +23,14 @@ def observation_evidence(
 
     ok = result.get("ok", result.get("success"))
     data = result.get("data")
-    resource_count = resource_count_for(data)
+    collection_data = _collection_data(data)
+    resource_count = resource_count_for(collection_data)
     if ok is False:
         result_status = "FAILED"
     elif ok is True:
         result_status = (
             "EMPTY"
-            if resource_count == 0 and is_collection_result(data)
+            if resource_count == 0 and is_collection_result(collection_data)
             else "SUCCESS"
         )
     else:
@@ -59,6 +60,7 @@ def observation_evidence(
 
 
 def is_collection_result(data: Any) -> bool:
+    data = _collection_data(data)
     if isinstance(data, list):
         return True
     if not isinstance(data, Mapping):
@@ -67,6 +69,7 @@ def is_collection_result(data: Any) -> bool:
 
 
 def resource_count_for(data: Any) -> int:
+    data = _collection_data(data)
     if isinstance(data, list):
         return len(data)
     if not isinstance(data, Mapping):
@@ -76,6 +79,27 @@ def resource_count_for(data: Any) -> int:
         if isinstance(value, list):
             return len(value)
     return 0
+
+
+def _collection_data(data: Any) -> Any:
+    """Unwrap a transport envelope without interpreting business semantics."""
+
+    current = data
+    for _ in range(2):
+        if not isinstance(current, Mapping):
+            break
+        nested = next(
+            (
+                current[key]
+                for key in ("data", "result", "payload")
+                if isinstance(current.get(key), (Mapping, list))
+            ),
+            None,
+        )
+        if nested is None:
+            break
+        current = nested
+    return current
 
 
 def available_read_fallbacks(

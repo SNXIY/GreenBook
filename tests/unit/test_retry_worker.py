@@ -6,15 +6,13 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
-
-from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
-from greenbook_agent_core.execution.retry_task import RetryTask, RetryTaskStatus
-from greenbook_agent_core.execution.retry_worker import RetryBackgroundWorker
 from greenbook_agent_core.execution.execution_queue import (
     ExecutionQueue,
     ExecutionQueueStatus,
 )
-
+from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
+from greenbook_agent_core.execution.retry_task import RetryTask, RetryTaskStatus
+from greenbook_agent_core.execution.retry_worker import RetryBackgroundWorker
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 

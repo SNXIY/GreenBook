@@ -116,26 +116,26 @@ class RetryDecisionEngine:
             "operation_id": operation_id,
         }
 
-        if resolved_evidence is None:
-            return RetryDecision(
-                **base,
-                reason=(
-                    "Retry denied: request delivery and side-effect evidence are "
-                    "missing; automatic replay is fail-closed."
-                ),
-                requires_reconciliation=True,
-                evidence_requirements=("request_sent", "side_effect_state"),
-            )
-
-        request_sent = resolved_evidence.request_sent
-        side_effect_state = resolved_evidence.side_effect_state
-        if (
-            request_sent is not False
-            or side_effect_state not in {
-                SideEffectState.NONE,
-                SideEffectState.NOT_STARTED,
-            }
-        ):
+        # No evidence envelope was supplied (for example the executor did not
+        # attach one).  The failure fact itself still carries the tri-state
+        # request_sent and side_effect_state fields; when both prove a safe
+        # boundary ("not sent" + "no side effect started") the transient
+        # failure may be retried.  A missing envelope is only fatal when the
+        # delivery boundary is actually unknown.
+        request_sent = (
+            resolved_evidence.request_sent
+            if resolved_evidence is not None
+            else failure.request_sent
+        )
+        side_effect_state = (
+            resolved_evidence.side_effect_state
+            if resolved_evidence is not None
+            else failure.side_effect_state
+        )
+        if request_sent is not False or side_effect_state not in {
+            SideEffectState.NONE,
+            SideEffectState.NOT_STARTED,
+        }:
             requirements = self._ambiguous_requirements(
                 request_sent,
                 side_effect_state,

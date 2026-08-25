@@ -62,6 +62,24 @@ public class AgentFacadeController {
         return agentFacadeService.getPost(postId);
     }
 
+    @DeleteMapping("/posts/{postId}")
+    @Operation(summary = "Delete an owned published post")
+    @ApiResponse(responseCode = "204", description = "Post deleted")
+    public ResponseEntity<Void> deletePost(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "Post ID") @PathVariable("postId") long postId,
+            @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key")
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        long userId = jwtService.extractUserId(jwt);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyService.execute(userId, "DELETE_POST", idempotencyKey, "{}", Void.class,
+                    () -> { agentFacadeService.deletePost(userId, postId); return null; });
+        } else {
+            agentFacadeService.deletePost(userId, postId);
+        }
+        return ResponseEntity.noContent().build();
+    }
+
     // ── My Posts ───────────────────────────────────────────────────
 
     @GetMapping("/me/posts")
@@ -132,6 +150,24 @@ public class AgentFacadeController {
         return agentFacadeService.updateDraft(userId, draftId, request);
     }
 
+    @DeleteMapping("/drafts/{draftId}")
+    @Operation(summary = "Delete draft")
+    @ApiResponse(responseCode = "204", description = "Draft deleted")
+    public ResponseEntity<Void> deleteDraft(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "Draft ID") @PathVariable("draftId") long draftId,
+            @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key")
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        long userId = jwtService.extractUserId(jwt);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyService.execute(userId, "DELETE_DRAFT", idempotencyKey, "{}", Void.class,
+                    () -> { agentFacadeService.deleteDraft(userId, draftId); return null; });
+        } else {
+            agentFacadeService.deleteDraft(userId, draftId);
+        }
+        return ResponseEntity.noContent().build();
+    }
+
     // ── Publications ───────────────────────────────────────────────
 
     @PostMapping("/publications/schedules")
@@ -162,6 +198,14 @@ public class AgentFacadeController {
             @Parameter(description = "定时任务ID") @PathVariable("scheduleId") long scheduleId) {
         long userId = jwtService.extractUserId(jwt);
         return scheduledPublicationService.get(userId, scheduleId);
+    }
+
+    @GetMapping("/publications/schedules")
+    @Operation(summary = "查询自己的定时发布")
+    public List<ScheduledPublicationResponse> getMySchedules(
+            @AuthenticationPrincipal Jwt jwt) {
+        long userId = jwtService.extractUserId(jwt);
+        return scheduledPublicationService.listByUser(userId);
     }
 
     @PutMapping("/publications/schedules/{scheduleId}")
@@ -230,6 +274,15 @@ public class AgentFacadeController {
             @Parameter(description = "分页游标") @RequestParam(value = "cursor", required = false) String cursor,
             @Parameter(description = "每页大小") @RequestParam(value = "size", defaultValue = "20") int size) {
         return agentFacadeService.getPostComments(postId, cursor, size);
+    }
+
+    @GetMapping("/comments/{commentId}")
+    @Operation(summary = "查询单条评论")
+    public AgentCommentResponse getComment(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "评论ID") @PathVariable("commentId") long commentId) {
+        long userId = jwtService.extractUserId(jwt);
+        return agentFacadeService.getComment(userId, String.valueOf(commentId));
     }
 
     @PostMapping("/comments/{commentId}/replies")

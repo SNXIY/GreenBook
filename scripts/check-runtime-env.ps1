@@ -53,7 +53,6 @@ $workerToken = Get-ConfiguredValue -Names @("GREENBOOK_AGENT_WORKER_ACCESS_TOKEN
 $processRole = (Get-ConfiguredValue -Names @("GREENBOOK_AGENT_PROCESS_ROLE") -Label "GREENBOOK_AGENT_PROCESS_ROLE").ToLowerInvariant()
 $inProcessWorker = (Get-ConfiguredValue -Names @("GREENBOOK_AGENT_IN_PROCESS_WORKER") -Label "GREENBOOK_AGENT_IN_PROCESS_WORKER").ToLowerInvariant()
 $javaBaseUrl = Get-ConfiguredValue -Names @("GREENBOOK_JAVA_BASE_URL") -Label "GREENBOOK_JAVA_BASE_URL" -Required
-$creatorBaseUrl = Get-ConfiguredValue -Names @("GREENBOOK_CREATOR_BASE_URL") -Label "GREENBOOK_CREATOR_BASE_URL" -Required
 
 if ($dispatch -and $dispatch.ToLowerInvariant() -notin @("direct", "queue")) {
   $errors.Add("GREENBOOK_AGENT_EXECUTION_DISPATCH must be 'direct' or 'queue'.")
@@ -75,7 +74,6 @@ if ($databaseUrl -and $databaseUrl -notmatch '^postgres(?:ql)?(?:\+[A-Za-z0-9_]+
   $errors.Add("GREENBOOK_AGENT_DATABASE_URL must use a PostgreSQL URL scheme.")
 }
 Assert-HttpUrl -Name "GREENBOOK_JAVA_BASE_URL" -Value $javaBaseUrl
-Assert-HttpUrl -Name "GREENBOOK_CREATOR_BASE_URL" -Value $creatorBaseUrl
 
 Write-Host "GREENBOOK Runtime Environment"
 Write-Host "Database: $(if ($databaseUrl) { 'CONFIGURED' } else { 'MISSING' })"
@@ -83,7 +81,6 @@ Write-Host "Dispatch: $dispatch"
 Write-Host "Queue consumer: $(if ($queueMode) { $queueConsumer } else { 'NOT REQUIRED' })"
 Write-Host "Worker token: $(if (-not $queueMode -or $localConsumer) { 'NOT REQUIRED' } elseif ($workerToken) { 'CONFIGURED' } else { 'MISSING' })"
 Write-Host "Java: $javaBaseUrl"
-Write-Host "Creator: $creatorBaseUrl"
 
 foreach ($warning in $warnings) { Write-Warning $warning }
 if ($errors.Count -gt 0) {

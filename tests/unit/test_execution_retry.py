@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
-
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
 from greenbook_agent_core.execution.events import EventType, ExecutionEvent
 from greenbook_agent_core.execution.evidence import ExecutionEvidence
-from greenbook_agent_core.execution.invocation import ExecutionResult
 from greenbook_agent_core.execution.models import (
     ExecutionStatus,
     StepStatus,
@@ -23,9 +21,10 @@ from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
 from greenbook_agent_core.execution.runtime_manager import RuntimeManager
 from greenbook_agent_core.execution.state_manager import ExecutionStateManager
 from greenbook_agent_core.execution.worker import ExecutionWorker, RunOutcome
-from tests.plan_factory import GoalPlanFactory
 from greenbook_agent_core.planning.validation import PlanValidator
 from greenbook_contracts import SideEffectState
+
+from tests.plan_factory import GoalPlanFactory
 
 
 @pytest.fixture(autouse=True)
@@ -41,9 +40,9 @@ def _plan(registry: CapabilityRegistry, requirements: list[str]):
     )
 
 
-def _runtime(requirements: list[str] = ["CREATE"]):
+def _runtime(requirements: list[str] | None = None):
     registry = CapabilityRegistry()
-    plan = _plan(registry, requirements)
+    plan = _plan(registry, requirements or ["CREATE"])
     executable = PlanValidator(registry).validate(plan)
     state = ExecutionStateManager(ExecutionRepository())
     runtime = RuntimeManager(state)
@@ -80,7 +79,9 @@ async def test_timeout_retry_runs_again_and_records_checkpoint() -> None:
 
     worker = ExecutionWorker(CapabilityExecutor(registry, handler), state._repo)
     first = await worker.run(execution.execution_id)
-    assert first in (RunOutcome.FAILED, RunOutcome.COMPLETED)
+    # A transient retryable failure must not finalize the execution: it waits
+    # for the retry worker (WAITING_ASYNC) instead of failing in the same pass.
+    assert first in (RunOutcome.WAITING_ASYNC, RunOutcome.FAILED, RunOutcome.COMPLETED)
 
     failed = state.list_steps(execution.execution_id)[0]
     assert failed.status == StepStatus.FAILED_RETRYABLE
@@ -153,7 +154,6 @@ async def test_retry_exhaustion_keeps_step_failed() -> None:
 
     for attempt in range(3):
         await worker.run(execution.execution_id)
-        failed = state.list_steps(execution.execution_id)[0]
         if attempt < 2:
             assert retry.retry_step(execution.execution_id, step_id).status == StepStatus.PENDING
 

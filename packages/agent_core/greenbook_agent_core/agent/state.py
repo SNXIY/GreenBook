@@ -78,11 +78,38 @@ class AgentState(BaseModel):
     finished: bool = False
     last_error: str = ""
     completed_task_ids: list[str] = Field(default_factory=list)
+    # Goal-level completion (goal_id), restored from durable resume state.
+    # Kept separate from completed_task_ids (task/step namespace): a Goal is
+    # satisfied by durable business facts, and every TaskNode owned by a
+    # satisfied Goal is skipped by next-task selection.
+    completed_goal_ids: list[str] = Field(default_factory=list)
+    # Task nodes that have been durably submitted to the Runtime (QUEUED /
+    # SUBMITTED) but are not yet complete.  Submission is a hand-off boundary,
+    # never a completion: activity/next-task selection must not present
+    # submitted work as finished, and the loop must not submit it again while
+    # it is in flight.
+    submitted_task_ids: list[str] = Field(default_factory=list)
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
     execution_results: list[dict[str, Any]] = Field(default_factory=list)
     planning_decisions: list[dict[str, Any]] = Field(default_factory=list)
     preferred_tool_name: str = ""
     preferred_tool_arguments: dict[str, Any] = Field(default_factory=dict)
+    # Control-plane convergence markers.  Plan/revision counters are not
+    # progress by themselves; these fields track the last business-state
+    # fingerprint seen by the generic no-progress guard.
+    no_progress_fingerprint: str = ""
+    no_progress_count: int = 0
+    root_error_code: str = ""
+    root_error_message: str = ""
+    root_error_goal_id: str = ""
+    root_error_iteration: int = 0
+    # Deterministic tool/capability rejections (TOOL_CAPABILITY_MISMATCH,
+    # TOOL_NOT_IN_CATALOG, ...).  A model may be corrected ONCE; repeating the
+    # same deterministic rejection is a hard path failure, not a retryable one.
+    deterministic_rejections: int = 0
+    # First-meaningful-feedback timing markers (ISO timestamps) recorded by
+    # the loop for the current run; consumed by the API layer for TTFA etc.
+    timings: dict[str, Any] = Field(default_factory=dict)
 
 
 __all__ = ["AgentState", "AgentStatus", "Observation"]

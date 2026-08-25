@@ -135,6 +135,13 @@
   margin-top: 9px;
 }
 
+.memoryNote {
+  margin-top: 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #888);
+}
+
 .memoryList > div {
   display: flex;
   align-items: center;
@@ -218,6 +225,47 @@
   accent-color: var(--color-primary);
 }
 
+.memoryRecords {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.memoryRecordsTitle {
+  font-size: 12px;
+  color: var(--color-text-subtle);
+}
+
+.memoryRecords ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.memoryRecords li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.memoryType {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-surface-raised, rgba(127, 127, 127, 0.12));
+  color: var(--color-text-subtle);
+  font-size: 11px;
+}
+
+.memoryContent {
+  min-width: 0;
+  color: var(--color-text);
+}
+
 .episodeList {
   display: grid;
   gap: 7px;
@@ -299,36 +347,11 @@
   font-size: 14px;
 }
 
-.suggestions {
-  display: grid;
-  gap: 9px;
-  margin-top: 8px;
-}
-
-.suggestions button {
-  min-height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  color: var(--color-text);
-  background: var(--color-surface);
-  text-align: left;
-  cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), transform 120ms var(--ease-out);
-}
-
-.suggestions button svg {
-  flex: 0 0 auto;
-  color: var(--color-primary);
-}
-
-.suggestions button:active {
-  transform: scale(0.985);
+.naturalLanguageHint {
+  margin-top: 2px;
+  color: var(--color-text-subtle);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .userMessage,
@@ -958,6 +981,120 @@
   background: var(--color-surface-soft);
 }
 
+.activityDone {
+  color: var(--color-success, #2e7d32);
+}
+
+.activityCurrent {
+  margin-top: 4px;
+}
+
+.concurrentSummary {
+  align-self: flex-start;
+  display: grid;
+  gap: 9px;
+  width: min(100%, 390px);
+  padding: 11px 13px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-soft);
+}
+
+.understandingCard {
+  align-self: flex-start;
+  display: grid;
+  gap: 7px;
+  width: min(100%, 390px);
+  padding: 11px 13px;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent, #4f7cff);
+  border-radius: 14px;
+  color: var(--color-text);
+  background: var(--color-surface-soft);
+  font-size: 13px;
+}
+
+.understandingList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--color-text-muted);
+}
+
+.understandingList li::marker {
+  color: var(--color-accent, #4f7cff);
+}
+
+.concurrentList {
+  display: grid;
+  gap: 8px;
+}
+
+.concurrentItem {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 7px;
+  align-items: start;
+  font-size: 13px;
+}
+
+.concurrentMarker,
+.concurrentFailed {
+  color: var(--color-primary);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.concurrentFailed {
+  color: var(--color-danger);
+  font-weight: 800;
+}
+
+.concurrentDone {
+  margin-top: 3px;
+  color: var(--color-success, #2e7d32);
+  font-size: 12px;
+}
+
+.concurrentCurrent {
+  margin-top: 3px;
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.followUpHint {
+  margin-top: 5px;
+  padding: 5px 8px;
+  border-left: 2px solid var(--color-primary);
+  border-radius: 4px;
+  background: var(--color-surface-2, rgba(127, 127, 127, 0.08));
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.followUpHint span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.followUpHint small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+}
+
+.concurrentItem small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
 .error {
   color: var(--color-danger);
   background: var(--color-danger-soft);
@@ -1057,12 +1194,6 @@
   .iconButton:hover {
     color: var(--color-text-strong);
     background: var(--color-surface-soft);
-  }
-
-  .suggestions button:hover {
-    border-color: var(--color-primary-border);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
   }
 
   .composer button:not(:disabled):hover,

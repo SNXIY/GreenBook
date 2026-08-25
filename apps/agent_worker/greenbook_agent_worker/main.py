@@ -7,17 +7,22 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+from greenbook_agent_core.execution.execution_queue import recover_unqueued_executions
 from greenbook_agent_core.execution.execution_queue_worker import (
     ExecutionHandler,
     ExecutionQueueWorker,
 )
+from greenbook_agent_core.execution.operation_ledger import OperationLedger
 from greenbook_agent_core.execution.persistence_provider import RuntimePersistenceFactory
+from greenbook_agent_core.execution.reconciliation_worker import ReconciliationWorker
 from greenbook_agent_core.execution.retry_manager import RetryManager
 from greenbook_agent_core.execution.retry_scheduler import RetryScheduler
 from greenbook_agent_core.execution.retry_worker import RetryBackgroundWorker
 from greenbook_agent_core.execution.runtime_manager import RuntimeManager
+from greenbook_agent_core.execution.runtime_result import RuntimeResult
 from greenbook_agent_core.observability.metrics import MemoryMetricsCollector
 from greenbook_agent_core.runtime.container import RuntimeContainer
+from greenbook_contracts.identity import AuthContext
 from greenbook_java_client import JavaClient
 
 logger = logging.getLogger(__name__)
@@ -119,7 +124,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
     runtime_container = None
     retry_worker = None
     execution_queue_worker = None
-    creator = None
+    completion_publisher = None
     llm = None
     poll_interval = float(
         os.getenv("GREENBOOK_AGENT_RETRY_POLL_INTERVAL_SECONDS", "1")
@@ -143,6 +148,21 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
             security_policy=SecurityPolicy(),
         )
         persistence = runtime_container.persistence
+        try:
+            recovered_unqueued = recover_unqueued_executions(
+                persistence.execution_repository,
+                persistence.execution_queue,
+            )
+            if recovered_unqueued:
+                logger.info(
+                    "Recovered unqueued durable executions count=%s",
+                    recovered_unqueued,
+                )
+        except Exception:
+            logger.warning(
+                "Unqueued execution recovery scan failed",
+                exc_info=True,
+            )
         queue_consumer_flag = os.getenv(
             "GREENBOOK_AGENT_EXECUTION_QUEUE_CONSUMER",
             "true" if persistence.storage == RuntimePersistenceFactory.POSTGRES else "false",
@@ -179,42 +199,42 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                 lease_seconds=lease_seconds,
                 poll_interval_seconds=poll_interval,
                 batch_size=batch_size,
+                max_concurrency=int(
+                    os.getenv("GREENBOOK_AGENT_EXECUTION_WORKER_CONCURRENCY", "4")
+                ),
                 lease_manager=persistence.lease_manager,
+                resource_access_provider=persistence.execution_repository.list_all,
             )
         else:
             if queue_consumer_flag in {"1", "true", "yes", "on"}:
-                from greenbook_agent_api.services.approval_runtime_service import (
-                    ApprovalRuntimeService,
-                )
-                from greenbook_agent_api.services.execution_completion_publisher import (
-                    ExecutionCompletionPublisher,
-                )
-                from greenbook_agent_api.services.task_provider import TaskProvider
+                from greenbook_agent_core.activity import UserActivityPublisher
                 from greenbook_agent_core.conversation import ConversationService
                 from greenbook_agent_core.db.connection import session_ctx
+                from greenbook_agent_core.execution.action_observation import (
+                    ActionObservationWriter,
+                    PostgresActionObservationStore,
+                )
+                from greenbook_agent_core.execution.completion_publisher import (
+                    ExecutionCompletionPublisher,
+                )
+                from greenbook_agent_core.execution.queue_execution_handler import (
+                    RuntimeExecutionQueueHandler,
+                )
                 from greenbook_agent_core.human import PostgresApprovalRequestStore
+                from greenbook_agent_core.human.approval_runtime_service import (
+                    ApprovalRuntimeService,
+                )
                 from greenbook_agent_core.memory import PostgresMemoryRepository
                 from greenbook_agent_core.memory.manager import MemoryManager
-                from greenbook_creator_client.client import CreatorClient
+                from greenbook_agent_core.task.provider import TaskProvider
                 from greenbook_mcp_server.server import GreenBookMCPServer
                 from openai import AsyncOpenAI
 
-                from .execution_handler import RuntimeExecutionQueueHandler
-
-                creator_base = os.getenv(
-                    "GREENBOOK_CREATOR_BASE_URL",
-                    "http://127.0.0.1:8092",
-                )
-                creator = CreatorClient.from_env(base_url=creator_base)
-                mcp = GreenBookMCPServer(
-                    java=java,
-                    creator=creator,
-                    capability_registry=runtime_container.capability_registry,
-                )
                 llm_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv(
                     "OPENAI_API_KEY",
                     "",
                 )
+                llm = None
                 if llm_key:
                     llm = AsyncOpenAI(
                         api_key=llm_key,
@@ -223,6 +243,12 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                             "https://api.deepseek.com",
                         ),
                     )
+                mcp = GreenBookMCPServer(
+                    java=java,
+                    capability_registry=runtime_container.capability_registry,
+                    llm=llm,
+                    model=os.getenv("LLM_MODEL", "deepseek-v4-flash"),
+                )
                 conversation_service = ConversationService()
                 await conversation_service.ensure_storage()
                 durable_memory_repository = None
@@ -241,6 +267,9 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     execution_queue=persistence.execution_queue,
                     conversation_service=conversation_service,
                 )
+                user_activity_publisher = UserActivityPublisher(
+                    persistence.user_activity_store,
+                )
                 completion_publisher = ExecutionCompletionPublisher(
                     conversation_service=conversation_service,
                     run_store={},
@@ -248,6 +277,12 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     result_projection_store=persistence.result_projection_store,
                     task_provider=task_provider,
                     approval_service=approval_service,
+                    user_activity_publisher=user_activity_publisher,
+                )
+                observation_writer = ActionObservationWriter(
+                    store=persistence.observation_store
+                    or PostgresActionObservationStore(persistence.bind),
+                    artifact_store=persistence.artifact_store,
                 )
                 for queued_message in persistence.execution_queue.list()[-100:]:
                     persisted_execution = persistence.execution_repository.find_by_id(
@@ -266,6 +301,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                             queued_message.execution_id,
                             exc_info=True,
                         )
+                operation_ledger = OperationLedger(persistence.external_operation_store)
                 execution_handler = RuntimeExecutionQueueHandler(
                     repository=persistence.execution_repository,
                     event_store=persistence.execution_event_store,
@@ -283,6 +319,10 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     container=runtime_container,
                     completion_publisher=completion_publisher,
                     memory_manager=memory_manager,
+                    observation_writer=observation_writer,
+                    user_activity_publisher=user_activity_publisher,
+                    operation_ledger=operation_ledger,
+                    worker_id=worker_id,
                 )
                 execution_queue_worker = ExecutionQueueWorker(
                     queue=persistence.execution_queue,
@@ -291,12 +331,144 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     lease_seconds=lease_seconds,
                     poll_interval_seconds=poll_interval,
                     batch_size=batch_size,
+                    max_concurrency=int(
+                        os.getenv("GREENBOOK_AGENT_EXECUTION_WORKER_CONCURRENCY", "4")
+                    ),
                     lease_manager=persistence.lease_manager,
+                    resource_access_provider=persistence.execution_repository.list_all,
                 )
             else:
                 logger.warning(
                     "Execution queue consumer is not enabled: no execution_handler was injected"
                 )
+
+        # Phase 4B.1: deterministic RESULT_UNKNOWN reconciliation.  Only runs on
+        # durable (postgres) storage; the in-memory profile (tests / local) has
+        # no durable ledger to reconcile.  The real Java authoritative-state
+        # query adapter is injected by the operator; until then the worker still
+        # scans and respects backoff/budget, keeping any still-unknown operation
+        # for the manual boundary (never re-run).
+        reconcile_task = None
+        reconcile_enabled = str(persistence.storage).lower() != "memory"
+        if reconcile_enabled:
+            from greenbook_agent_core.execution.reconciliation_adapters import (
+                JavaReconciliationAdapter,
+            )
+
+            def _reconcile_token() -> str:
+                return os.getenv("GREENBOOK_AGENT_WORKER_ACCESS_TOKEN", "")
+
+            async def _project_reconciled_operation(operation, status) -> None:
+                """Feed authoritative reconciliation through normal completion projections."""
+                if status.value not in {"SUCCEEDED", "FAILED"}:
+                    return
+                execution = persistence.execution_repository.find_by_id(
+                    operation.execution_id
+                )
+                if execution is None:
+                    return
+                steps = state_manager.list_steps(operation.execution_id)
+                matching = [
+                    step
+                    for step in steps
+                    if operation.step_id
+                    and operation.step_id in {step.step_id, step.step_execution_id}
+                ]
+                if not matching:
+                    # Older ledger rows may not carry step_id.  A single
+                    # non-terminal step is unambiguous and safe to recover.
+                    non_terminal = [
+                        step
+                        for step in steps
+                        if getattr(getattr(step, "status", None), "value", step.status)
+                        not in {"COMPLETED", "FAILED", "SKIPPED"}
+                    ]
+                    matching = non_terminal if len(non_terminal) == 1 else []
+                if len(matching) != 1:
+                    logger.warning(
+                        "Cannot project reconciled operation: ambiguous step execution_id=%s operation_id=%s",
+                        operation.execution_id,
+                        operation.operation_id,
+                    )
+                    return
+                step = matching[0]
+                if status.value == "SUCCEEDED":
+                    state_manager.reconcile_step_succeeded(
+                        operation.execution_id,
+                        step.step_execution_id,
+                        operation_id=operation.operation_id,
+                    )
+                else:
+                    state_manager.reconcile_step_failed(
+                        operation.execution_id,
+                        step.step_execution_id,
+                        error_code="EXTERNAL_OPERATION_FAILED",
+                        error_message="External operation status is FAILED.",
+                        operation_id=operation.operation_id,
+                    )
+                execution = persistence.execution_repository.find_by_id(
+                    operation.execution_id
+                )
+                message = persistence.execution_queue.get_by_execution_id(
+                    operation.execution_id
+                )
+                if completion_publisher is not None and message is not None and execution is not None:
+                    await completion_publisher.reconcile(message, execution)
+                if observation_writer is not None and message is not None and execution is not None:
+                    identity = message.payload.get("auth_context") or {}
+                    reconciled_result = RuntimeResult(
+                        success=status.value == "SUCCEEDED",
+                        status=("COMPLETED" if status.value == "SUCCEEDED" else "FAILED"),
+                        run_id=str(message.payload.get("run_id") or ""),
+                        task_id=str(message.payload.get("task_id") or execution.task_id or ""),
+                        execution_id=operation.execution_id,
+                        trace_id=str(message.payload.get("trace_id") or message.trace_id),
+                        error_message=(
+                            "External operation status is FAILED."
+                            if status.value == "FAILED"
+                            else ""
+                        ),
+                    )
+                    await observation_writer(
+                        message,
+                        reconciled_result,
+                        AuthContext(
+                            user_id=str(identity.get("user_id") or message.payload.get("user_id") or ""),
+                            tenant_id=str(identity.get("tenant_id") or message.payload.get("tenant_id") or ""),
+                            roles=[str(role) for role in (identity.get("roles") or [])],
+                            timezone=str(identity.get("timezone") or message.payload.get("timezone") or "Asia/Shanghai"),
+                            raw_access_token="",
+                        ),
+                        execution=execution,
+                    )
+
+            reconciliation_adapter = JavaReconciliationAdapter(
+                java,
+                token_provider=_reconcile_token,
+            )
+            reconciliation_worker = ReconciliationWorker(
+                OperationLedger(persistence.external_operation_store),
+                adapter=reconciliation_adapter,
+                on_reconciled=_project_reconciled_operation,
+            )
+            reconcile_interval = max(
+                10.0,
+                float(os.getenv("GREENBOOK_AGENT_RECONCILE_INTERVAL_SECONDS", "60")),
+            )
+
+            async def _reconcile_loop() -> None:
+                while True:
+                    try:
+                        outcomes = await reconciliation_worker.reconcile_due()
+                        if outcomes:
+                            logger.info(
+                                "reconciliation scan done worker_id=%s outcomes=%s",
+                                worker_id,
+                                outcomes,
+                            )
+                    except Exception:  # noqa: BLE001 - must not kill the worker
+                        logger.exception("reconciliation scan failed worker_id=%s", worker_id)
+                    await asyncio.sleep(reconcile_interval)
 
         logger.info(
             "Agent worker started java=%s storage=%s worker_id=%s",
@@ -342,6 +514,12 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     name="execution-consumer",
                 ),
             ]
+            if reconcile_enabled and reconcile_task is None:
+                reconcile_task = asyncio.create_task(
+                    _reconcile_loop(),
+                    name="reconciliation-consumer",
+                )
+                consumer_tasks.append(reconcile_task)
             try:
                 await asyncio.gather(*consumer_tasks)
             finally:
@@ -361,8 +539,6 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
             await execution_queue_worker.shutdown()
         if runtime_container is not None:
             runtime_container.close()
-        if creator is not None:
-            await creator.close()
         if llm is not None:
             await llm.close()
         await java.close()

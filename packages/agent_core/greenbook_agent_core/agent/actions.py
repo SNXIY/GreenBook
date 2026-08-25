@@ -19,10 +19,18 @@ class AgentActionType(StrEnum):
     UPDATE_PLAN = "UPDATE_PLAN"
     ASK_USER = "ASK_USER"
     FINISH = "FINISH"
+    PRODUCE_RESULT = "PRODUCE_RESULT"
 
 
 class AgentAction(BaseModel):
-    """One structured Reason output."""
+    """One structured Reason output.
+
+    ``PRODUCE_RESULT`` is the reasoning-backed action: it consumes existing
+    Observation/Artifact evidence and produces a structured semantic result
+    (summary, analysis, comparison) with no external tool call.  The result is
+    persisted and satisfies a reasoning-backed Goal; downstream Goals consume
+    it through ``source_refs`` lineage.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -34,6 +42,10 @@ class AgentAction(BaseModel):
     question: str = ""
     reason: str = ""
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    # Reasoning-backed result contract (PRODUCE_RESULT only).
+    result_payload: dict[str, Any] = Field(default_factory=dict)
+    result_type: str = ""
+    source_refs: list[str] = Field(default_factory=list)
 
 
 class SelectedTool(BaseModel):
@@ -78,6 +90,10 @@ class AgentRunResult(BaseModel):
     observations: list[dict[str, Any]] = Field(default_factory=list)
     tool_results: list[dict[str, Any]] = Field(default_factory=list)
     execution_results: list[dict[str, Any]] = Field(default_factory=list)
+    root_error_code: str = ""
+    root_error_message: str = ""
+    root_error_goal_id: str = ""
+    root_error_iteration: int = 0
     compiled_plan: dict[str, Any] | None = None
     state: AgentState | None = None
 

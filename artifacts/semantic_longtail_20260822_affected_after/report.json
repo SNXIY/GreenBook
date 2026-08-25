@@ -1,0 +1,741 @@
+{
+  "status": "COMPLETED",
+  "run_id": "20260822T162830",
+  "dataset": {
+    "path": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "version": "2026-08-22.freeze-1",
+    "primary_case_count": 28,
+    "category_counts": {
+      "B_MULTI_TARGET": 8,
+      "F_CROSS_TURN": 8,
+      "G_AMBIGUOUS_INCOMPLETE": 6,
+      "H_PARAPHRASE": 6
+    }
+  },
+  "summary": {
+    "primary_case_count": 28,
+    "evaluated_utterance_count": 46,
+    "exact_semantic_success": 25,
+    "exact_semantic_accuracy": 0.5434782608695652,
+    "primary_exact_semantic_success": 12,
+    "primary_exact_semantic_accuracy": 0.42857142857142855,
+    "unsafe_semantic_error_count": 8,
+    "unsafe_semantic_error_rate": 0.17391304347826086,
+    "primary_unsafe_semantic_error_count": 7,
+    "primary_unsafe_semantic_error_rate": 0.25,
+    "metrics": {
+      "UNKNOWN_should_have_been_used": 1,
+      "constraint_lost": 4,
+      "constraint_violation": 4,
+      "exact_semantic_success": 25,
+      "extra_goal": 1,
+      "missing_clarification": 1,
+      "missing_goal": 3,
+      "premature_commitment": 1,
+      "semantic_validation_failure": 2,
+      "target_ambiguity_missed": 2,
+      "unnecessary_clarification": 5,
+      "wrong_action": 7,
+      "wrong_goal_split": 4,
+      "wrong_publication": 3,
+      "wrong_target": 14,
+      "wrong_time": 5
+    },
+    "by_category": {
+      "B_MULTI_TARGET": {
+        "total": 8,
+        "exact": 4,
+        "exact_accuracy": 0.5,
+        "unsafe": 2,
+        "metrics": {
+          "exact_semantic_success": 4,
+          "semantic_validation_failure": 1,
+          "unnecessary_clarification": 1,
+          "wrong_target": 1,
+          "wrong_time": 3
+        }
+      },
+      "F_CROSS_TURN": {
+        "total": 8,
+        "exact": 3,
+        "exact_accuracy": 0.375,
+        "unsafe": 4,
+        "metrics": {
+          "UNKNOWN_should_have_been_used": 1,
+          "constraint_lost": 4,
+          "constraint_violation": 4,
+          "exact_semantic_success": 3,
+          "missing_clarification": 1,
+          "missing_goal": 1,
+          "premature_commitment": 1,
+          "unnecessary_clarification": 1,
+          "wrong_action": 1,
+          "wrong_goal_split": 1,
+          "wrong_publication": 1,
+          "wrong_target": 4
+        }
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 6,
+        "exact": 1,
+        "exact_accuracy": 0.16666666666666666,
+        "unsafe": 0,
+        "metrics": {
+          "exact_semantic_success": 1,
+          "missing_goal": 1,
+          "target_ambiguity_missed": 2,
+          "wrong_action": 2,
+          "wrong_goal_split": 1,
+          "wrong_target": 4
+        }
+      },
+      "H_PARAPHRASE": {
+        "total": 24,
+        "exact": 17,
+        "exact_accuracy": 0.7083333333333334,
+        "unsafe": 2,
+        "metrics": {
+          "exact_semantic_success": 17,
+          "extra_goal": 1,
+          "missing_goal": 1,
+          "semantic_validation_failure": 1,
+          "unnecessary_clarification": 3,
+          "wrong_action": 4,
+          "wrong_goal_split": 2,
+          "wrong_publication": 2,
+          "wrong_target": 5,
+          "wrong_time": 2
+        }
+      }
+    },
+    "primary_by_category": {
+      "B_MULTI_TARGET": {
+        "total": 8,
+        "exact": 4,
+        "unsafe": 2,
+        "exact_accuracy": 0.5,
+        "unsafe_rate": 0.25
+      },
+      "F_CROSS_TURN": {
+        "total": 8,
+        "exact": 3,
+        "unsafe": 4,
+        "exact_accuracy": 0.375,
+        "unsafe_rate": 0.5
+      },
+      "G_AMBIGUOUS_INCOMPLETE": {
+        "total": 6,
+        "exact": 1,
+        "unsafe": 0,
+        "exact_accuracy": 0.16666666666666666,
+        "unsafe_rate": 0.0
+      },
+      "H_PARAPHRASE": {
+        "total": 6,
+        "exact": 4,
+        "unsafe": 1,
+        "exact_accuracy": 0.6666666666666666,
+        "unsafe_rate": 0.16666666666666666
+      }
+    },
+    "provenance_coverage": {
+      "desired_outcome": {
+        "covered": 36,
+        "total": 46,
+        "coverage": 0.782608695652174
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 46,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 42,
+        "total": 46,
+        "coverage": 0.9130434782608695
+      },
+      "target_reference": {
+        "covered": 40,
+        "total": 46,
+        "coverage": 0.8695652173913043
+      },
+      "temporal_expression": {
+        "covered": 40,
+        "total": 46,
+        "coverage": 0.8695652173913043
+      }
+    },
+    "first_bad_state": {
+      "Interpreter": 9,
+      "Objective projection": 2,
+      "TargetResolver": 10
+    },
+    "top_failure_clusters": [
+      {
+        "cluster": "H_PARAPHRASE:wrong_target",
+        "count": 5
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_lost",
+        "count": 4
+      },
+      {
+        "cluster": "F_CROSS_TURN:wrong_target",
+        "count": 4
+      },
+      {
+        "cluster": "F_CROSS_TURN:constraint_violation",
+        "count": 4
+      },
+      {
+        "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_target",
+        "count": 4
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_action",
+        "count": 4
+      },
+      {
+        "cluster": "B_MULTI_TARGET:wrong_time",
+        "count": 3
+      },
+      {
+        "cluster": "H_PARAPHRASE:unnecessary_clarification",
+        "count": 3
+      },
+      {
+        "cluster": "G_AMBIGUOUS_INCOMPLETE:target_ambiguity_missed",
+        "count": 2
+      },
+      {
+        "cluster": "G_AMBIGUOUS_INCOMPLETE:wrong_action",
+        "count": 2
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_goal_split",
+        "count": 2
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_publication",
+        "count": 2
+      },
+      {
+        "cluster": "H_PARAPHRASE:wrong_time",
+        "count": 2
+      },
+      {
+        "cluster": "B_MULTI_TARGET:semantic_validation_failure",
+        "count": 1
+      },
+      {
+        "cluster": "B_MULTI_TARGET:unnecessary_clarification",
+        "count": 1
+      }
+    ]
+  },
+  "paraphrase": {
+    "groups": 6,
+    "consistent_groups": 3,
+    "inconsistent_groups": 3,
+    "consistency": 0.5,
+    "rows": [
+      {
+        "case_id": "H01",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NOT_FOUND",
+            true,
+            1,
+            "NOT_FOUND",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "UPDATE_SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "java 学习",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H02",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "DRAFT_ONLY",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "java",
+                "DRAFT_ONLY",
+                "NONE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H03",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H04",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NONE",
+            false,
+            1,
+            "NONE",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ],
+          [
+            "MULTI_OBJECTIVE",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            false,
+            "NOT_FOUND",
+            true,
+            2,
+            "NOT_FOUND",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "UNRESOLVED"
+              ],
+              [
+                "redis 这篇",
+                "SCHEDULED_PUBLISH",
+                "UNRESOLVED"
+              ]
+            ]
+          ],
+          [
+            "SCHEDULE",
+            "SCHEDULED",
+            "FUTURE",
+            true,
+            "NOT_FOUND",
+            true,
+            1,
+            "NOT_FOUND",
+            [
+              [
+                "redis",
+                "SCHEDULED_PUBLISH",
+                "FUTURE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H05",
+        "variant_count": 4,
+        "consistent": true,
+        "signatures": [
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "DELETE",
+            "NONE",
+            "NONE",
+            false,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "DELETE_DRAFT",
+                "NONE"
+              ]
+            ]
+          ]
+        ]
+      },
+      {
+        "case_id": "H06",
+        "variant_count": 4,
+        "consistent": false,
+        "signatures": [
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "CREATE",
+            "NONE",
+            "NONE",
+            false,
+            "NONE",
+            false,
+            1,
+            "",
+            [
+              [
+                "",
+                "CREATE",
+                "NONE"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ],
+          [
+            "PUBLISH_NOW",
+            "IMMEDIATE",
+            "NOW",
+            true,
+            "RESOLVED",
+            false,
+            1,
+            "RESOLVED",
+            [
+              [
+                "agent memory",
+                "IMMEDIATE_PUBLISH",
+                "NOW"
+              ]
+            ]
+          ]
+        ]
+      }
+    ]
+  },
+  "cost": {
+    "model": "deepseek-v4-flash",
+    "provider": "deepseek",
+    "base_url": "https://api.deepseek.com",
+    "temperature": 0.0,
+    "calls": 47,
+    "input_tokens": 237042,
+    "output_tokens": 13746,
+    "total_tokens": 250788,
+    "latency_ms_sum": 93170.91,
+    "latency_ms_avg": 1982.36,
+    "benchmark_wall_ms": 94149.23,
+    "provider_error_count": 0,
+    "calls_per_primary_case": 1.6785714285714286
+  },
+  "provenance": {
+    "formal_source_span_contract": false,
+    "observed_fields": [
+      "raw_input",
+      "goal",
+      "target.reference",
+      "items.temporal_text",
+      "constraints"
+    ],
+    "method": "diagnostic in-band/source-substring checks; no new provenance model",
+    "coverage": {
+      "desired_outcome": {
+        "covered": 36,
+        "total": 46,
+        "coverage": 0.782608695652174
+      },
+      "formal_source_span": {
+        "covered": 0,
+        "total": 46,
+        "coverage": 0.0
+      },
+      "hard_constraints": {
+        "covered": 42,
+        "total": 46,
+        "coverage": 0.9130434782608695
+      },
+      "target_reference": {
+        "covered": 40,
+        "total": 46,
+        "coverage": 0.8695652173913043
+      },
+      "temporal_expression": {
+        "covered": 40,
+        "total": 46,
+        "coverage": 0.8695652173913043
+      }
+    }
+  },
+  "artifacts": {
+    "dataset": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+    "results": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_affected_after\\results.json",
+    "report": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_affected_after\\report.json",
+    "snapshots": "D:\\agent\\green-book\\artifacts\\semantic_longtail_20260822_affected_after\\snapshots"
+  }
+}

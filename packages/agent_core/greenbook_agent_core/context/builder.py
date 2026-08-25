@@ -8,12 +8,15 @@ with PostgreSQL, test repositories, or a worker process.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .models import ContextBudget, ContextSnapshot
 from .projection import as_dict, project_artifact, project_execution, project_goal, project_task
+from ..execution.operation_ledger import is_reconciliation_exhausted
+from ..task.objective_reducer import is_context_isolated_task
 
 
 class ContextBuilder:
@@ -26,7 +29,9 @@ class ContextBuilder:
         task_provider: Any | None = None,
         task_manager: Any | None = None,
         execution_repository: Any | None = None,
+        external_operation_store: Any | None = None,
         artifact_store: Any | None = None,
+        observation_store: Any | None = None,
         memory_retriever: Any | None = None,
         memory_provider: Any | None = None,
         preference_provider: Any | None = None,
@@ -37,7 +42,9 @@ class ContextBuilder:
         self._task_provider = task_provider
         self._task_manager = task_manager
         self._execution_repository = execution_repository
+        self._external_operation_store = external_operation_store
         self._artifact_store = artifact_store
+        self._observation_store = observation_store
         self._memory_retriever = memory_retriever
         self._memory_provider = memory_provider
         self._preference_provider = preference_provider
@@ -56,7 +63,15 @@ class ContextBuilder:
         current_command: Any | None = None,
         current_goal: Any | None = None,
         target_query: str = "",
+        run_id: str = "",
+        memory_recall: bool | None = None,
     ) -> ContextSnapshot:
+        from ..observability.run_metrics import record_stage
+
+        def stage(name: str) -> None:
+            if run_id:
+                record_stage(name, run_id=run_id)
+
         try:
             conversation = await self._load_conversation(
                 conversation_id,
@@ -65,6 +80,7 @@ class ContextBuilder:
             )
         except LookupError:
             conversation = None
+        stage("context_conversation_loaded")
         session_value = getattr(conversation, "session", None) or session or conversation
         conversation_id = str(
             getattr(session_value, "conversation_id", "") or conversation_id
@@ -84,22 +100,41 @@ class ContextBuilder:
             or getattr(session_value, "conversation_summary", None)
             or _mapping_value(conversation, "conversation_summary")
         )
+        stage("context_history_ready")
 
         tasks = await self._load_tasks(
             conversation_id,
             user_id=user_id,
             tenant_id=tenant_id,
         )
+        stage("context_tasks_loaded")
         task_values = [project_task(item) for item in tasks][: self._budget.max_tasks]
         goal_values: list[dict[str, Any]] = []
         artifact_values: list[dict[str, Any]] = []
         resource_values: list[dict[str, Any]] = []
         for task, task_value in zip(tasks, task_values, strict=False):
             task_id = str(task_value.get("task_id", ""))
-            for goal in getattr(task, "goals", ()) or ():
-                status = str(getattr(goal, "status", "")).upper()
-                if status not in {"COMPLETED", "CANCELLED"}:
-                    goal_values.append(project_goal(goal, task_id=task_id))
+            objectives = list(getattr(task, "objectives", ()) or ())
+            if objectives:
+                from ..task.objective_reducer import mutation_objective_is_superseded
+
+                for objective in objectives:
+                    status = str(getattr(objective, "status", "")).upper()
+                    if (
+                        not mutation_objective_is_superseded(objective)
+                        and status not in {"COMPLETED", "CANCELLED", "SUPERSEDED"}
+                    ):
+                        value = as_dict(objective)
+                        value["goal_id"] = value.get("objective_id", "")
+                        value["task_id"] = task_id
+                        value["kind"] = value.get("intent", "")
+                        goal_values.append(value)
+            else:
+                # Historical tasks may have only TaskGoal projections.
+                for goal in getattr(task, "goals", ()) or ():
+                    status = str(getattr(goal, "status", "")).upper()
+                    if status not in {"COMPLETED", "CANCELLED"}:
+                        goal_values.append(project_goal(goal, task_id=task_id))
             for artifact in getattr(task, "artifacts", ()) or ():
                 artifact_value = project_artifact(artifact, task_id=task_id)
                 artifact_values.append(artifact_value)
@@ -132,21 +167,75 @@ class ContextBuilder:
                         ) if item.get("artifact_id") not in known
                     )
 
+        stage("context_task_projection_ready")
+
         goal_values = goal_values[: self._budget.max_goals]
         artifact_values = artifact_values[: self._budget.max_artifacts]
         resource_values = resource_values[: self._budget.max_resources]
 
-        executions = await self._load_executions({item.get("task_id") for item in task_values})
+        # executions / preferences / recall are mutually independent after the
+        # task projection; load them concurrently to shorten the first turn.
+        async def tracked(name: str, value: Any) -> Any:
+            try:
+                return await value
+            finally:
+                stage(name)
+
+        stage("context_parallel_start")
+        # Long-term recall is an explicit projection, not a prerequisite for
+        # Conversation/Task/Objective continuity.  ``None`` preserves the
+        # standalone builder's historical behavior for callers that already
+        # supplied a structured command; production assemblers pass False and
+        # opt in only when a future structured memory dependency exists.
+        recall_enabled = (
+            bool(memory_recall)
+            if memory_recall is not None
+            else current_command is not None or current_goal is not None
+        )
+        if not recall_enabled:
+            stage("memory_recall_skipped")
+        executions, observations, preferences, recalled = await asyncio.gather(
+            tracked("context_executions_ready", self._load_executions(
+                {item.get("task_id") for item in task_values}
+            )),
+            tracked("context_verified_outcomes_ready", self._load_recent_observations(
+                {item.get("task_id") for item in task_values},
+                limit=self._budget.max_verified_outcomes,
+            )),
+            tracked("context_preferences_ready", self._load_preferences(user_id)),
+            tracked("context_memory_ready", self._recall(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                command=current_command,
+                goal=current_goal,
+                target_query=target_query,
+                run_id=run_id,
+                enabled=recall_enabled,
+            )),
+            return_exceptions=True,
+        )
+        stage("context_parallel_ready")
+        if isinstance(executions, BaseException):
+            executions = []
+        if isinstance(observations, BaseException):
+            observations = []
+        if isinstance(preferences, BaseException):
+            preferences = []
+        if isinstance(recalled, BaseException):
+            recalled = []
         execution_values = [project_execution(item) for item in executions]
         operations = _operations(session_value, conversation)
-        preferences = await self._load_preferences(user_id)
-        recalled = await self._recall(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            command=current_command,
-            goal=current_goal,
-            target_query=target_query,
-        )
+        if await _conversation_has_exhausted_reconciliation(
+            self._external_operation_store,
+            conversation_id,
+        ):
+            operations = [
+                item
+                for item in operations
+                if str(item.get("status") or "").upper()
+                not in {"RESULT_UNKNOWN", "RECONCILING", "VERIFYING_RESULT"}
+            ]
+        stage("memory_format_start")
         recalled_preferences = [
             {
                 "key": item.get("structured_metadata", {}).get("preference_type", ""),
@@ -162,6 +251,7 @@ class ContextBuilder:
         preferences = [
             _compact_preference(item) for item in preferences[: self._budget.max_memories]
         ]
+        stage("memory_format_ready")
 
         targets = _target_candidates(
             task_values,
@@ -173,6 +263,7 @@ class ContextBuilder:
         )
         command_value = as_dict(current_command)
         goal_value = as_dict(current_goal)
+        stage("context_prompt_ready")
         return ContextSnapshot(
             conversation_id=conversation_id,
             user_id=user_id,
@@ -203,6 +294,7 @@ class ContextBuilder:
                 _compact_operation(item, self._budget.max_operation_chars)
                 for item in operations[: self._budget.max_operations]
             ],
+            recent_verified_outcomes=list(observations or ())[: self._budget.max_verified_outcomes],
             artifacts=artifact_values,
             execution_states=execution_values,
             available_resources=resource_values,
@@ -258,13 +350,54 @@ class ContextBuilder:
                     value = finder(scope)
                 except TypeError:
                     value = finder(conversation_id)
-                return list(await value if inspect.isawaitable(value) else value)
+                values = list(await value if inspect.isawaitable(value) else value)
+                return await self._filter_current_tasks(values, conversation_id)
         manager = self._task_manager
-        finder = getattr(manager, "get_active_tasks", None)
+        # Cross-turn resolution may legitimately address a completed Task
+        # whose Java ResourceBinding still exists.  Reuse TaskManager's
+        # canonical resolvable-task projection; it excludes administratively
+        # cancelled/failed tasks without introducing a second task index.
+        finder = getattr(manager, "get_resolvable_tasks", None)
+        if not callable(finder):
+            finder = getattr(manager, "get_active_tasks", None)
         if callable(finder):
             value = finder(conversation_id, user_id=user_id, tenant_id=tenant_id)
-            return list(await value if inspect.isawaitable(value) else value)
+            values = list(await value if inspect.isawaitable(value) else value)
+            return await self._filter_current_tasks(values, conversation_id)
         return []
+
+    async def _filter_current_tasks(
+        self,
+        values: Sequence[Any],
+        conversation_id: str,
+    ) -> list[Any]:
+        """Keep historical residue out of model-facing current context.
+
+        Terminal facts remain durable and queryable through their explicit
+        history surfaces.  Only the current-turn projection is narrowed here;
+        no Task/Execution/Operation row is rewritten.
+        """
+
+        exhausted = await _conversation_has_exhausted_reconciliation(
+            self._external_operation_store,
+            conversation_id,
+        )
+        result: list[Any] = []
+        for task in values:
+            if is_context_isolated_task(task):
+                continue
+            if exhausted:
+                task_status = str(
+                    getattr(getattr(task, "status", None), "value", getattr(task, "status", ""))
+                    or ""
+                ).upper()
+                # A failed Task in a conversation with a budget-exhausted
+                # unknown operation is historical/unresolved, not a safe
+                # retry candidate.  Keep the ledger truth untouched.
+                if task_status == "FAILED":
+                    continue
+            result.append(task)
+        return result
 
     async def _load_executions(self, task_ids: set[Any]) -> list[Any]:
         source = self._execution_repository
@@ -275,6 +408,34 @@ class ContextBuilder:
         values = list(await value if inspect.isawaitable(value) else value)
         normalized = {str(item) for item in task_ids if item}
         return [item for item in values if str(getattr(item, "task_id", "")) in normalized]
+
+    async def _load_recent_observations(
+        self,
+        task_ids: set[Any],
+        *,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        """Read only recent receipts for this bounded Task set.
+
+        ActionObservationStore is an existing execution projection.  Context
+        never scans the full observation history and never copies its payload;
+        the store supplies a small receipt projection for the next turn.
+        """
+
+        if self._observation_store is None or limit <= 0:
+            return []
+        normalized = [str(item) for item in task_ids if item]
+        if not normalized:
+            return []
+        finder = getattr(self._observation_store, "list_recent_for_tasks", None)
+        if not callable(finder):
+            return []
+        try:
+            value = finder(task_ids=normalized, limit=limit)
+        except TypeError:
+            value = finder(normalized, limit)
+        values = await value if inspect.isawaitable(value) else value
+        return [_compact_observation(item) for item in (values or ())]
 
     async def _load_preferences(self, user_id: str) -> list[dict[str, Any]]:
         provider = self._preference_provider
@@ -287,7 +448,9 @@ class ContextBuilder:
         values = await value if inspect.isawaitable(value) else value
         return [as_dict(item) for item in (values or ())]
 
-    async def _recall(self, **kwargs: Any) -> list[dict[str, Any]]:
+    async def _recall(self, *, enabled: bool = True, **kwargs: Any) -> list[dict[str, Any]]:
+        if not enabled:
+            return []
         provider = self._memory_retriever or self._memory_provider
         if provider is None or self._budget.max_memories == 0:
             return []
@@ -295,11 +458,89 @@ class ContextBuilder:
         if not callable(retrieve):
             return []
         try:
-            value = retrieve(limit=self._budget.max_memories, **kwargs)
+            value = retrieve(limit=self._budget.max_memories, touch=False, **kwargs)
         except TypeError:
-            value = retrieve(user_id=kwargs["user_id"], limit=self._budget.max_memories)
+            try:
+                value = retrieve(limit=self._budget.max_memories, **kwargs)
+            except TypeError:
+                value = retrieve(user_id=kwargs["user_id"], limit=self._budget.max_memories)
         values = await value if inspect.isawaitable(value) else value
         return [as_dict(item) for item in (values or ())]
+
+
+async def _conversation_has_exhausted_reconciliation(
+    store: Any | None,
+    conversation_id: str,
+) -> bool:
+    if store is None or not conversation_id:
+        return False
+    finder = getattr(store, "find_reconciliation_needed", None)
+    if not callable(finder):
+        return False
+    try:
+        value = finder(now="", limit=500)
+    except TypeError:
+        try:
+            value = finder(limit=500)
+        except TypeError:
+            value = finder()
+    values = await value if inspect.isawaitable(value) else value
+    return any(
+        str(getattr(operation, "conversation_id", "") or "") == str(conversation_id)
+        and is_reconciliation_exhausted(operation)
+        for operation in (values or ())
+    )
+
+
+def _compact_observation(value: Any) -> dict[str, Any]:
+    """Project an ActionObservation without its resumable payload."""
+
+    item = as_dict(value)
+    result = {
+        key: item.get(key)
+        for key in (
+            "execution_id",
+            "task_id",
+            "conversation_id",
+            "goal_id",
+            "capability",
+            "status",
+            "draft_id",
+            "schedule_id",
+            "error",
+            "observed_at",
+        )
+        if item.get(key) not in (None, "")
+    }
+    result["source"] = "action_observation"
+    refs = item.get("resource_refs")
+    if isinstance(refs, Sequence) and not isinstance(refs, (str, bytes)):
+        result["resource_refs"] = [
+            {
+                key: ref.get(key)
+                for key in ("resource_type", "resource_kind", "resource_id", "artifact_id")
+                if ref.get(key) not in (None, "")
+            }
+            for ref in refs[:8]
+            if isinstance(ref, Mapping)
+        ]
+    business = item.get("business_result")
+    if isinstance(business, Mapping):
+        compact_business = {
+            key: business.get(key)
+            for key in ("draft_id", "schedule_id", "post_id", "summary", "status", "state", "run_at")
+            if business.get(key) not in (None, "")
+        }
+        schedule = business.get("schedule")
+        if isinstance(schedule, Mapping):
+            compact_business["schedule"] = {
+                key: schedule.get(key)
+                for key in ("schedule_id", "draft_id", "post_id", "status", "state", "run_at")
+                if schedule.get(key) not in (None, "")
+            }
+        if compact_business:
+            result["business_result"] = compact_business
+    return result
 
 
 def _bounded_messages(values: Sequence[Mapping[str, Any]], budget: ContextBudget) -> list[dict[str, Any]]:
@@ -415,6 +656,23 @@ def _bounded_text(value: Any, limit: int) -> Any:
     return value
 
 
+def _first_schedule_run_at(task_value: Mapping[str, Any]) -> str | None:
+    """Expose a schedule time only when the Task has one typed schedule."""
+    schedules = [
+        resource
+        for resource in task_value.get("resource_index") or ()
+        if isinstance(resource, Mapping)
+        and str(resource.get("resource_kind") or "").upper() == "SCHEDULE"
+    ]
+    if len(schedules) != 1:
+        return None
+    for resource in schedules:
+        run_at = resource.get("scheduled_at") or resource.get("run_at")
+        if run_at:
+            return str(run_at)
+    return None
+
+
 def _target_candidates(
     tasks: Sequence[Mapping[str, Any]],
     artifacts: Sequence[Mapping[str, Any]],
@@ -425,7 +683,13 @@ def _target_candidates(
     limit: int,
 ) -> list[dict[str, Any]]:
     values: list[dict[str, Any]] = []
-    values.extend({**dict(item), "kind": "TASK"} for item in tasks)
+    for item in tasks:
+        task_value = dict(item)
+        if not task_value.get("run_at"):
+            schedule_run_at = _first_schedule_run_at(task_value)
+            if schedule_run_at:
+                task_value["run_at"] = schedule_run_at
+        values.append({**task_value, "kind": "TASK"})
     values.extend({**dict(item), "kind": "ARTIFACT"} for item in artifacts)
     values.extend(dict(item) for item in resources)
     values.extend(dict(item) for item in executions)
@@ -443,7 +707,28 @@ def _target_candidates(
     seen: set[tuple[str, str]] = set()
     result: list[dict[str, Any]] = []
     for item in values:
-        kind = str(item.get("kind", "TASK")).upper()
+        # Resource-index rows are business candidates even when their
+        # compatibility projection has no top-level ``kind``.  Preserve the
+        # typed resource kind here; otherwise every Schedule/Draft row is
+        # misclassified as a TASK and the resolver cannot apply its operation
+        # scope.  An explicit ``kind`` (for example ARTIFACT or EXECUTION)
+        # remains authoritative for that projection.
+        kind = str(
+            item.get("kind")
+            or item.get("resource_kind")
+            or item.get("resource_type")
+            or "TASK"
+        ).upper()
+        business_kind = str(
+            item.get("resource_kind") or item.get("resource_type") or ""
+        ).upper()
+        # An artifact projection can be another view of the same business
+        # resource (for example ARTIFACT+DRAFT alongside a DRAFT resource
+        # index row).  Resolve that view to the business kind before
+        # canonical candidate dedupe, so the provider/resolver sees one
+        # DRAFT/SCHEDULE candidate rather than two aliases.
+        if kind == "ARTIFACT" and business_kind and business_kind != "ARTIFACT":
+            kind = business_kind
         preferred = {
             "TASK": ("id", "task_id", "resource_id"),
             "ARTIFACT": ("id", "artifact_id", "resource_id", "task_id"),
@@ -452,11 +737,11 @@ def _target_candidates(
         identifier = next((str(item.get(key)) for key in preferred if item.get(key)), "")
         if not identifier:
             continue
-        key = (str(item.get("kind", "TASK")), identifier)
+        key = (kind, identifier)
         if key in seen:
             continue
         seen.add(key)
-        result.append({**item, "id": identifier})
+        result.append({**item, "kind": kind, "id": identifier})
     return result[:limit]
 
 

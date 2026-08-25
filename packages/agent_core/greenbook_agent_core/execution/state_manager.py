@@ -5,6 +5,7 @@ Phase 3.3: state management only — no tool execution.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from greenbook_agent_core.observability.context import TraceContext
@@ -77,17 +78,29 @@ class ExecutionStateManager:
         self,
         plan: TaskPlan,
         executable: ExecutablePlan,
+        objective_id: str | None = None,
+        *,
+        execution_id: str | None = None,
+        dispatch_payload: dict[str, object] | None = None,
     ) -> PlanExecution:
         """Create a PlanExecution from a validated ExecutablePlan."""
+        initial_checkpoint = (
+            {"dispatch_payload": dict(dispatch_payload)}
+            if dispatch_payload
+            else {}
+        )
         execution = PlanExecution(
+            execution_id=execution_id or str(uuid.uuid4()),
             plan_id=plan.plan_id,
             task_id=plan.task_id,
             status=ExecutionStatus.PENDING,
+            objective_id=objective_id,
             requires_approval=executable.requires_approval,
             has_side_effects=executable.has_side_effects,
             steps=[
                 StepExecution(
                     step_id=s.step_id,
+                    goal_id=str(getattr(s, "goal_id", "") or "") or None,
                     capability=s.capability,
                     tool_name=str(getattr(s, "tool_name", "") or ""),
                     arguments=dict(getattr(s, "constraints", {}) or {}),
@@ -101,8 +114,11 @@ class ExecutionStateManager:
                     input_artifact_types=list(s.input_artifact_types),
                     output_artifact_type=s.output_artifact_type,
                     depends_on=list(s.depends_on),
+                    checkpoint_data=(
+                        dict(initial_checkpoint) if index == 0 else {}
+                    ),
                 )
-                for s in plan.steps
+                for index, s in enumerate(plan.steps)
             ],
         )
         return self._repo.save(execution)
@@ -118,9 +134,13 @@ class ExecutionStateManager:
         step = self._require_step(execution_id, step_execution_id)
         if step.status != StepStatus.PENDING:
             raise _invalid_transition(step, StepStatus.PENDING, StepStatus.RUNNING)
-        return self._update_and_return(execution_id, step_execution_id,
-                                       status=StepStatus.RUNNING,
-                                       started_at=_now())
+        return self._update_and_return(
+            execution_id,
+            step_execution_id,
+            expected_status=StepStatus.PENDING,
+            status=StepStatus.RUNNING,
+            started_at=_now(),
+        )
 
     def complete_step(
         self,
@@ -138,7 +158,12 @@ class ExecutionStateManager:
         }
         if output_artifact is not None:
             fields["output_artifact"] = output_artifact
-        result = self._update_and_return(execution_id, step_execution_id, **fields)
+        result = self._update_and_return(
+            execution_id,
+            step_execution_id,
+            expected_status=StepStatus.RUNNING,
+            **fields,
+        )
         self._update_execution_status(execution_id)
         return result
 
@@ -158,6 +183,12 @@ class ExecutionStateManager:
 
         step = self._require_step(execution_id, step_execution_id)
         if step.status == StepStatus.COMPLETED:
+            # A crash may happen after the step commit but before the parent
+            # Execution status is recomputed. Re-open only this durable
+            # reconciliation path so a stale WAITING_HUMAN marker cannot keep
+            # an already verified operation non-terminal forever.
+            self._prepare_reconciled_execution(execution_id)
+            self._update_execution_status(execution_id)
             return step
         if step.status == StepStatus.SKIPPED:
             raise _invalid_transition(step, "non-SKIPPED", StepStatus.COMPLETED)
@@ -169,6 +200,7 @@ class ExecutionStateManager:
             error_message="",
             completed_at=_now(),
         )
+        self._prepare_reconciled_execution(execution_id)
         self._update_execution_status(execution_id)
         self._emit(
             execution_id,
@@ -200,6 +232,7 @@ class ExecutionStateManager:
             error_message=error_message,
             completed_at=_now(),
         )
+        self._prepare_reconciled_execution(execution_id)
         self._update_execution_status(execution_id)
         self._emit(
             execution_id,
@@ -352,6 +385,7 @@ class ExecutionStateManager:
         return self._update_and_return(
             execution_id,
             step_execution_id,
+            expected_status=StepStatus.RUNNING,
             status=StepStatus.PENDING,
             started_at="",
         )
@@ -368,6 +402,7 @@ class ExecutionStateManager:
                                       StepStatus.WAITING_APPROVAL)
         result = self._update_and_return(
             execution_id, step_execution_id,
+            expected_status=StepStatus.RUNNING,
             status=StepStatus.WAITING_APPROVAL,
         )
         self._emit(
@@ -388,9 +423,12 @@ class ExecutionStateManager:
         if step.status != StepStatus.WAITING_APPROVAL:
             raise _invalid_transition(step, StepStatus.WAITING_APPROVAL,
                                       StepStatus.RUNNING)
-        result = self._update_and_return(execution_id, step_execution_id,
-                                         status=StepStatus.PENDING,
-                                         started_at="")
+        result = self._update_and_return(
+            execution_id, step_execution_id,
+            expected_status=StepStatus.WAITING_APPROVAL,
+            status=StepStatus.PENDING,
+            started_at="",
+        )
         self._update_execution_status(execution_id)
         return result
 
@@ -675,14 +713,57 @@ class ExecutionStateManager:
         self,
         execution_id: str,
         step_execution_id: str,
+        *,
+        expected_status: StepStatus | str | None = None,
         **fields: object,
     ) -> StepExecution:
+        expected = (
+            expected_status.value
+            if isinstance(expected_status, StepStatus)
+            else expected_status
+        )
         result = self._repo.update_step(
-            execution_id, step_execution_id, **fields
+            execution_id,
+            step_execution_id,
+            expected_status=expected,
+            **fields,
         )
         if result is None:
             raise ValueError(f"Failed to update step {step_execution_id}")
+        if expected_status is not None:
+            # CAS guard: verify the stored status actually moved to the
+            # requested value.  A concurrent writer that transitioned first
+            # must surface as a conflict, never as a silent success (which
+            # would let two workers run the same step).
+            target = fields.get("status")
+            target_value = (
+                target.value if hasattr(target, "value") else target
+            )
+            current = (
+                result.status.value
+                if hasattr(result.status, "value")
+                else str(result.status)
+            )
+            if target_value is not None and current != target_value:
+                raise _StepTransitionConflictError(
+                    step_execution_id, current, target_value
+                )
         return result
+
+    def _prepare_reconciled_execution(self, execution_id: str) -> None:
+        """Let authoritative reconciliation recompute a waiting parent.
+
+        ``WAITING_HUMAN`` is also used as the safe intermediate state for a
+        lost external acknowledgement. Once the read-only Java check has
+        settled the operation, the normal terminal-state reducer must run;
+        ordinary clarification/approval paths never call this helper.
+        """
+        ex = self._require_execution(execution_id)
+        if ex.status != ExecutionStatus.WAITING_HUMAN:
+            return
+        ex.status = ExecutionStatus.RUNNING
+        ex.updated_at = _now()
+        self._repo.save(ex)
 
     def _update_execution_status(self, execution_id: str) -> None:
         ex = self._require_execution(execution_id)
@@ -799,3 +880,13 @@ def _invalid_transition(
         f"Invalid transition for {name}: {current} → {target} "
         f"(expected current={expected})"
     )
+
+
+class _StepTransitionConflictError(RuntimeError):
+    """Raised when a step CAS transition loses a concurrent writer."""
+
+    def __init__(self, step_execution_id: str, current: str, target: str) -> None:
+        super().__init__(
+            f"Step {step_execution_id} was concurrently transitioned "
+            f"({current} != {target})"
+        )

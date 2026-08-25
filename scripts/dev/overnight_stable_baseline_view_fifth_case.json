@@ -1,0 +1,8 @@
+[
+  {
+    "name": "view-java-second-result",
+    "turns": [
+      {"text": "搜索 Java 集合相关帖子", "ui_action": "click_search_first", "search_index": 1}
+    ]
+  }
+]

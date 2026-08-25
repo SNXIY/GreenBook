@@ -1,0 +1,29 @@
+[
+  {
+    "name": "clear-confirm-publish-java",
+    "turns": [
+      {
+        "text": "请创建并立即发布一篇标题为 GB-STABLE-R1-CONFIRM-CLEAR-JAVA 的 Java 学习文章。",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "clear-confirm-schedule-agent",
+    "turns": [
+      {
+        "text": "请创建一篇标题为 GB-STABLE-R1-CONFIRM-CLEAR-AGENT 的 Agent 学习草稿，并安排十分钟后发布。",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  },
+  {
+    "name": "clear-confirm-publish-redis",
+    "turns": [
+      {
+        "text": "请创建并发布一篇标题为 GB-STABLE-R1-CONFIRM-CLEAR-REDIS 的 Redis 学习文章。",
+        "hitl_sequence": ["confirm", "approve"]
+      }
+    ]
+  }
+]

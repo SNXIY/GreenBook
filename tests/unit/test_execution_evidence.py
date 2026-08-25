@@ -64,7 +64,7 @@ async def test_pre_execution_evidence_preserves_false_and_none_side_effect() -> 
 
     result = await CapabilityExecutor(
         CapabilityRegistry(), handler,
-    ).execute_step(PlanStep(capability="SEARCH_COMMUNITY", ordinal=1))
+    ).execute_step(PlanStep(capability="SEARCH_COMMUNITY", ordinal=1, tool_name="community.search_public_posts"))
 
     assert result.evidence is not None
     assert result.evidence.request_sent is False
@@ -98,18 +98,18 @@ async def test_runtime_timeout_keeps_unknown_delivery_evidence() -> None:
 
 
 @pytest.mark.asyncio
-async def test_handler_exception_keeps_unknown_delivery_evidence() -> None:
+async def test_handler_exception_is_internal_without_reconciliation_evidence() -> None:
     async def broken_handler(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
-        raise RuntimeError("handler failed after an indeterminate boundary")
+        raise RuntimeError("local runtime handler failure")
 
     runtime = ToolRuntime(broken_handler)
     result = await runtime.invoke(_ctx())
 
-    assert result.error_code == "TOOL_EXECUTION_FAILED"
-    assert result.request_sent is None
+    assert result.error_code == "INTERNAL_ERROR"
+    assert result.request_sent is False
     assert result.evidence is not None
-    assert result.evidence.request_sent is None
-    assert result.evidence.side_effect_state is SideEffectState.UNKNOWN
+    assert result.evidence.request_sent is False
+    assert result.evidence.side_effect_state is SideEffectState.NOT_STARTED
     assert result.evidence.raw_error_type == "RuntimeError"
 
 
@@ -135,7 +135,7 @@ async def test_external_failure_evidence_survives_normalization() -> None:
 
     result = await CapabilityExecutor(
         CapabilityRegistry(), handler,
-    ).execute_step(PlanStep(capability="SEARCH_COMMUNITY", ordinal=1))
+    ).execute_step(PlanStep(capability="SEARCH_COMMUNITY", ordinal=1, tool_name="community.search_public_posts"))
 
     assert result.evidence is not None
     assert result.evidence.request_sent is True

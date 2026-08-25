@@ -39,6 +39,10 @@
         SELECT * FROM know_posts WHERE id = #{id}
     </select>
 
+    <select id="findByIdForUpdate" parameterType="long" resultMap="KnowPostResultMap">
+        SELECT * FROM know_posts WHERE id = #{id} FOR UPDATE
+    </select>
+
     <update id="updateContent" parameterType="com.tongji.knowpost.model.KnowPost">
         UPDATE know_posts
         <set>
@@ -246,6 +250,57 @@
         ORDER BY
           CASE WHEN LOWER(COALESCE(p.title, '')) LIKE CONCAT('%', LOWER(#{query}), '%') THEN 0 ELSE 1 END,
           p.publish_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <!--
+      Token-aware agent retrieval: OR recall over every token with a
+      field-weighted relevance score (title 3 > tags 2 > description 1,
+      plus a title-exact bonus of 5).  Ordering is relevance first, then
+      publish time, so "Java 后端 面试" can hit posts whose metadata
+      contains any of the tokens instead of requiring the exact phrase.
+    -->
+    <select id="searchPublicForAgentTokens" resultType="com.tongji.knowpost.model.KnowPostDetailRow">
+        SELECT
+            p.id,
+            p.creator_id AS creatorId,
+            p.title,
+            p.description,
+            p.tags,
+            p.img_urls AS imgUrls,
+            p.content_url AS contentUrl,
+            p.content_object_key AS contentObjectKey,
+            p.content_etag AS contentEtag,
+            p.content_sha256 AS contentSha256,
+            u.avatar AS authorAvatar,
+            u.nickname AS authorNickname,
+            u.tags_json AS authorTagJson,
+            p.publish_time AS publishTime,
+            p.is_top AS isTop,
+            p.visible,
+            p.type,
+            p.status,
+            p.content_origin AS contentOrigin,
+            (
+                <foreach collection="tokens" item="tok" separator=" + ">
+                    (CASE WHEN LOWER(COALESCE(p.title, '')) LIKE CONCAT('%', LOWER(#{tok}), '%') THEN 3 ELSE 0 END
+                     + CASE WHEN LOWER(COALESCE(p.tags, '')) LIKE CONCAT('%', LOWER(#{tok}), '%') THEN 2 ELSE 0 END
+                     + CASE WHEN LOWER(COALESCE(p.description, '')) LIKE CONCAT('%', LOWER(#{tok}), '%') THEN 1 ELSE 0 END)
+                </foreach>
+                + CASE WHEN LOWER(COALESCE(p.title, '')) LIKE CONCAT('%', LOWER(#{query}), '%') THEN 5 ELSE 0 END
+            ) AS relevance
+        FROM know_posts p
+        JOIN users u ON p.creator_id = u.id
+        WHERE p.status = 'published'
+          AND p.visible = 'public'
+          AND (
+            <foreach collection="tokens" item="tok" separator=" OR ">
+                (LOWER(COALESCE(p.title, '')) LIKE CONCAT('%', LOWER(#{tok}), '%')
+                 OR LOWER(COALESCE(p.tags, '')) LIKE CONCAT('%', LOWER(#{tok}), '%')
+                 OR LOWER(COALESCE(p.description, '')) LIKE CONCAT('%', LOWER(#{tok}), '%'))
+            </foreach>
+          )
+        ORDER BY relevance DESC, p.publish_time DESC
         LIMIT #{limit}
     </select>
 

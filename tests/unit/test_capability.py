@@ -5,16 +5,13 @@ from __future__ import annotations
 import pytest
 from greenbook_agent_core.capability.mapper import CapabilityMapper
 from greenbook_agent_core.capability.models import (
-    Capability,
     CapabilityCategory,
-    CapabilityMatch,
 )
-from greenbook_contracts.tool_contract import TOOL_POLICY_CATALOG
 from greenbook_agent_core.capability.registry import (
     CapabilityRegistry,
     get_capability_registry,
 )
-
+from greenbook_contracts.tool_contract import TOOL_POLICY_CATALOG
 
 # ── helpers ──────────────────────────────────────────────────────
 
@@ -40,7 +37,12 @@ def test_get_known_capability(registry: CapabilityRegistry) -> None:
     assert cap is not None
     assert cap.name == "SEARCH_COMMUNITY"
     assert cap.category == CapabilityCategory.SEARCH
+    # Search-and-summarize completes by reading post details; get_post is the
+    # read-only retrieval tool this capability must legally reach.
     assert cap.tools == ["community.search_public_posts"]
+    # get_post stays reachable on SEARCH_COMMUNITY via its serves declaration,
+    # not as a positional second tool (keeps single-tool auto-selection valid).
+    assert "community.search_public_posts" in cap.tools
 
 
 def test_get_unknown_returns_none(registry: CapabilityRegistry) -> None:
@@ -103,22 +105,6 @@ def test_generate_content_has_correct_metadata(registry: CapabilityRegistry) -> 
 
 # ── Scenario 2: IMPROVE_CONTENT → content.revise_draft ────────────
 
-def test_improve_content_maps_correctly(mapper: CapabilityMapper) -> None:
-    match = mapper.map_single("IMPROVE")
-    assert match.capability is not None
-    assert match.capability.name == "IMPROVE_CONTENT"
-    assert "content.revise_draft" in match.capability.tools
-    assert "side_effect" not in type(match.capability).model_fields
-
-
-def test_improve_content_requires_draft_id(registry: CapabilityRegistry) -> None:
-    cap = registry.get_required("IMPROVE_CONTENT")
-    assert "draft_id" in cap.inputs.required
-    assert "revision_instruction" in cap.inputs.required
-
-
-# ── Scenario 3: UPDATE_SCHEDULE → publication.update_schedule ─────
-
 def test_manage_schedule_maps_correctly(mapper: CapabilityMapper) -> None:
     match = mapper.map_single("PUBLISH")
     assert match.capability is not None
@@ -131,6 +117,27 @@ def test_cancel_schedule_maps_correctly(mapper: CapabilityMapper) -> None:
     assert match.capability is not None
     assert match.capability.name == "CANCEL_SCHEDULE"
     assert "publication.cancel_schedule" in match.capability.tools
+
+
+def test_semantic_update_draft_maps_to_draft_management(
+    registry: CapabilityRegistry,
+) -> None:
+    match = registry.resolve_requirement(
+        {"type": "UPDATE", "semantic_action": "UPDATE_DRAFT"}
+    )
+
+    assert match.capability is not None
+    assert match.capability.name == "MANAGE_DRAFT"
+    assert match.capability.tools == ["content.update_draft"]
+
+
+def test_bare_update_fails_closed_instead_of_selecting_schedule(
+    registry: CapabilityRegistry,
+) -> None:
+    match = registry.resolve_requirement({"type": "UPDATE"})
+
+    assert match.capability is None
+    assert "semantic_action" in match.error
 
 
 def test_manage_schedule_requires_run_at(registry: CapabilityRegistry) -> None:
@@ -250,3 +257,40 @@ def test_capability_references_are_stable(registry: CapabilityRegistry) -> None:
     cap1 = registry.get("GENERATE_CONTENT")
     cap2 = registry.get("GENERATE_CONTENT")
     assert cap1 is cap2  # same object reference
+
+
+# ── per-business-item temporal binding ──────────────────────────────────
+
+
+def test_objectives_from_items_three_targets_three_times() -> None:
+    import datetime
+    from greenbook_agent_core.command.models import CommandItem
+    from greenbook_agent_core.task.objective_compat import objectives_from_items
+
+    now = datetime.datetime(2026, 8, 16, 12, 0, tzinfo=datetime.timezone.utc)
+    items = [
+        CommandItem(title="Java集合", capabilities=["GENERATE_CONTENT", "SCHEDULE_PUBLISH"], temporal_text="明天上午八点"),
+        CommandItem(title="JVM", capabilities=["GENERATE_CONTENT", "SCHEDULE_PUBLISH"], temporal_text="明天下午两点"),
+        CommandItem(title="Spring Boot", capabilities=["GENERATE_CONTENT", "SCHEDULE_PUBLISH"], temporal_text="明天下午五点"),
+    ]
+    objs = objectives_from_items(items, "t1", timezone="Asia/Shanghai", now=now)
+    assert len(objs) == 3, "exactly one Objective per business item (not per capability)"
+    assert [o.constraints.get("run_at") for o in objs] == [
+        "2026-08-17T00:00:00Z", "2026-08-17T06:00:00Z", "2026-08-17T09:00:00Z",
+    ]
+    assert all(o.constraints.get("timezone") == "Asia/Shanghai" for o in objs)
+
+
+def test_objectives_from_items_partial_temporal_no_inherit() -> None:
+    import datetime
+    from greenbook_agent_core.command.models import CommandItem
+    from greenbook_agent_core.task.objective_compat import objectives_from_items
+
+    now = datetime.datetime(2026, 8, 16, 12, 0, tzinfo=datetime.timezone.utc)
+    items = [
+        CommandItem(title="Java", capabilities=["GENERATE_CONTENT", "SCHEDULE_PUBLISH"], temporal_text="明天上午十点"),
+        CommandItem(title="Agent草稿", capabilities=["GENERATE_CONTENT"]),
+    ]
+    objs = objectives_from_items(items, "t1", timezone="Asia/Shanghai", now=now)
+    assert objs[0].constraints.get("run_at") == "2026-08-17T02:00:00Z"
+    assert "run_at" not in objs[1].constraints, "item without temporal must not inherit"

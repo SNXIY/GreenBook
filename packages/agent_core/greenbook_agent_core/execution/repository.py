@@ -59,6 +59,8 @@ class ExecutionRepository:
         self,
         execution_id: str,
         step_execution_id: str,
+        *,
+        expected_status: str | None = None,
         **fields: object,
     ) -> StepExecution | None:
         ex = _store.get(execution_id)
@@ -66,6 +68,22 @@ class ExecutionRepository:
             return None
         for s in ex.steps:
             if s.step_execution_id == step_execution_id:
+                if expected_status is not None:
+                    current = (
+                        s.status.value
+                        if hasattr(s.status, "value")
+                        else str(s.status)
+                    )
+                    expected = (
+                        expected_status.value
+                        if hasattr(expected_status, "value")
+                        else expected_status
+                    )
+                    if current != expected:
+                        # CAS rejected: another writer transitioned first.
+                        # Return the current snapshot so the caller can
+                        # distinguish "concurrent transition" from "missing".
+                        return s.model_copy(deep=True)
                 for k, v in fields.items():
                     setattr(s, k, v)
                 s.version += 1

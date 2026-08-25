@@ -1,0 +1,10 @@
+[
+  {
+    "name": "clarify-then-approve-delete",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-TARGET-A 的 Java 学习草稿，只保存草稿"},
+      {"text": "创建一个标题为 GB-STABLE-R1-TARGET-B 的 Java 学习草稿，只保存草稿"},
+      {"text": "删除 Java 学习草稿", "hitl_sequence": ["clarify", "approve"], "candidate_index": 0}
+    ]
+  }
+]

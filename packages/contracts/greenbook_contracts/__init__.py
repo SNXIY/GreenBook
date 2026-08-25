@@ -1,7 +1,20 @@
 """GreenBook shared contracts."""
 
 from greenbook_contracts.errors import ErrorCode, GreenBookError
-from greenbook_contracts.events import BusinessEvent
+from greenbook_contracts.events import (
+    EVENT_ACTION_COMPLETED,
+    EVENT_FOLLOW_UP_QUEUED,
+    EVENT_OBSERVATION,
+    EVENT_PARTIAL_RESULT,
+    EVENT_REASONING_STARTED,
+    EVENT_RUN_COMPLETED,
+    EVENT_RUN_FAILED,
+    EVENT_SEMANTIC_ACTION,
+    EVENT_TOOL_STARTED,
+    EVENT_UNDERSTANDING,
+    EVENT_WAITING_APPROVAL,
+    BusinessEvent,
+)
 from greenbook_contracts.external_agent_failure import (
     ExternalAgentFailure,
     FailureNormalizer,
@@ -12,23 +25,40 @@ from greenbook_contracts.external_agent_failure import (
 from greenbook_contracts.identity import AuthContext
 from greenbook_contracts.tool_contract import (
     TOOL_POLICY_CATALOG,
+    TOOL_SEMANTIC_ACTIONS,
     PermissionPolicy,
     RetryPolicy,
+    SemanticAction,
     SideEffectMetadata,
     ToolContract,
     ToolMetadata,
     ToolPolicyMetadata,
     ToolRegistry,
+    semantic_action_for_tool,
 )
-from greenbook_contracts.tool_result import ToolResult
+from greenbook_contracts.tool_result import OperationReceipt, ToolResult
+from greenbook_contracts.user_activity import (
+    UserActivityEvent,
+    UserActivityMapping,
+    UserActivityStatus,
+    UserActivityType,
+    activity_mapping_for_semantic_action,
+)
 
 __all__ = [
     "ToolResult",
+    "OperationReceipt",
+    "UserActivityEvent",
+    "UserActivityMapping",
+    "UserActivityStatus",
+    "UserActivityType",
+    "activity_mapping_for_semantic_action",
     "ErrorCode",
     "GreenBookError",
     "BusinessEvent",
     "AuthContext",
     "PermissionPolicy",
+    "SemanticAction",
     "RetryPolicy",
     "SideEffectMetadata",
     "ToolPolicyMetadata",
@@ -36,9 +66,22 @@ __all__ = [
     "ToolRegistry",
     "ToolContract",
     "TOOL_POLICY_CATALOG",
+    "TOOL_SEMANTIC_ACTIONS",
+    "semantic_action_for_tool",
     "ExternalAgentFailure",
     "FailureNormalizer",
     "RecoveryAction",
     "SideEffectState",
     "normalize_external_failure",
+    "EVENT_ACTION_COMPLETED",
+    "EVENT_FOLLOW_UP_QUEUED",
+    "EVENT_OBSERVATION",
+    "EVENT_PARTIAL_RESULT",
+    "EVENT_REASONING_STARTED",
+    "EVENT_RUN_COMPLETED",
+    "EVENT_RUN_FAILED",
+    "EVENT_SEMANTIC_ACTION",
+    "EVENT_TOOL_STARTED",
+    "EVENT_UNDERSTANDING",
+    "EVENT_WAITING_APPROVAL",
 ]

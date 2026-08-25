@@ -55,6 +55,10 @@ class ResumeContext(BaseModel):
     recovery_action: RecoveryKind = RecoveryKind.RESUME_EXECUTION
     recovery_reason: str = ""
     trace_context: dict[str, Any] = Field(default_factory=dict)
+    # Per-Goal satisfaction projection (goal_id / satisfied / missing) derived
+    # from durable business facts at continuation time. Survives the per-round
+    # context refresh because it travels with the resume state.
+    goal_states: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class IdempotentRecoveryGuard:
@@ -180,9 +184,11 @@ class AgentRecoveryService:
             if _value(step, "status") == StepStatus.COMPLETED
         }
         completed_steps.update(str(item) for item in (_value(checkpoint, "completed_steps", ()) or ()))
-        goals = list(_value(task, "goals", ()) or ())
+        goals = list(_value(task, "objectives", ()) or ())
+        if not goals:
+            goals = list(_value(task, "goals", ()) or ())
         completed_goals = [
-            str(_value(goal, "goal_id") or "")
+            str(_value(goal, "objective_id") or _value(goal, "goal_id") or "")
             for goal in goals
             if str(_value(goal, "status") or "").upper() in {"COMPLETED", "DONE"}
         ]
@@ -192,6 +198,28 @@ class AgentRecoveryService:
             artifact = _value(step, "output_artifact")
             if artifact is not None:
                 artifacts.append(_dump(artifact))
+                continue
+            # The Worker checkpoints the successful tool result before the
+            # artifact projection.  If artifact persistence was delayed or
+            # failed, retain the committed business resource as a synthetic
+            # projection; never re-create the side effect.
+            checkpoint_data = _value(step, "checkpoint_data", {}) or {}
+            completed_result = (
+                checkpoint_data.get("completed_tool_result", {})
+                if isinstance(checkpoint_data, Mapping)
+                else {}
+            )
+            data = completed_result.get("data", {}) if isinstance(completed_result, Mapping) else {}
+            if isinstance(data, Mapping):
+                for key, artifact_type in (("draft_id", "DRAFT"), ("schedule_id", "SCHEDULE")):
+                    resource_id = str(data.get(key) or "")
+                    if resource_id:
+                        artifacts.append({
+                            "artifact_type": artifact_type,
+                            "resource_id": resource_id,
+                            "step_id": str(_value(step, "step_id") or ""),
+                            "projection_source": "execution_checkpoint",
+                        })
         return ResumeContext(
             task_id=str(_value(task, "task_id") or _value(execution, "task_id") or ""),
             goal_tree_version=int(_value(task, "goal_tree_version") or 0),

@@ -17,7 +17,6 @@ _ENV_PREFIXES = (
     "GREENBOOK_AGENT_DATABASE_URL",
     "GREENBOOK_AGENT_DB_URL",
     "GREENBOOK_DB_URL",
-    "CREATOR_DB_URL",
 )
 _DEFAULT = (
     "postgresql+asyncpg://mindflow:mindflow@127.0.0.1:25432/mindflow_creator"

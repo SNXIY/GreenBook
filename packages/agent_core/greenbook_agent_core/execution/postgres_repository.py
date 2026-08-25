@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import sqlalchemy as sa
@@ -127,21 +128,58 @@ class PostgresExecutionRepository:
         return next((step.model_copy(deep=True) for step in execution.steps
                      if step.step_execution_id == step_execution_id), None)
 
-    def update_step(self, execution_id: str, step_execution_id: str,
-                    **fields: object) -> StepExecution | None:
-        step = self.find_step(execution_id, step_execution_id)
-        if step is None:
-            return None
-        for key, value in fields.items():
-            setattr(step, key, value)
-        step.version += 1
-        execution = self.find_by_id(execution_id)
-        if execution is None:
-            return None
-        execution.steps = [step if item.step_execution_id == step_execution_id else item
-                           for item in execution.steps]
-        self.save(execution)
-        return step.model_copy(deep=True)
+    def update_step(
+        self,
+        execution_id: str,
+        step_execution_id: str,
+        *,
+        expected_status: str | None = None,
+        **fields: object,
+    ) -> StepExecution | None:
+        """Atomically update one step, optionally guarded by its current status.
+
+        With ``expected_status`` set, the UPDATE is a compare-and-swap: it
+        only applies when the stored status still equals the expected value
+        (``WHERE status = expected_status``), so two workers racing on the
+        same step cannot both claim/complete it (design goal 0813 — no double
+        side effects).  Without it, the update is an unconditional in-place
+        write of the supplied fields.
+        """
+        update_fields = dict(fields)
+        step_version = int(update_fields.get("version", 0) or 0)
+        update_fields["version"] = step_version + 1
+        conditions = [
+            execution_steps.c.execution_id == execution_id,
+            execution_steps.c.step_execution_id == step_execution_id,
+        ]
+        if expected_status is not None:
+            conditions.append(execution_steps.c.status == expected_status)
+        with self._connect() as conn:
+            result = conn.execute(
+                sa.update(execution_steps)
+                .where(*conditions)
+                .values(**_step_update_values(update_fields))
+            )
+            if result.rowcount == 0:
+                # Either the step does not exist or the expected-status CAS
+                # failed (another worker transitioned it first).  Re-read to
+                # distinguish "missing" from "concurrent transition".
+                row = conn.execute(
+                    sa.select(execution_steps).where(
+                        execution_steps.c.execution_id == execution_id,
+                        execution_steps.c.step_execution_id == step_execution_id,
+                    )
+                ).mappings().first()
+                if row is None:
+                    return None
+                return _to_step(row)
+            row = conn.execute(
+                sa.select(execution_steps).where(
+                    execution_steps.c.execution_id == execution_id,
+                    execution_steps.c.step_execution_id == step_execution_id,
+                )
+            ).mappings().first()
+        return _to_step(row) if row is not None else None
 
     def list_all(self) -> list[PlanExecution]:
         with self._connect() as conn:
@@ -196,6 +234,7 @@ def _step_values(step: StepExecution, execution_id: str) -> dict[str, Any]:
     # tool name after a process boundary.
     checkpoint_data = dict(step.checkpoint_data or {})
     checkpoint_data.update({
+        "_goal_id": step.goal_id,
         "_tool_name": step.tool_name,
         "_arguments": dict(step.arguments or {}),
         "_idempotency_key": step.idempotency_key,
@@ -227,30 +266,7 @@ def _step_values(step: StepExecution, execution_id: str) -> dict[str, Any]:
 
 
 def _to_execution(row: Any, step_rows: list[Any], control_row: Any | None) -> PlanExecution:
-    steps = []
-    for raw in step_rows:
-        data = dict(raw)
-        checkpoint_data = dict(data.get("checkpoint_data") or {})
-        # Fallbacks preserve compatibility with executions written before the
-        # resolved runtime fields were added to the checkpoint envelope.
-        data["tool_name"] = str(checkpoint_data.pop("_tool_name", "") or "")
-        data["arguments"] = dict(checkpoint_data.pop("_arguments", {}) or {})
-        data["idempotency_key"] = str(
-            checkpoint_data.pop("_idempotency_key", "") or ""
-        )
-        data["execution_mode"] = str(
-            checkpoint_data.pop("_execution_mode", "QUEUE") or "QUEUE"
-        )
-        data["policy_snapshot"] = dict(
-            checkpoint_data.pop("_policy_snapshot", {}) or {}
-        )
-        data["checkpoint_data"] = checkpoint_data
-        data["status"] = data["status"]
-        data["input_artifacts"] = [ArtifactHandle.model_validate(item)
-                                    for item in (data.get("input_artifacts") or [])]
-        if data.get("output_artifact"):
-            data["output_artifact"] = ArtifactHandle.model_validate(data["output_artifact"])
-        steps.append(StepExecution.model_validate(data))
+    steps = [_to_step(raw) for raw in step_rows]
     control = dict(control_row) if control_row is not None else {}
     return PlanExecution.model_validate({
         **dict(row),
@@ -261,6 +277,47 @@ def _to_execution(row: Any, step_rows: list[Any], control_row: Any | None) -> Pl
         "control_updated_at": control.get("updated_at", row["updated_at"]),
         "steps": steps,
     })
+
+
+def _to_step(raw: Any) -> StepExecution:
+    data = dict(raw)
+    checkpoint_data = dict(data.get("checkpoint_data") or {})
+    # Fallbacks preserve compatibility with executions written before the
+    # resolved runtime fields were added to the checkpoint envelope.
+    data["tool_name"] = str(checkpoint_data.pop("_tool_name", "") or "")
+    data["goal_id"] = str(checkpoint_data.pop("_goal_id", "") or "") or None
+    data["arguments"] = dict(checkpoint_data.pop("_arguments", {}) or {})
+    data["idempotency_key"] = str(
+        checkpoint_data.pop("_idempotency_key", "") or ""
+    )
+    data["execution_mode"] = str(
+        checkpoint_data.pop("_execution_mode", "QUEUE") or "QUEUE"
+    )
+    data["policy_snapshot"] = dict(
+        checkpoint_data.pop("_policy_snapshot", {}) or {}
+    )
+    data["checkpoint_data"] = checkpoint_data
+    data["input_artifacts"] = [
+        ArtifactHandle.model_validate(item)
+        for item in (data.get("input_artifacts") or [])
+    ]
+    if data.get("output_artifact"):
+        data["output_artifact"] = ArtifactHandle.model_validate(data["output_artifact"])
+    return StepExecution.model_validate(data)
+
+
+def _step_update_values(fields: Mapping[str, Any]) -> dict[str, Any]:
+    """Map update fields to the execution_step schema (status/artifacts)."""
+    values: dict[str, Any] = dict(fields)
+    status = values.get("status")
+    if status is not None and not isinstance(status, str):
+        values["status"] = status.value
+    output = values.get("output_artifact")
+    if output is not None and hasattr(output, "model_dump"):
+        values["output_artifact"] = output.model_dump(mode="json")
+    elif output is None and "output_artifact" in values:
+        values["output_artifact"] = None
+    return values
 
 
 __all__ = ["PostgresExecutionRepository"]

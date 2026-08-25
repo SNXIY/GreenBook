@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from typing import Any
 
 from greenbook_agent_core.command.correction import CorrectionEvent
@@ -11,6 +12,8 @@ from greenbook_agent_core.command.correction import CorrectionEvent
 from .models import MemoryQuery, MemoryRecord, MemoryType
 from .policy import MemoryWritePolicy
 from .repository import InMemoryMemoryRepository
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryManager:
@@ -32,6 +35,25 @@ class MemoryManager:
         return self._repository
 
     def remember(self, record: MemoryRecord) -> MemoryRecord:
+        if record.source_type and record.source_id:
+            existing = self._find_by_source(
+                record.user_id,
+                record.source_type,
+                record.source_id,
+            )
+            if existing is not None:
+                # The same logical fact (e.g. the same execution outcome
+                # re-delivered by a retry) must not multiply into duplicate
+                # rows: reuse the existing identity (memory_id / created_at)
+                # and refresh the payload. The durable store upserts by
+                # memory_id, so this is an in-place update, not an insert.
+                updates = record.model_dump()
+                updates["memory_id"] = existing.memory_id
+                updates["created_at"] = existing.created_at
+                updates["user_id"] = existing.user_id
+                updates["access_count"] = existing.access_count
+                updates["last_accessed_at"] = existing.last_accessed_at
+                record = MemoryRecord.model_validate(updates)
         saved = self._repository.save(record)
         self._persist(saved)
         return saved
@@ -55,7 +77,7 @@ class MemoryManager:
         if self._durable_repository is not None:
             value = self._durable_repository.delete(memory_id)
             if inspect.isawaitable(value):
-                self._persist_awaitable(value)
+                self._persist_awaitable(value, memory_id)
 
     def remember_execution(
         self,
@@ -150,21 +172,72 @@ class MemoryManager:
             confidence=0.8,
         ))
 
+    def _find_by_source(
+        self,
+        user_id: str,
+        source_type: str,
+        source_id: str,
+    ) -> MemoryRecord | None:
+        finder = getattr(self._repository, "find_by_source", None)
+        if finder is None:
+            return None
+        value = finder(user_id, source_type, source_id)
+        if inspect.isawaitable(value):
+            value = _run(value)
+        return value
+
     def _persist(self, record: MemoryRecord) -> None:
         if self._durable_repository is None:
             return
-        value = self._durable_repository.save(record)
+        try:
+            value = self._durable_repository.save(record)
+        except Exception:
+            # A synchronous durable failure must be visible, not silent: the
+            # memory stays in the in-process store for this session, but the
+            # operator sees exactly what failed (design goal 0813 — no
+            # silently dropped persistence).
+            logger.warning(
+                "Durable memory persistence failed synchronously "
+                "memory_id=%s source_type=%s source_id=%s",
+                record.memory_id,
+                record.source_type,
+                record.source_id,
+                exc_info=True,
+            )
+            return
         if inspect.isawaitable(value):
-            self._persist_awaitable(value)
+            self._persist_awaitable(value, record.memory_id)
 
     @staticmethod
-    def _persist_awaitable(value: Any) -> None:
+    def _persist_awaitable(value: Any, memory_id: str) -> None:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            asyncio.run(value)
-        else:
-            loop.create_task(value)
+            try:
+                asyncio.run(value)
+            except Exception:
+                logger.warning(
+                    "Durable memory persistence failed (sync path) memory_id=%s",
+                    memory_id,
+                    exc_info=True,
+                )
+            return
+        loop.create_task(_guard_persist(value, memory_id))
+
+
+async def _guard_persist(value: Any, memory_id: str) -> None:
+    """Run a durable save without letting a failure vanish into a
+    fire-and-forget task: the error is logged and the memory simply remains
+    in-process for the current session."""
+    try:
+        await value
+    except Exception:
+        logger.warning(
+            "Durable memory persistence failed; memory kept in-process "
+            "memory_id=%s",
+            memory_id,
+            exc_info=True,
+        )
 
 
 def _run(value: Any) -> Any:

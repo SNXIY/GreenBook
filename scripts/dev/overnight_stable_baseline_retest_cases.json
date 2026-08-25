@@ -1,0 +1,17 @@
+[
+  {
+    "name": "chat-fix",
+    "turns": [
+      {"text": "你好"},
+      {"text": "你能做什么"}
+    ]
+  },
+  {
+    "name": "clarify-fix",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-RETEST-JAVA-A 的 Java 草稿，只保存草稿"},
+      {"text": "创建一个标题为 GB-STABLE-RETEST-JAVA-B 的 Java 草稿，只保存草稿"},
+      {"text": "删除 Java 草稿", "hitl": "clarify", "candidate_index": 0}
+    ]
+  }
+]

@@ -7,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "runtime-health-check"
 
@@ -32,7 +31,6 @@ def test_runtime_health_check_reports_configured_components_without_network(tmp_
     assert "PostgreSQL: READY" in result.stdout
     assert "Agent API: READY" in result.stdout
     assert "Agent Worker: READY" in result.stdout
-    assert "Creator: READY" in result.stdout
     assert "Java Backend: READY" in result.stdout
     assert "Overall: READY" in result.stdout
 

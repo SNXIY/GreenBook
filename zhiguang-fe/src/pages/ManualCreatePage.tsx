@@ -13,6 +13,7 @@ import {
 import AuthStatus from "@/features/auth/AuthStatus";
 import { useAuth } from "@/context/AuthContext";
 import { computeSha256, knowpostService, uploadToPresigned } from "@/services/knowpostService";
+import { userFacingErrorMessage } from "@/services/userFacingError";
 import styles from "./CreatePage.module.css";
 
 type ContentOrigin = "MANUAL" | "AI_ASSISTED";
@@ -163,7 +164,7 @@ const ManualCreatePage = () => {
         );
       } catch (cause) {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "草稿加载失败");
+          setError(userFacingErrorMessage(cause, "草稿暂时无法加载，请稍后重试。"));
         }
       }
     })();
@@ -248,7 +249,7 @@ const ManualCreatePage = () => {
       setUploadedImgUrls(current => [...current, ...nextUrls]);
       setMessage(`${nextUrls.length} 张图片已上传到内容存储`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "图片上传失败");
+      setError(userFacingErrorMessage(cause, "图片上传暂时无法完成，请稍后重试。"));
     } finally {
       setImageUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -271,7 +272,7 @@ const ManualCreatePage = () => {
       setSummary((response.description || "").slice(0, 50));
       setMessage("摘要已根据正文生成");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "摘要生成失败");
+      setError(userFacingErrorMessage(cause, "摘要暂时无法生成，请稍后重试。"));
     } finally {
       setAiSummaryLoading(false);
     }
@@ -335,7 +336,7 @@ const ManualCreatePage = () => {
       localStorage.removeItem(LOCAL_DRAFT_KEY);
     } catch (cause) {
       setPublishState("idle");
-      setError(cause instanceof Error ? cause.message : "发布失败，请稍后重试");
+      setError(userFacingErrorMessage(cause, "发布暂时无法完成，请稍后重试。"));
     } finally {
       setSubmitting(false);
     }
@@ -549,7 +550,7 @@ const ManualCreatePage = () => {
             </h3>
             <p>
               {contentOrigin === "AI_ASSISTED"
-                ? "来源由Creator Service 与 Java 服务间签名确认。你补充的图片和设置会一起进入正式发布流程。"
+                ? "AI 成稿由 Agent 直接写入 Java 草稿。你补充的图片和设置会一起进入正式发布流程。"
                 : "标题、摘要、标签和正文会按当前发布策略校验，确认后进入可靠发布流程。"}
             </p>
           </div>

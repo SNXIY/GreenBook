@@ -1,0 +1,167 @@
+.cluster {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 14px;
+  padding: 12px;
+  border: 1px solid rgba(28, 91, 71, 0.16);
+  border-radius: 14px;
+  background: rgba(247, 252, 249, 0.88);
+}
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.heading strong {
+  color: #1d493b;
+  font-size: 14px;
+}
+
+.heading small {
+  color: #69756f;
+  font-size: 12px;
+}
+
+.task {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.taskTitle {
+  color: #26372f;
+  font-size: 13px;
+}
+
+.events {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.events li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 7px;
+  color: #42524a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.events li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.marker {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e6f4ec;
+  color: #23734d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statusIN_PROGRESS .marker,
+.statusRECONCILING .marker {
+  background: #e9f0ff;
+  color: #3865b7;
+}
+
+.statusWAITING_CLARIFICATION .marker,
+.statusWAITING_APPROVAL .marker {
+  background: #fff4d8;
+  color: #9d6800;
+}
+
+.statusFAILED .marker,
+.statusRESULT_UNKNOWN .marker {
+  background: #ffe9e6;
+  color: #b43b28;
+}
+
+.preview,
+.candidates,
+.unknownNote {
+  color: #6d796f;
+  font-size: 12px;
+}
+
+.unknownNote {
+  color: #9b5f1c;
+}
+
+.approvalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.approvalCard {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid #ead9a8;
+  border-radius: 9px;
+  background: #fffaf0;
+}
+
+.approvalCard strong {
+  color: #744d00;
+  font-size: 13px;
+}
+
+.approvalCard p,
+.approvalCard small {
+  margin: 0;
+}
+
+.approvalCard p {
+  color: #3e3a2e;
+}
+
+.approvalCard small {
+  color: #806f48;
+  font-size: 12px;
+}
+
+.approvalActions button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #c7d4cd;
+  border-radius: 8px;
+  background: #fff;
+  color: #31463b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.approvalActions button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.approvalActions .approveButton {
+  border-color: #23734d;
+  background: #23734d;
+  color: #fff;
+}
+
+@media (max-width: 560px) {
+  .heading {
+    display: grid;
+    gap: 2px;
+  }
+}

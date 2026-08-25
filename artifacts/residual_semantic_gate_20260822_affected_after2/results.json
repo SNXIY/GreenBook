@@ -1,0 +1,5537 @@
+[
+  {
+    "case_id": "A08",
+    "category": "A_SINGLE_ORAL",
+    "message": "帮我写一篇 RAG 入门，今天就发出去。",
+    "turns": [],
+    "provider_calls_before": 0,
+    "command": {
+      "command_id": "8d9c7888-8641-4682-94d8-a0492c11e49c",
+      "type": "CREATE",
+      "goal": "帮我写一篇 RAG 入门，今天就发出去。",
+      "objective": "帮我写一篇 RAG 入门，今天就发出去。",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [],
+      "target": null,
+      "parameters": {},
+      "entities": {
+        "topic": "RAG 入门"
+      },
+      "constraints": {
+        "publication_intent": "IMMEDIATE_PUBLISH"
+      },
+      "semantic_operation": "CREATE",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "",
+      "needs_clarification": false,
+      "required_capabilities": [
+        "GENERATE_CONTENT",
+        "PUBLISH_NOW"
+      ],
+      "confidence": 0.9,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "帮我写一篇 RAG 入门，今天就发出去。",
+      "items": [
+        {
+          "title": "",
+          "topic": "RAG 入门",
+          "requirements": [
+            "写一篇 RAG 入门文章"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT",
+            "PUBLISH_NOW"
+          ],
+          "temporal_text": "今天",
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH"
+          }
+        }
+      ],
+      "target_resolution": null,
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "8d9c7888-8641-4682-94d8-a0492c11e49c",
+      "operation": "CREATE",
+      "semantic_operation": "CREATE",
+      "capabilities": [
+        "GENERATE_CONTENT",
+        "PUBLISH_NOW"
+      ],
+      "publication_intent": "IMMEDIATE_PUBLISH",
+      "target_type": "",
+      "target_reference": {},
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "NOW",
+      "run_at": null,
+      "temporal_resolved": true,
+      "constraints": {
+        "publication_intent": "IMMEDIATE_PUBLISH",
+        "temporal_kind": "NOW",
+        "temporal_resolved": true
+      },
+      "dependencies": [],
+      "clarification_required": false,
+      "clarification_reason": "",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "RAG 入门",
+          "requirements": [
+            "写一篇 RAG 入门文章"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT",
+            "PUBLISH_NOW"
+          ],
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_text": "今天",
+          "temporal_kind": "NOW",
+          "run_at": null,
+          "temporal_resolved": true,
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH",
+            "temporal_kind": "NOW",
+            "temporal_resolved": true
+          },
+          "target_reference": {}
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "RAG 入门",
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT",
+            "PUBLISH_NOW"
+          ],
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_kind": "NOW",
+          "temporal_resolved": true,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH",
+            "temporal_kind": "NOW",
+            "temporal_resolved": true
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "CREATE",
+      "publication_mode": "IMMEDIATE",
+      "temporal_kind": "NOW",
+      "temporal_resolved": true,
+      "target_state": "NONE",
+      "clarification_required": false,
+      "objective_count": 1,
+      "task_expectation": "READY"
+    },
+    "target_resolution": {
+      "status": "NONE"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "RAG 入门",
+        "operation": "CREATE",
+        "capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "publication_intent": "IMMEDIATE_PUBLISH",
+        "temporal_kind": "NOW",
+        "temporal_resolved": true,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_kind": "NOW",
+          "temporal_resolved": true
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "CREATE",
+        "goal": "帮我写一篇 RAG 入门，今天就发出去。",
+        "objective": "帮我写一篇 RAG 入门，今天就发出去。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "RAG 入门"
+        },
+        "constraints": {
+          "publication_intent": "PUBLISH_NOW"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "RAG 入门",
+            "requirements": [
+              "写一篇 RAG 入门文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "今天",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          }
+        ]
+      },
+      "schema_parse": {
+        "command": "CREATE",
+        "goal": "帮我写一篇 RAG 入门，今天就发出去。",
+        "objective": "帮我写一篇 RAG 入门，今天就发出去。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "RAG 入门"
+        },
+        "constraints": {
+          "publication_intent": "PUBLISH_NOW"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "RAG 入门",
+            "requirements": [
+              "写一篇 RAG 入门文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "今天",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          }
+        ]
+      },
+      "repair": {
+        "triggered": false,
+        "items": [
+          {
+            "title": "",
+            "topic": "RAG 入门",
+            "requirements": [
+              "写一篇 RAG 入门文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "今天",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          }
+        ]
+      },
+      "normalized": {
+        "command": "CREATE",
+        "goal": "帮我写一篇 RAG 入门，今天就发出去。",
+        "objective": "帮我写一篇 RAG 入门，今天就发出去。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "RAG 入门"
+        },
+        "constraints": {
+          "publication_intent": "PUBLISH_NOW"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "RAG 入门",
+            "requirements": [
+              "写一篇 RAG 入门文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "今天",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          }
+        ]
+      },
+      "segmentation": {
+        "command": "CREATE",
+        "goal": "帮我写一篇 RAG 入门，今天就发出去。",
+        "objective": "帮我写一篇 RAG 入门，今天就发出去。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "RAG 入门"
+        },
+        "constraints": {
+          "publication_intent": "PUBLISH_NOW"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "RAG 入门",
+            "requirements": [
+              "写一篇 RAG 入门文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "今天",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          }
+        ]
+      },
+      "semantic_derivation": {
+        "semantic_operation": "CREATE",
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "publication_intent": "IMMEDIATE_PUBLISH",
+        "item_count": 1
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5354,
+      "output_tokens": 239,
+      "total_tokens": 5593,
+      "latency_ms": 2556.03,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5354,
+          "output_tokens": 239,
+          "total_tokens": 5593,
+          "latency_ms": 2556.03
+        }
+      ]
+    },
+    "latency_ms": 2574.8,
+    "evaluation": {
+      "metrics": [
+        "exact_semantic_success"
+      ],
+      "exact": true,
+      "unsafe": false,
+      "first_bad_state": "",
+      "constraint_preserved": [],
+      "constraint_violated": [],
+      "target_reason": "",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "B03",
+    "category": "B_MULTI_TARGET",
+    "message": "写一篇 Java 和一篇 Agent，Java 直接发，Agent 我先看看。",
+    "turns": [],
+    "provider_calls_before": 1,
+    "command": {
+      "command_id": "515c1e72-d5db-41fe-8588-e5022867c3f1",
+      "type": "CREATE",
+      "goal": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+      "objective": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [],
+      "target": null,
+      "parameters": {},
+      "entities": {
+        "topics": [
+          "Java",
+          "Agent"
+        ]
+      },
+      "constraints": {
+        "publication_intent": "MIXED"
+      },
+      "semantic_operation": "CREATE",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "",
+      "needs_clarification": false,
+      "required_capabilities": [
+        "GENERATE_CONTENT",
+        "PUBLISH_NOW"
+      ],
+      "confidence": 0.9,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "写一篇 Java 和一篇 Agent，Java 直接发，Agent 我先看看。",
+      "items": [
+        {
+          "title": "",
+          "topic": "Java",
+          "requirements": [
+            "写一篇关于 Java 的文章"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT",
+            "PUBLISH_NOW"
+          ],
+          "temporal_text": "",
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH"
+          }
+        },
+        {
+          "title": "",
+          "topic": "Agent",
+          "requirements": [
+            "写一篇关于 Agent 的文章，先保存为草稿供用户查看"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "temporal_text": "",
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ],
+      "target_resolution": null,
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "515c1e72-d5db-41fe-8588-e5022867c3f1",
+      "operation": "CREATE",
+      "semantic_operation": "CREATE",
+      "capabilities": [
+        "GENERATE_CONTENT",
+        "PUBLISH_NOW"
+      ],
+      "publication_intent": "MIXED",
+      "target_type": "",
+      "target_reference": {},
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "NOW",
+      "run_at": null,
+      "temporal_resolved": true,
+      "constraints": {
+        "publication_intent": "MIXED",
+        "temporal_kind": "NOW",
+        "temporal_resolved": true
+      },
+      "dependencies": [],
+      "clarification_required": false,
+      "clarification_reason": "",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "Java",
+          "requirements": [
+            "写一篇关于 Java 的文章"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT",
+            "PUBLISH_NOW"
+          ],
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_text": "",
+          "temporal_kind": "NOW",
+          "run_at": null,
+          "temporal_resolved": true,
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH",
+            "temporal_kind": "NOW",
+            "temporal_resolved": true
+          },
+          "target_reference": {}
+        },
+        {
+          "title": "",
+          "topic": "Agent",
+          "requirements": [
+            "写一篇关于 Agent 的文章，先保存为草稿供用户查看"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_text": "",
+          "temporal_kind": "NONE",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          },
+          "target_reference": {}
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "Java",
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT",
+            "PUBLISH_NOW"
+          ],
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_kind": "NOW",
+          "temporal_resolved": true,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH",
+            "temporal_kind": "NOW",
+            "temporal_resolved": true
+          }
+        },
+        {
+          "title": "",
+          "topic": "Agent",
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_kind": "NONE",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "MULTI_OBJECTIVE",
+      "publication_mode": "MIXED",
+      "temporal_kind": "NOW",
+      "temporal_resolved": true,
+      "target_state": "NONE",
+      "clarification_required": false,
+      "objective_count": 2,
+      "task_expectation": "READY"
+    },
+    "target_resolution": {
+      "status": "NONE"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "Java",
+        "operation": "CREATE",
+        "capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "publication_intent": "IMMEDIATE_PUBLISH",
+        "temporal_kind": "NOW",
+        "temporal_resolved": true,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_kind": "NOW",
+          "temporal_resolved": true
+        }
+      },
+      {
+        "title": "",
+        "topic": "Agent",
+        "operation": "CREATE",
+        "capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "objective": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "entities": {
+          "topics": [
+            "Java",
+            "Agent"
+          ]
+        },
+        "constraints": {
+          "publication_intent": "MIXED"
+        },
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "request_complexity": "SIMPLE",
+        "first_action": "",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "写一篇关于 Java 的文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "写一篇关于 Agent 的文章，先保存为草稿供用户查看"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "schema_parse": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "objective": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topics": [
+            "Java",
+            "Agent"
+          ]
+        },
+        "constraints": {
+          "publication_intent": "MIXED"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "写一篇关于 Java 的文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "写一篇关于 Agent 的文章，先保存为草稿供用户查看"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "repair": {
+        "triggered": false,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "写一篇关于 Java 的文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "写一篇关于 Agent 的文章，先保存为草稿供用户查看"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "normalized": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "objective": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topics": [
+            "Java",
+            "Agent"
+          ]
+        },
+        "constraints": {
+          "publication_intent": "MIXED"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "写一篇关于 Java 的文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "写一篇关于 Agent 的文章，先保存为草稿供用户查看"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "segmentation": {
+        "command": "CREATE",
+        "goal": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "objective": "写一篇 Java 文章并直接发布，写一篇 Agent 文章先保存为草稿供用户查看。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topics": [
+            "Java",
+            "Agent"
+          ]
+        },
+        "constraints": {
+          "publication_intent": "MIXED"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "写一篇关于 Java 的文章"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT",
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "写一篇关于 Agent 的文章，先保存为草稿供用户查看"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "semantic_derivation": {
+        "semantic_operation": "CREATE",
+        "required_capabilities": [
+          "GENERATE_CONTENT",
+          "PUBLISH_NOW"
+        ],
+        "publication_intent": "MIXED",
+        "item_count": 2
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5360,
+      "output_tokens": 326,
+      "total_tokens": 5686,
+      "latency_ms": 3113.35,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5360,
+          "output_tokens": 326,
+          "total_tokens": 5686,
+          "latency_ms": 3113.35
+        }
+      ]
+    },
+    "latency_ms": 3119.88,
+    "evaluation": {
+      "metrics": [
+        "wrong_time"
+      ],
+      "exact": false,
+      "unsafe": true,
+      "first_bad_state": "Interpreter",
+      "constraint_preserved": [
+        "REVIEW_BEFORE_PUBLISH"
+      ],
+      "constraint_violated": [],
+      "target_reason": "",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "B07",
+    "category": "B_MULTI_TARGET",
+    "message": "Java 直接发，另外给我写两篇 Agent 和 Redis，都先存草稿。",
+    "turns": [],
+    "provider_calls_before": 2,
+    "command": {
+      "command_id": "7ef73425-c7ae-4e2f-b984-9de8f1be9d65",
+      "type": "CREATE",
+      "goal": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+      "objective": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+      "first_action": "",
+      "request_complexity": "COMPLEX",
+      "task_changes": [],
+      "target": null,
+      "parameters": {},
+      "entities": {},
+      "constraints": {},
+      "semantic_operation": "CREATE",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "",
+      "needs_clarification": false,
+      "required_capabilities": [
+        "PUBLISH_NOW",
+        "GENERATE_CONTENT"
+      ],
+      "confidence": 0.9,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "Java 直接发，另外给我写两篇 Agent 和 Redis，都先存草稿。",
+      "items": [
+        {
+          "title": "",
+          "topic": "Java",
+          "requirements": [
+            "直接发布"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "PUBLISH_NOW"
+          ],
+          "temporal_text": "",
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH"
+          }
+        },
+        {
+          "title": "",
+          "topic": "Agent",
+          "requirements": [
+            "先存草稿"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "temporal_text": "",
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        },
+        {
+          "title": "",
+          "topic": "Redis",
+          "requirements": [
+            "先存草稿"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "temporal_text": "",
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ],
+      "target_resolution": null,
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "7ef73425-c7ae-4e2f-b984-9de8f1be9d65",
+      "operation": "CREATE",
+      "semantic_operation": "CREATE",
+      "capabilities": [
+        "PUBLISH_NOW",
+        "GENERATE_CONTENT"
+      ],
+      "publication_intent": "MIXED",
+      "target_type": "",
+      "target_reference": {},
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "NOW",
+      "run_at": null,
+      "temporal_resolved": true,
+      "constraints": {
+        "temporal_kind": "NOW",
+        "temporal_resolved": true
+      },
+      "dependencies": [],
+      "clarification_required": false,
+      "clarification_reason": "",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "Java",
+          "requirements": [
+            "直接发布"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "PUBLISH_NOW"
+          ],
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_text": "",
+          "temporal_kind": "NOW",
+          "run_at": null,
+          "temporal_resolved": true,
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH",
+            "temporal_kind": "NOW",
+            "temporal_resolved": true
+          },
+          "target_reference": {}
+        },
+        {
+          "title": "",
+          "topic": "Agent",
+          "requirements": [
+            "先存草稿"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_text": "",
+          "temporal_kind": "NONE",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          },
+          "target_reference": {}
+        },
+        {
+          "title": "",
+          "topic": "Redis",
+          "requirements": [
+            "先存草稿"
+          ],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_text": "",
+          "temporal_kind": "NONE",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          },
+          "target_reference": {}
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "Java",
+          "operation": "CREATE",
+          "capabilities": [
+            "PUBLISH_NOW"
+          ],
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_kind": "NOW",
+          "temporal_resolved": true,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "IMMEDIATE_PUBLISH",
+            "temporal_kind": "NOW",
+            "temporal_resolved": true
+          }
+        },
+        {
+          "title": "",
+          "topic": "Agent",
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_kind": "NONE",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        },
+        {
+          "title": "",
+          "topic": "Redis",
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_kind": "NONE",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "MULTI_OBJECTIVE",
+      "publication_mode": "MIXED",
+      "temporal_kind": "NOW",
+      "temporal_resolved": true,
+      "target_state": "NONE",
+      "clarification_required": false,
+      "objective_count": 3,
+      "task_expectation": "READY"
+    },
+    "target_resolution": {
+      "status": "NONE"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "Java",
+        "operation": "CREATE",
+        "capabilities": [
+          "PUBLISH_NOW"
+        ],
+        "publication_intent": "IMMEDIATE_PUBLISH",
+        "temporal_kind": "NOW",
+        "temporal_resolved": true,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "IMMEDIATE_PUBLISH",
+          "temporal_kind": "NOW",
+          "temporal_resolved": true
+        }
+      },
+      {
+        "title": "",
+        "topic": "Agent",
+        "operation": "CREATE",
+        "capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        }
+      },
+      {
+        "title": "",
+        "topic": "Redis",
+        "operation": "CREATE",
+        "capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "CREATE",
+        "goal": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "objective": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "semantic_operation": "CREATE",
+        "request_complexity": "COMPLEX",
+        "needs_clarification": false,
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "直接发布"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Redis",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ],
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "references": [],
+        "ambiguity": "",
+        "required_capabilities": [
+          "PUBLISH_NOW",
+          "GENERATE_CONTENT"
+        ],
+        "first_action": "",
+        "scope": "",
+        "risk": ""
+      },
+      "schema_parse": {
+        "command": "CREATE",
+        "goal": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "objective": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "first_action": "",
+        "request_complexity": "COMPLEX",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "PUBLISH_NOW",
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "直接发布"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Redis",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "repair": {
+        "triggered": false,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "直接发布"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Redis",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "normalized": {
+        "command": "CREATE",
+        "goal": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "objective": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "first_action": "",
+        "request_complexity": "COMPLEX",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "PUBLISH_NOW",
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "直接发布"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Redis",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "segmentation": {
+        "command": "CREATE",
+        "goal": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "objective": "Java 那篇直接发布；另外写两篇关于 Agent 和 Redis 的文章，都先存为草稿。",
+        "first_action": "",
+        "request_complexity": "COMPLEX",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "PUBLISH_NOW",
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Java",
+            "requirements": [
+              "直接发布"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "PUBLISH_NOW"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "PUBLISH_NOW"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Agent",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          },
+          {
+            "title": "",
+            "topic": "Redis",
+            "requirements": [
+              "先存草稿"
+            ],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "semantic_derivation": {
+        "semantic_operation": "CREATE",
+        "required_capabilities": [
+          "PUBLISH_NOW",
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "",
+        "item_count": 3
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5363,
+      "output_tokens": 305,
+      "total_tokens": 5668,
+      "latency_ms": 3046.4,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5363,
+          "output_tokens": 305,
+          "total_tokens": 5668,
+          "latency_ms": 3046.4
+        }
+      ]
+    },
+    "latency_ms": 3061.83,
+    "evaluation": {
+      "metrics": [
+        "wrong_time"
+      ],
+      "exact": false,
+      "unsafe": true,
+      "first_bad_state": "Interpreter",
+      "constraint_preserved": [],
+      "constraint_violated": [],
+      "target_reason": "",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "C04",
+    "category": "C_TARGET_REFERENCE",
+    "message": "刚刚定时的那篇改到明天下午。",
+    "turns": [],
+    "provider_calls_before": 3,
+    "command": {
+      "command_id": "e36d4cd1-4d90-436c-8378-298f61941d91",
+      "type": "MODIFY",
+      "goal": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+      "objective": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [
+        {
+          "operation": "UPDATE_GOAL",
+          "change_id": "",
+          "target_reference": {
+            "kind": "SCHEDULE",
+            "id": "schedule-java",
+            "resource_id": "schedule-java",
+            "task_id": "task-java",
+            "label": "Java 学习",
+            "reference_type": "ACTIVE",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java"
+          },
+          "desired_changes": {
+            "semantic_action": "UPDATE_SCHEDULE",
+            "run_at": "明天下午",
+            "temporal_base": "EXISTING_SCHEDULE_TIME",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java"
+          },
+          "dependency_reference": [],
+          "source_reference": {},
+          "needs_target_resolution": false
+        }
+      ],
+      "target": {
+        "kind": "SCHEDULE",
+        "id": "schedule-java",
+        "task_id": "task-java",
+        "resource_id": "schedule-java",
+        "reference": null,
+        "label": "Java 学习",
+        "reference_type": "ACTIVE",
+        "ordinal": null,
+        "property": null,
+        "value": null,
+        "after": null,
+        "before": null
+      },
+      "parameters": {},
+      "entities": {
+        "target_resource": "schedule-java",
+        "target_label": "Java 学习"
+      },
+      "constraints": {
+        "publication_intent": "SCHEDULED_PUBLISH"
+      },
+      "semantic_operation": "UPDATE_SCHEDULE",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "",
+      "needs_clarification": false,
+      "required_capabilities": [
+        "SCHEDULE_PUBLISH"
+      ],
+      "confidence": 0.95,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "刚刚定时的那篇改到明天下午。",
+      "items": [],
+      "target_resolution": "RESOLVED",
+      "resolved_target": {
+        "task_id": "task-java",
+        "objective_id": null,
+        "resource_id": "task-java",
+        "kind": "TASK"
+      },
+      "target_candidates": [
+        {
+          "kind": "TASK",
+          "id": "task-java",
+          "task_id": "task-java",
+          "resource_id": "task-java",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Java 学习",
+          "status": null,
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "metadata": {
+            "id": "task-java",
+            "task_id": "task-java",
+            "kind": "TASK",
+            "label": "Java 学习",
+            "status": null,
+            "created_at": "2026-08-19T09:00:00+08:00",
+            "updated_at": "2026-08-19T09:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "resource_refs": [
+                {
+                  "resource_id": "draft-java",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习"
+                },
+                {
+                  "resource_id": "schedule-java",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习",
+                  "run_at": "2026-08-23T15:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "e36d4cd1-4d90-436c-8378-298f61941d91",
+      "operation": "MODIFY",
+      "semantic_operation": "UPDATE_SCHEDULE",
+      "capabilities": [
+        "SCHEDULE_PUBLISH"
+      ],
+      "publication_intent": "SCHEDULED_PUBLISH",
+      "target_type": "SCHEDULE",
+      "target_reference": {
+        "kind": "SCHEDULE",
+        "id": "schedule-java",
+        "task_id": "task-java",
+        "resource_id": "schedule-java",
+        "reference": null,
+        "label": "Java 学习",
+        "reference_type": "ACTIVE",
+        "ordinal": null,
+        "property": null,
+        "value": null,
+        "after": null,
+        "before": null
+      },
+      "resolved_target": {
+        "task_id": "task-java",
+        "objective_id": null,
+        "resource_id": "task-java",
+        "kind": "TASK"
+      },
+      "target_candidates": [
+        {
+          "kind": "TASK",
+          "id": "task-java",
+          "task_id": "task-java",
+          "resource_id": "task-java",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Java 学习",
+          "status": null,
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "metadata": {
+            "id": "task-java",
+            "task_id": "task-java",
+            "kind": "TASK",
+            "label": "Java 学习",
+            "status": null,
+            "created_at": "2026-08-19T09:00:00+08:00",
+            "updated_at": "2026-08-19T09:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "resource_refs": [
+                {
+                  "resource_id": "draft-java",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习"
+                },
+                {
+                  "resource_id": "schedule-java",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习",
+                  "run_at": "2026-08-23T15:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "temporal_kind": "UNRESOLVED",
+      "run_at": null,
+      "temporal_resolved": false,
+      "constraints": {
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "temporal_kind": "UNRESOLVED",
+        "temporal_resolved": false
+      },
+      "dependencies": [],
+      "clarification_required": true,
+      "clarification_reason": "schedule_time_unresolved",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "Java 学习",
+          "requirements": [],
+          "operation": "UPDATE_SCHEDULE",
+          "capabilities": [
+            "MANAGE_SCHEDULE"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_text": "明天下午",
+          "temporal_kind": "UNRESOLVED",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "semantic_action": "UPDATE_SCHEDULE",
+            "run_at": "明天下午",
+            "temporal_base": "EXISTING_SCHEDULE_TIME",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java",
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "temporal_kind": "UNRESOLVED",
+            "temporal_resolved": false,
+            "temporal_unresolved_reason": "temporal_expression_unresolved"
+          },
+          "target_reference": {
+            "kind": "SCHEDULE",
+            "id": "schedule-java",
+            "resource_id": "schedule-java",
+            "task_id": "task-java",
+            "label": "Java 学习",
+            "reference_type": "ACTIVE",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java"
+          }
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "Java 学习",
+          "operation": "UPDATE_SCHEDULE",
+          "capabilities": [
+            "MANAGE_SCHEDULE"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_kind": "UNRESOLVED",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "semantic_action": "UPDATE_SCHEDULE",
+            "run_at": "明天下午",
+            "temporal_base": "EXISTING_SCHEDULE_TIME",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java",
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "temporal_kind": "UNRESOLVED",
+            "temporal_resolved": false,
+            "temporal_unresolved_reason": "temporal_expression_unresolved"
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "UPDATE_SCHEDULE",
+      "publication_mode": "UNRESOLVED",
+      "temporal_kind": "UNRESOLVED",
+      "temporal_resolved": false,
+      "target_state": "RESOLVED",
+      "clarification_required": true,
+      "objective_count": 1,
+      "task_expectation": "CLARIFY"
+    },
+    "target_resolution": {
+      "status": "RESOLVED",
+      "target": {
+        "kind": "TASK",
+        "id": "task-java",
+        "task_id": "task-java",
+        "resource_id": "task-java",
+        "artifact_id": null,
+        "execution_id": null,
+        "label": "Java 学习",
+        "status": null,
+        "created_at": "2026-08-19T09:00:00+08:00",
+        "updated_at": "2026-08-19T09:00:00+08:00",
+        "metadata": {
+          "id": "task-java",
+          "task_id": "task-java",
+          "kind": "TASK",
+          "label": "Java 学习",
+          "status": null,
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "resource_index": [
+            {
+              "resource_id": "draft-java",
+              "resource_kind": "DRAFT",
+              "objective_id": "objective-java",
+              "label": "Java 学习"
+            },
+            {
+              "resource_id": "schedule-java",
+              "resource_kind": "SCHEDULE",
+              "objective_id": "objective-java",
+              "label": "Java 学习",
+              "run_at": "2026-08-23T15:00:00+08:00"
+            }
+          ],
+          "metadata": {
+            "resource_refs": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ]
+          }
+        }
+      },
+      "candidates": [
+        {
+          "kind": "TASK",
+          "id": "task-java",
+          "task_id": "task-java",
+          "resource_id": "task-java",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Java 学习",
+          "status": null,
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "metadata": {
+            "id": "task-java",
+            "task_id": "task-java",
+            "kind": "TASK",
+            "label": "Java 学习",
+            "status": null,
+            "created_at": "2026-08-19T09:00:00+08:00",
+            "updated_at": "2026-08-19T09:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "resource_refs": [
+                {
+                  "resource_id": "draft-java",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习"
+                },
+                {
+                  "resource_id": "schedule-java",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习",
+                  "run_at": "2026-08-23T15:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "reason": "resource_reference"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "Java 学习",
+        "operation": "UPDATE_SCHEDULE",
+        "capabilities": [
+          "MANAGE_SCHEDULE"
+        ],
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "temporal_kind": "UNRESOLVED",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "semantic_action": "UPDATE_SCHEDULE",
+          "run_at": "明天下午",
+          "temporal_base": "EXISTING_SCHEDULE_TIME",
+          "target_objective_id": "objective-java",
+          "objective_id": "objective-java",
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_kind": "UNRESOLVED",
+          "temporal_resolved": false,
+          "temporal_unresolved_reason": "temporal_expression_unresolved"
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "MODIFY",
+        "goal": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "objective": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "target_reference": {
+              "kind": "SCHEDULE",
+              "id": "schedule-java",
+              "resource_id": "schedule-java",
+              "task_id": "task-java",
+              "label": "Java 学习",
+              "reference_type": "ACTIVE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXISTING_SCHEDULE_TIME"
+            }
+          }
+        ],
+        "target": {
+          "kind": "SCHEDULE",
+          "id": "schedule-java",
+          "resource_id": "schedule-java",
+          "task_id": "task-java",
+          "label": "Java 学习",
+          "reference_type": "ACTIVE"
+        },
+        "entities": {
+          "target_resource": "schedule-java",
+          "target_label": "Java 学习"
+        },
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "semantic_operation": "UPDATE_SCHEDULE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.95,
+        "items": [],
+        "parameters": {},
+        "first_action": "",
+        "request_complexity": "SIMPLE"
+      },
+      "schema_parse": {
+        "command": "MODIFY",
+        "goal": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "objective": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "SCHEDULE",
+              "id": "schedule-java",
+              "resource_id": "schedule-java",
+              "task_id": "task-java",
+              "label": "Java 学习",
+              "reference_type": "ACTIVE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXISTING_SCHEDULE_TIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "SCHEDULE",
+          "id": "schedule-java",
+          "task_id": "task-java",
+          "resource_id": "schedule-java",
+          "reference": null,
+          "label": "Java 学习",
+          "reference_type": "ACTIVE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {
+          "target_resource": "schedule-java",
+          "target_label": "Java 学习"
+        },
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "semantic_operation": "UPDATE_SCHEDULE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.95,
+        "items": []
+      },
+      "repair": {
+        "triggered": false,
+        "items": []
+      },
+      "normalized": {
+        "command": "MODIFY",
+        "goal": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "objective": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "SCHEDULE",
+              "id": "schedule-java",
+              "resource_id": "schedule-java",
+              "task_id": "task-java",
+              "label": "Java 学习",
+              "reference_type": "ACTIVE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXISTING_SCHEDULE_TIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "SCHEDULE",
+          "id": "schedule-java",
+          "task_id": "task-java",
+          "resource_id": "schedule-java",
+          "reference": null,
+          "label": "Java 学习",
+          "reference_type": "ACTIVE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {
+          "target_resource": "schedule-java",
+          "target_label": "Java 学习"
+        },
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "semantic_operation": "UPDATE_SCHEDULE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.95,
+        "items": []
+      },
+      "segmentation": {
+        "command": "MODIFY",
+        "goal": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "objective": "将刚刚定时的那篇（Java 学习）的发布时间改到明天下午。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "SCHEDULE",
+              "id": "schedule-java",
+              "resource_id": "schedule-java",
+              "task_id": "task-java",
+              "label": "Java 学习",
+              "reference_type": "ACTIVE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXISTING_SCHEDULE_TIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "SCHEDULE",
+          "id": "schedule-java",
+          "task_id": "task-java",
+          "resource_id": "schedule-java",
+          "reference": null,
+          "label": "Java 学习",
+          "reference_type": "ACTIVE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {
+          "target_resource": "schedule-java",
+          "target_label": "Java 学习"
+        },
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "semantic_operation": "UPDATE_SCHEDULE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.95,
+        "items": []
+      },
+      "semantic_derivation": {
+        "semantic_operation": "UPDATE_SCHEDULE",
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "item_count": 0
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5759,
+      "output_tokens": 347,
+      "total_tokens": 6106,
+      "latency_ms": 3378.04,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5759,
+          "output_tokens": 347,
+          "total_tokens": 6106,
+          "latency_ms": 3378.04
+        }
+      ]
+    },
+    "latency_ms": 3387.05,
+    "evaluation": {
+      "metrics": [
+        "wrong_publication"
+      ],
+      "exact": false,
+      "unsafe": false,
+      "first_bad_state": "Normalization",
+      "constraint_preserved": [],
+      "constraint_violated": [],
+      "target_reason": "resource_reference",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "E07",
+    "category": "E_NEGATIVE_CONSTRAINT",
+    "message": "不要发布，先给我看看 RAG 草稿。",
+    "turns": [],
+    "provider_calls_before": 4,
+    "command": {
+      "command_id": "679137fa-d126-41e5-8a0a-9d42e8af5ce8",
+      "type": "QUERY",
+      "goal": "查看 RAG 草稿，不发布",
+      "objective": "查看 RAG 草稿，不发布",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [],
+      "target": {
+        "kind": "DRAFT",
+        "id": null,
+        "task_id": null,
+        "resource_id": null,
+        "reference": null,
+        "label": "RAG 草稿",
+        "reference_type": "NONE",
+        "ordinal": null,
+        "property": null,
+        "value": null,
+        "after": null,
+        "before": null
+      },
+      "parameters": {},
+      "entities": {},
+      "constraints": {
+        "publication_intent": "DRAFT_ONLY"
+      },
+      "semantic_operation": "QUERY",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "",
+      "needs_clarification": true,
+      "required_capabilities": [],
+      "confidence": 0.6,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "不要发布，先给我看看 RAG 草稿。",
+      "items": [],
+      "target_resolution": "NOT_FOUND",
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "679137fa-d126-41e5-8a0a-9d42e8af5ce8",
+      "operation": "QUERY",
+      "semantic_operation": "QUERY",
+      "capabilities": [],
+      "publication_intent": "DRAFT_ONLY",
+      "target_type": "DRAFT",
+      "target_reference": {
+        "kind": "DRAFT",
+        "id": null,
+        "task_id": null,
+        "resource_id": null,
+        "reference": null,
+        "label": "RAG 草稿",
+        "reference_type": "NONE",
+        "ordinal": null,
+        "property": null,
+        "value": null,
+        "after": null,
+        "before": null
+      },
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "NONE",
+      "run_at": null,
+      "temporal_resolved": false,
+      "constraints": {
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false
+      },
+      "dependencies": [],
+      "clarification_required": true,
+      "clarification_reason": "target_unresolved",
+      "risk": "",
+      "requires_approval": false,
+      "items": [],
+      "objectives": []
+    },
+    "canonical": {
+      "action_family": "QUERY",
+      "publication_mode": "DRAFT_ONLY",
+      "temporal_kind": "NONE",
+      "temporal_resolved": false,
+      "target_state": "NOT_FOUND",
+      "clarification_required": true,
+      "objective_count": 1,
+      "task_expectation": "CLARIFY"
+    },
+    "target_resolution": {
+      "status": "NOT_FOUND",
+      "target": null,
+      "candidates": [],
+      "reason": "unstructured_reference_not_found"
+    },
+    "objective_projection": [],
+    "stages": {
+      "raw": {
+        "command": "QUERY",
+        "goal": "查看 RAG 草稿，不发布",
+        "objective": "查看 RAG 草稿，不发布",
+        "semantic_operation": "QUERY",
+        "scope": "",
+        "risk": "",
+        "entities": {},
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.6,
+        "items": [],
+        "task_changes": [],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "RAG 草稿",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "first_action": "",
+        "request_complexity": "SIMPLE"
+      },
+      "schema_parse": {
+        "command": "QUERY",
+        "goal": "查看 RAG 草稿，不发布",
+        "objective": "查看 RAG 草稿，不发布",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "RAG 草稿",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "QUERY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.6,
+        "items": []
+      },
+      "repair": {
+        "triggered": false,
+        "items": []
+      },
+      "normalized": {
+        "command": "QUERY",
+        "goal": "查看 RAG 草稿，不发布",
+        "objective": "查看 RAG 草稿，不发布",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "RAG 草稿",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "QUERY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.6,
+        "items": []
+      },
+      "segmentation": {
+        "command": "QUERY",
+        "goal": "查看 RAG 草稿，不发布",
+        "objective": "查看 RAG 草稿，不发布",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "RAG 草稿",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "QUERY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.6,
+        "items": []
+      },
+      "semantic_derivation": {
+        "semantic_operation": "QUERY",
+        "required_capabilities": [],
+        "publication_intent": "DRAFT_ONLY",
+        "item_count": 0
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5354,
+      "output_tokens": 179,
+      "total_tokens": 5533,
+      "latency_ms": 2483.96,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5354,
+          "output_tokens": 179,
+          "total_tokens": 5533,
+          "latency_ms": 2483.96
+        }
+      ]
+    },
+    "latency_ms": 2491.53,
+    "evaluation": {
+      "metrics": [
+        "UNKNOWN_should_have_been_used",
+        "wrong_publication"
+      ],
+      "exact": false,
+      "unsafe": true,
+      "first_bad_state": "Interpreter",
+      "constraint_preserved": [
+        "REVIEW_BEFORE_PUBLISH"
+      ],
+      "constraint_violated": [],
+      "target_reason": "unstructured_reference_not_found",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "F01",
+    "category": "F_CROSS_TURN",
+    "message": "把 Java 那篇安排五分钟后发布。",
+    "turns": [
+      {
+        "role": "user",
+        "content": "写一篇 Java 草稿"
+      },
+      {
+        "role": "user",
+        "content": "再写一篇 Agent 草稿"
+      }
+    ],
+    "provider_calls_before": 5,
+    "command": {
+      "command_id": "11b3b304-a0b9-4eff-9888-16e1c7516b2d",
+      "type": "MODIFY",
+      "goal": "把 Java 那篇安排五分钟后发布。",
+      "objective": "把 Java 那篇安排五分钟后发布。",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [
+        {
+          "operation": "UPDATE_GOAL",
+          "change_id": "",
+          "target_reference": {
+            "kind": "DRAFT",
+            "id": null,
+            "task_id": null,
+            "resource_id": null,
+            "reference": null,
+            "label": "Java 学习",
+            "reference_type": "NONE",
+            "ordinal": null,
+            "property": null,
+            "value": null,
+            "after": null,
+            "before": null,
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java"
+          },
+          "desired_changes": {
+            "semantic_action": "UPDATE_SCHEDULE",
+            "run_at": "五分钟后",
+            "temporal_base": "CURRENT_TIME",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java"
+          },
+          "dependency_reference": [],
+          "source_reference": {},
+          "needs_target_resolution": false
+        }
+      ],
+      "target": {
+        "kind": "TASK",
+        "id": "schedule-java",
+        "task_id": "task-java",
+        "resource_id": "schedule-java",
+        "reference": null,
+        "label": null,
+        "reference_type": "PROPERTY",
+        "ordinal": null,
+        "property": "label",
+        "value": "Java",
+        "after": null,
+        "before": null
+      },
+      "parameters": {},
+      "entities": {},
+      "constraints": {},
+      "semantic_operation": "MODIFY",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "",
+      "needs_clarification": false,
+      "required_capabilities": [],
+      "confidence": 0.9,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "把 Java 那篇安排五分钟后发布。",
+      "items": [],
+      "target_resolution": "RESOLVED",
+      "resolved_target": {
+        "task_id": "task-java",
+        "objective_id": "objective-java",
+        "resource_id": "objective-java",
+        "kind": "TASK"
+      },
+      "target_candidates": [
+        {
+          "kind": "TASK",
+          "id": "objective-java",
+          "task_id": "task-java",
+          "resource_id": "objective-java",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Java 学习",
+          "status": "PENDING",
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "metadata": {
+            "id": "objective-java",
+            "goal_id": "objective-java",
+            "objective_id": "objective-java",
+            "task_id": "task-java",
+            "kind": "TASK",
+            "label": "Java 学习",
+            "status": "PENDING",
+            "run_at": null,
+            "constraints": {},
+            "created_at": "2026-08-19T09:00:00+08:00",
+            "updated_at": "2026-08-19T09:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "objective_id": "objective-java",
+              "resource_refs": [
+                {
+                  "resource_id": "draft-java",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习"
+                },
+                {
+                  "resource_id": "schedule-java",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习",
+                  "run_at": "2026-08-23T15:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "11b3b304-a0b9-4eff-9888-16e1c7516b2d",
+      "operation": "MODIFY",
+      "semantic_operation": "MODIFY",
+      "capabilities": [],
+      "publication_intent": "SCHEDULED_PUBLISH",
+      "target_type": "TASK",
+      "target_reference": {
+        "kind": "TASK",
+        "id": "schedule-java",
+        "task_id": "task-java",
+        "resource_id": "schedule-java",
+        "reference": null,
+        "label": null,
+        "reference_type": "PROPERTY",
+        "ordinal": null,
+        "property": "label",
+        "value": "Java",
+        "after": null,
+        "before": null
+      },
+      "resolved_target": {
+        "task_id": "task-java",
+        "objective_id": "objective-java",
+        "resource_id": "objective-java",
+        "kind": "TASK"
+      },
+      "target_candidates": [
+        {
+          "kind": "TASK",
+          "id": "objective-java",
+          "task_id": "task-java",
+          "resource_id": "objective-java",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Java 学习",
+          "status": "PENDING",
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "metadata": {
+            "id": "objective-java",
+            "goal_id": "objective-java",
+            "objective_id": "objective-java",
+            "task_id": "task-java",
+            "kind": "TASK",
+            "label": "Java 学习",
+            "status": "PENDING",
+            "run_at": null,
+            "constraints": {},
+            "created_at": "2026-08-19T09:00:00+08:00",
+            "updated_at": "2026-08-19T09:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "objective_id": "objective-java",
+              "resource_refs": [
+                {
+                  "resource_id": "draft-java",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习"
+                },
+                {
+                  "resource_id": "schedule-java",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习",
+                  "run_at": "2026-08-23T15:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "temporal_kind": "FUTURE",
+      "run_at": "2026-08-22T02:05:00Z",
+      "temporal_resolved": true,
+      "constraints": {
+        "temporal_kind": "FUTURE",
+        "temporal_resolved": true
+      },
+      "dependencies": [],
+      "clarification_required": false,
+      "clarification_reason": "",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "Java 学习",
+          "requirements": [],
+          "operation": "UPDATE_SCHEDULE",
+          "capabilities": [
+            "MANAGE_SCHEDULE"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_text": "五分钟后",
+          "temporal_kind": "FUTURE",
+          "run_at": "2026-08-22T02:05:00Z",
+          "temporal_resolved": true,
+          "constraints": {
+            "semantic_action": "UPDATE_SCHEDULE",
+            "run_at": "2026-08-22T02:05:00Z",
+            "temporal_base": "CURRENT_TIME",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java",
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "timezone": "Asia/Shanghai",
+            "temporal_kind": "FUTURE",
+            "temporal_resolved": true
+          },
+          "target_reference": {
+            "kind": "DRAFT",
+            "id": null,
+            "task_id": null,
+            "resource_id": null,
+            "reference": null,
+            "label": "Java 学习",
+            "reference_type": "NONE",
+            "ordinal": null,
+            "property": null,
+            "value": null,
+            "after": null,
+            "before": null,
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java"
+          }
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "Java 学习",
+          "operation": "UPDATE_SCHEDULE",
+          "capabilities": [
+            "MANAGE_SCHEDULE"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_kind": "FUTURE",
+          "temporal_resolved": true,
+          "run_at": "2026-08-22T02:05:00Z",
+          "constraints": {
+            "semantic_action": "UPDATE_SCHEDULE",
+            "run_at": "2026-08-22T02:05:00Z",
+            "temporal_base": "CURRENT_TIME",
+            "target_objective_id": "objective-java",
+            "objective_id": "objective-java",
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "timezone": "Asia/Shanghai",
+            "temporal_kind": "FUTURE",
+            "temporal_resolved": true
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "REVISE",
+      "publication_mode": "SCHEDULED",
+      "temporal_kind": "FUTURE",
+      "temporal_resolved": true,
+      "target_state": "RESOLVED",
+      "clarification_required": false,
+      "objective_count": 1,
+      "task_expectation": "READY"
+    },
+    "target_resolution": {
+      "status": "RESOLVED",
+      "target": {
+        "kind": "TASK",
+        "id": "objective-java",
+        "task_id": "task-java",
+        "resource_id": "objective-java",
+        "artifact_id": null,
+        "execution_id": null,
+        "label": "Java 学习",
+        "status": "PENDING",
+        "created_at": "2026-08-19T09:00:00+08:00",
+        "updated_at": "2026-08-19T09:00:00+08:00",
+        "metadata": {
+          "id": "objective-java",
+          "goal_id": "objective-java",
+          "objective_id": "objective-java",
+          "task_id": "task-java",
+          "kind": "TASK",
+          "label": "Java 学习",
+          "status": "PENDING",
+          "run_at": null,
+          "constraints": {},
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "resource_index": [
+            {
+              "resource_id": "draft-java",
+              "resource_kind": "DRAFT",
+              "objective_id": "objective-java",
+              "label": "Java 学习"
+            },
+            {
+              "resource_id": "schedule-java",
+              "resource_kind": "SCHEDULE",
+              "objective_id": "objective-java",
+              "label": "Java 学习",
+              "run_at": "2026-08-23T15:00:00+08:00"
+            }
+          ],
+          "metadata": {
+            "objective_id": "objective-java",
+            "resource_refs": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ]
+          }
+        }
+      },
+      "candidates": [
+        {
+          "kind": "TASK",
+          "id": "objective-java",
+          "task_id": "task-java",
+          "resource_id": "objective-java",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Java 学习",
+          "status": "PENDING",
+          "created_at": "2026-08-19T09:00:00+08:00",
+          "updated_at": "2026-08-19T09:00:00+08:00",
+          "metadata": {
+            "id": "objective-java",
+            "goal_id": "objective-java",
+            "objective_id": "objective-java",
+            "task_id": "task-java",
+            "kind": "TASK",
+            "label": "Java 学习",
+            "status": "PENDING",
+            "run_at": null,
+            "constraints": {},
+            "created_at": "2026-08-19T09:00:00+08:00",
+            "updated_at": "2026-08-19T09:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-java",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-java",
+                "label": "Java 学习"
+              },
+              {
+                "resource_id": "schedule-java",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-java",
+                "label": "Java 学习",
+                "run_at": "2026-08-23T15:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "objective_id": "objective-java",
+              "resource_refs": [
+                {
+                  "resource_id": "draft-java",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习"
+                },
+                {
+                  "resource_id": "schedule-java",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-java",
+                  "label": "Java 学习",
+                  "run_at": "2026-08-23T15:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "reason": "goal_reference"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "Java 学习",
+        "operation": "UPDATE_SCHEDULE",
+        "capabilities": [
+          "MANAGE_SCHEDULE"
+        ],
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "temporal_kind": "FUTURE",
+        "temporal_resolved": true,
+        "run_at": "2026-08-22T02:05:00Z",
+        "constraints": {
+          "semantic_action": "UPDATE_SCHEDULE",
+          "run_at": "2026-08-22T02:05:00Z",
+          "temporal_base": "CURRENT_TIME",
+          "target_objective_id": "objective-java",
+          "objective_id": "objective-java",
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "timezone": "Asia/Shanghai",
+          "temporal_kind": "FUTURE",
+          "temporal_resolved": true
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "MODIFY",
+        "goal": "把 Java 那篇安排五分钟后发布。",
+        "objective": "把 Java 那篇安排五分钟后发布。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "DRAFT",
+              "id": null,
+              "task_id": null,
+              "resource_id": null,
+              "reference": null,
+              "label": "Java 学习",
+              "reference_type": "NONE",
+              "ordinal": null,
+              "property": null,
+              "value": null,
+              "after": null,
+              "before": null
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "五分钟后",
+              "temporal_base": "CURRENT_TIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "Java 学习",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [],
+        "confidence": 0.9,
+        "items": []
+      },
+      "schema_parse": {
+        "command": "MODIFY",
+        "goal": "把 Java 那篇安排五分钟后发布。",
+        "objective": "把 Java 那篇安排五分钟后发布。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "DRAFT",
+              "id": null,
+              "task_id": null,
+              "resource_id": null,
+              "reference": null,
+              "label": "Java 学习",
+              "reference_type": "NONE",
+              "ordinal": null,
+              "property": null,
+              "value": null,
+              "after": null,
+              "before": null
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "五分钟后",
+              "temporal_base": "CURRENT_TIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "Java 学习",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [],
+        "confidence": 0.9,
+        "items": []
+      },
+      "repair": {
+        "triggered": false,
+        "items": []
+      },
+      "normalized": {
+        "command": "MODIFY",
+        "goal": "把 Java 那篇安排五分钟后发布。",
+        "objective": "把 Java 那篇安排五分钟后发布。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "DRAFT",
+              "id": null,
+              "task_id": null,
+              "resource_id": null,
+              "reference": null,
+              "label": "Java 学习",
+              "reference_type": "NONE",
+              "ordinal": null,
+              "property": null,
+              "value": null,
+              "after": null,
+              "before": null
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "五分钟后",
+              "temporal_base": "CURRENT_TIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "Java 学习",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [],
+        "confidence": 0.9,
+        "items": []
+      },
+      "segmentation": {
+        "command": "MODIFY",
+        "goal": "把 Java 那篇安排五分钟后发布。",
+        "objective": "把 Java 那篇安排五分钟后发布。",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "DRAFT",
+              "id": null,
+              "task_id": null,
+              "resource_id": null,
+              "reference": null,
+              "label": "Java 学习",
+              "reference_type": "NONE",
+              "ordinal": null,
+              "property": null,
+              "value": null,
+              "after": null,
+              "before": null
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_SCHEDULE",
+              "run_at": "五分钟后",
+              "temporal_base": "CURRENT_TIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "Java 学习",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [],
+        "confidence": 0.9,
+        "items": []
+      },
+      "semantic_derivation": {
+        "semantic_operation": "MODIFY",
+        "required_capabilities": [],
+        "publication_intent": "",
+        "item_count": 0
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 6586,
+      "output_tokens": 292,
+      "total_tokens": 6878,
+      "latency_ms": 2842.12,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 6586,
+          "output_tokens": 292,
+          "total_tokens": 6878,
+          "latency_ms": 2842.12
+        }
+      ]
+    },
+    "latency_ms": 2850.8,
+    "evaluation": {
+      "metrics": [
+        "constraint_lost",
+        "constraint_violation",
+        "wrong_action",
+        "wrong_target"
+      ],
+      "exact": false,
+      "unsafe": true,
+      "first_bad_state": "Interpreter",
+      "constraint_preserved": [
+        "HISTORICAL_RESOURCE_CONTINUITY"
+      ],
+      "constraint_violated": [
+        "NEW_OBJECTIVE"
+      ],
+      "target_reason": "goal_reference",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": false,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "F02",
+    "category": "F_CROSS_TURN",
+    "message": "Agent 那篇标题改一下。",
+    "turns": [
+      {
+        "role": "user",
+        "content": "写一篇 Java 草稿"
+      },
+      {
+        "role": "user",
+        "content": "再写一篇 Agent 草稿"
+      },
+      {
+        "role": "user",
+        "content": "Java 五分钟后发"
+      }
+    ],
+    "provider_calls_before": 6,
+    "command": {
+      "command_id": "a5cc0242-d91e-46f5-80fe-617b6ecc7a2d",
+      "type": "MODIFY",
+      "goal": "修改 Agent 那篇的标题",
+      "objective": "修改 Agent 那篇的标题",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [
+        {
+          "operation": "UPDATE_GOAL",
+          "change_id": "",
+          "target_reference": {
+            "kind": "DRAFT",
+            "label": "Agent Memory",
+            "reference_type": "NONE",
+            "target_objective_id": "objective-agent",
+            "objective_id": "objective-agent"
+          },
+          "desired_changes": {
+            "semantic_action": "UPDATE_DRAFT",
+            "title": "",
+            "target_objective_id": "objective-agent",
+            "objective_id": "objective-agent"
+          },
+          "dependency_reference": [],
+          "source_reference": {},
+          "needs_target_resolution": false
+        }
+      ],
+      "target": {
+        "kind": "TASK",
+        "id": "draft-agent",
+        "task_id": "task-agent",
+        "resource_id": "draft-agent",
+        "reference": null,
+        "label": null,
+        "reference_type": "PROPERTY",
+        "ordinal": null,
+        "property": "label",
+        "value": "Agent",
+        "after": null,
+        "before": null
+      },
+      "parameters": {},
+      "entities": {
+        "target_label": "Agent Memory"
+      },
+      "constraints": {},
+      "semantic_operation": "MODIFY",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "用户未提供新标题",
+      "needs_clarification": true,
+      "required_capabilities": [],
+      "confidence": 0.8,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "Agent 那篇标题改一下。",
+      "items": [],
+      "target_resolution": "RESOLVED",
+      "resolved_target": {
+        "task_id": "task-agent",
+        "objective_id": "objective-agent",
+        "resource_id": "objective-agent",
+        "kind": "TASK"
+      },
+      "target_candidates": [
+        {
+          "kind": "TASK",
+          "id": "objective-agent",
+          "task_id": "task-agent",
+          "resource_id": "objective-agent",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Agent Memory",
+          "status": "PENDING",
+          "created_at": "2026-08-19T10:00:00+08:00",
+          "updated_at": "2026-08-19T10:00:00+08:00",
+          "metadata": {
+            "id": "objective-agent",
+            "goal_id": "objective-agent",
+            "objective_id": "objective-agent",
+            "task_id": "task-agent",
+            "kind": "TASK",
+            "label": "Agent Memory",
+            "status": "PENDING",
+            "run_at": null,
+            "constraints": {},
+            "created_at": "2026-08-19T10:00:00+08:00",
+            "updated_at": "2026-08-19T10:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-agent",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory"
+              },
+              {
+                "resource_id": "schedule-agent",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory",
+                "run_at": "2026-08-24T09:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "objective_id": "objective-agent",
+              "resource_refs": [
+                {
+                  "resource_id": "draft-agent",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-agent",
+                  "label": "Agent Memory"
+                },
+                {
+                  "resource_id": "schedule-agent",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-agent",
+                  "label": "Agent Memory",
+                  "run_at": "2026-08-24T09:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "a5cc0242-d91e-46f5-80fe-617b6ecc7a2d",
+      "operation": "MODIFY",
+      "semantic_operation": "MODIFY",
+      "capabilities": [],
+      "publication_intent": "",
+      "target_type": "TASK",
+      "target_reference": {
+        "kind": "TASK",
+        "id": "draft-agent",
+        "task_id": "task-agent",
+        "resource_id": "draft-agent",
+        "reference": null,
+        "label": null,
+        "reference_type": "PROPERTY",
+        "ordinal": null,
+        "property": "label",
+        "value": "Agent",
+        "after": null,
+        "before": null
+      },
+      "resolved_target": {
+        "task_id": "task-agent",
+        "objective_id": "objective-agent",
+        "resource_id": "objective-agent",
+        "kind": "TASK"
+      },
+      "target_candidates": [
+        {
+          "kind": "TASK",
+          "id": "objective-agent",
+          "task_id": "task-agent",
+          "resource_id": "objective-agent",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Agent Memory",
+          "status": "PENDING",
+          "created_at": "2026-08-19T10:00:00+08:00",
+          "updated_at": "2026-08-19T10:00:00+08:00",
+          "metadata": {
+            "id": "objective-agent",
+            "goal_id": "objective-agent",
+            "objective_id": "objective-agent",
+            "task_id": "task-agent",
+            "kind": "TASK",
+            "label": "Agent Memory",
+            "status": "PENDING",
+            "run_at": null,
+            "constraints": {},
+            "created_at": "2026-08-19T10:00:00+08:00",
+            "updated_at": "2026-08-19T10:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-agent",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory"
+              },
+              {
+                "resource_id": "schedule-agent",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory",
+                "run_at": "2026-08-24T09:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "objective_id": "objective-agent",
+              "resource_refs": [
+                {
+                  "resource_id": "draft-agent",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-agent",
+                  "label": "Agent Memory"
+                },
+                {
+                  "resource_id": "schedule-agent",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-agent",
+                  "label": "Agent Memory",
+                  "run_at": "2026-08-24T09:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "temporal_kind": "NONE",
+      "run_at": null,
+      "temporal_resolved": false,
+      "constraints": {
+        "temporal_kind": "NONE",
+        "temporal_resolved": false
+      },
+      "dependencies": [],
+      "clarification_required": true,
+      "clarification_reason": "用户未提供新标题",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "Agent Memory",
+          "requirements": [],
+          "operation": "UPDATE_DRAFT",
+          "capabilities": [
+            "MANAGE_DRAFT"
+          ],
+          "publication_intent": "",
+          "temporal_text": "",
+          "temporal_kind": "NONE",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "semantic_action": "UPDATE_DRAFT",
+            "title": "",
+            "target_objective_id": "objective-agent",
+            "objective_id": "objective-agent"
+          },
+          "target_reference": {
+            "kind": "DRAFT",
+            "label": "Agent Memory",
+            "reference_type": "NONE",
+            "target_objective_id": "objective-agent",
+            "objective_id": "objective-agent"
+          }
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "Agent Memory",
+          "operation": "UPDATE_DRAFT",
+          "capabilities": [
+            "MANAGE_DRAFT"
+          ],
+          "publication_intent": "",
+          "temporal_kind": "NONE",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "semantic_action": "UPDATE_DRAFT",
+            "title": "",
+            "target_objective_id": "objective-agent",
+            "objective_id": "objective-agent"
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "REVISE",
+      "publication_mode": "NONE",
+      "temporal_kind": "NONE",
+      "temporal_resolved": false,
+      "target_state": "RESOLVED",
+      "clarification_required": true,
+      "objective_count": 1,
+      "task_expectation": "CLARIFY"
+    },
+    "target_resolution": {
+      "status": "RESOLVED",
+      "target": {
+        "kind": "TASK",
+        "id": "objective-agent",
+        "task_id": "task-agent",
+        "resource_id": "objective-agent",
+        "artifact_id": null,
+        "execution_id": null,
+        "label": "Agent Memory",
+        "status": "PENDING",
+        "created_at": "2026-08-19T10:00:00+08:00",
+        "updated_at": "2026-08-19T10:00:00+08:00",
+        "metadata": {
+          "id": "objective-agent",
+          "goal_id": "objective-agent",
+          "objective_id": "objective-agent",
+          "task_id": "task-agent",
+          "kind": "TASK",
+          "label": "Agent Memory",
+          "status": "PENDING",
+          "run_at": null,
+          "constraints": {},
+          "created_at": "2026-08-19T10:00:00+08:00",
+          "updated_at": "2026-08-19T10:00:00+08:00",
+          "resource_index": [
+            {
+              "resource_id": "draft-agent",
+              "resource_kind": "DRAFT",
+              "objective_id": "objective-agent",
+              "label": "Agent Memory"
+            },
+            {
+              "resource_id": "schedule-agent",
+              "resource_kind": "SCHEDULE",
+              "objective_id": "objective-agent",
+              "label": "Agent Memory",
+              "run_at": "2026-08-24T09:00:00+08:00"
+            }
+          ],
+          "metadata": {
+            "objective_id": "objective-agent",
+            "resource_refs": [
+              {
+                "resource_id": "draft-agent",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory"
+              },
+              {
+                "resource_id": "schedule-agent",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory",
+                "run_at": "2026-08-24T09:00:00+08:00"
+              }
+            ]
+          }
+        }
+      },
+      "candidates": [
+        {
+          "kind": "TASK",
+          "id": "objective-agent",
+          "task_id": "task-agent",
+          "resource_id": "objective-agent",
+          "artifact_id": null,
+          "execution_id": null,
+          "label": "Agent Memory",
+          "status": "PENDING",
+          "created_at": "2026-08-19T10:00:00+08:00",
+          "updated_at": "2026-08-19T10:00:00+08:00",
+          "metadata": {
+            "id": "objective-agent",
+            "goal_id": "objective-agent",
+            "objective_id": "objective-agent",
+            "task_id": "task-agent",
+            "kind": "TASK",
+            "label": "Agent Memory",
+            "status": "PENDING",
+            "run_at": null,
+            "constraints": {},
+            "created_at": "2026-08-19T10:00:00+08:00",
+            "updated_at": "2026-08-19T10:00:00+08:00",
+            "resource_index": [
+              {
+                "resource_id": "draft-agent",
+                "resource_kind": "DRAFT",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory"
+              },
+              {
+                "resource_id": "schedule-agent",
+                "resource_kind": "SCHEDULE",
+                "objective_id": "objective-agent",
+                "label": "Agent Memory",
+                "run_at": "2026-08-24T09:00:00+08:00"
+              }
+            ],
+            "metadata": {
+              "objective_id": "objective-agent",
+              "resource_refs": [
+                {
+                  "resource_id": "draft-agent",
+                  "resource_kind": "DRAFT",
+                  "objective_id": "objective-agent",
+                  "label": "Agent Memory"
+                },
+                {
+                  "resource_id": "schedule-agent",
+                  "resource_kind": "SCHEDULE",
+                  "objective_id": "objective-agent",
+                  "label": "Agent Memory",
+                  "run_at": "2026-08-24T09:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "reason": "goal_reference"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "Agent Memory",
+        "operation": "UPDATE_DRAFT",
+        "capabilities": [
+          "MANAGE_DRAFT"
+        ],
+        "publication_intent": "",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "semantic_action": "UPDATE_DRAFT",
+          "title": "",
+          "target_objective_id": "objective-agent",
+          "objective_id": "objective-agent"
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "MODIFY",
+        "goal": "修改 Agent 那篇的标题",
+        "objective": "修改 Agent 那篇的标题",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "target_reference": {
+              "kind": "DRAFT",
+              "label": "Agent Memory",
+              "reference_type": "NONE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_DRAFT",
+              "title": ""
+            },
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "label": "Agent Memory",
+          "reference_type": "NONE"
+        },
+        "entities": {
+          "target_label": "Agent Memory"
+        },
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "用户未提供新标题",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.8,
+        "items": [],
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "parameters": {}
+      },
+      "schema_parse": {
+        "command": "MODIFY",
+        "goal": "修改 Agent 那篇的标题",
+        "objective": "修改 Agent 那篇的标题",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "DRAFT",
+              "label": "Agent Memory",
+              "reference_type": "NONE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_DRAFT",
+              "title": ""
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "Agent Memory",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {
+          "target_label": "Agent Memory"
+        },
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "用户未提供新标题",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.8,
+        "items": []
+      },
+      "repair": {
+        "triggered": false,
+        "items": []
+      },
+      "normalized": {
+        "command": "MODIFY",
+        "goal": "修改 Agent 那篇的标题",
+        "objective": "修改 Agent 那篇的标题",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "DRAFT",
+              "label": "Agent Memory",
+              "reference_type": "NONE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_DRAFT",
+              "title": ""
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "Agent Memory",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {
+          "target_label": "Agent Memory"
+        },
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "用户未提供新标题",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.8,
+        "items": []
+      },
+      "segmentation": {
+        "command": "MODIFY",
+        "goal": "修改 Agent 那篇的标题",
+        "objective": "修改 Agent 那篇的标题",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "DRAFT",
+              "label": "Agent Memory",
+              "reference_type": "NONE"
+            },
+            "desired_changes": {
+              "semantic_action": "UPDATE_DRAFT",
+              "title": ""
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": false
+          }
+        ],
+        "target": {
+          "kind": "DRAFT",
+          "id": null,
+          "task_id": null,
+          "resource_id": null,
+          "reference": null,
+          "label": "Agent Memory",
+          "reference_type": "NONE",
+          "ordinal": null,
+          "property": null,
+          "value": null,
+          "after": null,
+          "before": null
+        },
+        "parameters": {},
+        "entities": {
+          "target_label": "Agent Memory"
+        },
+        "constraints": {},
+        "semantic_operation": "MODIFY",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "用户未提供新标题",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.8,
+        "items": []
+      },
+      "semantic_derivation": {
+        "semantic_operation": "MODIFY",
+        "required_capabilities": [],
+        "publication_intent": "",
+        "item_count": 0
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 6600,
+      "output_tokens": 227,
+      "total_tokens": 6827,
+      "latency_ms": 2256.84,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 6600,
+          "output_tokens": 227,
+          "total_tokens": 6827,
+          "latency_ms": 2256.84
+        }
+      ]
+    },
+    "latency_ms": 2263.95,
+    "evaluation": {
+      "metrics": [
+        "constraint_lost",
+        "constraint_violation",
+        "unnecessary_clarification"
+      ],
+      "exact": false,
+      "unsafe": false,
+      "first_bad_state": "Objective projection",
+      "constraint_preserved": [],
+      "constraint_violated": [
+        "NEW_OBJECTIVE"
+      ],
+      "target_reason": "goal_reference",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": false,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "F07",
+    "category": "F_CROSS_TURN",
+    "message": "失败的那个再创建一次。",
+    "turns": [
+      {
+        "role": "user",
+        "content": "创建 Kubernetes 草稿失败了"
+      }
+    ],
+    "provider_calls_before": 7,
+    "command": {
+      "command_id": "312b92ec-ac22-47cb-add4-5fff69d23a93",
+      "type": "CREATE",
+      "goal": "重新创建 Kubernetes 入门草稿",
+      "objective": "重新创建 Kubernetes 入门草稿",
+      "first_action": "GENERATE_CONTENT",
+      "request_complexity": "SIMPLE",
+      "task_changes": [
+        {
+          "operation": "CREATE_TASK",
+          "change_id": "",
+          "target_reference": {
+            "reference_type": "FAILED",
+            "label": "Kubernetes 入门"
+          },
+          "desired_changes": {
+            "goal": "Kubernetes 入门",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          },
+          "dependency_reference": [],
+          "source_reference": {
+            "kind": "FAILED_OBJECTIVE_RETRY",
+            "user_triggered_retry": true,
+            "objective_id": "objective-failed"
+          },
+          "needs_target_resolution": false
+        }
+      ],
+      "target": null,
+      "parameters": {},
+      "entities": {
+        "topic": "Kubernetes 入门"
+      },
+      "constraints": {
+        "publication_intent": "DRAFT_ONLY"
+      },
+      "semantic_operation": "CREATE",
+      "scope": "",
+      "risk": "",
+      "references": [
+        {
+          "kind": "FAILED_OBJECTIVE_RETRY",
+          "objective_id": "objective-failed",
+          "user_triggered_retry": true
+        }
+      ],
+      "ambiguity": "",
+      "needs_clarification": false,
+      "required_capabilities": [
+        "GENERATE_CONTENT"
+      ],
+      "confidence": 0.9,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "失败的那个再创建一次。",
+      "items": [
+        {
+          "title": "",
+          "topic": "Kubernetes 入门",
+          "requirements": [],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "temporal_text": "",
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ],
+      "target_resolution": null,
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "312b92ec-ac22-47cb-add4-5fff69d23a93",
+      "operation": "CREATE",
+      "semantic_operation": "CREATE",
+      "capabilities": [
+        "GENERATE_CONTENT"
+      ],
+      "publication_intent": "DRAFT_ONLY",
+      "target_type": "",
+      "target_reference": {},
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "NONE",
+      "run_at": null,
+      "temporal_resolved": false,
+      "constraints": {
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false
+      },
+      "dependencies": [
+        "{'kind': 'FAILED_OBJECTIVE_RETRY', 'objective_id': 'objective-failed', 'user_triggered_retry': True}"
+      ],
+      "clarification_required": false,
+      "clarification_reason": "",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "Kubernetes 入门",
+          "requirements": [],
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_text": "",
+          "temporal_kind": "NONE",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          },
+          "target_reference": {}
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "Kubernetes 入门",
+          "operation": "CREATE",
+          "capabilities": [
+            "GENERATE_CONTENT"
+          ],
+          "publication_intent": "DRAFT_ONLY",
+          "temporal_kind": "NONE",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "DRAFT_ONLY"
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "CREATE",
+      "publication_mode": "DRAFT_ONLY",
+      "temporal_kind": "NONE",
+      "temporal_resolved": false,
+      "target_state": "NONE",
+      "clarification_required": false,
+      "objective_count": 1,
+      "task_expectation": "READY"
+    },
+    "target_resolution": {
+      "status": null
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "Kubernetes 入门",
+        "operation": "CREATE",
+        "capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "DRAFT_ONLY",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "CREATE",
+        "goal": "重新创建 Kubernetes 入门草稿",
+        "objective": "重新创建 Kubernetes 入门草稿",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "CREATE_TASK",
+            "change_id": "",
+            "target_reference": {
+              "reference_type": "FAILED",
+              "label": "Kubernetes 入门"
+            },
+            "desired_changes": {
+              "goal": "Kubernetes 入门",
+              "constraints": {
+                "publication_intent": "DRAFT_ONLY"
+              }
+            },
+            "dependency_reference": [],
+            "source_reference": {
+              "kind": "FAILED_OBJECTIVE_RETRY",
+              "user_triggered_retry": true,
+              "objective_id": "objective-failed"
+            },
+            "needs_target_resolution": false
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "Kubernetes 入门"
+        },
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [
+          {
+            "kind": "FAILED_OBJECTIVE_RETRY",
+            "objective_id": "objective-failed",
+            "user_triggered_retry": true
+          }
+        ],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Kubernetes 入门",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "schema_parse": {
+        "command": "CREATE",
+        "goal": "重新创建 Kubernetes 入门草稿",
+        "objective": "重新创建 Kubernetes 入门草稿",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "CREATE_TASK",
+            "change_id": "",
+            "target_reference": {
+              "reference_type": "FAILED",
+              "label": "Kubernetes 入门"
+            },
+            "desired_changes": {
+              "goal": "Kubernetes 入门",
+              "constraints": {
+                "publication_intent": "DRAFT_ONLY"
+              }
+            },
+            "dependency_reference": [],
+            "source_reference": {
+              "kind": "FAILED_OBJECTIVE_RETRY",
+              "user_triggered_retry": true,
+              "objective_id": "objective-failed"
+            },
+            "needs_target_resolution": false
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "Kubernetes 入门"
+        },
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [
+          {
+            "kind": "FAILED_OBJECTIVE_RETRY",
+            "objective_id": "objective-failed",
+            "user_triggered_retry": true
+          }
+        ],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Kubernetes 入门",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "repair": {
+        "triggered": false,
+        "items": [
+          {
+            "title": "",
+            "topic": "Kubernetes 入门",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "normalized": {
+        "command": "CREATE",
+        "goal": "重新创建 Kubernetes 入门草稿",
+        "objective": "重新创建 Kubernetes 入门草稿",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "CREATE_TASK",
+            "change_id": "",
+            "target_reference": {
+              "reference_type": "FAILED",
+              "label": "Kubernetes 入门"
+            },
+            "desired_changes": {
+              "goal": "Kubernetes 入门",
+              "constraints": {
+                "publication_intent": "DRAFT_ONLY"
+              }
+            },
+            "dependency_reference": [],
+            "source_reference": {
+              "kind": "FAILED_OBJECTIVE_RETRY",
+              "user_triggered_retry": true,
+              "objective_id": "objective-failed"
+            },
+            "needs_target_resolution": false
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "Kubernetes 入门"
+        },
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [
+          {
+            "kind": "FAILED_OBJECTIVE_RETRY",
+            "objective_id": "objective-failed",
+            "user_triggered_retry": true
+          }
+        ],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Kubernetes 入门",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "segmentation": {
+        "command": "CREATE",
+        "goal": "重新创建 Kubernetes 入门草稿",
+        "objective": "重新创建 Kubernetes 入门草稿",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "CREATE_TASK",
+            "change_id": "",
+            "target_reference": {
+              "reference_type": "FAILED",
+              "label": "Kubernetes 入门"
+            },
+            "desired_changes": {
+              "goal": "Kubernetes 入门",
+              "constraints": {
+                "publication_intent": "DRAFT_ONLY"
+              }
+            },
+            "dependency_reference": [],
+            "source_reference": {
+              "kind": "FAILED_OBJECTIVE_RETRY",
+              "user_triggered_retry": true,
+              "objective_id": "objective-failed"
+            },
+            "needs_target_resolution": false
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "entities": {
+          "topic": "Kubernetes 入门"
+        },
+        "constraints": {
+          "publication_intent": "DRAFT_ONLY"
+        },
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [
+          {
+            "kind": "FAILED_OBJECTIVE_RETRY",
+            "objective_id": "objective-failed",
+            "user_triggered_retry": true
+          }
+        ],
+        "ambiguity": "",
+        "needs_clarification": false,
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "confidence": 0.9,
+        "items": [
+          {
+            "title": "",
+            "topic": "Kubernetes 入门",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "GENERATE_CONTENT"
+            ],
+            "temporal_text": "",
+            "constraints": {
+              "publication_intent": "DRAFT_ONLY"
+            }
+          }
+        ]
+      },
+      "semantic_derivation": {
+        "semantic_operation": "CREATE",
+        "required_capabilities": [
+          "GENERATE_CONTENT"
+        ],
+        "publication_intent": "DRAFT_ONLY",
+        "item_count": 1
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5510,
+      "output_tokens": 457,
+      "total_tokens": 5967,
+      "latency_ms": 3084.05,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5510,
+          "output_tokens": 457,
+          "total_tokens": 5967,
+          "latency_ms": 3084.05
+        }
+      ]
+    },
+    "latency_ms": 3090.76,
+    "evaluation": {
+      "metrics": [
+        "UNKNOWN_should_have_been_used",
+        "wrong_publication",
+        "wrong_target"
+      ],
+      "exact": false,
+      "unsafe": true,
+      "first_bad_state": "Interpreter",
+      "constraint_preserved": [
+        "NEW_OBJECTIVE",
+        "NO_RESOURCE_REUSE"
+      ],
+      "constraint_violated": [],
+      "target_reason": "",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "G04",
+    "category": "G_AMBIGUOUS_INCOMPLETE",
+    "message": "写点东西。",
+    "turns": [],
+    "provider_calls_before": 8,
+    "command": {
+      "command_id": "2fedbdfb-d2e2-4ca4-b1b7-a024555322e3",
+      "type": "CREATE",
+      "goal": "写点东西",
+      "objective": "写点东西",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [],
+      "target": null,
+      "parameters": {},
+      "entities": {},
+      "constraints": {},
+      "semantic_operation": "CREATE",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。",
+      "needs_clarification": true,
+      "required_capabilities": [],
+      "confidence": 0.3,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "写点东西。",
+      "items": [
+        {
+          "title": "",
+          "topic": "",
+          "requirements": [],
+          "operation": "CREATE",
+          "capabilities": [],
+          "temporal_text": "",
+          "constraints": {}
+        }
+      ],
+      "target_resolution": null,
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "2fedbdfb-d2e2-4ca4-b1b7-a024555322e3",
+      "operation": "CREATE",
+      "semantic_operation": "CREATE",
+      "capabilities": [],
+      "publication_intent": "",
+      "target_type": "",
+      "target_reference": {},
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "NONE",
+      "run_at": null,
+      "temporal_resolved": false,
+      "constraints": {
+        "temporal_kind": "NONE",
+        "temporal_resolved": false
+      },
+      "dependencies": [],
+      "clarification_required": true,
+      "clarification_reason": "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "",
+          "requirements": [],
+          "operation": "CREATE",
+          "capabilities": [],
+          "publication_intent": "",
+          "temporal_text": "",
+          "temporal_kind": "NONE",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {},
+          "target_reference": {}
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "",
+          "operation": "CREATE",
+          "capabilities": [],
+          "publication_intent": "",
+          "temporal_kind": "NONE",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {}
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "CREATE",
+      "publication_mode": "NONE",
+      "temporal_kind": "NONE",
+      "temporal_resolved": false,
+      "target_state": "NONE",
+      "clarification_required": true,
+      "objective_count": 1,
+      "task_expectation": "CLARIFY"
+    },
+    "target_resolution": {
+      "status": "NONE"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "",
+        "operation": "CREATE",
+        "capabilities": [],
+        "publication_intent": "",
+        "temporal_kind": "NONE",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {}
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "CREATE",
+        "goal": "写点东西",
+        "objective": "写点东西",
+        "semantic_operation": "CREATE",
+        "request_complexity": "SIMPLE",
+        "needs_clarification": true,
+        "ambiguity": "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。",
+        "confidence": 0.3,
+        "items": [
+          {
+            "operation": "CREATE",
+            "topic": "",
+            "title": "",
+            "requirements": [],
+            "temporal_text": "",
+            "constraints": {}
+          }
+        ],
+        "task_changes": [],
+        "target": null,
+        "entities": {},
+        "constraints": {},
+        "references": [],
+        "parameters": {},
+        "required_capabilities": [],
+        "first_action": "",
+        "scope": "",
+        "risk": ""
+      },
+      "schema_parse": {
+        "command": "CREATE",
+        "goal": "写点东西",
+        "objective": "写点东西",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.3,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [],
+            "temporal_text": "",
+            "constraints": {}
+          }
+        ]
+      },
+      "repair": {
+        "triggered": false,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [],
+            "temporal_text": "",
+            "constraints": {}
+          }
+        ]
+      },
+      "normalized": {
+        "command": "CREATE",
+        "goal": "写点东西",
+        "objective": "写点东西",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.3,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [],
+            "temporal_text": "",
+            "constraints": {}
+          }
+        ]
+      },
+      "segmentation": {
+        "command": "CREATE",
+        "goal": "写点东西",
+        "objective": "写点东西",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {},
+        "semantic_operation": "CREATE",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "用户未指定写作主题、内容类型或发布要求，需要澄清具体要写什么。",
+        "needs_clarification": true,
+        "required_capabilities": [],
+        "confidence": 0.3,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [],
+            "temporal_text": "",
+            "constraints": {}
+          }
+        ]
+      },
+      "semantic_derivation": {
+        "semantic_operation": "CREATE",
+        "required_capabilities": [],
+        "publication_intent": "",
+        "item_count": 1
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5346,
+      "output_tokens": 143,
+      "total_tokens": 5489,
+      "latency_ms": 1917.98,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5346,
+          "output_tokens": 143,
+          "total_tokens": 5489,
+          "latency_ms": 1917.98
+        }
+      ]
+    },
+    "latency_ms": 1926.05,
+    "evaluation": {
+      "metrics": [
+        "wrong_publication"
+      ],
+      "exact": false,
+      "unsafe": false,
+      "first_bad_state": "Interpreter",
+      "constraint_preserved": [],
+      "constraint_violated": [],
+      "target_reason": "",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": true,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  },
+  {
+    "case_id": "G05",
+    "category": "G_AMBIGUOUS_INCOMPLETE",
+    "message": "明天下午发。",
+    "turns": [],
+    "provider_calls_before": 9,
+    "command": {
+      "command_id": "30dbdd2a-30e3-4b1c-8c41-9939efeb0061",
+      "type": "MODIFY",
+      "goal": "明天下午发布",
+      "objective": "明天下午发布",
+      "first_action": "",
+      "request_complexity": "SIMPLE",
+      "task_changes": [
+        {
+          "operation": "UPDATE_GOAL",
+          "change_id": "",
+          "target_reference": {
+            "kind": "TASK",
+            "reference_type": "NONE"
+          },
+          "desired_changes": {
+            "semantic_action": "CREATE_SCHEDULE",
+            "run_at": "明天下午",
+            "temporal_base": "EXPLICIT_DATETIME"
+          },
+          "dependency_reference": [],
+          "source_reference": {},
+          "needs_target_resolution": true
+        }
+      ],
+      "target": null,
+      "parameters": {},
+      "entities": {},
+      "constraints": {
+        "publication_intent": "SCHEDULED_PUBLISH"
+      },
+      "semantic_operation": "SCHEDULE_PUBLISH",
+      "scope": "",
+      "risk": "",
+      "references": [],
+      "ambiguity": "缺少发布目标（哪篇文章/草稿）以及具体时间",
+      "needs_clarification": true,
+      "required_capabilities": [
+        "SCHEDULE_PUBLISH"
+      ],
+      "confidence": 0.6,
+      "source": "LLM_STRUCTURED_OUTPUT",
+      "raw_input": "明天下午发。",
+      "items": [
+        {
+          "title": "",
+          "topic": "",
+          "requirements": [],
+          "operation": "CREATE",
+          "capabilities": [
+            "SCHEDULE_PUBLISH"
+          ],
+          "temporal_text": "明天下午",
+          "constraints": {
+            "publication_intent": "SCHEDULED_PUBLISH"
+          }
+        }
+      ],
+      "target_resolution": "NOT_FOUND",
+      "resolved_target": null,
+      "target_candidates": [],
+      "resolved_semantics": null
+    },
+    "state": {
+      "source_command_id": "30dbdd2a-30e3-4b1c-8c41-9939efeb0061",
+      "operation": "MODIFY",
+      "semantic_operation": "SCHEDULE_PUBLISH",
+      "capabilities": [
+        "SCHEDULE_PUBLISH"
+      ],
+      "publication_intent": "SCHEDULED_PUBLISH",
+      "target_type": "",
+      "target_reference": {},
+      "resolved_target": {},
+      "target_candidates": [],
+      "temporal_kind": "UNRESOLVED",
+      "run_at": null,
+      "temporal_resolved": false,
+      "constraints": {
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "temporal_kind": "UNRESOLVED",
+        "temporal_resolved": false
+      },
+      "dependencies": [],
+      "clarification_required": true,
+      "clarification_reason": "target_unresolved",
+      "risk": "",
+      "requires_approval": false,
+      "items": [
+        {
+          "title": "",
+          "topic": "",
+          "requirements": [],
+          "operation": "CREATE",
+          "capabilities": [
+            "SCHEDULE_PUBLISH"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_text": "明天下午",
+          "temporal_kind": "UNRESOLVED",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "temporal_kind": "UNRESOLVED",
+            "temporal_resolved": false,
+            "temporal_unresolved_reason": "temporal_expression_unresolved"
+          },
+          "target_reference": {}
+        },
+        {
+          "title": "",
+          "topic": "",
+          "requirements": [],
+          "operation": "CREATE_SCHEDULE",
+          "capabilities": [
+            "SCHEDULE_PUBLISH"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_text": "明天下午",
+          "temporal_kind": "UNRESOLVED",
+          "run_at": null,
+          "temporal_resolved": false,
+          "constraints": {
+            "semantic_action": "CREATE_SCHEDULE",
+            "run_at": "明天下午",
+            "temporal_base": "EXPLICIT_DATETIME",
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "temporal_kind": "UNRESOLVED",
+            "temporal_resolved": false,
+            "temporal_unresolved_reason": "temporal_expression_unresolved"
+          },
+          "target_reference": {
+            "kind": "TASK",
+            "reference_type": "NONE"
+          }
+        }
+      ],
+      "objectives": [
+        {
+          "title": "",
+          "topic": "",
+          "operation": "CREATE",
+          "capabilities": [
+            "SCHEDULE_PUBLISH"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_kind": "UNRESOLVED",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "temporal_kind": "UNRESOLVED",
+            "temporal_resolved": false,
+            "temporal_unresolved_reason": "temporal_expression_unresolved"
+          }
+        },
+        {
+          "title": "",
+          "topic": "",
+          "operation": "CREATE_SCHEDULE",
+          "capabilities": [
+            "SCHEDULE_PUBLISH"
+          ],
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_kind": "UNRESOLVED",
+          "temporal_resolved": false,
+          "run_at": null,
+          "constraints": {
+            "semantic_action": "CREATE_SCHEDULE",
+            "run_at": "明天下午",
+            "temporal_base": "EXPLICIT_DATETIME",
+            "publication_intent": "SCHEDULED_PUBLISH",
+            "temporal_kind": "UNRESOLVED",
+            "temporal_resolved": false,
+            "temporal_unresolved_reason": "temporal_expression_unresolved"
+          }
+        }
+      ]
+    },
+    "canonical": {
+      "action_family": "MULTI_OBJECTIVE",
+      "publication_mode": "UNRESOLVED",
+      "temporal_kind": "UNRESOLVED",
+      "temporal_resolved": false,
+      "target_state": "NOT_FOUND",
+      "clarification_required": true,
+      "objective_count": 2,
+      "task_expectation": "CLARIFY"
+    },
+    "target_resolution": {
+      "status": "NOT_FOUND"
+    },
+    "objective_projection": [
+      {
+        "title": "",
+        "topic": "",
+        "operation": "CREATE",
+        "capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "temporal_kind": "UNRESOLVED",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_kind": "UNRESOLVED",
+          "temporal_resolved": false,
+          "temporal_unresolved_reason": "temporal_expression_unresolved"
+        }
+      },
+      {
+        "title": "",
+        "topic": "",
+        "operation": "CREATE_SCHEDULE",
+        "capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "temporal_kind": "UNRESOLVED",
+        "temporal_resolved": false,
+        "run_at": null,
+        "constraints": {
+          "semantic_action": "CREATE_SCHEDULE",
+          "run_at": "明天下午",
+          "temporal_base": "EXPLICIT_DATETIME",
+          "publication_intent": "SCHEDULED_PUBLISH",
+          "temporal_kind": "UNRESOLVED",
+          "temporal_resolved": false,
+          "temporal_unresolved_reason": "temporal_expression_unresolved"
+        }
+      }
+    ],
+    "stages": {
+      "raw": {
+        "command": "MODIFY",
+        "goal": "明天下午发布",
+        "objective": "明天下午发布",
+        "semantic_operation": "SCHEDULE_PUBLISH",
+        "scope": "",
+        "risk": "",
+        "entities": {},
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "references": [],
+        "ambiguity": "缺少发布目标（哪篇文章/草稿）以及具体时间",
+        "needs_clarification": true,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.6,
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "target_reference": {
+              "kind": "TASK",
+              "reference_type": "NONE",
+              "label": ""
+            },
+            "desired_changes": {
+              "semantic_action": "CREATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXPLICIT_DATETIME"
+            },
+            "needs_target_resolution": true
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "SCHEDULE_PUBLISH"
+            ],
+            "temporal_text": "明天下午",
+            "constraints": {
+              "publication_intent": "SCHEDULED_PUBLISH"
+            }
+          }
+        ]
+      },
+      "schema_parse": {
+        "command": "MODIFY",
+        "goal": "明天下午发布",
+        "objective": "明天下午发布",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "TASK",
+              "reference_type": "NONE"
+            },
+            "desired_changes": {
+              "semantic_action": "CREATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXPLICIT_DATETIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": true
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "semantic_operation": "SCHEDULE_PUBLISH",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "缺少发布目标（哪篇文章/草稿）以及具体时间",
+        "needs_clarification": true,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.6,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "SCHEDULE_PUBLISH"
+            ],
+            "temporal_text": "明天下午",
+            "constraints": {
+              "publication_intent": "SCHEDULED_PUBLISH"
+            }
+          }
+        ]
+      },
+      "repair": {
+        "triggered": false,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "SCHEDULE_PUBLISH"
+            ],
+            "temporal_text": "明天下午",
+            "constraints": {
+              "publication_intent": "SCHEDULED_PUBLISH"
+            }
+          }
+        ]
+      },
+      "normalized": {
+        "command": "MODIFY",
+        "goal": "明天下午发布",
+        "objective": "明天下午发布",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "TASK",
+              "reference_type": "NONE"
+            },
+            "desired_changes": {
+              "semantic_action": "CREATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXPLICIT_DATETIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": true
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "semantic_operation": "SCHEDULE_PUBLISH",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "缺少发布目标（哪篇文章/草稿）以及具体时间",
+        "needs_clarification": true,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.6,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "SCHEDULE_PUBLISH"
+            ],
+            "temporal_text": "明天下午",
+            "constraints": {
+              "publication_intent": "SCHEDULED_PUBLISH"
+            }
+          }
+        ]
+      },
+      "segmentation": {
+        "command": "MODIFY",
+        "goal": "明天下午发布",
+        "objective": "明天下午发布",
+        "first_action": "",
+        "request_complexity": "SIMPLE",
+        "task_changes": [
+          {
+            "operation": "UPDATE_GOAL",
+            "change_id": "",
+            "target_reference": {
+              "kind": "TASK",
+              "reference_type": "NONE"
+            },
+            "desired_changes": {
+              "semantic_action": "CREATE_SCHEDULE",
+              "run_at": "明天下午",
+              "temporal_base": "EXPLICIT_DATETIME"
+            },
+            "dependency_reference": [],
+            "source_reference": {},
+            "needs_target_resolution": true
+          }
+        ],
+        "target": null,
+        "parameters": {},
+        "entities": {},
+        "constraints": {
+          "publication_intent": "SCHEDULED_PUBLISH"
+        },
+        "semantic_operation": "SCHEDULE_PUBLISH",
+        "scope": "",
+        "risk": "",
+        "references": [],
+        "ambiguity": "缺少发布目标（哪篇文章/草稿）以及具体时间",
+        "needs_clarification": true,
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "confidence": 0.6,
+        "items": [
+          {
+            "title": "",
+            "topic": "",
+            "requirements": [],
+            "operation": "CREATE",
+            "capabilities": [
+              "SCHEDULE_PUBLISH"
+            ],
+            "temporal_text": "明天下午",
+            "constraints": {
+              "publication_intent": "SCHEDULED_PUBLISH"
+            }
+          }
+        ]
+      },
+      "semantic_derivation": {
+        "semantic_operation": "SCHEDULE_PUBLISH",
+        "required_capabilities": [
+          "SCHEDULE_PUBLISH"
+        ],
+        "publication_intent": "SCHEDULED_PUBLISH",
+        "item_count": 1
+      }
+    },
+    "provider_calls": 1,
+    "provider_usage": {
+      "input_tokens": 5346,
+      "output_tokens": 257,
+      "total_tokens": 5603,
+      "latency_ms": 2626.33,
+      "records": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0.0,
+          "response_format": "json_object",
+          "input_tokens": 5346,
+          "output_tokens": 257,
+          "total_tokens": 5603,
+          "latency_ms": 2626.33
+        }
+      ]
+    },
+    "latency_ms": 2633.3,
+    "evaluation": {
+      "metrics": [
+        "wrong_action",
+        "wrong_goal_split"
+      ],
+      "exact": false,
+      "unsafe": false,
+      "first_bad_state": "Objective projection",
+      "constraint_preserved": [],
+      "constraint_violated": [],
+      "target_reason": "",
+      "provenance": {
+        "desired_outcome": true,
+        "target_reference": false,
+        "temporal_expression": true,
+        "hard_constraints": true,
+        "formal_source_span": false
+      }
+    },
+    "variant_index": 0
+  }
+]

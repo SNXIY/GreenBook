@@ -1,0 +1,1312 @@
+﻿packages/evaluation/greenbook_evaluation/canonical.py:50:    publication_intent = _publication_alias(state.get("publication_intent"))
+packages/evaluation/greenbook_evaluation/canonical.py:51:    temporal_kind_raw = _upper(state.get("temporal_kind") or "NONE")
+packages/evaluation/greenbook_evaluation/canonical.py:52:    temporal_resolved_raw = bool(state.get("temporal_resolved"))
+packages/evaluation/greenbook_evaluation/canonical.py:58:        _publication_alias(item.get("publication_intent"))
+packages/evaluation/greenbook_evaluation/canonical.py:60:        if isinstance(item, Mapping) and item.get("publication_intent")
+packages/evaluation/greenbook_evaluation/canonical.py:65:        if isinstance(item, Mapping) and item.get("publication_intent")
+packages/evaluation/greenbook_evaluation/canonical.py:67:    item_temporals_all = {
+packages/evaluation/greenbook_evaluation/canonical.py:68:        _upper(item.get("temporal_kind"))
+packages/evaluation/greenbook_evaluation/canonical.py:70:        if isinstance(item, Mapping) and item.get("temporal_kind")
+packages/evaluation/greenbook_evaluation/canonical.py:72:    item_temporals = {value for value in item_temporals_all if value != "NONE"}
+packages/evaluation/greenbook_evaluation/canonical.py:73:    temporal_items = [
+packages/evaluation/greenbook_evaluation/canonical.py:77:        and _upper(item.get("temporal_kind")) in {"NOW", "FUTURE"}
+packages/evaluation/greenbook_evaluation/canonical.py:79:    item_temporal_resolved = bool(temporal_items) and all(
+packages/evaluation/greenbook_evaluation/canonical.py:80:        bool(item.get("temporal_resolved") or item.get("run_at"))
+packages/evaluation/greenbook_evaluation/canonical.py:81:        for item in temporal_items
+packages/evaluation/greenbook_evaluation/canonical.py:83:    if item_temporal_resolved:
+packages/evaluation/greenbook_evaluation/canonical.py:84:        temporal_resolved_raw = True
+packages/evaluation/greenbook_evaluation/canonical.py:89:        publication_intent=publication_intent,
+packages/evaluation/greenbook_evaluation/canonical.py:93:    publication_mode = _publication_mode(
+packages/evaluation/greenbook_evaluation/canonical.py:95:        publication_intent=publication_intent,
+packages/evaluation/greenbook_evaluation/canonical.py:96:        temporal_kind=temporal_kind_raw,
+packages/evaluation/greenbook_evaluation/canonical.py:97:        temporal_resolved=temporal_resolved_raw,
+packages/evaluation/greenbook_evaluation/canonical.py:99:        item_temporals=item_temporals,
+packages/evaluation/greenbook_evaluation/canonical.py:103:    temporal_kind = _temporal_kind(
+packages/evaluation/greenbook_evaluation/canonical.py:105:        raw_kind=temporal_kind_raw,
+packages/evaluation/greenbook_evaluation/canonical.py:106:        publication_mode=publication_mode,
+packages/evaluation/greenbook_evaluation/canonical.py:107:        resolved=temporal_resolved_raw,
+packages/evaluation/greenbook_evaluation/canonical.py:108:        item_temporals=item_temporals_all,
+packages/evaluation/greenbook_evaluation/canonical.py:112:    temporal_resolved = temporal_resolved_raw or temporal_kind == "NOW"
+packages/evaluation/greenbook_evaluation/canonical.py:113:    target_state = _target_state(
+packages/evaluation/greenbook_evaluation/canonical.py:126:        "publication_mode": publication_mode,
+packages/evaluation/greenbook_evaluation/canonical.py:127:        "temporal_kind": temporal_kind,
+packages/evaluation/greenbook_evaluation/canonical.py:128:        "temporal_resolved": temporal_resolved,
+packages/evaluation/greenbook_evaluation/canonical.py:129:        "target_state": target_state,
+packages/evaluation/greenbook_evaluation/canonical.py:165:    publication_intent: str,
+packages/evaluation/greenbook_evaluation/canonical.py:193:        and clarification_candidate(operation, semantic_operation, publication_intent)
+packages/evaluation/greenbook_evaluation/canonical.py:196:    if publication_intent in {"IMMEDIATE_PUBLISH", "PUBLISH_NOW", "NOW"}:
+packages/evaluation/greenbook_evaluation/canonical.py:198:    if publication_intent in {"SCHEDULED_PUBLISH", "SCHEDULE", "SCHEDULED", "FUTURE"}:
+packages/evaluation/greenbook_evaluation/canonical.py:211:def _publication_mode(
+packages/evaluation/greenbook_evaluation/canonical.py:214:    publication_intent: str,
+packages/evaluation/greenbook_evaluation/canonical.py:215:    temporal_kind: str,
+packages/evaluation/greenbook_evaluation/canonical.py:216:    temporal_resolved: bool,
+packages/evaluation/greenbook_evaluation/canonical.py:218:    item_temporals: set[str],
+packages/evaluation/greenbook_evaluation/canonical.py:230:            if temporal_kind == "UNRESOLVED" or not temporal_resolved:
+packages/evaluation/greenbook_evaluation/canonical.py:233:        if len(item_intents) > 1 or len(item_temporals) > 1:
+packages/evaluation/greenbook_evaluation/canonical.py:235:        if item_intents or "FUTURE" in item_temporals:
+packages/evaluation/greenbook_evaluation/canonical.py:236:            if temporal_kind == "UNRESOLVED" or not temporal_resolved:
+packages/evaluation/greenbook_evaluation/canonical.py:240:    if publication_intent == "MIXED" or len(item_intents) > 1:
+packages/evaluation/greenbook_evaluation/canonical.py:242:    if publication_intent in {"DRAFT_ONLY", "DRAFT"}:
+packages/evaluation/greenbook_evaluation/canonical.py:254:            if temporal_kind == "UNRESOLVED" or not temporal_resolved:
+packages/evaluation/greenbook_evaluation/canonical.py:257:    if action_family == "PUBLISH_NOW" or publication_intent in {
+packages/evaluation/greenbook_evaluation/canonical.py:263:    if action_family in {"SCHEDULE", "UPDATE_SCHEDULE"} or publication_intent in {
+packages/evaluation/greenbook_evaluation/canonical.py:269:        if temporal_kind == "UNRESOLVED" or not temporal_resolved:
+packages/evaluation/greenbook_evaluation/canonical.py:275:def _temporal_kind(
+packages/evaluation/greenbook_evaluation/canonical.py:279:    publication_mode: str,
+packages/evaluation/greenbook_evaluation/canonical.py:281:    item_temporals: set[str],
+packages/evaluation/greenbook_evaluation/canonical.py:285:    meaningful_temporals = {value for value in item_temporals if value != "NONE"}
+packages/evaluation/greenbook_evaluation/canonical.py:287:        "NONE" in item_temporals
+packages/evaluation/greenbook_evaluation/canonical.py:288:        and meaningful_temporals
+packages/evaluation/greenbook_evaluation/canonical.py:292:    if raw_kind == "MIXED" or len(meaningful_temporals) > 1:
+packages/evaluation/greenbook_evaluation/canonical.py:296:    if raw_kind == "UNRESOLVED" or publication_mode == "UNRESOLVED":
+packages/evaluation/greenbook_evaluation/canonical.py:302:            and publication_mode == "MIXED"
+packages/evaluation/greenbook_evaluation/canonical.py:303:            and meaningful_temporals == {"UNRESOLVED"}
+packages/evaluation/greenbook_evaluation/canonical.py:307:    if raw_kind == "FUTURE" or publication_mode == "SCHEDULED":
+packages/evaluation/greenbook_evaluation/canonical.py:312:def _target_state(
+packages/evaluation/greenbook_evaluation/canonical.py:319:    target_status = _upper(getattr(command, "target_resolution", ""))
+packages/evaluation/greenbook_evaluation/canonical.py:321:    if target_status == "AMBIGUOUS" or "AMBIGUOUS" in reason:
+packages/evaluation/greenbook_evaluation/canonical.py:323:    if target_status in {"NOT_FOUND", "UNRESOLVED"} or "TARGET_UNRESOLVED" in reason:
+packages/evaluation/greenbook_evaluation/canonical.py:324:        # Keep target resolution's three-state contract visible at the
+packages/evaluation/greenbook_evaluation/canonical.py:325:        # product-semantic boundary.  Temporal unresolved remains orthogonal;
+packages/evaluation/greenbook_evaluation/canonical.py:326:        # this branch is only the target resolver's zero-candidate outcome.
+packages/evaluation/greenbook_evaluation/canonical.py:328:    resolved_target = state.get("resolved_target") or {}
+packages/evaluation/greenbook_evaluation/canonical.py:329:    target = getattr(command, "target", None)
+packages/evaluation/greenbook_evaluation/canonical.py:330:    if resolved_target or target is not None:
+packages/evaluation/greenbook_evaluation/canonical.py:331:        reference_type = _upper(getattr(target, "reference_type", ""))
+packages/evaluation/greenbook_evaluation/canonical.py:332:        if reference_type in {"ACTIVE", "RECENT", "LATEST", "PROPERTY", "TEMPORAL"}:
+packages/evaluation/greenbook_evaluation/canonical.py:334:        if target is not None and (
+packages/evaluation/greenbook_evaluation/canonical.py:335:            getattr(target, "explicit_id", None)
+packages/evaluation/greenbook_evaluation/canonical.py:336:            or getattr(target, "ordinal", None)
+packages/evaluation/greenbook_evaluation/canonical.py:379:    publication_intent: str,
+packages/evaluation/greenbook_evaluation/canonical.py:386:        and not publication_intent
+packages/evaluation/greenbook_evaluation/canonical.py:393:        "publication_mode": {
+packages/evaluation/greenbook_evaluation/canonical.py:405:        "temporal_kind": {
+packages/evaluation/greenbook_evaluation/canonical.py:427:def _publication_alias(value: Any) -> str:
+evaluation/semantic_longtail/run_benchmark.py:4:CommandInterpreter, TargetResolver, and TemporalResolver boundaries and writes
+evaluation/semantic_longtail/run_benchmark.py:44:    "target_resolution",
+evaluation/semantic_longtail/run_benchmark.py:45:    "temporal_resolution",
+evaluation/semantic_longtail/run_benchmark.py:58:    "wrong_target",
+evaluation/semantic_longtail/run_benchmark.py:59:    "target_ambiguity_missed",
+evaluation/semantic_longtail/run_benchmark.py:61:    "temporal_ownership_violation",
+evaluation/semantic_longtail/run_benchmark.py:62:    "wrong_publication",
+evaluation/semantic_longtail/run_benchmark.py:63:    "constraint_lost",
+evaluation/semantic_longtail/run_benchmark.py:64:    "constraint_violation",
+evaluation/semantic_longtail/run_benchmark.py:132:    """Small OpenAI-compatible facade used only to measure provider calls."""
+evaluation/semantic_longtail/run_benchmark.py:202:def _canonical_publication(value: Any) -> str:
+evaluation/semantic_longtail/run_benchmark.py:221:def _publication_from(value: Any) -> str:
+evaluation/semantic_longtail/run_benchmark.py:224:    for key in ("publication_intent", "publication_mode", "content_state"):
+evaluation/semantic_longtail/run_benchmark.py:225:        value_found = _canonical_publication(value.get(key))
+evaluation/semantic_longtail/run_benchmark.py:261:        return {"goal_count": 0, "publication": "", "temporal": [], "target": {}}
+evaluation/semantic_longtail/run_benchmark.py:269:    publications: list[str] = []
+evaluation/semantic_longtail/run_benchmark.py:270:    for container in (payload, payload.get("constraints"), payload.get("parameters"), payload.get("entities")):
+evaluation/semantic_longtail/run_benchmark.py:271:        intent = _publication_from(container)
+evaluation/semantic_longtail/run_benchmark.py:273:            publications.append(intent)
+evaluation/semantic_longtail/run_benchmark.py:276:            intent = _publication_from(item.get("constraints"))
+evaluation/semantic_longtail/run_benchmark.py:278:                publications.append(intent)
+evaluation/semantic_longtail/run_benchmark.py:279:    temporal: list[str] = []
+evaluation/semantic_longtail/run_benchmark.py:281:        if key in {"temporal_text", "temporal_expression", "time", "run_at", "publish_at", "scheduled_at"}:
+evaluation/semantic_longtail/run_benchmark.py:283:                temporal.append(value.strip())
+evaluation/semantic_longtail/run_benchmark.py:284:    target = payload.get("target") if isinstance(payload.get("target"), Mapping) else {}
+evaluation/semantic_longtail/run_benchmark.py:288:            reference = delta.get("target_reference")
+evaluation/semantic_longtail/run_benchmark.py:293:        "publication": publications[-1] if publications else "",
+evaluation/semantic_longtail/run_benchmark.py:294:        "publications": publications,
+evaluation/semantic_longtail/run_benchmark.py:295:        "temporal": temporal,
+evaluation/semantic_longtail/run_benchmark.py:296:        "target": dict(target),
+evaluation/semantic_longtail/run_benchmark.py:322:def _publication_mode_expected(value: Any) -> str:
+evaluation/semantic_longtail/run_benchmark.py:327:def _target_status(result: Any, command: Mapping[str, Any]) -> tuple[str, str, str]:
+evaluation/semantic_longtail/run_benchmark.py:331:        target = result.get("target") if isinstance(result, Mapping) else None
+evaluation/semantic_longtail/run_benchmark.py:333:        if isinstance(target, Mapping):
+evaluation/semantic_longtail/run_benchmark.py:334:            identity = str(target.get("resource_id") or target.get("id") or "")
+evaluation/semantic_longtail/run_benchmark.py:335:            metadata = target.get("metadata")
+evaluation/semantic_longtail/run_benchmark.py:339:    if command.get("target") or command.get("task_changes"):
+evaluation/semantic_longtail/run_benchmark.py:340:        return _upper(command.get("target_resolution")) or "NOT_FOUND", "", ""
+evaluation/semantic_longtail/run_benchmark.py:348:def _command_target_identities(command: Mapping[str, Any]) -> set[str]:
+evaluation/semantic_longtail/run_benchmark.py:360:            "target_objective_id",
+evaluation/semantic_longtail/run_benchmark.py:368:    collect(command.get("target"))
+evaluation/semantic_longtail/run_benchmark.py:371:            collect(delta.get("target_reference"))
+evaluation/semantic_longtail/run_benchmark.py:376:def _constraint_checks(case: Mapping[str, Any], command: Mapping[str, Any], canonical: Mapping[str, Any], state: Mapping[str, Any]) -> tuple[set[str], set[str]]:
+evaluation/semantic_longtail/run_benchmark.py:377:    expected = [str(item).upper() for item in (case.get("truth", {}).get("constraints") or [])]
+evaluation/semantic_longtail/run_benchmark.py:379:    publication = _upper(canonical.get("publication_mode"))
+evaluation/semantic_longtail/run_benchmark.py:380:    item_publications = {
+evaluation/semantic_longtail/run_benchmark.py:381:        _upper(item.get("publication_intent"))
+evaluation/semantic_longtail/run_benchmark.py:383:        if item.get("publication_intent")
+evaluation/semantic_longtail/run_benchmark.py:389:            if publication == "DRAFT_ONLY" or (
+evaluation/semantic_longtail/run_benchmark.py:391:                and item_publications
+evaluation/semantic_longtail/run_benchmark.py:392:                and item_publications <= {"DRAFT_ONLY"}
+evaluation/semantic_longtail/run_benchmark.py:437:                if _canonical_publication(goal.get("publication")) == "DRAFT_ONLY"
+evaluation/semantic_longtail/run_benchmark.py:441:                publication == "DRAFT_ONLY"
+evaluation/semantic_longtail/run_benchmark.py:446:                        and _publication_from(item) == "DRAFT_ONLY"
+evaluation/semantic_longtail/run_benchmark.py:464:            # missing marker is recorded as lost evidence, not guessed away.
+evaluation/semantic_longtail/run_benchmark.py:470:            if state.get("resolved_target") or state.get("target_reference"):
+evaluation/semantic_longtail/run_benchmark.py:479:        elif marker == "PUBLICATION_UNDECIDED":
+evaluation/semantic_longtail/run_benchmark.py:480:            if publication == "NONE":
+evaluation/semantic_longtail/run_benchmark.py:490:    target = actual.get("target_resolution") or {}
+evaluation/semantic_longtail/run_benchmark.py:495:            _upper(item.get("publication_intent") or item.get("operation")),
+evaluation/semantic_longtail/run_benchmark.py:496:            _upper(item.get("temporal_kind")),
+evaluation/semantic_longtail/run_benchmark.py:500:        _upper(canonical.get("publication_mode")),
+evaluation/semantic_longtail/run_benchmark.py:501:        _upper(canonical.get("temporal_kind")),
+evaluation/semantic_longtail/run_benchmark.py:502:        bool(canonical.get("temporal_resolved")),
+evaluation/semantic_longtail/run_benchmark.py:503:        _upper(canonical.get("target_state")),
+evaluation/semantic_longtail/run_benchmark.py:506:        _upper(target.get("status")),
+evaluation/semantic_longtail/run_benchmark.py:519:    expected_target = _upper(truth.get("target_resolution"))
+evaluation/semantic_longtail/run_benchmark.py:520:    expected_expression = str(truth.get("temporal_expression") or "").strip()
+evaluation/semantic_longtail/run_benchmark.py:521:    target_refs = _command_target_identities(command)
+evaluation/semantic_longtail/run_benchmark.py:522:    target_payload = command.get("target") if isinstance(command.get("target"), Mapping) else {}
+evaluation/semantic_longtail/run_benchmark.py:523:    target_ref_text = " ".join(
+evaluation/semantic_longtail/run_benchmark.py:524:        str(target_payload.get(key) or "")
+evaluation/semantic_longtail/run_benchmark.py:529:            ref = delta.get("target_reference") if isinstance(delta.get("target_reference"), Mapping) else {}
+evaluation/semantic_longtail/run_benchmark.py:530:            target_ref_text += " " + " ".join(str(ref.get(key) or "") for key in ("reference", "label", "value", "property"))
+evaluation/semantic_longtail/run_benchmark.py:531:    temporal_values = []
+evaluation/semantic_longtail/run_benchmark.py:534:        temporal_values.extend(str(value) for value in evidence.get("temporal", []))
+evaluation/semantic_longtail/run_benchmark.py:536:        temporal_values.append(str(item.get("temporal_text") or ""))
+evaluation/semantic_longtail/run_benchmark.py:538:    expected_constraints = [str(item).upper() for item in truth.get("constraints") or []]
+evaluation/semantic_longtail/run_benchmark.py:539:    preserved, _violated = _constraint_checks(case, command, actual.get("canonical") or {}, state)
+evaluation/semantic_longtail/run_benchmark.py:546:    target_covered = expected_target == "NONE" or bool(target_refs or target_ref_text.strip())
+evaluation/semantic_longtail/run_benchmark.py:547:    temporal_covered = not expected_expression or any(
+evaluation/semantic_longtail/run_benchmark.py:549:        for value in temporal_values
+evaluation/semantic_longtail/run_benchmark.py:552:    hard_constraints_covered = not expected_constraints or set(expected_constraints) <= preserved
+evaluation/semantic_longtail/run_benchmark.py:555:        "target_reference": target_covered,
+evaluation/semantic_longtail/run_benchmark.py:556:        "temporal_expression": temporal_covered,
+evaluation/semantic_longtail/run_benchmark.py:557:        "hard_constraints": hard_constraints_covered,
+evaluation/semantic_longtail/run_benchmark.py:562:def _state_publication_matches_expected(state: Mapping[str, Any], truth: Mapping[str, Any]) -> bool:
+evaluation/semantic_longtail/run_benchmark.py:563:    expected = _publication_mode_expected(truth.get("publication_mode"))
+evaluation/semantic_longtail/run_benchmark.py:568:            wanted = _canonical_publication(goal.get("publication"))
+evaluation/semantic_longtail/run_benchmark.py:573:                and _canonical_publication(_publication_from(item)) == wanted
+evaluation/semantic_longtail/run_benchmark.py:578:    actual = _canonical_publication(state.get("publication_intent"))
+evaluation/semantic_longtail/run_benchmark.py:583:            _canonical_publication(_publication_from(item)) == "DRAFT_ONLY"
+evaluation/semantic_longtail/run_benchmark.py:591:        publications = {
+evaluation/semantic_longtail/run_benchmark.py:592:            _canonical_publication(_publication_from(item))
+evaluation/semantic_longtail/run_benchmark.py:594:            if _publication_from(item)
+evaluation/semantic_longtail/run_benchmark.py:596:        return len(publications) > 1
+evaluation/semantic_longtail/run_benchmark.py:600:def _state_temporal_matches_expected(state: Mapping[str, Any], truth: Mapping[str, Any]) -> bool:
+evaluation/semantic_longtail/run_benchmark.py:601:    expected = _upper(truth.get("temporal_kind"))
+evaluation/semantic_longtail/run_benchmark.py:602:    actual = _upper(state.get("temporal_kind"))
+evaluation/semantic_longtail/run_benchmark.py:604:    item_temporals = {_upper(item.get("temporal_kind")) for item in items if item.get("temporal_kind")}
+evaluation/semantic_longtail/run_benchmark.py:605:    resolved = bool(state.get("temporal_resolved"))
+evaluation/semantic_longtail/run_benchmark.py:607:        return actual == "NONE" and item_temporals <= {"", "NONE"}
+evaluation/semantic_longtail/run_benchmark.py:619:def _first_bad_state(
+evaluation/semantic_longtail/run_benchmark.py:632:    expected_pub = _publication_mode_expected(truth.get("publication_mode"))
+evaluation/semantic_longtail/run_benchmark.py:633:    expected_temporal = _upper(truth.get("temporal_kind"))
+evaluation/semantic_longtail/run_benchmark.py:634:    expected_target = _upper(truth.get("target_resolution"))
+evaluation/semantic_longtail/run_benchmark.py:635:    expected_expr = str(truth.get("temporal_expression") or "").strip()
+evaluation/semantic_longtail/run_benchmark.py:639:        pubs = {_upper(_publication_mode_expected(item)) for item in evidence.get("publications", [])}
+evaluation/semantic_longtail/run_benchmark.py:649:        # target/time evidence.  Its omission is not semantic loss.
+evaluation/semantic_longtail/run_benchmark.py:650:        if stage != "semantic_derivation" and expected_expr and not any(expected_expr in value or value in expected_expr for value in evidence.get("temporal", [])):
+evaluation/semantic_longtail/run_benchmark.py:652:        target = evidence.get("target") or {}
+evaluation/semantic_longtail/run_benchmark.py:654:        if stage != "semantic_derivation" and expected_target == "RESOLVED" and not (target or refs):
+evaluation/semantic_longtail/run_benchmark.py:656:        if stage != "semantic_derivation" and expected_target in {"AMBIGUOUS", "NOT_FOUND", "RECONCILIATION_REQUIRED"} and not (target or refs):
+evaluation/semantic_longtail/run_benchmark.py:657:            # A targetless incomplete sentence is allowed to fail later in
+evaluation/semantic_longtail/run_benchmark.py:669:    if "wrong_target" in metrics or "target_ambiguity_missed" in metrics:
+evaluation/semantic_longtail/run_benchmark.py:670:        return "TargetResolver"
+evaluation/semantic_longtail/run_benchmark.py:671:    if "wrong_time" in metrics or "UNKNOWN_should_have_been_used" in metrics or "temporal_ownership_violation" in metrics:
+evaluation/semantic_longtail/run_benchmark.py:672:        if _state_temporal_matches_expected(actual.get("state") or {}, truth):
+evaluation/semantic_longtail/run_benchmark.py:674:        return "TemporalResolver" if expected_temporal != "NONE" else "Interpreter"
+evaluation/semantic_longtail/run_benchmark.py:675:    if "wrong_publication" in metrics:
+evaluation/semantic_longtail/run_benchmark.py:676:        if _state_publication_matches_expected(actual.get("state") or {}, truth):
+evaluation/semantic_longtail/run_benchmark.py:691:    target = actual.get("target_resolution") or {}
+evaluation/semantic_longtail/run_benchmark.py:706:            "first_bad_state": _first_bad_state(case=case, actual=actual, metrics={failure_metric}),
+evaluation/semantic_longtail/run_benchmark.py:707:            "constraint_preserved": [],
+evaluation/semantic_longtail/run_benchmark.py:708:            "constraint_violated": [],
+evaluation/semantic_longtail/run_benchmark.py:709:            "target_reason": "",
+evaluation/semantic_longtail/run_benchmark.py:727:    # through TaskDelta/target evidence and may have no ResolvedSemanticItem.
+evaluation/semantic_longtail/run_benchmark.py:748:    expected_pub = _publication_mode_expected(truth.get("publication_mode"))
+evaluation/semantic_longtail/run_benchmark.py:749:    actual_pub = _upper(canonical.get("publication_mode"))
+evaluation/semantic_longtail/run_benchmark.py:751:        metrics.add("wrong_publication")
+evaluation/semantic_longtail/run_benchmark.py:753:    expected_temporal = _upper(truth.get("temporal_kind"))
+evaluation/semantic_longtail/run_benchmark.py:754:    actual_temporal = _upper(canonical.get("temporal_kind"))
+evaluation/semantic_longtail/run_benchmark.py:755:    if expected_temporal != actual_temporal or bool(truth.get("temporal_resolved")) != bool(canonical.get("temporal_resolved")):
+evaluation/semantic_longtail/run_benchmark.py:758:        metrics.add("temporal_ownership_violation")
+evaluation/semantic_longtail/run_benchmark.py:760:    expected_target = _upper(truth.get("target_resolution"))
+evaluation/semantic_longtail/run_benchmark.py:761:    target_status = _upper(target.get("status")) or "NONE"
+evaluation/semantic_longtail/run_benchmark.py:762:    target_reason = str(target.get("reason") or "")
+evaluation/semantic_longtail/run_benchmark.py:763:    if expected_target == "RECONCILIATION_REQUIRED":
+evaluation/semantic_longtail/run_benchmark.py:764:        target_ok = "reconciliation" in target_reason.casefold()
+evaluation/semantic_longtail/run_benchmark.py:765:    elif expected_target == "NONE":
+evaluation/semantic_longtail/run_benchmark.py:766:        target_ok = target_status in {"NONE", "NOT_FOUND"} and not command.get("target") and not command.get("task_changes")
+evaluation/semantic_longtail/run_benchmark.py:768:        target_ok = target_status == expected_target
+evaluation/semantic_longtail/run_benchmark.py:769:    identity = str(truth.get("target_identity") or "")
+evaluation/semantic_longtail/run_benchmark.py:770:    if target_ok and identity:
+evaluation/semantic_longtail/run_benchmark.py:772:            str(target.get("identity") or ""),
+evaluation/semantic_longtail/run_benchmark.py:773:            str((state.get("resolved_target") or {}).get("resource_id") or ""),
+evaluation/semantic_longtail/run_benchmark.py:774:            str((state.get("resolved_target") or {}).get("objective_id") or ""),
+evaluation/semantic_longtail/run_benchmark.py:775:            str((state.get("resolved_target") or {}).get("task_id") or ""),
+evaluation/semantic_longtail/run_benchmark.py:777:        identity_values.update(_command_target_identities(command))
+evaluation/semantic_longtail/run_benchmark.py:778:        target_ok = identity in identity_values
+evaluation/semantic_longtail/run_benchmark.py:779:    if not target_ok:
+evaluation/semantic_longtail/run_benchmark.py:780:        metrics.add("wrong_target")
+evaluation/semantic_longtail/run_benchmark.py:781:        if expected_target == "AMBIGUOUS":
+evaluation/semantic_longtail/run_benchmark.py:782:            metrics.add("target_ambiguity_missed")
+evaluation/semantic_longtail/run_benchmark.py:790:        if expected_target in {"AMBIGUOUS", "NOT_FOUND", "RECONCILIATION_REQUIRED"} or expected_temporal == "UNRESOLVED":
+evaluation/semantic_longtail/run_benchmark.py:793:    preserved, violated = _constraint_checks(case, command, canonical, state)
+evaluation/semantic_longtail/run_benchmark.py:794:    if truth.get("constraints") and len(preserved) < len(set(str(item).upper() for item in truth.get("constraints") or [])):
+evaluation/semantic_longtail/run_benchmark.py:795:        metrics.add("constraint_lost")
+evaluation/semantic_longtail/run_benchmark.py:797:        metrics.add("constraint_violation")
+evaluation/semantic_longtail/run_benchmark.py:805:        if before.get("publication") != after.get("publication") and before.get("publication"):
+evaluation/semantic_longtail/run_benchmark.py:811:    first_bad = _first_bad_state(case=case, actual=actual, metrics=metrics - {"exact_semantic_success"})
+evaluation/semantic_longtail/run_benchmark.py:817:        "temporal_ownership_violation",
+evaluation/semantic_longtail/run_benchmark.py:824:            "wrong_target",
+evaluation/semantic_longtail/run_benchmark.py:825:            "target_ambiguity_missed",
+evaluation/semantic_longtail/run_benchmark.py:827:            "wrong_publication",
+evaluation/semantic_longtail/run_benchmark.py:828:            "constraint_violation",
+evaluation/semantic_longtail/run_benchmark.py:834:        "first_bad_state": first_bad,
+evaluation/semantic_longtail/run_benchmark.py:835:        "constraint_preserved": sorted(preserved),
+evaluation/semantic_longtail/run_benchmark.py:836:        "constraint_violated": sorted(violated),
+evaluation/semantic_longtail/run_benchmark.py:837:        "target_reason": target_reason,
+evaluation/semantic_longtail/run_benchmark.py:855:    from greenbook_agent_core.execution.temporal_resolver import TemporalResolver
+evaluation/semantic_longtail/run_benchmark.py:869:        temporal_resolver=TemporalResolver(now=fixed_now),
+evaluation/semantic_longtail/run_benchmark.py:893:        assembled = SimpleNamespace(snapshot=SimpleNamespace(active_tasks=list(payload.get("active_tasks") or [])))
+evaluation/semantic_longtail/run_benchmark.py:894:        resolution_obj = await coordinator._resolve_target(command_obj, context, assembled=assembled)  # noqa: SLF001
+evaluation/semantic_longtail/run_benchmark.py:897:            target_resolution=resolution_obj,
+evaluation/semantic_longtail/run_benchmark.py:907:            "target_resolution": resolution or {
+evaluation/semantic_longtail/run_benchmark.py:908:                "status": "NONE" if not command.get("target") and not command.get("task_changes") else command.get("target_resolution", "NOT_FOUND")
+evaluation/semantic_longtail/run_benchmark.py:953:    first_bad: Counter[str] = Counter()
+evaluation/semantic_longtail/run_benchmark.py:978:        if evaluation.get("first_bad_state"):
+evaluation/semantic_longtail/run_benchmark.py:979:            first_bad[str(evaluation["first_bad_state"])] += 1
+evaluation/semantic_longtail/run_benchmark.py:981:        entry = by_category.setdefault(category, {"total": 0, "exact": 0, "unsafe": 0, "metrics": Counter()})
+evaluation/semantic_longtail/run_benchmark.py:1002:        entry = primary_by_category.setdefault(category, {"total": 0, "exact": 0, "unsafe": 0})
+evaluation/semantic_longtail/run_benchmark.py:1031:        "first_bad_state": dict(sorted(first_bad.items())),
+evaluation/semantic_longtail/run_benchmark.py:1178:            "observed_fields": ["raw_input", "goal", "target.reference", "items.temporal_text", "constraints"],
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:4:interprets the Command, resolves target and temporal, runs FastPathGate, and
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:24:    TargetResolutionStatus,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:25:    TargetResolver,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:32:    TargetReferenceType,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:36:from greenbook_agent_core.execution.temporal_resolver import (
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:37:    TemporalResolution,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:38:    TemporalResolver,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:64:_TERMINAL_NO_FALLBACK = {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:116:    reference = dict(getattr(delta, "target_reference", None) or {})
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:118:    publication_intent = str(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:119:        desired.get("publication_intent")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:120:        or desired.get("publication_mode")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:123:    if not publication_intent:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:125:            publication_intent = "IMMEDIATE_PUBLISH"
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:127:            publication_intent = "SCHEDULED_PUBLISH"
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:128:    constraints = dict(desired)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:129:    if publication_intent:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:130:        constraints["publication_intent"] = publication_intent
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:131:    temporal_text = str(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:155:        temporal_text=temporal_text,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:156:        constraints=constraints,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:162:    """Avoid counting one provider item and its same-target mutation twice."""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:164:    reference = getattr(delta, "target_reference", None) or {}
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:183:# Runtime must surface its failure, never be silently re-run through legacy.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:184:def _terminal_without_fallback(result: RuntimeResult) -> bool:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:185:    return result.status in _TERMINAL_NO_FALLBACK
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:196:        target_resolver: TargetResolver | Any | None = None,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:197:        temporal_resolver: TemporalResolver | Any | None = None,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:207:        self._target_resolver = target_resolver or TargetResolver()
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:208:        self._temporal_resolver = temporal_resolver or TemporalResolver()
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:247:        command_override: Any = None,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:249:        if command_override is not None:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:278:                _command_override=command_override,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:354:        target_resolution = await self._resolve_target(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:357:        resolved_target = getattr(target_resolution, "target", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:358:        resolved_target_kind = getattr(resolved_target, "kind", "")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:359:        resolved_target_kind = str(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:360:            getattr(resolved_target_kind, "value", resolved_target_kind) or ""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:364:            target_resolution=target_resolution,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:368:        # both paths.  Mirror its derived fields back onto the compatibility
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:369:        # Command so FastPath/legacy ComplexPath cannot fall back to an LLM
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:393:        # composition that has durable Task ownership.  Lightweight legacy
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:414:            target_resolution=target_resolution,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:441:        # target.  The existing loop resolves only the selected Objective's
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:451:        if has_semantic_mutation and command.target_resolution in {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:452:            TargetResolutionStatus.AMBIGUOUS.value,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:453:            TargetResolutionStatus.NOT_FOUND.value,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:473:            target_resolution=target_resolution,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:497:    async def _resolve_target(self, command: Command, context: Any, assembled: Any = None) -> Any:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:499:        # every Objective in this conversation before the active-task binding
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:501:        # owning Task; active_task_id remains only a weak fallback for an
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:503:        delta_resolution = self._resolve_delta_objective_target(command, assembled)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:505:            command.target_candidates = [
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:510:                target = getattr(delta_resolution, "target", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:511:                if target is not None:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:512:                    metadata = getattr(target, "metadata", {}) or {}
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:513:                    command.resolved_target = {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:514:                        "task_id": getattr(target, "task_id", None) or None,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:516:                        "resource_id": metadata.get("resource_id") or getattr(target, "resource_id", None),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:519:                    command.target_resolution = TargetResolutionStatus.RESOLVED.value
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:521:                status = getattr(delta_resolution, "status", TargetResolutionStatus.NOT_FOUND)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:522:                command.target_resolution = str(getattr(status, "value", status))
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:525:            command.target is not None
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:526:            and command.target.reference_type == TargetReferenceType.FAILED
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:528:        targeted_query = (
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:531:            and command.target is not None
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:534:            (not command.requires_target and not failed_reference and not targeted_query)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:535:            or not command.target
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:539:            resolution = self._target_resolver.resolve(command, context)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:542:        # A mutation whose task_changes already carry concrete resource targets
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:543:        # (needs_target_resolution=false) is grounded even when the top-level
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:544:        # target reference is a resource id the resolver can't match.  Resolve
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:546:        # UPDATE_DRAFT don't spuriously ask the user to re-specify the target.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:553:                target = getattr(resolved, "target", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:555:                    getattr(target, "task_id", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:556:                    or getattr(target, "id", "") or ""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:559:                    command.resolved_target = {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:563:                    command.target_resolution = TargetResolutionStatus.RESOLVED.value
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:564:                    command.target_candidates = [
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:573:            command.target_candidates = [
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:577:            status = getattr(resolution, "status", TargetResolutionStatus.NOT_FOUND)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:578:            command.target_resolution = str(getattr(status, "value", status)).upper()
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:580:            target = getattr(resolution, "target", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:581:            if target is not None:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:582:                command.resolved_target = {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:583:                    "task_id": getattr(target, "task_id", None) or None,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:584:                    "resource_id": getattr(target, "resource_id", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:585:                    or getattr(target, "id", None),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:587:                        getattr(getattr(target, "kind", None), "value", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:588:                        or getattr(target, "kind", "") or ""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:591:                command.target_resolution = TargetResolutionStatus.RESOLVED.value
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:594:    def _resolve_delta_objective_target(self, command: Command, assembled: Any) -> Any:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:598:        TargetResolver; it does not introduce a second index or task manager.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:605:        tasks = list(getattr(snapshot, "active_tasks", None) or ())
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:623:                        objective_resource_owner.setdefault(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:657:                constraints = dict(objective.get("constraints") or {})
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:666:                    "run_at": constraints.get("run_at"),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:667:                    "constraints": constraints,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:675:        def trace(resolution: Any, *, fallback_used: bool = False) -> Any:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:676:            target = getattr(resolution, "target", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:677:            metadata = getattr(target, "metadata", {}) or {}
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:679:                dict(getattr(change, "target_reference", None) or {})
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:681:                if getattr(change, "target_reference", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:684:                "cross_turn_target_resolution conversation_id=%s active_task_id=%s "
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:687:                "selection_reason=%s fallback_used=%s resource_bindings=%s",
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:689:                getattr(snapshot, "active_task_id", ""),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:694:                getattr(target, "task_id", "") if target is not None else "",
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:695:                metadata.get("objective_id") if target is not None else "",
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:697:                fallback_used,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:705:        resolver = self._target_resolver
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:706:        active_task_id = str(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:707:            getattr(getattr(assembled, "snapshot", None), "active_task_id", "") or ""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:716:            reference = getattr(change, "target_reference", None) or {}
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:720:            # to active_task_id/latest focus, which would hide ambiguity.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:724:                active_task_id=active_task_id,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:726:                    getattr(getattr(assembled, "snapshot", None), "active_task_id", "") or ""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:730:            if getattr(value, "is_resolved", False) and getattr(value, "target", None) is not None:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:731:                target = value.target
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:732:                metadata = getattr(target, "metadata", {}) or {}
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:750:                    desired["target_objective_id"] = objective_id
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:753:                    ref["target_objective_id"] = objective_id
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:755:                    change.target_reference = ref
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:761:            str(getattr(item.target, "task_id", "") or "")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:763:            if getattr(item, "target", None) is not None
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:768:            from greenbook_agent_core.command.target import Ambiguous
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:773:        """Resolve the owning Task from a mutation's concrete resource targets.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:776:        (needs_target_resolution=false) is grounded on that resource's owner.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:778:        TargetResolver (``resolve_task_delta``) rather than hand-matching the
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:785:            or getattr(getattr(assembled, "snapshot", None), "active_tasks", None)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:789:            if getattr(change, "needs_target_resolution", True):
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:791:            resolution = self._target_resolver.resolve_task_delta(change, tasks)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:796:    def _resolve_temporal(self, command: Command, timezone: str) -> str | None:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:797:        """Compatibility accessor backed by the canonical semantic resolver."""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:800:            target_resolution=None,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:808:        target_resolution: Any,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:813:        top_constraints = dict(command.constraints or {})
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:826:        resolved_target = dict(command.resolved_target or {})
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:827:        target_candidates = list(command.target_candidates or [])
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:828:        target_reference = (
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:829:            command.target.model_dump(mode="json") if command.target is not None else {}
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:831:        if target_resolution is not None and getattr(target_resolution, "target", None) is not None:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:832:            target = target_resolution.target
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:833:            resolved_target = {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:834:                **resolved_target,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:835:                "task_id": getattr(target, "task_id", None) or None,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:836:                "objective_id": (getattr(target, "metadata", {}) or {}).get("objective_id"),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:837:                "resource_id": getattr(target, "resource_id", None) or getattr(target, "id", None),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:838:                "kind": str(getattr(getattr(target, "kind", None), "value", "") or getattr(target, "kind", "") or "").upper(),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:840:        if target_resolution is not None:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:841:            target_candidates = [
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:843:                for candidate in (getattr(target_resolution, "candidates", None) or [])
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:847:            (item, dict(target_reference), False) for item in (command.items or ())
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:857:                item, item_target = projected
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:858:                semantic_item_inputs.append((item, item_target, True))
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:860:        request_intent = self._publication_intent(top_constraints)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:864:            for item, _item_target, _is_delta in semantic_item_inputs
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:865:            if (intent := self._publication_intent(dict(getattr(item, "constraints", {}) or {})))
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:869:            # turn a title-only/update-draft delta into a publication goal.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:877:            # Preserve the item-level publication facts as MIXED instead.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:881:                bool(self._publication_intent(dict(getattr(item, "constraints", {}) or {})))
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:882:                for item, _item_target, _is_delta in semantic_item_inputs
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:887:                # An item without publication evidence must not inherit the
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:894:        temporal_resolutions: list[TemporalResolution] = []
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:895:        temporal_signatures: list[str] = []
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:896:        for item, item_target_reference, is_delta in semantic_item_inputs:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:897:            constraints = dict(getattr(item, "constraints", {}) or {})
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:898:            temporal_text = str(getattr(item, "temporal_text", "") or "").strip()
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:900:                constraints.get("run_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:901:                or constraints.get("publish_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:902:                or constraints.get("scheduled_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:907:                    top_constraints.get("run_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:908:                    or top_constraints.get("publish_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:909:                    or top_constraints.get("scheduled_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:912:            temporal_input = temporal_text or explicit_time
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:913:            item_intent = self._publication_intent(constraints)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:919:            item_temporal = TemporalResolution(timezone=timezone)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:920:            if temporal_input:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:921:                item_temporal = self._temporal_resolver.resolve_result(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:922:                    temporal_input,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:923:                    constraints=({"type": "TIME", "value": temporal_input},),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:931:            if not temporal_input and item_intent in {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:940:                # the absence of a parser result as temporal NONE.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:941:                item_temporal = TemporalResolution(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:947:            if not temporal_input and item_intent in {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:952:                item_temporal = TemporalResolution(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:957:            if item_temporal.intent != "NONE":
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:958:                temporal_resolutions.append(item_temporal)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:959:                temporal_signatures.append(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:960:                    str(item_temporal.run_at or temporal_input or item_temporal.temporal_kind)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:962:            item_run_at = item_temporal.run_at
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:965:                constraints["run_at"] = str(item_run_at)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:966:                constraints["timezone"] = timezone
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:967:            if item_temporal.intent != "NONE":
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:968:                constraints["temporal_kind"] = item_temporal.temporal_kind
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:969:                constraints["temporal_resolved"] = bool(item_temporal.resolved)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:970:                if item_temporal.unresolved_reason:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:971:                    constraints["temporal_unresolved_reason"] = item_temporal.unresolved_reason
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:978:                publication_intent=item_intent,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:979:                temporal_text=temporal_text,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:980:                temporal_kind=item_temporal.temporal_kind,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:982:                temporal_resolved=bool(item_temporal.resolved),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:983:                constraints=constraints,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:984:                target_reference=dict(item_target_reference),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:989:            temporal_input = str(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:990:                top_constraints.get("run_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:991:                or top_constraints.get("publish_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:992:                or top_constraints.get("scheduled_at")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:996:            if temporal_input:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:997:                temporal_resolution = self._temporal_resolver.resolve_result(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:999:                    constraints=({"type": "TIME", "value": temporal_input},),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1002:                temporal_resolutions.append(temporal_resolution)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1003:                run_at = temporal_resolution.run_at
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1005:                    top_constraints["run_at"] = str(run_at)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1006:                    top_constraints["timezone"] = timezone
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1008:        target_status = str(getattr(command, "target_resolution", "") or "").upper()
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1011:        # target cardinality, and TemporalResolver results below.
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1013:        if any(bool(getattr(delta, "needs_target_resolution", False)) for delta in command.task_changes or ()):
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1016:        if target_status in {TargetResolutionStatus.AMBIGUOUS.value, TargetResolutionStatus.NOT_FOUND.value}:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1018:            clarification_reason = "ambiguous_target" if target_status == TargetResolutionStatus.AMBIGUOUS.value else "target_unresolved"
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1020:            resolution.intent == "FUTURE" for resolution in temporal_resolutions
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1024:            for resolution in temporal_resolutions
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1028:            if target_status not in {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1029:                TargetResolutionStatus.AMBIGUOUS.value,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1030:                TargetResolutionStatus.NOT_FOUND.value,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1034:        item_temporal_kinds = {
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1035:            resolution.temporal_kind
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1036:            for resolution in temporal_resolutions
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1039:        if len(set(temporal_signatures)) > 1 or len(item_temporal_kinds) > 1:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1040:            temporal_kind = "MIXED"
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1041:        elif item_temporal_kinds:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1042:            temporal_kind = next(iter(item_temporal_kinds))
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1044:            temporal_kind = "UNRESOLVED"
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1046:            temporal_kind = "NOW"
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1048:            temporal_kind = "NONE"
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1049:        temporal_requirements_resolved = bool(temporal_resolutions) and all(
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1050:            resolution.resolved for resolution in temporal_resolutions
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1052:        temporal_resolved = (
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1053:            temporal_requirements_resolved
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1056:        top_constraints["temporal_kind"] = temporal_kind
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1057:        top_constraints["temporal_resolved"] = temporal_resolved
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1063:            publication_intent=global_intent,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1064:            target_type=str(getattr(command.target, "kind", "") or "").upper(),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1065:            target_reference=target_reference,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1066:            resolved_target=resolved_target,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1067:            target_candidates=target_candidates,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1068:            temporal_kind=temporal_kind,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1070:            temporal_resolved=temporal_resolved,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1071:            constraints=top_constraints,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1084:                    "publication_intent": item.publication_intent,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1085:                    "temporal_kind": item.temporal_kind,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1086:                    "temporal_resolved": item.temporal_resolved,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1088:                    "constraints": dict(item.constraints),
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1095:    def _publication_intent(constraints: Mapping[str, Any]) -> str:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1096:        for key in ("publication_intent", "publication_mode", "content_state"):
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1097:            value = str(constraints.get(key) or "").strip().upper().replace("-", "_")
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1100:        if constraints.get("publish_now") is True:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1102:        if constraints.get("schedule") is True or constraints.get("publish") is True:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1135:        if _terminal_without_fallback(result) or boundary.can_fallback():
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1288:            (getattr(command, "resolved_target", None) or {}).get("task_id") or ""
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1322:                (getattr(command, "resolved_target", None) or {}), exc,
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1330:                error_code="TARGET_CLARIFICATION_REQUIRED",
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1336:    def _capability_requires_legacy(self, command: Command) -> bool:
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1342:        treated as migrated/new-path (no generic legacy fallback).
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1369:            if decision.reason in {"ambiguous_target", "target_unresolved"}
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1386:                    # target matching or hand the clarification layer every
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1389:                        (command.resolved_semantics.target_candidates
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1391:                         else command.target_candidates)
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1435:        "ambiguous_target": "AMBIGUOUS_TARGET",
+apps/agent_api/greenbook_agent_api/services/turn_coordinator.py:1436:        "target_unresolved": "TARGET_CLARIFICATION_REQUIRED",
+packages/agent_core/greenbook_agent_core/command\correction.py:19:    original_target: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\correction.py:20:    corrected_target: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:19:from greenbook_agent_core.llm_compat import extract_top_level_json, structured_call
+packages/agent_core/greenbook_agent_core/command\interpreter.py:24:    CommandTarget,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:30:    TargetKind,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:31:    TargetReferenceType,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:38:from .target import TargetResolutionStatus, TargetResolver
+packages/agent_core/greenbook_agent_core/command\interpreter.py:59:        target_resolver: TargetResolver | None = None,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:65:        self._target_resolver = target_resolver or TargetResolver()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:117:        repair_triggered = _looks_like_merged_multi_objective(text, structured)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:145:        # responses, including legacy provider fallbacks that omit ``items``,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:174:        structured = _materialize_request_publication_constraints(structured)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:186:            first_action=structured.first_action,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:189:            target=structured.target,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:192:            constraints=structured.constraints,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:212:        # Keep the single structured candidate authoritative.  The compatibility
+packages/agent_core/greenbook_agent_core/command\interpreter.py:215:        # publication requirement from another field or from raw text.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:222:                "publication_intent": command.constraints.get("publication_intent", ""),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:242:            command.target_resolution = "NOT_APPLICABLE"
+packages/agent_core/greenbook_agent_core/command\interpreter.py:243:        elif command.requires_target and not (
+packages/agent_core/greenbook_agent_core/command\interpreter.py:245:            and command.target_resolution == TargetResolutionStatus.RESOLVED.value
+packages/agent_core/greenbook_agent_core/command\interpreter.py:248:            self._resolve_target(command, command_context)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:266:        Span grouping is a bounded fallback for the one-item shape.  Once the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:269:        ownership (for example, immediate versus scheduled publication).
+packages/agent_core/greenbook_agent_core/command\interpreter.py:270:        Preserve that structured cardinality and its constraints.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:302:                grouped.setdefault(group_id, []).append(span)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:306:                merged_text = " ".join(span.text for span in group_spans).strip()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:314:                    title = merged_text[:240]
+packages/agent_core/greenbook_agent_core/command\interpreter.py:315:                base_constraints = dict(base.get("constraints") or {})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:316:                item_intent = _publication_intent_from_constraints(base_constraints)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:318:                    item_intent = _publication_intent_from_constraints(
+packages/agent_core/greenbook_agent_core/command\interpreter.py:319:                        structured.constraints
+packages/agent_core/greenbook_agent_core/command\interpreter.py:321:                temporal_text = str(base.get("temporal_text") or "").strip()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:323:                # expression.  Only use it as a temporal fallback when the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:326:                # ordinary prose must never become a publication time.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:327:                if not temporal_text and item_intent in {
+packages/agent_core/greenbook_agent_core/command\interpreter.py:334:                    temporal_text = merged_text
+packages/agent_core/greenbook_agent_core/command\interpreter.py:339:                    "requirements": [merged_text],
+packages/agent_core/greenbook_agent_core/command\interpreter.py:342:                    # Keep explicit per-item temporal evidence.  The span is
+packages/agent_core/greenbook_agent_core/command\interpreter.py:343:                    # only a fallback for an already scheduled item; it is
+packages/agent_core/greenbook_agent_core/command\interpreter.py:344:                    # never a generic temporal input.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:345:                    "temporal_text": temporal_text,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:370:        one connected pipeline or several merged deliverables.  The first
+packages/agent_core/greenbook_agent_core/command\interpreter.py:373:        applied independently to each segment and the results are merged
+packages/agent_core/greenbook_agent_core/command\interpreter.py:400:            # Preserve those placeholder entries; filtering them would merge
+packages/agent_core/greenbook_agent_core/command\interpreter.py:401:            # independent outcomes back into the fallback item.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:413:                            str(segment.temporal_text or "").strip(),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:414:                            bool(segment.constraints),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:415:                            bool(segment.target_reference),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:445:                                str(segment.temporal_text or "").strip(),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:446:                                bool(segment.constraints),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:447:                                bool(segment.target_reference),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:460:                fallback = structured.items[0].model_dump(mode="python")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:462:                    **fallback,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:463:                    "operation": segment.operation_hint or fallback.get("operation", "CREATE"),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:464:                    "topic": segment.topic or fallback.get("topic", ""),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:465:                    "title": segment.title or segment.topic or fallback.get("title", ""),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:466:                    "requirements": list(segment.requirements or fallback.get("requirements") or ()),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:467:                    "temporal_text": segment.temporal_text or fallback.get("temporal_text", ""),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:468:                    "constraints": {
+packages/agent_core/greenbook_agent_core/command\interpreter.py:469:                        **dict(fallback.get("constraints") or {}),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:470:                        **dict(segment.constraints or {}),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:473:                segment_intent = _publication_intent_from_constraints(item["constraints"])
+packages/agent_core/greenbook_agent_core/command\interpreter.py:479:                        not in _SCHEDULE_PUBLICATION_CAPABILITIES
+packages/agent_core/greenbook_agent_core/command\interpreter.py:486:                if segment.target_reference:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:487:                    item["constraints"]["target_reference"] = dict(segment.target_reference)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:493:            merged = structured.model_dump(mode="python")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:494:            merged["items"] = extracted
+packages/agent_core/greenbook_agent_core/command\interpreter.py:495:            return StructuredCommandOutput.model_validate(merged)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:501:        """Deterministically fill a missing/weak target when the LLM omitted one.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:505:        coarse time window) overrides a weak model target — a bare label,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:506:        ACTIVE, or a non-TASK resource reference that would otherwise resolve
+packages/agent_core/greenbook_agent_core/command\interpreter.py:508:        TargetResolver still owns candidate selection and the bind/clarify
+packages/agent_core/greenbook_agent_core/command\interpreter.py:514:        llm_target = command.target
+packages/agent_core/greenbook_agent_core/command\interpreter.py:517:            if llm_target is not None:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:518:                command.target = llm_target.model_copy(
+packages/agent_core/greenbook_agent_core/command\interpreter.py:522:                        "reference_type": TargetReferenceType.IDENTIFIER,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:526:            command.target = feature.to_command_target()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:528:        extracted = feature.to_command_target()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:529:        if llm_target is None:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:530:            command.target = extracted
+packages/agent_core/greenbook_agent_core/command\interpreter.py:532:        if self._llm_target_is_specific(llm_target):
+packages/agent_core/greenbook_agent_core/command\interpreter.py:534:        command.target = extracted
+packages/agent_core/greenbook_agent_core/command\interpreter.py:537:    def _llm_target_is_specific(target: CommandTarget) -> bool:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:538:        """A model target is concrete only when it pins an owned Task identity.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:546:        if target.task_id:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:548:        return target.kind == TargetKind.TASK and bool(target.explicit_id)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:697:    def _resolve_target(self, command: Command, context: CommandContext) -> None:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:698:        if command.target is None:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:699:            command.target_resolution = TargetResolutionStatus.NOT_FOUND.value
+packages/agent_core/greenbook_agent_core/command\interpreter.py:700:            _observe_target_resolution(command, TargetResolutionStatus.NOT_FOUND.value)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:702:        resolution = self._target_resolver.resolve(command, context)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:703:        command.target_resolution = resolution.status.value
+packages/agent_core/greenbook_agent_core/command\interpreter.py:704:        command.target_candidates = [
+packages/agent_core/greenbook_agent_core/command\interpreter.py:708:        _observe_target_resolution(command, resolution.status.value)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:709:        if resolution.is_resolved and resolution.target is not None:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:710:            candidate = resolution.target
+packages/agent_core/greenbook_agent_core/command\interpreter.py:711:            command.resolved_target = candidate.model_dump(mode="json")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:712:            command.target = command.target.model_copy(
+packages/agent_core/greenbook_agent_core/command\interpreter.py:721:def _observe_target_resolution(command: Command, status: str) -> None:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:725:        observability().target_resolution().inc(status=status)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:757:# mutation while the conversation already has an owned publication target.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:758:_PUBLICATION_WORDS = (
+packages/agent_core/greenbook_agent_core/command\interpreter.py:766:_IMMEDIATE_PUBLICATION_CUES = (
+packages/agent_core/greenbook_agent_core/command\interpreter.py:777:_PUBLICATION_STATUS_CUES = (
+packages/agent_core/greenbook_agent_core/command\interpreter.py:797:    text.  A POST target plus an explicit destructive command must never be
+packages/agent_core/greenbook_agent_core/command\interpreter.py:800:    target = command.target
+packages/agent_core/greenbook_agent_core/command\interpreter.py:801:    if target is None or target.kind != TargetKind.POST:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:809:    command.first_action = "DELETE_POST"
+packages/agent_core/greenbook_agent_core/command\interpreter.py:812:    post_id = target.explicit_id or target.reference
+packages/agent_core/greenbook_agent_core/command\interpreter.py:814:        command.target_resolution = TargetResolutionStatus.RESOLVED.value
+packages/agent_core/greenbook_agent_core/command\interpreter.py:815:        command.resolved_target = {"kind": "POST", "id": post_id, "resource_id": post_id}
+packages/agent_core/greenbook_agent_core/command\interpreter.py:819:            target_reference={"reference_type": "IDENTIFIER", "id": post_id, "kind": "POST"},
+packages/agent_core/greenbook_agent_core/command\interpreter.py:836:        """Bounded semantic shape repair for an obviously merged output."""
+packages/agent_core/greenbook_agent_core/command\interpreter.py:842:                + "\nThe previous output is malformed: the user supplied multiple independent publish times but you returned one item. Return the same schema with one atomic CommandItem per independent final deliverable. Keep each item's title, topic, capabilities, and temporal_text together. Do not split dependent steps such as SEARCH/ANALYZE/GENERATE within one deliverable.",
+packages/agent_core/greenbook_agent_core/command\interpreter.py:867:                target_reference={"reference_type": "ACTIVE"},
+packages/agent_core/greenbook_agent_core/command\interpreter.py:875:    """Remove hallucinated publication work from an explicit draft-only turn.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:878:    but publication must never be inferred when the user explicitly asks to
+packages/agent_core/greenbook_agent_core/command\interpreter.py:884:    constraints = command.constraints if isinstance(command.constraints, Mapping) else {}
+packages/agent_core/greenbook_agent_core/command\interpreter.py:885:    intents = [constraints.get("publication_intent"), constraints.get("publication_mode"), constraints.get("content_state")]
+packages/agent_core/greenbook_agent_core/command\interpreter.py:887:        item_constraints = getattr(item, "constraints", {})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:888:        if isinstance(item_constraints, Mapping):
+packages/agent_core/greenbook_agent_core/command\interpreter.py:889:            intents.extend([item_constraints.get("publication_intent"), item_constraints.get("publication_mode"), item_constraints.get("content_state")])
+packages/agent_core/greenbook_agent_core/command\interpreter.py:891:        _publication_intent_from_constraints(getattr(item, "constraints", {}))
+packages/agent_core/greenbook_agent_core/command\interpreter.py:894:    top_intent = _publication_intent_from_constraints(constraints)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:896:    # different publication outcome.  A mixed draft/scheduled request must
+packages/agent_core/greenbook_agent_core/command\interpreter.py:897:    # retain its per-item publication ownership.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:905:    ) or any(value is False for value in (constraints.get("publish"), constraints.get("schedule"), constraints.get("publish_now")))
+packages/agent_core/greenbook_agent_core/command\interpreter.py:908:    # Draft-only describes the final publication outcome.  It must not erase
+packages/agent_core/greenbook_agent_core/command\interpreter.py:911:    # Remove only publication mutations, then keep the remaining semantic
+packages/agent_core/greenbook_agent_core/command\interpreter.py:913:    publication_capabilities = {
+packages/agent_core/greenbook_agent_core/command\interpreter.py:924:        if str(capability).upper() not in publication_capabilities
+packages/agent_core/greenbook_agent_core/command\interpreter.py:928:    command.first_action = (
+packages/agent_core/greenbook_agent_core/command\interpreter.py:935:    command.constraints = {
+packages/agent_core/greenbook_agent_core/command\interpreter.py:937:        for key, value in (command.constraints or {}).items()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:940:            "publication_intent", "publication_mode", "content_state",
+packages/agent_core/greenbook_agent_core/command\interpreter.py:947:            if str(capability).upper() not in publication_capabilities
+packages/agent_core/greenbook_agent_core/command\interpreter.py:989:or publication times are two deliverables.  For each deliverable fill its own
+packages/agent_core/greenbook_agent_core/command\interpreter.py:990:operation_hint, entity_type, topic, title, requirements, temporal_text,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:991:constraints, and target_reference.  Preserve per-deliverable
+packages/agent_core/greenbook_agent_core/command\interpreter.py:992:publication_intent such as SCHEDULED_PUBLISH or DRAFT_ONLY when publication
+packages/agent_core/greenbook_agent_core/command\interpreter.py:993:outcomes differ.  A future publication requirement without a concrete time
+packages/agent_core/greenbook_agent_core/command\interpreter.py:994:keeps publication_intent=SCHEDULED_PUBLISH with an empty temporal_text; do not
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1009:deliverable.  Never merge independent articles just because they share one
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1012:requirements, constraints, and publication time.  Preserve explicitly requested
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1016:keep constraints.publication_intent=SCHEDULED_PUBLISH and temporal_text empty;
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1069:entities, constraints, references, ambiguity, publication requirements,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1070:temporal expressions, and target references.  ``semantic_operation``,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1071:``required_capabilities``, ``first_action``, ``request_complexity``,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1072:``needs_clarification``, ``temporal_kind``, ``temporal_resolved``, and ``run_at``
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1073:are compatibility fields or evidence only: the runtime deterministically
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1074:derives their canonical values after item normalization.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1079:publication requirement, target/reference, temporal expression, deliverable
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1080:ownership, content constraints, and dependencies.  The runtime derives the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1081:canonical capabilities and first action from those facts.  It also derives
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1089:CONTINUE_TASK / NO_CHANGE / ASK_USER), a target_reference identifying the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1091:(for UPDATE_GOAL: run_at / description / publication state), and optional
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1092:dependency_reference / source_reference. target_reference is a reference, not
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1094:that cannot be safely grounded sets needs_target_resolution true. task_changes
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1113:temporal_base: CURRENT_TIME for "十分钟后", EXISTING_SCHEDULE_TIME for
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1119:Use the conversation history, summary, active tasks, unfinished goals, and
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1120:structured target candidates to understand follow-up turns.  When the user
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1121:refers to an existing task or artifact, emit a structured target/reference and
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1122:prefer reference_type ACTIVE only when the conversation context establishes an
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1123:active object.  A follow-up such as changing an existing task should modify the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1124:existing target rather than silently creating a new task.  Set
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1126:boolean needs_clarification value as the final routing decision.  Target
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1127:cardinality, temporal resolution, and semantic validation determine the final
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1128:clarification state; do not guess an identity.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1131:visible in context, do not copy one into a target unless the user supplied it
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1133:as "Java 那篇" or "Redis 那篇" is label/reference evidence, not ACTIVE and
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1134:not permission to select the active/latest object; use the label field with
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1136:attribute/property match. Use ACTIVE/RECENT/LATEST
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1137:only when the user explicitly uses a recentness expression (for example
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1138:"刚刚那篇" or "最新那篇"); never synthesize those types as a fallback, and
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1139:never turn a new CREATE into MODIFY merely because context has active tasks.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1142:target_reference so the runtime can resolve them deterministically:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1143:- a content label ("Java 那篇") -> target_reference.label set to the quoted
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1145:- an ordinal ("第三篇", "第一篇") -> target_reference.ordinal (1-based
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1147:- the most recent object ("刚刚那篇", "最新那篇") -> reference_type ACTIVE
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1150:- a publication-time window ("下午那篇") -> target_reference.label may carry
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1158:source_reference.user_triggered_retry=true, and target_reference.reference_type
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1164:semantic_action in desired_changes: PUBLISH_NOW for a failed publication, or
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1170:targets. A retry with an existing Draft reuses that Draft and continues the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1179:An active_task, active_target, unfinished Goal, similar history, or previous
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1182:outcome (for example search + analysis + article + future publication) is
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1183:NEW_WORK/CREATE even when an earlier Task remains active.  Emit UPDATE_GOAL or
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1187:target_reference.reference_type=ACTIVE for an explicitly task-relative
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1189:needs_target_resolution to true; never emit an empty goal_id and never silently
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1193:ordered target, PROPERTY with property and value for an attribute match, and
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1194:TEMPORAL with ISO after/before bounds for a time-window match.  Do not emit MCP
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1205:outcome, but must not include capabilities whose required target or evidence
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1209:engagement metrics, account performance, or supplies an eligible target. Do
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1216:SCHEDULE_PUBLISH for a future publication and PUBLISH_NOW only for an explicit
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1217:immediate publication. When the user explicitly says publication must wait for
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1218:their confirmation, record the structured constraint {"requires_approval":
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1219:true}; do not infer that constraint for an ordinary future schedule.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1221:Publication intent is independent from whether a concrete time is known. If
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1222:the requested outcome includes future publication but the user did not supply
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1223:enough temporal detail, preserve the request-level structured evidence with
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1224:constraints.publication_intent="SCHEDULED_PUBLISH", include SCHEDULE_PUBLISH
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1225:in required_capabilities, leave temporal_text/run_at empty when no time was
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1226:given, and set needs_clarification=true. This is unresolved future publication,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1227:not publication intent NONE and never PUBLISH_NOW. When several deliverables
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1228:are present, put the same intent on each affected item's constraints when the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1230:item-specific publication evidence separate.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1232:Distinguish an immediate publication mutation from a status question by the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1234:imperative immediate-publication cue (publish/send it directly, do not wait,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1237:what status a publication has remain QUERY/read actions.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1239:When the requested outcome is draft-only, set constraints.publication_intent to
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1243:Publication intent is evidence, not a product default. If the user only asks
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1245:publish-now, or future publication, leave publication_intent absent (NONE or
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1246:UNKNOWN); when the field is present, use exactly UNKNOWN. Do not infer DRAFT_ONLY from CREATE, GENERATE_CONTENT, or a retry
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1248:decided" also leaves publication intent absent while preserving that
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1249:undecided constraint. A later product policy may save content as a draft, but
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1250:that policy is not semantic evidence. A plain retry of a failed publication
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1254:Negative and preservation constraints have the same priority as positive
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1258:new CREATE; keep its semantic target label, leave publication intent absent,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1261:When one request contains several independent content targets,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1263:request-wide concrete run_at, target, or action value to represent every
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1264:target; preserve those values for the Goal Runtime to attach to the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1265:corresponding Goal. A shared unresolved publication requirement is different:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1266:constraints.publication_intent="SCHEDULED_PUBLISH" may be request-level when
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1270:publication request.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1273:TaskDelta. Keep that item's target, action, publication intent, temporal
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1274:expression, and constraints together; do not copy a sibling's value, and do
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1275:not emit mutations for other active tasks that the user did not mention.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1285:represent the meaning without inventing a target ID: set semantic_operation to
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1287:and risk to BROAD_DESTRUCTIVE. Do not turn it into a normal target-not-found
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1290:Deliverable-first contract for new work:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1294:independent deliverable; do not merge items merely because they occur in one
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1296:language requirements for the deliverable), and temporal_text/run_at.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1303:Capabilities may be included as canonical high-level metadata for compatibility,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1311:publication) is ONE outcome, not several: keep it as one item; do not emit an execution plan here.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1315:_SCHEDULED_PUBLICATION_INTENTS = frozenset({
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1324:_DRAFT_PUBLICATION_INTENTS = frozenset({"DRAFT", "DRAFT_ONLY", "SAVE_AS_DRAFT"})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1325:_IMMEDIATE_PUBLICATION_INTENTS = frozenset({"IMMEDIATE", "IMMEDIATE_PUBLISH", "NOW", "PUBLISH_NOW"})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1326:_SCHEDULE_PUBLICATION_CAPABILITIES = frozenset({
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1335:def _canonical_publication_intent(value: Any) -> str:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1337:    if normalized in _SCHEDULED_PUBLICATION_INTENTS:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1339:    if normalized in _DRAFT_PUBLICATION_INTENTS:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1341:    if normalized in _IMMEDIATE_PUBLICATION_INTENTS:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1346:def _publication_intent_from_constraints(value: Any) -> str:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1349:    for key in ("publication_intent", "publication_mode", "content_state"):
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1350:        intent = _canonical_publication_intent(value.get(key))
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1362:def _request_publication_intent(structured: StructuredCommandOutput) -> str:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1363:    """Read only explicit request-level publication evidence.
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1365:    Capabilities, operation names, and temporal text are not publication
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1371:        structured.constraints,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1375:        intent = _publication_intent_from_constraints(container)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1382:        intent = _publication_intent_from_constraints(desired)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1388:def _item_publication_evidence(item: Mapping[str, Any]) -> str:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1389:    return _publication_intent_from_constraints(item.get("constraints"))
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1392:def _materialize_request_publication_constraints(
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1395:    """Preserve a structured future-publication requirement on each item."""
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1399:    request_intent = _request_publication_intent(structured)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1405:    evidence = [_item_publication_evidence(item) for item in items]
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1413:        target_indexes = [
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1418:        target_indexes = list(range(len(items)))
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1420:    request_constraints = dict(payload.get("constraints") or {})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1421:    request_constraints.setdefault("publication_intent", "SCHEDULED_PUBLISH")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1422:    payload["constraints"] = request_constraints
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1430:        if index not in target_indexes:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1432:        item_constraints = dict(item.get("constraints") or {})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1433:        item_intent = _publication_intent_from_constraints(item_constraints)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1436:        item_constraints.setdefault("publication_intent", "SCHEDULED_PUBLISH")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1437:        item["constraints"] = item_constraints
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1444:            for key in ("temporal_text", "run_at", "publish_at", "scheduled_at")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1446:            str(item_constraints.get(key) or "").strip()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1447:            for key in ("temporal_text", "run_at", "publish_at", "scheduled_at")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1461:    This is a shape repair only: it never infers targets from user-language
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1475:        key in {"titles", "topics", "temporal_texts", "publish_times", "deliverables", "items"}
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1483:            constraints = dict(desired.get("constraints") or {})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1490:                "temporal_text": str(
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1491:                    desired.get("temporal_text") or constraints.get("temporal_text")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1493:                    or constraints.get("publish_at") or constraints.get("run_at") or ""
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1495:                "constraints": constraints,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1500:        constraints = dict(item.get("constraints") or {})
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1502:            key: value for key, value in constraints.items()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1506:        # CREATE_TASK delta instead of the CommandItem constraints.  This is
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1512:                if key in {"titles", "topics", "temporal_texts", "publish_times", "deliverables", "items"} and isinstance(value, list) and len(value) > 1:
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1513:                    list_fields.setdefault(key, value)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1519:                child_constraints = {
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1522:                    for key, value in constraints.items()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1524:                child["constraints"] = child_constraints
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1525:                for source, target in (("titles", "title"), ("topics", "topic"), ("temporal_texts", "temporal_text"), ("publish_times", "temporal_text")):
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1528:                        child[target] = str(values[index] if index < len(values) else values[-1])
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1535:                            for key in ("title", "topic", "requirements", "temporal_text", "constraints", "capabilities")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1567:    temporal_text = str(
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1568:        parameters.get("temporal_text")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1579:        "temporal_text": temporal_text,
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1580:        "constraints": dict(payload.get("constraints") or {}),
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1585:def _looks_like_merged_multi_objective(
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1595:    constraints = item.get("constraints") or {}
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1598:        for key, value in constraints.items()
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1599:        if key in {"titles", "topics", "temporal_texts", "publish_times", "deliverables", "items"}
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1664:    Never invents business facts: it only coerces the shape of fields the
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1678:    for key in ("constraints", "parameters", "entities"):
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1711:    target = repaired.get("target")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1712:    if isinstance(target, Mapping):
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1713:        kind = target.get("kind")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1715:            target = dict(target)
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1716:            target["kind"] = str(kind).strip().upper().replace("-", "_")
+packages/agent_core/greenbook_agent_core/command\interpreter.py:1717:            repaired["target"] = target
+packages/agent_core/greenbook_agent_core/command\__init__.py:14:    CommandTarget,
+packages/agent_core/greenbook_agent_core/command\__init__.py:22:    TargetKind,
+packages/agent_core/greenbook_agent_core/command\__init__.py:23:    TargetReferenceType,
+packages/agent_core/greenbook_agent_core/command\__init__.py:26:    DerivedSemanticFacts,
+packages/agent_core/greenbook_agent_core/command\__init__.py:28:    derive_semantic_facts,
+packages/agent_core/greenbook_agent_core/command\__init__.py:30:from .target import (
+packages/agent_core/greenbook_agent_core/command\__init__.py:35:    TargetCandidate,
+packages/agent_core/greenbook_agent_core/command\__init__.py:36:    TargetResolution,
+packages/agent_core/greenbook_agent_core/command\__init__.py:37:    TargetResolutionStatus,
+packages/agent_core/greenbook_agent_core/command\__init__.py:38:    TargetResolver,
+packages/agent_core/greenbook_agent_core/command\__init__.py:39:    UnifiedTargetResolver,
+packages/agent_core/greenbook_agent_core/command\__init__.py:48:    "DerivedSemanticFacts",
+packages/agent_core/greenbook_agent_core/command\__init__.py:52:    "CommandTarget",
+packages/agent_core/greenbook_agent_core/command\__init__.py:57:    "derive_semantic_facts",
+packages/agent_core/greenbook_agent_core/command\__init__.py:66:    "TargetCandidate",
+packages/agent_core/greenbook_agent_core/command\__init__.py:67:    "TargetKind",
+packages/agent_core/greenbook_agent_core/command\__init__.py:68:    "TargetReferenceType",
+packages/agent_core/greenbook_agent_core/command\__init__.py:69:    "TargetResolution",
+packages/agent_core/greenbook_agent_core/command\__init__.py:70:    "TargetResolutionStatus",
+packages/agent_core/greenbook_agent_core/command\__init__.py:71:    "TargetResolver",
+packages/agent_core/greenbook_agent_core/command\__init__.py:72:    "UnifiedTargetResolver",
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:3:The LLM is the primary source for ``target_reference``; this module is a
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:4:deterministic fallback so a follow-up turn still resolves when the model omits
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:7:it never decides which resource is the target.  ``TargetResolver`` owns
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:18:from .models import CommandTarget, TargetKind, TargetReferenceType
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:20:# Coarse time words that map to a run_at hour window (mirrors target._time_window).
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:25:# Recency markers: the most recent conversation object.
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:47:# A time word is a target reference only when it directly precedes the
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:49:# where 下午 is the desired new run_at, not the target).
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:57:# grammar here is important because the model may omit ``target`` entirely
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:65:    r"(?P<noun>posts?|articles?|drafts?|schedules?|publications?)\b",
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:70:    "草稿": TargetKind.DRAFT,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:71:    "发布计划": TargetKind.SCHEDULE,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:72:    "排程": TargetKind.SCHEDULE,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:73:    "定时任务": TargetKind.SCHEDULE,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:74:    "帖子": TargetKind.POST,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:75:    "文章": TargetKind.POST,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:76:    "内容": TargetKind.POST,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:77:    "draft": TargetKind.DRAFT,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:78:    "drafts": TargetKind.DRAFT,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:79:    "schedule": TargetKind.SCHEDULE,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:80:    "schedules": TargetKind.SCHEDULE,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:81:    "publication": TargetKind.SCHEDULE,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:82:    "publications": TargetKind.SCHEDULE,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:83:    "post": TargetKind.POST,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:84:    "posts": TargetKind.POST,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:85:    "article": TargetKind.POST,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:86:    "articles": TargetKind.POST,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:92:    """One deterministic reference feature, ready to project onto CommandTarget."""
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:94:    kind: TargetKind = TargetKind.TASK
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:96:    reference_type: TargetReferenceType = TargetReferenceType.NONE
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:101:    temporal_word: str | None = None
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:105:    def to_command_target(self) -> CommandTarget:
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:107:            return CommandTarget(
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:108:                kind=self.kind, id=self.id, reference_type=TargetReferenceType.IDENTIFIER
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:111:            return CommandTarget(
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:113:                reference_type=TargetReferenceType.ORDINAL,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:116:        if self.temporal_word:
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:117:            return CommandTarget(
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:119:                reference_type=TargetReferenceType.PROPERTY,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:121:                value=self.temporal_word,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:124:            return CommandTarget(
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:126:                reference_type=TargetReferenceType.PROPERTY,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:130:        if self.reference_type == TargetReferenceType.ACTIVE:
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:131:            return CommandTarget(kind=self.kind, reference_type=TargetReferenceType.ACTIVE)
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:132:        return CommandTarget(kind=self.kind, reference_type=TargetReferenceType.NONE)
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:151:        temporal = _TIME_BEFORE_REF.search(raw)
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:152:        if temporal:
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:155:                temporal_word=temporal.group(1),
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:156:                reference_type=TargetReferenceType.PROPERTY,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:161:                kind=kind, reference_type=TargetReferenceType.ACTIVE, raw=raw
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:175:                reference_type=TargetReferenceType.PROPERTY,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:181:        if kind != TargetKind.TASK:
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:183:            # token; the active object of that kind is the only safe candidate.
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:185:                kind=kind, reference_type=TargetReferenceType.ACTIVE, raw=raw
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:192:                reference_type=TargetReferenceType.PROPERTY,
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:199:    def _resource_kind(text: str) -> TargetKind:
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:203:                english.group("noun").casefold(), TargetKind.TASK
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:210:            return TargetKind.TASK
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:214:            return _RESOURCE_KIND_BY_WORD.get(word, TargetKind.TASK)
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:215:        return TargetKind.TASK
+packages/agent_core/greenbook_agent_core/command\reference_extractor.py:226:            reference_type=TargetReferenceType.ACTIVE,
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:5:one another.  It never reads user text, calls an LLM, resolves a target, or
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:72:_TEMPORAL_KEYS = (
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:77:    "temporal_text",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:78:    "temporal_kind",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:89:    boundary without constructing targets or invoking any resolver.
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:102:    now_temporal = _has_now_temporal(candidate)
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:107:    if scheduled_intent and (immediate_operation or immediate_capability) and not _mixed_item_publication(candidate):
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:109:            code="SEMANTIC_PUBLICATION_CONFLICT",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:112:                "scheduled/future publication intent conflicts with immediate "
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:113:                "publication operation or capability"
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:117:    if scheduled_intent and now_temporal:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:119:            code="SEMANTIC_TEMPORAL_CONFLICT",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:120:            path="temporal_kind",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:121:            reason="scheduled/future publication cannot carry NOW temporal semantics",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:129:                code="SEMANTIC_TEMPORAL_CONFLICT",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:131:                reason="unresolved future publication requires clarification",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:133:        if immediate_operation or immediate_capability or now_temporal:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:135:                code="SEMANTIC_TEMPORAL_CONFLICT",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:136:                path="temporal_kind" if now_temporal else "semantic_operation",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:137:                reason="unresolved future publication cannot carry NOW semantics",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:146:            reason="immediate publication operation requires PUBLISH_NOW capability",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:152:            reason="PUBLISH_NOW capability requires immediate publication semantics",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:158:            reason="scheduled publication operation requires schedule capability",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:161:    # Rule 5: a pure search envelope cannot carry publication temporal
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:167:            or _is_search_publication_conflict(candidate, semantic_operation, capabilities)
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:169:        and (_has_publication_evidence(candidate) or _has_temporal_evidence(candidate))
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:172:            code="SEMANTIC_TEMPORAL_CONFLICT",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:173:            path="items" if _has_item_temporal_evidence(candidate) else "constraints",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:174:            reason="search-only semantic state cannot carry publication temporal evidence",
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:181:    values = [_intent_from_mapping(_mapping_value(candidate, "constraints"))]
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:192:        _intent_from_mapping(_mapping_value(item, "constraints"))
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:201:    values = [_intent_from_mapping(_mapping_value(candidate, "constraints"))]
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:208:        _intent_from_mapping(_mapping_value(item, "constraints"))
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:214:def _mixed_item_publication(candidate: Any) -> bool:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:215:    """Allow aggregate publication capabilities when ownership is per item."""
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:222:        constraints = _mapping_value(item, "constraints")
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:223:        intent = _intent_from_mapping(constraints)
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:245:    top_constraints = _mapping_value(candidate, "constraints")
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:246:    if _normalize(top_constraints.get("temporal_kind")) == "UNRESOLVED":
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:249:        constraints = _mapping_value(item, "constraints")
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:250:        if _normalize(constraints.get("temporal_kind")) == "UNRESOLVED":
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:270:def _is_search_publication_conflict(
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:275:    """Treat publication fields as pollution when SEARCH remains the action."""
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:282:    non_publication = all_capabilities - (_SCHEDULED_CAPABILITIES | _IMMEDIATE_CAPABILITIES)
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:283:    return bool(non_publication) and non_publication <= _SEARCH_CAPABILITIES
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:286:def _has_publication_evidence(candidate: Any) -> bool:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:287:    if _intent_from_mapping(_mapping_value(candidate, "constraints")):
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:292:        _intent_from_mapping(_mapping_value(item, "constraints"))
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:298:def _has_temporal_evidence(candidate: Any) -> bool:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:299:    if _has_mapping_temporal_evidence(_mapping_value(candidate, "constraints")):
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:301:    if any(_has_mapping_temporal_evidence(_mapping_value(delta, "desired_changes")) for delta in _sequence_value(candidate, "task_changes")):
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:303:    return _has_item_temporal_evidence(candidate)
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:306:def _has_item_temporal_evidence(candidate: Any) -> bool:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:308:        _has_mapping_temporal_evidence(_mapping_value(item, "constraints"))
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:309:        or any(str(_value(item, key) or "").strip() for key in ("temporal_text", "run_at"))
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:314:def _has_now_temporal(candidate: Any) -> bool:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:315:    containers = [_mapping_value(candidate, "constraints")]
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:316:    containers.extend(_mapping_value(item, "constraints") for item in _items(candidate))
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:318:        str(container.get("temporal_kind") or "").strip().upper().replace("-", "_") == "NOW"
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:324:def _has_mapping_temporal_evidence(value: Any) -> bool:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:327:    for key in _TEMPORAL_KEYS:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:329:        if key == "temporal_kind" and _normalize(raw) in {"", "NONE"}:
+packages/agent_core/greenbook_agent_core/command\semantic_validator.py:339:    raw = value.get("publication_intent") or value.get("publication_mode") or value.get("content_state")
+packages/agent_core/greenbook_agent_core/command\normalization.py:15:Task/Goal reference, and preserves every existing constraint.
+packages/agent_core/greenbook_agent_core/command\normalization.py:33:    "temporal_base",
+packages/agent_core/greenbook_agent_core/command\normalization.py:39:    "goal_id", "task_id", "resource_target", "target",
+packages/agent_core/greenbook_agent_core/command\normalization.py:102:    # no desired constraint is lost during the split.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:1:"""Small compatibility projection for the structured semantic boundary.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:4:module intentionally does not infer an operation, capability, publication
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:5:requirement, temporal meaning, or target from another field.  It only
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:7:legacy consumers can keep receiving the existing Command shape.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:18:_PUBLICATION_ALIASES = {
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:36:class DerivedSemanticFacts:
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:41:    publication_intent: str
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:42:    first_action: str
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:48:def derive_semantic_facts(
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:51:    resolved_target_kind: str = "",
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:52:) -> DerivedSemanticFacts:
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:53:    """Project explicit candidate fields without semantic inference.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:55:    ``resolved_target_kind`` is retained only for API compatibility.  Target
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:56:    resolution belongs to TargetResolver and must not change this projection.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:57:    In particular, capabilities, task deltas, temporal text, and target kind
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:58:    are never used to invent a publication intent or operation.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:61:    del resolved_target_kind
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:63:    top_constraints = _project_constraints(command.constraints)
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:64:    publication_intent = _explicit_intent(top_constraints)
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:68:        if (intent := _explicit_intent(item.constraints))
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:70:    if not publication_intent:
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:72:            publication_intent = next(iter(item_intents))
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:74:            publication_intent = "MIXED"
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:76:    return DerivedSemanticFacts(
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:79:        publication_intent=publication_intent,
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:80:        first_action=_normalize(command.first_action),
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:90:    resolved_target_kind: str = "",
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:92:    """Return a compatibility-normalized Command.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:96:    capability, publication requirement, or clarification state is inferred.
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:99:    facts = derive_semantic_facts(
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:101:        resolved_target_kind=resolved_target_kind,
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:103:    constraints = _project_constraints(command.constraints)
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:104:    if facts.publication_intent and facts.publication_intent != "MIXED":
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:105:        constraints.setdefault("publication_intent", facts.publication_intent)
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:109:        "first_action": facts.first_action,
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:112:        "constraints": constraints,
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:121:        "constraints": _project_constraints(item.constraints),
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:125:def _project_constraints(value: Any) -> dict[str, Any]:
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:129:        result["publication_intent"] = intent
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:136:    for key in ("publication_intent", "publication_mode", "content_state"):
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:153:    return _PUBLICATION_ALIASES.get(normalized, normalized)
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:175:    "DerivedSemanticFacts",
+packages/agent_core/greenbook_agent_core/command\semantic_derivation.py:177:    "derive_semantic_facts",
+packages/agent_core/greenbook_agent_core/command\models.py:28:class TargetKind(StrEnum):
+packages/agent_core/greenbook_agent_core/command\models.py:37:class TargetReferenceType(StrEnum):
+packages/agent_core/greenbook_agent_core/command\models.py:38:    """Semantic reference selected by the model, not inferred by Python."""
+packages/agent_core/greenbook_agent_core/command\models.py:41:    ACTIVE = "ACTIVE"
+packages/agent_core/greenbook_agent_core/command\models.py:45:    TEMPORAL = "TEMPORAL"
+packages/agent_core/greenbook_agent_core/command\models.py:48:    # recency reference; TargetResolver applies the FAILED/UNKNOWN/terminal
+packages/agent_core/greenbook_agent_core/command\models.py:71:    the desired/actual gap. ``target_reference`` grounds which Task/Goal the
+packages/agent_core/greenbook_agent_core/command\models.py:79:    target_reference: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:83:    needs_target_resolution: bool = False
+packages/agent_core/greenbook_agent_core/command\models.py:85:    @field_validator("target_reference", mode="before")
+packages/agent_core/greenbook_agent_core/command\models.py:87:    def _normalize_target_reference(cls, value: Any) -> dict[str, Any]:
+packages/agent_core/greenbook_agent_core/command\models.py:108:            reference = self.target_reference
+packages/agent_core/greenbook_agent_core/command\models.py:125:            reference = self.target_reference
+packages/agent_core/greenbook_agent_core/command\models.py:131:                or str(reference.get("reference_type") or "").upper() == "ACTIVE"
+packages/agent_core/greenbook_agent_core/command\models.py:141:    A CommandItem is a business target, not a capability.  It carries the
+packages/agent_core/greenbook_agent_core/command\models.py:142:    natural-language temporal expression (``temporal_text``) so a later step can
+packages/agent_core/greenbook_agent_core/command\models.py:143:    resolve it through TemporalResolver to a canonical absolute run_at.  The
+packages/agent_core/greenbook_agent_core/command\models.py:158:    temporal_text: str = Field(default="", description="This item's natural-language publication time")
+packages/agent_core/greenbook_agent_core/command\models.py:159:    constraints: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:170:    # The model may provide an operation/capability hint for compatibility;
+packages/agent_core/greenbook_agent_core/command\models.py:171:    # the semantic compilation boundary derives the canonical values.
+packages/agent_core/greenbook_agent_core/command\models.py:175:        description="Open capability evidence; canonical capabilities are derived later",
+packages/agent_core/greenbook_agent_core/command\models.py:177:    publication_intent: str = ""
+packages/agent_core/greenbook_agent_core/command\models.py:178:    temporal_text: str = ""
+packages/agent_core/greenbook_agent_core/command\models.py:179:    temporal_kind: str = "NONE"
+packages/agent_core/greenbook_agent_core/command\models.py:181:    temporal_resolved: bool = False
+packages/agent_core/greenbook_agent_core/command\models.py:182:    constraints: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:183:    target_reference: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:199:    publication_intent: str = ""
+packages/agent_core/greenbook_agent_core/command\models.py:200:    target_type: str = ""
+packages/agent_core/greenbook_agent_core/command\models.py:201:    target_reference: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:202:    resolved_target: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:204:    # consumers.  This is evidence, not an alternate target selection path.
+packages/agent_core/greenbook_agent_core/command\models.py:205:    target_candidates: list[dict[str, Any]] = Field(default_factory=list)
+packages/agent_core/greenbook_agent_core/command\models.py:206:    temporal_kind: str = "NONE"
+packages/agent_core/greenbook_agent_core/command\models.py:208:    temporal_resolved: bool = False
+packages/agent_core/greenbook_agent_core/command\models.py:209:    constraints: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:233:    temporal_text: str = ""
+packages/agent_core/greenbook_agent_core/command\models.py:235:    # bounded constraint container used by CommandItem; segmentation may carry
+packages/agent_core/greenbook_agent_core/command\models.py:236:    # publication intent without inventing a concrete timestamp.
+packages/agent_core/greenbook_agent_core/command\models.py:237:    constraints: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:238:    target_reference: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:269:class CommandTarget(BaseModel):
+packages/agent_core/greenbook_agent_core/command\models.py:270:    """Structured target reference emitted by the model."""
+packages/agent_core/greenbook_agent_core/command\models.py:274:    kind: TargetKind = TargetKind.TASK
+packages/agent_core/greenbook_agent_core/command\models.py:280:    # human-readable identity that TaskDelta.target_reference already accepts.
+packages/agent_core/greenbook_agent_core/command\models.py:284:    reference_type: TargetReferenceType = TargetReferenceType.NONE
+packages/agent_core/greenbook_agent_core/command\models.py:294:            self.task_id if self.kind == TargetKind.TASK else None
+packages/agent_core/greenbook_agent_core/command\models.py:303:    accepted as compatibility fields; ``goal`` and the semantic fields are
+packages/agent_core/greenbook_agent_core/command\models.py:312:    # Phase 3.5 adaptive control plane: the first semantic action (a canonical
+packages/agent_core/greenbook_agent_core/command\models.py:314:    # GoalDecomposer and the first AgentLoop reason; COMPLEX keeps the full
+packages/agent_core/greenbook_agent_core/command\models.py:317:    first_action: str = Field(
+packages/agent_core/greenbook_agent_core/command\models.py:319:        description="Compatibility hint only; the runtime derives the first action",
+packages/agent_core/greenbook_agent_core/command\models.py:323:        description="Segmentation bootstrap hint; final complexity is derived",
+packages/agent_core/greenbook_agent_core/command\models.py:326:    target: CommandTarget | None = None
+packages/agent_core/greenbook_agent_core/command\models.py:329:    constraints: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:332:        description="Open action-family evidence; final operation is derived",
+packages/agent_core/greenbook_agent_core/command\models.py:344:        description="Compatibility capability evidence; canonical capabilities are derived",
+packages/agent_core/greenbook_agent_core/command\models.py:347:    # Thin per-business-target items (each with its own temporal_text).
+packages/agent_core/greenbook_agent_core/command\models.py:360:    first_action: str = ""
+packages/agent_core/greenbook_agent_core/command\models.py:363:    target: CommandTarget | None = None
+packages/agent_core/greenbook_agent_core/command\models.py:366:    constraints: dict[str, Any] = Field(default_factory=dict)
+packages/agent_core/greenbook_agent_core/command\models.py:377:    # Thin per-business-target items (each with its own temporal_text).  When
+packages/agent_core/greenbook_agent_core/command\models.py:379:    # single turn can schedule multiple targets at different times.
+packages/agent_core/greenbook_agent_core/command\models.py:381:    target_resolution: str | None = None
+packages/agent_core/greenbook_agent_core/command\models.py:382:    resolved_target: dict[str, Any] | None = None
+packages/agent_core/greenbook_agent_core/command\models.py:383:    target_candidates: list[dict[str, Any]] = Field(default_factory=list)
+packages/agent_core/greenbook_agent_core/command\models.py:388:        """Compatibility spelling used by older Runtime callers."""
+packages/agent_core/greenbook_agent_core/command\models.py:403:    def requires_target(self) -> bool:
+packages/agent_core/greenbook_agent_core/command\models.py:411:    def target_exists(self) -> bool:
+packages/agent_core/greenbook_agent_core/command\models.py:413:            self.target
+packages/agent_core/greenbook_agent_core/command\models.py:415:                self.target.explicit_id
+packages/agent_core/greenbook_agent_core/command\models.py:416:                or self.resolved_target
+packages/agent_core/greenbook_agent_core/command\models.py:425:        for container in (self.parameters, self.entities, self.constraints):
+packages/agent_core/greenbook_agent_core/command\models.py:458:    active_target: CommandTarget | None = None
+packages/agent_core/greenbook_agent_core/command\models.py:459:    active_tasks: list[dict[str, Any]] = Field(default_factory=list)
+packages/agent_core/greenbook_agent_core/command\models.py:461:    targets: list[dict[str, Any]] = Field(default_factory=list)
+packages/agent_core/greenbook_agent_core/command\models.py:477:                active_target=payload.get("active_target"),
+packages/agent_core/greenbook_agent_core/command\models.py:478:                active_tasks=list(payload.get("active_tasks") or []),
+packages/agent_core/greenbook_agent_core/command\models.py:480:                targets=list(
+packages/agent_core/greenbook_agent_core/command\models.py:481:                    payload.get("targets")
+packages/agent_core/greenbook_agent_core/command\models.py:482:                    or payload.get("target_candidates")
+packages/agent_core/greenbook_agent_core/command\models.py:487:                    or payload.get("recent_messages")
+packages/agent_core/greenbook_agent_core/command\models.py:499:        # Prefer the assembled target_candidates (tasks projected with label,
+packages/agent_core/greenbook_agent_core/command\models.py:502:        target_candidates = payload.get("target_candidates")
+packages/agent_core/greenbook_agent_core/command\models.py:503:        if target_candidates:
+packages/agent_core/greenbook_agent_core/command\models.py:504:            resources = list(target_candidates) if isinstance(target_candidates, list) else []
+packages/agent_core/greenbook_agent_core/command\models.py:514:                    getattr(value, "active_tasks", None)
+packages/agent_core/greenbook_agent_core/command\models.py:515:                    or payload.get("active_tasks", [])
+packages/agent_core/greenbook_agent_core/command\models.py:536:        active_tasks = list(
+packages/agent_core/greenbook_agent_core/command\models.py:537:            getattr(value, "active_tasks", None)
+packages/agent_core/greenbook_agent_core/command\models.py:538:            or payload.get("active_tasks", [])
+packages/agent_core/greenbook_agent_core/command\models.py:546:        active_target = _active_target_from_session(session)
+packages/agent_core/greenbook_agent_core/command\models.py:556:            active_target=active_target,
+packages/agent_core/greenbook_agent_core/command\models.py:557:            active_tasks=active_tasks,
+packages/agent_core/greenbook_agent_core/command\models.py:559:            targets=resources,
+packages/agent_core/greenbook_agent_core/command\models.py:561:                getattr(value, "recent_messages", None)
+packages/agent_core/greenbook_agent_core/command\models.py:562:                or payload.get("recent_messages", [])
+packages/agent_core/greenbook_agent_core/command\models.py:575:def _active_target_from_session(session: Any) -> CommandTarget | None:
+packages/agent_core/greenbook_agent_core/command\models.py:576:    """Project explicit session bindings without guessing from user text."""
+packages/agent_core/greenbook_agent_core/command\models.py:581:        (TargetKind.DRAFT, getattr(session, "active_draft_id", None)),
+packages/agent_core/greenbook_agent_core/command\models.py:582:        (TargetKind.SCHEDULE, getattr(session, "active_schedule_id", None)),
+packages/agent_core/greenbook_agent_core/command\models.py:583:        (TargetKind.POST, getattr(session, "active_post_id", None)),
+packages/agent_core/greenbook_agent_core/command\models.py:584:        (TargetKind.TASK, getattr(session, "active_task_id", None)),
+packages/agent_core/greenbook_agent_core/command\models.py:585:        (TargetKind.EXECUTION, getattr(session, "active_execution_id", None)),
+packages/agent_core/greenbook_agent_core/command\models.py:589:            return CommandTarget(kind=kind, id=str(identifier))
+packages/agent_core/greenbook_agent_core/command\models.py:596:    "CommandTarget",
+packages/agent_core/greenbook_agent_core/command\models.py:604:    "TargetKind",
+packages/agent_core/greenbook_agent_core/command\models.py:605:    "TargetReferenceType",
+packages/agent_core/greenbook_agent_core/command\target.py:1:"""Single target-resolution facade for Command Runtime.
+packages/agent_core/greenbook_agent_core/command\target.py:3:The facade consumes structured target references and returns one of three
+packages/agent_core/greenbook_agent_core/command\target.py:4:explicit outcomes.  It never silently selects an arbitrary recent object.
+packages/agent_core/greenbook_agent_core/command\target.py:20:    CommandTarget,
+packages/agent_core/greenbook_agent_core/command\target.py:21:    TargetKind,
+packages/agent_core/greenbook_agent_core/command\target.py:22:    TargetReferenceType,
+packages/agent_core/greenbook_agent_core/command\target.py:25:# Operation scope is a domain constraint, not a user-text classifier.  It is
+packages/agent_core/greenbook_agent_core/command\target.py:30:_OPERATION_ALLOWED_KINDS: dict[str, frozenset[TargetKind]] = {
+packages/agent_core/greenbook_agent_core/command\target.py:31:    "UPDATE_DRAFT": frozenset({TargetKind.DRAFT}),
+packages/agent_core/greenbook_agent_core/command\target.py:32:    "DELETE_DRAFT": frozenset({TargetKind.DRAFT}),
+packages/agent_core/greenbook_agent_core/command\target.py:33:    "UPDATE_SCHEDULE": frozenset({TargetKind.SCHEDULE}),
+packages/agent_core/greenbook_agent_core/command\target.py:34:    "CREATE_SCHEDULE": frozenset({TargetKind.SCHEDULE}),
+packages/agent_core/greenbook_agent_core/command\target.py:35:    "CANCEL_SCHEDULE": frozenset({TargetKind.SCHEDULE}),
+packages/agent_core/greenbook_agent_core/command\target.py:36:    "DELETE_POST": frozenset({TargetKind.POST}),
+packages/agent_core/greenbook_agent_core/command\target.py:37:    "REVISE": frozenset({TargetKind.DRAFT, TargetKind.POST}),
+packages/agent_core/greenbook_agent_core/command\target.py:38:    "PUBLISH_NOW": frozenset({TargetKind.DRAFT, TargetKind.POST}),
+packages/agent_core/greenbook_agent_core/command\target.py:42:class TargetResolutionStatus(StrEnum):
+packages/agent_core/greenbook_agent_core/command\target.py:48:class TargetCandidate(BaseModel):
+packages/agent_core/greenbook_agent_core/command\target.py:49:    kind: TargetKind = TargetKind.TASK
+packages/agent_core/greenbook_agent_core/command\target.py:66:    def type(self) -> TargetKind:
+packages/agent_core/greenbook_agent_core/command\target.py:67:        """Compatibility spelling for consumers of the old target model."""
+packages/agent_core/greenbook_agent_core/command\target.py:72:class TargetResolution(BaseModel):
+packages/agent_core/greenbook_agent_core/command\target.py:73:    status: TargetResolutionStatus
+packages/agent_core/greenbook_agent_core/command\target.py:74:    target: TargetCandidate | None = None
+packages/agent_core/greenbook_agent_core/command\target.py:75:    candidates: list[TargetCandidate] = Field(default_factory=list)
+packages/agent_core/greenbook_agent_core/command\target.py:80:        return self.status == TargetResolutionStatus.RESOLVED and self.target is not None
+packages/agent_core/greenbook_agent_core/command\target.py:84:        return self.status == TargetResolutionStatus.AMBIGUOUS
+packages/agent_core/greenbook_agent_core/command\target.py:87:class Resolved(TargetResolution):
+packages/agent_core/greenbook_agent_core/command\target.py:88:    status: Literal[TargetResolutionStatus.RESOLVED] = TargetResolutionStatus.RESOLVED
+packages/agent_core/greenbook_agent_core/command\target.py:91:class Ambiguous(TargetResolution):
+packages/agent_core/greenbook_agent_core/command\target.py:92:    status: Literal[TargetResolutionStatus.AMBIGUOUS] = TargetResolutionStatus.AMBIGUOUS
+packages/agent_core/greenbook_agent_core/command\target.py:95:class NotFound(TargetResolution):
+packages/agent_core/greenbook_agent_core/command\target.py:96:    status: Literal[TargetResolutionStatus.NOT_FOUND] = TargetResolutionStatus.NOT_FOUND
+packages/agent_core/greenbook_agent_core/command\target.py:99:class TargetResolver:
+packages/agent_core/greenbook_agent_core/command\target.py:100:    """Resolve a Command target against bounded conversation resources."""
+packages/agent_core/greenbook_agent_core/command\target.py:107:        active_task_id: str = "",
+packages/agent_core/greenbook_agent_core/command\target.py:109:    ) -> TargetResolution:
+packages/agent_core/greenbook_agent_core/command\target.py:119:        reference = getattr(delta, "target_reference", None) or {}
+packages/agent_core/greenbook_agent_core/command\target.py:127:            or reference.get("target_objective_id")
+packages/agent_core/greenbook_agent_core/command\target.py:168:            # A Goal mutation may not use the active Task as an implicit Goal
+packages/agent_core/greenbook_agent_core/command\target.py:169:            # target.  It must carry a resolvable Goal id, a strong label, an
+packages/agent_core/greenbook_agent_core/command\target.py:176:                or reference_type in {"ACTIVE", "RECENT", "LATEST"}
+packages/agent_core/greenbook_agent_core/command\target.py:177:                or _is_recent_label(label)
+packages/agent_core/greenbook_agent_core/command\target.py:200:        # label, the active Task, or deterministic references: ordinal
+packages/agent_core/greenbook_agent_core/command\target.py:201:        # ("第三篇"), most-recent ("刚刚那篇") and run-time ("下午那篇").
+packages/agent_core/greenbook_agent_core/command\target.py:211:                active_task_id=active_task_id,
+packages/agent_core/greenbook_agent_core/command\target.py:224:    ) -> TargetResolution:
+packages/agent_core/greenbook_agent_core/command\target.py:228:        resolution.  A user retry is a new logical Task, so ACTIVE/RECENT/
+packages/agent_core/greenbook_agent_core/command\target.py:229:        LATEST and task-level resource fallback are not valid substitutes for
+packages/agent_core/greenbook_agent_core/command\target.py:318:    ) -> TargetResolution:
+packages/agent_core/greenbook_agent_core/command\target.py:322:            return Resolved(target=candidates[0], candidates=candidates, reason=reason)
+packages/agent_core/greenbook_agent_core/command\target.py:330:    def resolve(self, command: Any, context: Any | None = None) -> TargetResolution:
+packages/agent_core/greenbook_agent_core/command\target.py:332:        requested = canonical.target
+packages/agent_core/greenbook_agent_core/command\target.py:334:            return NotFound(reason="command_has_no_target")
+packages/agent_core/greenbook_agent_core/command\target.py:337:        weak_reference = _is_weak_target_reference(requested)
+packages/agent_core/greenbook_agent_core/command\target.py:344:        # FAILED is a historical Objective reference, not an ordinary target
+packages/agent_core/greenbook_agent_core/command\target.py:347:        # completed/current resource or fall back to active candidates.
+packages/agent_core/greenbook_agent_core/command\target.py:348:        if requested.reference_type == TargetReferenceType.FAILED:
+packages/agent_core/greenbook_agent_core/command\target.py:350:            # A failed target may be serialized as a DRAFT/POST resource or a
+packages/agent_core/greenbook_agent_core/command\target.py:352:            # searched across the bounded context; target kind is not allowed
+packages/agent_core/greenbook_agent_core/command\target.py:356:                TargetKind.TASK,
+packages/agent_core/greenbook_agent_core/command\target.py:369:            # filtering or fall back to the active Task.
+packages/agent_core/greenbook_agent_core/command\target.py:380:                    flattened.setdefault("id", objective_id)
+packages/agent_core/greenbook_agent_core/command\target.py:381:                    flattened.setdefault("objective_id", objective_id)
+packages/agent_core/greenbook_agent_core/command\target.py:382:                    flattened.setdefault("task_id", task_id_value)
+packages/agent_core/greenbook_agent_core/command\target.py:383:                    flattened.setdefault("kind", "TASK")
+packages/agent_core/greenbook_agent_core/command\target.py:384:                    flattened.setdefault(
+packages/agent_core/greenbook_agent_core/command\target.py:391:                    flattened.setdefault("resource_index", task_resources)
+packages/agent_core/greenbook_agent_core/command\target.py:401:                or reference.get("target_objective_id")
+packages/agent_core/greenbook_agent_core/command\target.py:433:            # A TASK target may carry a resource id (DraftA/ScheduleA) rather than
+packages/agent_core/greenbook_agent_core/command\target.py:436:            if requested.kind == TargetKind.TASK:
+packages/agent_core/greenbook_agent_core/command\target.py:437:                raw = list(command_context.targets)
+packages/agent_core/greenbook_agent_core/command\target.py:438:                if command_context.active_target is not None:
+packages/agent_core/greenbook_agent_core/command\target.py:439:                    raw.append(command_context.active_target.model_dump(mode="json"))
+packages/agent_core/greenbook_agent_core/command\target.py:457:            if scoped_result.status != TargetResolutionStatus.NOT_FOUND:
+packages/agent_core/greenbook_agent_core/command\target.py:460:        if requested.reference_type == TargetReferenceType.ACTIVE:
+packages/agent_core/greenbook_agent_core/command\target.py:461:            active = self._active_candidate(command_context, requested.kind, candidates)
+packages/agent_core/greenbook_agent_core/command\target.py:462:            if active is not None:
+packages/agent_core/greenbook_agent_core/command\target.py:463:                return self._resolved(active, "active_context_binding")
+packages/agent_core/greenbook_agent_core/command\target.py:464:            # ACTIVE is a weak conversational reference, not proof that no
+packages/agent_core/greenbook_agent_core/command\target.py:465:            # target exists.  When the context contains several candidates and
+packages/agent_core/greenbook_agent_core/command\target.py:466:            # no focus/active binding disambiguates them, preserve the full
+packages/agent_core/greenbook_agent_core/command\target.py:469:                return self._one_or_many(candidates, "active_context_binding")
+packages/agent_core/greenbook_agent_core/command\target.py:470:            return NotFound(reason="active_target_not_found")
+packages/agent_core/greenbook_agent_core/command\target.py:472:        if requested.reference_type == TargetReferenceType.IDENTIFIER:
+packages/agent_core/greenbook_agent_core/command\target.py:476:        if requested.reference_type == TargetReferenceType.ORDINAL:
+packages/agent_core/greenbook_agent_core/command\target.py:494:        if requested.reference_type == TargetReferenceType.PROPERTY:
+packages/agent_core/greenbook_agent_core/command\target.py:496:        elif requested.reference_type == TargetReferenceType.TEMPORAL:
+packages/agent_core/greenbook_agent_core/command\target.py:497:            filtered = self._temporal_matches(requested, candidates, command_context.timezone)
+packages/agent_core/greenbook_agent_core/command\target.py:503:        if requested.reference_type == TargetReferenceType.NONE and (
+packages/agent_core/greenbook_agent_core/command\target.py:506:            # A legacy projection may carry only a semantic reference string.
+packages/agent_core/greenbook_agent_core/command\target.py:516:        requested_kind: TargetKind,
+packages/agent_core/greenbook_agent_core/command\target.py:519:    ) -> list[TargetCandidate]:
+packages/agent_core/greenbook_agent_core/command\target.py:520:        values: list[Any] = list(context.targets)
+packages/agent_core/greenbook_agent_core/command\target.py:523:        # resolver; it is not allowed to turn a missing ``targets`` projection
+packages/agent_core/greenbook_agent_core/command\target.py:526:            {**dict(item), "kind": TargetKind.TASK.value}
+packages/agent_core/greenbook_agent_core/command\target.py:527:            for item in context.active_tasks
+packages/agent_core/greenbook_agent_core/command\target.py:530:        if context.active_target is not None:
+packages/agent_core/greenbook_agent_core/command\target.py:531:            values.append(context.active_target.model_dump(mode="json"))
+packages/agent_core/greenbook_agent_core/command\target.py:533:        result: list[TargetCandidate] = []
+packages/agent_core/greenbook_agent_core/command\target.py:553:    def _active_candidate(
+packages/agent_core/greenbook_agent_core/command\target.py:555:        requested_kind: TargetKind,
+packages/agent_core/greenbook_agent_core/command\target.py:556:        candidates: list[TargetCandidate],
+packages/agent_core/greenbook_agent_core/command\target.py:557:    ) -> TargetCandidate | None:
+packages/agent_core/greenbook_agent_core/command\target.py:558:        # Active context is weak evidence.  It may confirm a sole candidate,
+packages/agent_core/greenbook_agent_core/command\target.py:559:        # but it must never collapse a set of equally valid targets.
+packages/agent_core/greenbook_agent_core/command\target.py:562:        active = context.active_target
+packages/agent_core/greenbook_agent_core/command\target.py:563:        if active is not None:
+packages/agent_core/greenbook_agent_core/command\target.py:564:            active_candidate = _candidate(active.model_dump(mode="json"))
+packages/agent_core/greenbook_agent_core/command\target.py:565:            if active_candidate is not None:
+packages/agent_core/greenbook_agent_core/command\target.py:567:                    if candidate.kind == active_candidate.kind and candidate.identity == active_candidate.identity:
+packages/agent_core/greenbook_agent_core/command\target.py:574:        requested: CommandTarget,
+packages/agent_core/greenbook_agent_core/command\target.py:575:        candidates: list[TargetCandidate],
+packages/agent_core/greenbook_agent_core/command\target.py:578:    ) -> list[TargetCandidate]:
+packages/agent_core/greenbook_agent_core/command\target.py:579:        """Filter only by typed domain scope; never rank or pick a target."""
+packages/agent_core/greenbook_agent_core/command\target.py:601:        requested: CommandTarget,
+packages/agent_core/greenbook_agent_core/command\target.py:602:        candidates: list[TargetCandidate],
+packages/agent_core/greenbook_agent_core/command\target.py:604:    ) -> list[TargetCandidate]:
+packages/agent_core/greenbook_agent_core/command\target.py:629:        matches: list[TargetCandidate] = []
+packages/agent_core/greenbook_agent_core/command\target.py:637:    def _temporal_matches(
+packages/agent_core/greenbook_agent_core/command\target.py:638:        requested: CommandTarget,
+packages/agent_core/greenbook_agent_core/command\target.py:639:        candidates: list[TargetCandidate],
+packages/agent_core/greenbook_agent_core/command\target.py:641:    ) -> list[TargetCandidate]:
+packages/agent_core/greenbook_agent_core/command\target.py:646:        result: list[TargetCandidate] = []
+packages/agent_core/greenbook_agent_core/command\target.py:657:    def _text_matches(reference: str, candidates: list[TargetCandidate]) -> list[TargetCandidate]:
+packages/agent_core/greenbook_agent_core/command\target.py:671:    def _resolved(candidate: TargetCandidate, reason: str) -> Resolved:
+packages/agent_core/greenbook_agent_core/command\target.py:672:        return Resolved(target=candidate, candidates=[candidate], reason=reason)
+packages/agent_core/greenbook_agent_core/command\target.py:676:        candidates: list[TargetCandidate],
+packages/agent_core/greenbook_agent_core/command\target.py:678:    ) -> TargetResolution:
+packages/agent_core/greenbook_agent_core/command\target.py:680:            return Resolved(target=candidates[0], candidates=candidates, reason=reason)
+packages/agent_core/greenbook_agent_core/command\target.py:682:            return Ambiguous(target=None, candidates=candidates, reason=f"{reason}_ambiguous")
+packages/agent_core/greenbook_agent_core/command\target.py:686:UnifiedTargetResolver = TargetResolver
+packages/agent_core/greenbook_agent_core/command\target.py:687:Resolver = TargetResolver
+packages/agent_core/greenbook_agent_core/command\target.py:696:def _is_weak_target_reference(requested: CommandTarget) -> bool:
+packages/agent_core/greenbook_agent_core/command\target.py:705:    return requested.kind == TargetKind.TASK and not requested.explicit_id
+packages/agent_core/greenbook_agent_core/command\target.py:708:def _allowed_kinds_for_operation(command: Command) -> frozenset[TargetKind] | None:
+packages/agent_core/greenbook_agent_core/command\target.py:727:    first = scoped[0]
+packages/agent_core/greenbook_agent_core/command\target.py:728:    return first if all(value == first for value in scoped[1:]) else None
+packages/agent_core/greenbook_agent_core/command\target.py:731:def _candidate(value: Any) -> TargetCandidate | None:
+packages/agent_core/greenbook_agent_core/command\target.py:732:    if isinstance(value, TargetCandidate):
+packages/agent_core/greenbook_agent_core/command\target.py:734:    if isinstance(value, CommandTarget):
+packages/agent_core/greenbook_agent_core/command\target.py:745:        or TargetKind.TASK.value
+packages/agent_core/greenbook_agent_core/command\target.py:748:        kind = TargetKind(str(kind_raw).upper())
+packages/agent_core/greenbook_agent_core/command\target.py:750:        # "ARTIFACT" is not a TargetKind.  Derive the kind from the resource
+packages/agent_core/greenbook_agent_core/command\target.py:751:        # type when present; otherwise this is not a resolvable target and
+packages/agent_core/greenbook_agent_core/command\target.py:756:            kind = TargetKind(str(resource_kind).upper())
+packages/agent_core/greenbook_agent_core/command\target.py:761:        or value.get("target_id")
+packages/agent_core/greenbook_agent_core/command\target.py:771:    return TargetCandidate(
+packages/agent_core/greenbook_agent_core/command\target.py:798:    resource kind is supplied.  This protects the existing Task/Goal target
+packages/agent_core/greenbook_agent_core/command\target.py:1022:#   * "下午那篇"              — publication time window
+packages/agent_core/greenbook_agent_core/command\target.py:1024:# The model may express these as ordinal/temporal fields or as a free-text
+packages/agent_core/greenbook_agent_core/command\target.py:1055:def _is_recent_label(label: str) -> bool:
+packages/agent_core/greenbook_agent_core/command\target.py:1061:            "just now", "latest", "most recent", "recent",
+packages/agent_core/greenbook_agent_core/command\target.py:1086:    constraints = value.get("constraints")
+packages/agent_core/greenbook_agent_core/command\target.py:1087:    if isinstance(constraints, Mapping) and constraints.get("run_at"):
+packages/agent_core/greenbook_agent_core/command\target.py:1088:        return str(constraints["run_at"])
+packages/agent_core/greenbook_agent_core/command\target.py:1089:    if isinstance(constraints, list):
+packages/agent_core/greenbook_agent_core/command\target.py:1090:        for item in constraints:
+packages/agent_core/greenbook_agent_core/command\target.py:1121:    if _is_recent_label(label) or reference_type in {"ACTIVE", "RECENT", "LATEST"}:
+packages/agent_core/greenbook_agent_core/command\target.py:1159:    active_task_id: str = "",
+packages/agent_core/greenbook_agent_core/command\target.py:1164:    # ``ACTIVE`` is a weak conversational cue.  It must not override an
+packages/agent_core/greenbook_agent_core/command\target.py:1166:    # classified the turn as active-context.  Explicit title/topic/ordinal
+packages/agent_core/greenbook_agent_core/command\target.py:1181:    if _is_recent_label(label) or reference_type in {"ACTIVE", "RECENT", "LATEST"}:
+packages/agent_core/greenbook_agent_core/command\target.py:1183:        # never a newest-updated-resource or active-task guess.
+packages/agent_core/greenbook_agent_core/command\target.py:1231:def _timestamp(value: TargetCandidate) -> datetime:
+packages/agent_core/greenbook_agent_core/command\target.py:1242:    "TargetCandidate",
+packages/agent_core/greenbook_agent_core/command\target.py:1243:    "TargetResolution",
+packages/agent_core/greenbook_agent_core/command\target.py:1244:    "TargetResolutionStatus",
+packages/agent_core/greenbook_agent_core/command\target.py:1245:    "TargetResolver",
+packages/agent_core/greenbook_agent_core/command\target.py:1246:    "UnifiedTargetResolver",

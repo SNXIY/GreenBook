@@ -6,11 +6,8 @@ requires-python = ">=3.12"
 dependencies = [
     "greenbook-contracts",
     "greenbook-agent-core",
-    "greenbook-agent-api",
-    "greenbook-creator-client",
     "greenbook-java-client",
     "greenbook-mcp-server",
-    "aiokafka>=0.12",
     "openai>=1.80",
 ]
 

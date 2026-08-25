@@ -1,0 +1,12 @@
+[
+  {
+    "name": "create-five-fresh-zh",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-CREATE-JAVA 的 Java 学习草稿，只保存草稿"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-CREATE-AGENT 的 Agent 学习草稿，只保存草稿"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-CREATE-REDIS 的 Redis 学习草稿，只保存草稿"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-CREATE-SPRING 的 Spring Boot 学习草稿，只保存草稿"},
+      {"text": "创建一个标题为 GB-STABLE-R1-FRESH-CREATE-AI 的 AI 学习草稿，只保存草稿"}
+    ]
+  }
+]

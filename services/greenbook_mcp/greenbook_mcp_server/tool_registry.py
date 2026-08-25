@@ -15,14 +15,16 @@ from greenbook_contracts.tool_contract import (
     ToolContract,
     ToolMetadata,
     ToolRegistry,
+    semantic_action_for_tool,
 )
 from greenbook_contracts.tool_result import ToolResult
 from pydantic import BaseModel
 
 from .tool_schemas import (
-    BuildStrategyArguments,
     CancelScheduleArguments,
     CreateDraftArguments,
+    DeleteDraftArguments,
+    DeletePostArguments,
     GetAccountSummaryArguments,
     GetDraftArguments,
     GetPostArguments,
@@ -32,11 +34,11 @@ from .tool_schemas import (
     ListDraftsArguments,
     ListOwnPostsArguments,
     PublishNowArguments,
-    ReviseDraftArguments,
     ScheduleArguments,
     SearchPublicPostsArguments,
     SendReplyArguments,
     UpdateScheduleArguments,
+    UpdateDraftArguments,
 )
 from .tools import analytics, community, content, interaction, publication
 
@@ -52,6 +54,7 @@ def _register(
     description: str,
     category: str,
     input_schema: type[BaseModel],
+    serves: tuple[str, ...] = (),
 ) -> None:
     try:
         policy = TOOL_POLICY_CATALOG[name]
@@ -67,6 +70,8 @@ def _register(
         output_schema=ToolResult,
         operations=operations,
         policy=policy,
+        semantic_action=semantic_action_for_tool(name),
+        serves=serves,
     )
 
 
@@ -88,6 +93,9 @@ _register(
     description="Get a single public post by ID",
     category="community",
     input_schema=GetPostArguments,
+    # A search-and-summarize step stays on SEARCH_COMMUNITY while reading post
+    # details; get_post is read-only and legitimately completes that capability.
+    serves=("SEARCH_COMMUNITY",),
 )
 _register(
     "community.list_own_posts",
@@ -105,21 +113,36 @@ _register(
     content.create_draft,
     capability="GENERATE_CONTENT",
     operations=("CREATE_CONTENT",),
-    description="Create a new draft via Creator Service and Java Facade",
+    description="Create a new draft via the Java Agent Facade",
     category="content",
     input_schema=CreateDraftArguments,
 )
 _register(
-    "content.build_strategy",
-    content.build_strategy,
-    capability="DESIGN_CONTENT_STRATEGY",
-    operations=("DESIGN_CONTENT_STRATEGY",),
-    description=(
-        "Build an evidence-aware content strategy via Creator Service "
-        "without creating a Java draft"
-    ),
+    "content.update_draft",
+    content.update_draft,
+    capability="MANAGE_DRAFT",
+    operations=("UPDATE_CONTENT",),
+    description="Partially update an existing draft through the Java Agent Facade",
     category="content",
-    input_schema=BuildStrategyArguments,
+    input_schema=UpdateDraftArguments,
+)
+_register(
+    "content.delete_draft",
+    content.delete_draft,
+    capability="DELETE_DRAFT",
+    operations=("DELETE_CONTENT",),
+    description="Soft-delete a draft through the Java Agent Facade (requires approval)",
+    category="content",
+    input_schema=DeleteDraftArguments,
+)
+_register(
+    "community.delete_post",
+    community.delete_post,
+    capability="DELETE_POST",
+    operations=("DELETE_CONTENT",),
+    description="Delete an owned published post through the Java Agent Facade (requires approval)",
+    category="community",
+    input_schema=DeletePostArguments,
 )
 _register(
     "content.get_draft",
@@ -138,15 +161,6 @@ _register(
     description="List the current user's drafts",
     category="content",
     input_schema=ListDraftsArguments,
-)
-_register(
-    "content.revise_draft",
-    content.revise_draft,
-    capability="IMPROVE_CONTENT",
-    operations=("UPDATE_CONTENT", "REVISE_DRAFT"),
-    description="Revise an existing draft via Creator Service",
-    category="content",
-    input_schema=ReviseDraftArguments,
 )
 
 # Publication ---------------------------------------------------------------
@@ -278,6 +292,8 @@ def validate_registered_tool_contracts(*, capability_registry: Any | None = None
     for definition in _TOOLS.values():
         if not definition.operations:
             raise RuntimeError(f"Tool contract {definition.name} has no operation mapping")
+        if definition.semantic_action is None:
+            raise RuntimeError(f"Tool contract {definition.name} has no semantic action mapping")
         model = definition.input_schema
         if not isinstance(model, type) or not issubclass(model, BaseModel):
             raise RuntimeError(f"Tool contract for {definition.name} has no input schema")

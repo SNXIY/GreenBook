@@ -2,7 +2,6 @@
 
 import pytest
 import sqlalchemy as sa
-
 from greenbook_agent_core.compatibility.history import (
     DuplicateRunExecutionBindingError,
     ExecutionReference,

@@ -12,7 +12,10 @@ from greenbook_agent_core.artifact.models import Artifact, ArtifactLifecycle
 from greenbook_agent_core.artifact.store import PostgresArtifactStore
 from greenbook_agent_core.execution.execution_queue_worker import ExecutionQueueWorker
 from greenbook_agent_core.execution.persistence_provider import RuntimePersistenceFactory
+from greenbook_agent_core.goal.models import Goal, GoalTree
+from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
 from greenbook_agent_core.runtime.container import RuntimeContainer
+from greenbook_agent_core.task.provider import TaskProviderError
 
 
 def test_api_and_worker_use_the_same_persistence_profile_and_artifact_provider() -> None:
@@ -102,6 +105,36 @@ def test_runtime_modules_share_container_registries_without_recomposition() -> N
     assert adapter._artifact_registry._schemas is container.artifact_schema_registry
 
     container.close()
+
+
+def test_plan_submission_rejects_missing_executable_goal_coverage() -> None:
+    tree = GoalTree(
+        root=Goal(
+            goal_id="root",
+            description="Multiple independent goals",
+            children=[
+                Goal(goal_id="goal-a", description="First"),
+                Goal(goal_id="goal-b", description="Second"),
+                Goal(goal_id="goal-c", description="Third"),
+            ],
+        )
+    )
+    partial_plan = TaskPlan(
+        task_id="coverage-test",
+        steps=[
+            PlanStep(
+                step_id="goal-a:1",
+                ordinal=1,
+                capability="GENERATE_CONTENT",
+                goal_id="goal-a",
+            )
+        ],
+    )
+
+    with pytest.raises(TaskProviderError) as exc_info:
+        ConversationRuntimeAdapter._require_plan_goal_coverage(partial_plan, tree)
+
+    assert exc_info.value.code == "PLAN_GOAL_COVERAGE_REQUIRED"
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from greenbook_agent_core.memory.manager import MemoryManager
 from greenbook_agent_core.memory.models import (
     MemoryQuery,
@@ -204,3 +205,117 @@ def test_manager_forget() -> None:
     assert mgr.store.count() == 1
     mgr.forget(r.memory_id)
     assert mgr.store.count() == 0
+
+
+# ── Manager: write dedup by source ──────────────────────────────
+
+def test_manager_remember_dedupes_by_source() -> None:
+    """The same logical fact (same user + source) must update the existing
+    record in place, never insert a duplicate row (design goal 0813 —
+    idempotent memory writes under re-delivery / retry)."""
+    mgr = MemoryManager()
+    first = mgr.remember(MemoryRecord(
+        user_id="u1", source_type="EXECUTION_OUTCOME", source_id="exec-1",
+        content="[COMPLETED] goal", importance=0.7,
+    ))
+    second = mgr.remember(MemoryRecord(
+        user_id="u1", source_type="EXECUTION_OUTCOME", source_id="exec-1",
+        content="[COMPLETED] goal (refreshed)", importance=0.8,
+    ))
+
+    assert mgr.store.count() == 1
+    assert second.memory_id == first.memory_id
+    stored = mgr.store.get(second.memory_id)
+    assert stored is not None
+    assert stored.content == "[COMPLETED] goal (refreshed)"
+    assert stored.created_at == first.created_at
+
+
+def test_manager_remember_keeps_distinct_sources() -> None:
+    mgr = MemoryManager()
+    mgr.remember(MemoryRecord(
+        user_id="u1", source_type="EXECUTION_OUTCOME", source_id="exec-1",
+        content="A",
+    ))
+    mgr.remember(MemoryRecord(
+        user_id="u1", source_type="EXECUTION_OUTCOME", source_id="exec-2",
+        content="B",
+    ))
+    assert mgr.store.count() == 2
+
+
+def test_manager_remember_execution_is_idempotent_per_execution() -> None:
+    mgr = MemoryManager()
+    first = mgr.remember_execution(
+        user_id="u1", goal="Create Java article",
+        category="CREATE_CONTENT", status="COMPLETED",
+        draft_id="d1", execution_id="exec-42",
+    )
+    second = mgr.remember_execution(
+        user_id="u1", goal="Create Java article",
+        category="CREATE_CONTENT", status="COMPLETED",
+        draft_id="d1", execution_id="exec-42",
+    )
+    assert mgr.store.count() == 1
+    assert second.memory_id == first.memory_id
+    assert second.metadata["execution_id"] == "exec-42"
+
+
+# ── Manager: durable persistence failure handling ───────────────
+
+class _FailingDurableRepository:
+    """Sync durable store that is down: save raises immediately."""
+
+    def __init__(self, fail: bool = True) -> None:
+        self.fail = fail
+        self.saved: list[MemoryRecord] = []
+
+    def save(self, record: MemoryRecord) -> MemoryRecord:
+        if self.fail:
+            raise RuntimeError("durable store down")
+        self.saved.append(record)
+        return record
+
+    def delete(self, memory_id: str) -> None:
+        return None
+
+
+def test_manager_sync_durable_failure_is_observed_and_record_kept() -> None:
+    """A durable persistence failure must not crash the write path or vanish
+    silently: the memory stays in-process and the failure is logged."""
+    mgr = MemoryManager(durable_repository=_FailingDurableRepository())
+    record = mgr.remember(MemoryRecord(user_id="u1", content="Session fact"))
+
+    assert mgr.store.count() == 1
+    assert mgr.recall(MemoryQuery(user_id="u1"))[0].content == "Session fact"
+    assert record.memory_id
+
+
+class _AsyncFailingDurableRepository:
+    """Async durable store that is down: save raises when awaited."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def save(self, record: MemoryRecord) -> MemoryRecord:
+        self.calls += 1
+        raise RuntimeError("durable store down (async)")
+
+    def delete(self, memory_id: str) -> None:
+        return None
+
+
+@pytest.mark.asyncio
+async def test_manager_async_durable_failure_is_guarded() -> None:
+    """A fire-and-forget durable save that fails must be guarded and logged,
+    never an unobserved task exception."""
+    import asyncio
+
+    durable = _AsyncFailingDurableRepository()
+    mgr = MemoryManager(durable_repository=durable)
+    mgr.remember(MemoryRecord(user_id="u1", content="Async fact"))
+    # Let the guarded fire-and-forget task run and observe the failure.
+    await asyncio.sleep(0.05)
+
+    assert durable.calls >= 1
+    assert mgr.store.count() == 1

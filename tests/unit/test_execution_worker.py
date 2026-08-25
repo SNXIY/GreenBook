@@ -8,6 +8,7 @@ import pytest
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.execution.capability_executor import CapabilityExecutor
 from greenbook_agent_core.execution.models import (
+    ArtifactHandle,
     ExecutionStatus,
     PlanExecution,
     StepStatus,
@@ -77,7 +78,20 @@ def _init_search_analyze_create(
     )
     executable = validator.validate(plan)
     assert executable.is_valid
-    return worker.init_from_plan(executable, task_id=task_id)
+    execution = worker.init_from_plan(executable, task_id=task_id)
+    # Reasoning-backed ANALYZE is completed by AgentLoop.PRODUCE_RESULT. The
+    # Worker fixture starts after that durable hand-off.
+    analysis = execution.steps[1]
+    worker._state.start_step(execution.execution_id, analysis.step_execution_id)
+    worker._state.complete_step(
+        execution.execution_id,
+        analysis.step_execution_id,
+        output_artifact=ArtifactHandle(
+            artifact_type="ANALYSIS_REPORT",
+            summary="Analysis result",
+        ),
+    )
+    return worker._repo.find_by_id(execution.execution_id) or execution
 
 
 # ── Scenario 1: SEARCH → ANALYZE → CREATE complete execution ─────
@@ -147,6 +161,7 @@ async def test_search_resource_reference_binds_dependent_post_detail(
                 ordinal=1,
                 capability="SEARCH_COMMUNITY",
                 output_artifact_type="SEARCH_RESULT",
+                tool_name="community.search_public_posts",
             ),
             PlanStep(
                 step_id="detail",
@@ -274,7 +289,7 @@ async def test_resume_after_approval_completes(
     assert outcome1 == RunOutcome.WAITING_APPROVAL
 
     # Resume
-    outcome2 = await worker.resume_after_approval(ex.execution_id)
+    outcome2 = await worker.resume_after_approval(ex.execution_id, approved=True)
     assert outcome2 == RunOutcome.COMPLETED
 
     final = worker._repo.find_by_id(ex.execution_id)
@@ -308,7 +323,7 @@ async def test_upstream_failure_skips_downstream(
     final = worker._repo.find_by_id(ex.execution_id)
     assert final is not None
     assert final.steps[0].status == StepStatus.FAILED
-    assert final.steps[1].status == StepStatus.SKIPPED
+    assert final.steps[1].status == StepStatus.COMPLETED
     assert final.steps[2].status == StepStatus.SKIPPED
 
 
@@ -331,6 +346,7 @@ async def test_single_step_worker(
         steps=[PlanStep(
             capability="SEARCH_COMMUNITY", ordinal=1,
             output_artifact_type="SEARCH_RESULT",
+            tool_name="community.search_public_posts",
         )],
     )
     from greenbook_agent_core.planning.models import ExecutablePlan
@@ -342,12 +358,17 @@ async def test_single_step_worker(
 
 
 @pytest.mark.asyncio
-async def test_retryable_step_stalls(
+async def test_retryable_step_waits_for_retry_worker(
     orchestrator: GoalPlanFactory,
     validator: PlanValidator,
     registry: CapabilityRegistry,
 ) -> None:
-    """A retryable failure returns STALLED (caller retries)."""
+    """A retryable failure must not fail the execution in the same pass.
+
+    The step is FAILED_RETRYABLE with retry budget remaining; the execution
+    stays RUNNING and the Worker pass returns WAITING_ASYNC so the external
+    retry worker can reset the step and re-dispatch (design goal 0813: a
+    recoverable failure is never reported as a terminal failure)."""
     worker = _make_worker(registry, {
         "community.search_public_posts": {
             "ok": False, "code": "TIMEOUT", "retryable": True,
@@ -362,10 +383,92 @@ async def test_retryable_step_stalls(
 
     outcome = await worker.run(ex.execution_id)
 
-    # Step 1 fails retryable, Step 2 (LLM) still blocked, Step 3 blocked
-    # → stalled because no ready steps (Step 1 is FAILED_RETRYABLE, not PENDING)
-    assert outcome in (RunOutcome.STALLED, RunOutcome.FAILED)
+    # Step 1 fails retryable; the execution is not terminal and waits for the
+    # retry worker instead of being frozen as EXECUTION_STALLED/FAILED.
+    assert outcome == RunOutcome.WAITING_ASYNC
     final = worker._repo.find_by_id(ex.execution_id)
     assert final is not None
+    assert final.status == ExecutionStatus.RUNNING
     s1 = final.steps[0]
-    assert s1.status in (StepStatus.FAILED_RETRYABLE, StepStatus.FAILED)
+    assert s1.status == StepStatus.FAILED_RETRYABLE
+    assert s1.retry_count < s1.max_retries
+
+
+@pytest.mark.asyncio
+async def test_p1_p2_plan_execution_objective_id_persists(registry: CapabilityRegistry) -> None:
+    """P1+P2: init_from_plan carries objective_id into PlanExecution and it
+    survives repository reload."""
+    from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
+    from greenbook_agent_core.planning.models import ExecutablePlan
+
+    worker = _make_worker(registry, {})
+    plan = TaskPlan(task_id="t-obj", steps=[PlanStep(
+        capability="SCHEDULE_PUBLISH", ordinal=1,
+        tool_name="publication.schedule",
+    )])
+    executable = ExecutablePlan(steps=plan.steps, is_valid=True)
+    execution = worker.init_from_plan(executable, task_id="t-obj", objective_id="obj-A")
+    assert execution.objective_id == "obj-A"
+
+    # P2: persist + reload via the worker's repository.
+    loaded = worker._repo.find_by_id(execution.execution_id)
+    assert loaded is not None
+    assert loaded.objective_id == "obj-A"
+
+
+@pytest.mark.asyncio
+async def test_p4_plan_execution_none_objective_compatible(registry: CapabilityRegistry) -> None:
+    """P4: PlanExecution without objective_id (historical) reloads fine (None)."""
+    from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
+    from greenbook_agent_core.planning.models import ExecutablePlan
+
+    worker = _make_worker(registry, {})
+    plan = TaskPlan(task_id="t-hist", steps=[PlanStep(
+        capability="SCHEDULE_PUBLISH", ordinal=1, tool_name="publication.schedule",
+    )])
+    executable = ExecutablePlan(steps=plan.steps, is_valid=True)
+    execution = worker.init_from_plan(executable, task_id="t-hist")  # objective_id defaults None
+    assert execution.objective_id is None
+    loaded = worker._repo.find_by_id(execution.execution_id)
+    assert loaded is not None
+    assert loaded.objective_id is None
+
+
+@pytest.mark.asyncio
+async def test_p1_p2_plan_execution_objective_id_persists(registry: CapabilityRegistry) -> None:
+    """P1+P2: init_from_plan carries objective_id into PlanExecution and it
+    survives repository reload."""
+    from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
+    from greenbook_agent_core.planning.models import ExecutablePlan
+
+    worker = _make_worker(registry, {})
+    plan = TaskPlan(task_id="t-obj", steps=[PlanStep(
+        capability="SCHEDULE_PUBLISH", ordinal=1,
+        tool_name="publication.schedule",
+    )])
+    executable = ExecutablePlan(steps=plan.steps, is_valid=True)
+    execution = worker.init_from_plan(executable, task_id="t-obj", objective_id="obj-A")
+    assert execution.objective_id == "obj-A"
+
+    # P2: persist + reload via the worker's repository.
+    loaded = worker._repo.find_by_id(execution.execution_id)
+    assert loaded is not None
+    assert loaded.objective_id == "obj-A"
+
+
+@pytest.mark.asyncio
+async def test_p4_plan_execution_none_objective_compatible(registry: CapabilityRegistry) -> None:
+    """P4: PlanExecution without objective_id (historical) reloads fine (None)."""
+    from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
+    from greenbook_agent_core.planning.models import ExecutablePlan
+
+    worker = _make_worker(registry, {})
+    plan = TaskPlan(task_id="t-hist", steps=[PlanStep(
+        capability="SCHEDULE_PUBLISH", ordinal=1, tool_name="publication.schedule",
+    )])
+    executable = ExecutablePlan(steps=plan.steps, is_valid=True)
+    execution = worker.init_from_plan(executable, task_id="t-hist")  # objective_id defaults None
+    assert execution.objective_id is None
+    loaded = worker._repo.find_by_id(execution.execution_id)
+    assert loaded is not None
+    assert loaded.objective_id is None

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "view-java-result",
+    "turns": [
+      {"text": "搜索 Java 学习相关帖子", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-agent-result",
+    "turns": [
+      {"text": "搜索 Agent 学习相关帖子", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-redis-result",
+    "turns": [
+      {"text": "搜索 Redis 缓存实践", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-spring-result",
+    "turns": [
+      {"text": "搜索 Spring Boot 入门内容", "ui_action": "click_search_first"}
+    ]
+  },
+  {
+    "name": "view-python-result",
+    "turns": [
+      {"text": "搜索 Python 和 AI 相关帖子", "ui_action": "click_search_first"}
+    ]
+  }
+]

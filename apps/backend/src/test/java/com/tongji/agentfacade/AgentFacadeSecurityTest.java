@@ -2,6 +2,7 @@ package com.tongji.agentfacade;
 
 import com.tongji.agentfacade.api.dto.*;
 import com.tongji.agentfacade.service.AgentFacadeService;
+import com.tongji.agentfacade.mapper.ScheduledPublicationMapper;
 import com.tongji.agentfacade.service.IdempotencyService;
 import com.tongji.agentfacade.service.ScheduledPublicationService;
 import com.tongji.auth.token.JwtService;
@@ -38,6 +39,7 @@ class AgentFacadeSecurityTest {
     @Mock private CounterService counterService;
     @Mock private OssStorageService ossStorageService;
     @Mock private RelationMapper relationMapper;
+    @Mock private ScheduledPublicationMapper scheduledPublicationMapper;
 
     private AgentFacadeService agentFacadeService;
 
@@ -45,7 +47,7 @@ class AgentFacadeSecurityTest {
     void setUp() {
         agentFacadeService = new AgentFacadeService(
                 knowPostMapper, knowPostService, commentService,
-                counterService, relationMapper, ossStorageService);
+                counterService, relationMapper, ossStorageService, scheduledPublicationMapper);
     }
 
     @Test
@@ -95,5 +97,31 @@ class AgentFacadeSecurityTest {
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 agentFacadeService.updateDraft(1L, 100L, request));
         assertTrue(ex.getMessage().contains("只能修改草稿"));
+    }
+
+    @Test
+    void deleteDraft_shouldRejectWhileAnActiveScheduleStillExists() {
+        KnowPost draft = KnowPost.builder()
+                .id(100L).creatorId(1L).status("draft").build();
+        when(knowPostMapper.findByIdForUpdate(100L)).thenReturn(draft);
+        when(scheduledPublicationMapper.countActiveByUserAndDraft(1L, 100L)).thenReturn(1);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                agentFacadeService.deleteDraft(1L, 100L));
+
+        assertTrue(ex.getMessage().contains("Cancel the active publication schedule"));
+        verify(knowPostService, never()).delete(anyLong(), anyLong());
+    }
+
+    @Test
+    void deleteDraft_shouldDeleteOnlyOwnedUnscheduledDraft() {
+        KnowPost draft = KnowPost.builder()
+                .id(100L).creatorId(1L).status("draft").build();
+        when(knowPostMapper.findByIdForUpdate(100L)).thenReturn(draft);
+        when(scheduledPublicationMapper.countActiveByUserAndDraft(1L, 100L)).thenReturn(0);
+
+        agentFacadeService.deleteDraft(1L, 100L);
+
+        verify(knowPostService).delete(1L, 100L);
     }
 }

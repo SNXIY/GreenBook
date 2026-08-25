@@ -101,6 +101,21 @@ def test_typed_artifact_resource_id_never_guesses_from_field_order() -> None:
     assert post is not None and post.resource_id == "post-correct"
 
 
+def test_artifact_resource_id_projects_from_canonical_resource_ref() -> None:
+    draft = CapabilityExecutor._extract_artifact(
+        "GENERATE_CONTENT",
+        "DRAFT",
+        {
+            "data": {"title": "draft"},
+            "resource_refs": [
+                {"kind": "DRAFT", "resource_id": "draft-from-ref"},
+            ],
+        },
+    )
+
+    assert draft is not None and draft.resource_id == "draft-from-ref"
+
+
 def test_memory_and_postgres_artifacts_expose_the_same_body_free_result_fields() -> None:
     engine = sa.create_engine("sqlite+pysqlite:///:memory:")
     memory = MemoryArtifactStore()
@@ -130,6 +145,7 @@ def test_memory_and_postgres_artifacts_expose_the_same_body_free_result_fields()
     assert restored_draft.resource_id == "draft-java-17c"
     assert restored_schedule.resource_id == "schedule-java-17c"
     assert restored_schedule.run_at == "2026-08-12T00:00:00Z"
+    assert restored_schedule.metadata["projection"]["draft_id"] == "draft-java-17c"
     assert "content" not in restored_draft.metadata
     assert "content" not in restored_draft.metadata["projection"]
     engine.dispose()
@@ -246,6 +262,7 @@ async def test_java_post_completion_is_durable_and_publishes_structured_message(
     assert "schedule-java-17c" in serialized_message
     assert "2026-08-12T00:00:00Z" in serialized_message
     assert assistant_message["parts"][0]["type"] == "execution_result"
+    assert assistant_message["parts"][0]["execution"]["business_projection"]["state"] == "SCHEDULED"
     assert tasks.completions[0]["status"] == "COMPLETED"
     assert context.session.active_draft_id == "draft-java-17c"
     assert context.session.active_schedule_id == "schedule-java-17c"

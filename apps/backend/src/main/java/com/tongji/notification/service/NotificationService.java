@@ -9,6 +9,9 @@ public interface NotificationService {
 
     void notifyFollowCreated(String eventId, long actorId, long receiverId);
 
+    /** 定时/立即发布成功后通知帖子作者（系统通知，actorId 固定为 0）。 */
+    void notifyPostPublished(String eventId, long userId, long postId, Long scheduleId);
+
     NotificationPageResponse list(long receiverId, Long cursor, int size);
 
     long unreadCount(long receiverId);

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "scheduler-third-two-minute-zh",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-SCHED-THIRD-JAVA 的 Java 学习草稿，并安排两分钟后发布", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  }
+]

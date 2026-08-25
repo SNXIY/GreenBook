@@ -158,6 +158,12 @@ class TaskRegistryRepository:
             "priority": task.priority,
             "task_type": task.task_type,
             "execution_mode": task.execution_mode,
+            "requires_confirmation": task.requires_confirmation,
+            "confirmation_state": task.confirmation_state,
+            "confirmation_version": task.confirmation_version,
+            "confirmed_version": task.confirmed_version,
+            "confirmation_snapshot_hash": task.confirmation_snapshot_hash,
+            "confirmation_resume_run_id": task.confirmation_resume_run_id,
             "root_goal_id": task.root_goal_id,
             "goal_tree_version": task.goal_tree_version,
             "goal_tree_snapshot": task.goal_tree_snapshot,
@@ -167,6 +173,7 @@ class TaskRegistryRepository:
             "artifacts": [item.model_dump(mode="json") for item in task.artifacts],
             "depends_on": task.depends_on,
             "goals": [item.model_dump(mode="json") for item in task.goals],
+            "objectives": [item.model_dump(mode="json") for item in task.objectives],
             "revisions": [item.model_dump(mode="json") for item in task.revisions],
             "execution_refs": [item.model_dump(mode="json") for item in task.execution_refs],
             "resource_index": [item.model_dump(mode="json") for item in task.resource_index],
@@ -177,7 +184,15 @@ class TaskRegistryRepository:
             "max_retries": task.max_retries,
             "completed_at": task.completed_at,
         }
-        result = self._registry.update_task(task.task_id, **fields)
+        update = self._registry.update_task
+        if expected_version is None:
+            result = update(task.task_id, **fields)
+        else:
+            result = update(
+                task.task_id,
+                expected_version=expected_version,
+                **fields,
+            )
         updated = await result if asyncio.iscoroutine(result) else result
         if updated is None:
             raise TaskRepositoryError(f"Task '{task.task_id}' disappeared during update.")

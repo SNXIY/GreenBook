@@ -16,12 +16,7 @@ from pydantic import ValidationError
 from greenbook_agent_core.capability.models import Capability
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.command.models import Command, CommandContext
-from greenbook_agent_core.llm_compat import (
-    add_json_schema_instruction,
-    has_structured_payload,
-    retry_json_object,
-    structured_provider_options,
-)
+from greenbook_agent_core.llm_compat import structured_call
 
 from .models import GoalTree
 
@@ -188,47 +183,18 @@ class GoalDecomposer:
                     "Return the same semantic GoalTree with the exact supplied "
                     "schema. Repair only serialization or field-shape errors; "
                     "preserve the user objective, goal decomposition, "
-                    "dependencies, constraints, and required capabilities."
+                    "dependencies, per-goal target, temporal constraint, "
+                    "publication intent, and required capabilities."
                 ),
             }
-        kwargs = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": _GOAL_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": json.dumps(request, ensure_ascii=False, default=str),
-                },
-            ],
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "greenbook_goal_tree",
-                    "strict": True,
-                    "schema": GoalTree.model_json_schema(),
-                },
-            },
-            "temperature": 0.0,
-            **structured_provider_options(client, model),
-        }
-        try:
-            response = await client.chat.completions.create(**kwargs)
-        except Exception as exc:
-            if "response_format" not in str(exc).lower() and "json_schema" not in str(exc).lower():
-                raise
-            kwargs["response_format"] = {"type": "json_object"}
-            kwargs["messages"] = add_json_schema_instruction(
-                kwargs["messages"],
-                GoalTree.model_json_schema(),
-            )
-            response = await client.chat.completions.create(**kwargs)
-        if not has_structured_payload(response):
-            response = await retry_json_object(
-                client,
-                kwargs,
-                GoalTree.model_json_schema(),
-            )
-        return response
+        return await structured_call(
+            client,
+            model,
+            _GOAL_SYSTEM_PROMPT,
+            "greenbook_goal_tree",
+            GoalTree.model_json_schema(),
+            request,
+        )
 
     def _capability_descriptors(
         self,
@@ -333,24 +299,36 @@ explicitly; do not rely on sentence order. Set required_capabilities to
 semantic capability names from the supplied catalog and preserve every
 required_capability requested by Command understanding. Keep entities,
 constraints, references, time bounds, and expected outputs on the relevant
-Goal. Independent child Goals may be parallel; dependent Goals must declare
-dependencies. A GoalTree may include TaskNodes when a single Goal needs
-multiple planner requirements.
+Goal. For every user-visible Goal, preserve its own semantic_operation,
+target, temporal_constraint, and publication_intent. Independent child Goals
+may be parallel; dependent Goals must declare dependencies. A GoalTree may
+include TaskNodes when a single Goal needs multiple planner requirements.
+
+Publication semantics are safety-critical and are never inherited from a
+request-wide scalar. Use SCHEDULE_PUBLISH only when that Goal has its own
+future temporal constraint, use PUBLISH_NOW only when the Command explicitly
+requested immediate publication, and use publication_intent DRAFT_ONLY when
+the Goal must remain a draft. A missing schedule time must remain unresolved
+and fail closed; it must never be normalized to immediate publication. The
+absence of a schedule is not evidence of PUBLISH_NOW.
 
 Do not add target-specific capabilities merely because they are available in
-the catalog. Require GET_POST_DETAIL or another concrete-resource capability
-only when the Command/Context contains a target identifier or a dependency is
-explicitly guaranteed to emit the required resource reference. For a general
-trend or interest request, SEARCH_COMMUNITY plus an appropriate analysis step
-is sufficient; an empty search result must not be followed by a fabricated
-post_id. Likewise, do not add own-post performance analysis unless the user
-asked for their own posts or the context supplies that target.
+the catalog, and never invent a resource identifier: any concrete-read step
+must consume a real reference emitted by an earlier SEARCH dependency. For a
+general trend or interest request, SEARCH_COMMUNITY plus an appropriate
+analysis step is sufficient. But when the requested outcome is to summarize,
+synthesize, compare, or extract the community's common methods, viewpoints,
+writing style, or lessons, the analysis must be grounded in real post bodies:
+add a concrete-read Goal (GET_POST_DETAIL, depending on the SEARCH Goal) that
+reads the representative posts returned by the search — at least two posts for
+a reliable synthesis — so the summary is not inferred from titles alone. An
+empty search result must not be followed by a fabricated post_id. Likewise,
+do not add own-post performance analysis unless the user asked for their own
+posts or the context supplies that target.
 
-Keep strategy design separate from draft generation: when the requested result
-contains a distinct editorial strategy or series plan, use the semantic
-DESIGN_CONTENT_STRATEGY capability for that result and reserve
-GENERATE_CONTENT for the actual draft. Do not turn either capability into a
-fixed workflow; preserve the dependencies expressed by the GoalTree.
+Keep content generation focused: GENERATE_CONTENT produces the actual draft
+from the accumulated evidence. Do not turn it into a fixed workflow; preserve
+the dependencies expressed by the GoalTree.
 
 Do not emit MCP tool names, Agent names, execution steps, queue operations, or
 prose. Candidate tool names are catalog context only and are not executable

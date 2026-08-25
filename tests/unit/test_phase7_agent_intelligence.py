@@ -114,7 +114,10 @@ async def test_command_understanding_preserves_continuation_semantics() -> None:
     assert command.target is not None
     assert command.target.task_id == "task-article"
     request = json.loads(llm.calls[0]["messages"][1]["content"])
-    assert request["context"]["active_tasks"][0]["task_id"] == "task-article"
+    # Interpreter context carries the task's user-facing lifecycle facts, but
+    # canonical task identity remains resolver-owned.
+    assert "task_id" not in request["context"]["active_tasks"][0]
+    assert request["context"]["active_tasks"][0]["status"] == "RUNNING"
     assert len(request["context"]["history"]) == 2
 
 

@@ -1,0 +1,16 @@
+[
+  {
+    "name": "draft-immediate-publish",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-PUBLISH-AGENT 的 Agent 学习草稿，只保存草稿"},
+      {"text": "Agent 那篇直接发布", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  },
+  {
+    "name": "draft-publish-java",
+    "turns": [
+      {"text": "创建一个标题为 GB-STABLE-R1-PUBLISH-JAVA 的 Java 实践草稿，只保存草稿"},
+      {"text": "请把 Java 那篇立即发布", "hitl_sequence": ["confirm", "approve"]}
+    ]
+  }
+]

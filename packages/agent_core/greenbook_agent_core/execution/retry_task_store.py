@@ -152,11 +152,16 @@ class RetryTaskStore:
                 return None
             if task.claimed_by != worker_id:
                 return None
+            # A release means the retry was not applied (denied / failed /
+            # undispatchable).  Consume one unit of budget so an
+            # always-undispatchable task eventually terminates instead of
+            # looping forever (design goal 0813).
             released = task.model_copy(
                 update={
                     "status": RetryTaskStatus.READY,
                     "claimed_by": None,
                     "claim_until": None,
+                    "retry_budget": max(0, task.retry_budget - 1),
                     "updated_at": self._now().isoformat(),
                 },
                 deep=True,
@@ -375,6 +380,9 @@ class PostgresRetryTaskStore:
                 status=RetryTaskStatus.READY.value,
                 claimed_by=None,
                 claim_until=None,
+                # A release means the retry was not applied; consume budget so
+                # the task terminates instead of looping forever.
+                retry_budget=retry_tasks.c.retry_budget - 1,
                 updated_at=datetime.now(UTC).isoformat(),
             )
             if conn.execute(statement).rowcount == 0:

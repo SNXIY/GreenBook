@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
-
 from greenbook_agent_core.context import SessionContext
 from greenbook_agent_core.conversation.service import ConversationService
 
@@ -108,6 +107,20 @@ class _MessageRepository:
         if limit is not None:
             messages = messages[-limit:]
         return messages
+
+    async def count_by_conversation(self, conversation_id, *, roles=None):
+        messages = list(self.store.messages.get(conversation_id, []))
+        if roles:
+            messages = [item for item in messages if item["role"] in roles]
+        return len(messages)
+
+    async def trim(self, conversation_id, *, keep):
+        messages = self.store.messages.setdefault(conversation_id, [])
+        if len(messages) <= keep:
+            return 0
+        removed = len(messages) - keep
+        del messages[:removed]
+        return removed
 
 
 class _ContextRepository:
@@ -247,6 +260,65 @@ async def test_context_compression_persists_summary_and_keeps_recent_messages(ma
     assert "第一轮" in restored.summary
     assert [item["content"] for item in restored.recent_messages] == ["第一轮答复", "第二轮"]
     assert store.conversations[conversation_id]["conversation_summary"] == restored.summary
+
+
+@pytest.mark.asyncio
+async def test_message_table_stays_bounded_and_summary_never_duplicates(manager) -> None:
+    """Compaction must fold each message into the durable summary exactly
+    once and trim the raw rows: the table stays bounded by the recent window
+    and the summary grows once per fact, not once per compression
+    (design goal 0813 — durable context, no unbounded row growth, no
+    duplicate summary lines)."""
+    store, context = manager
+    conversation_id = "conversation-bounded"
+    await context.create_conversation(
+        conversation_id=conversation_id,
+        user_id="user-1",
+        tenant_id="tenant-1",
+    )
+    for index in range(9):
+        await context.append_message(
+            conversation_id,
+            user_id="user-1",
+            tenant_id="tenant-1",
+            role="user" if index % 2 == 0 else "assistant",
+            content=f"内容{index}",
+        )
+
+    restored = await context.load(
+        conversation_id,
+        user_id="user-1",
+        tenant_id="tenant-1",
+    )
+    summary = restored.summary or ""
+    # Every folded message appears at most once.
+    assert "内容0" in summary
+    assert "内容6" in summary
+    lines = [line.strip() for line in summary.splitlines() if line.strip()]
+    assert len(lines) == len(set(lines))
+    # The raw table is bounded by the recent window.
+    assert len(store.messages[conversation_id]) == 2
+    # The newest turn is still raw, not yet folded.
+    assert "内容8" not in summary
+    assert [item["content"] for item in restored.recent_messages] == ["内容7", "内容8"]
+
+
+def test_merge_summary_does_not_duplicate_captured_lines() -> None:
+    from greenbook_agent_core.conversation.service import _merge_summary
+
+    merged = _merge_summary(
+        "user: 第一轮",
+        "user: 第一轮\nassistant: 第一轮答复",
+    )
+    assert merged.count("user: 第一轮") == 1
+    assert "assistant: 第一轮答复" in merged
+
+
+def test_merge_summary_keeps_prior_facts_when_no_fresh_lines() -> None:
+    from greenbook_agent_core.conversation.service import _merge_summary
+
+    merged = _merge_summary("user: A\nassistant: B", "user: A")
+    assert merged == "user: A\nassistant: B"
 
 
 @pytest.mark.asyncio

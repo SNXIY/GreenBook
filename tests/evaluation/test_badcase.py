@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from greenbook_evaluation.analyzer import FailureAnalyzer
-from greenbook_evaluation.badcase import BadCase, FailureType
+from greenbook_evaluation.badcase import (
+    BadCase,
+    BadCaseStatus,
+    BadCaseStore,
+    CaseLevelStatus,
+    FailureType,
+)
 from greenbook_evaluation.metrics import MetricsCalculator
 from greenbook_evaluation.models import EvalCheck, EvalResult
 
@@ -19,11 +25,118 @@ def test_badcase_model() -> None:
     assert bc.case_id == "test-1"
 
 
+def test_badcase_status_update_is_small_and_explicit() -> None:
+    store = BadCaseStore()
+    store.save(BadCase(case_id="rc-02-case-5", root_cause_id="RC-02"))
+
+    updated = store.update_status(
+        "rc-02-case-5", BadCaseStatus.FIXED, root_cause_id="RC-02"
+    )
+
+    assert updated is not None
+    assert updated.status == BadCaseStatus.FIXED
+    assert updated.root_cause_id == "RC-02"
+    assert store.list_cases()[0].status == BadCaseStatus.FIXED
+
+
+def test_case_level_ledger_deduplicates_assertions_and_excludes_invalid_eval() -> None:
+    store = BadCaseStore()
+    store.save(
+        BadCase(
+            case_id="case-1",
+            assertion_id="case-1:semantic_state",
+            status=BadCaseStatus.FIXED,
+            root_cause_id="RC-01",
+        )
+    )
+    store.save(
+        BadCase(
+            case_id="case-1",
+            assertion_id="case-1:temporal_resolution",
+            status=BadCaseStatus.OPEN,
+            root_cause_id="RC-04",
+        )
+    )
+    store.register_case("case-1")
+    store.set_case_status("case-1", CaseLevelStatus.OPEN_AGENT, historical_root_causes=["RC-01", "RC-04"])
+    store.set_case_status("case-2", CaseLevelStatus.INVALID_EVAL, historical_root_causes=["RC-06"])
+    store.set_case_status("case-3", CaseLevelStatus.PASS)
+
+    assert store.case_level_counts() == {
+        "PASS": 1,
+        "OPEN_AGENT": 1,
+        "FIXED": 0,
+        "INVALID_EVAL": 1,
+        "UNCERTAIN": 0,
+    }
+    assert [item.assertion_id for item in store.open_agent_assertions()] == [
+        "case-1:temporal_resolution"
+    ]
+    # Two assertions are retained in historical storage, but only one case
+    # contributes to the case-level OPEN_AGENT count.
+    assert len(store.list_cases()) == 2
+
+
+def test_multi_assertion_status_update_requires_assertion_identity() -> None:
+    store = BadCaseStore()
+    store.save(BadCase(case_id="case-1", assertion_id="case-1:a"))
+    store.save(BadCase(case_id="case-1", assertion_id="case-1:b"))
+
+    assert store.update_status("case-1", BadCaseStatus.FIXED) is None
+    updated = store.update_status(
+        "case-1",
+        BadCaseStatus.FIXED,
+        assertion_id="case-1:a",
+        root_cause_id="RC-02",
+    )
+    assert updated is not None
+    assert updated.assertion_id == "case-1:a"
+    assert updated.status == BadCaseStatus.FIXED
+
+
+def test_reconcile_cases_closes_an_explicit_eval_universe() -> None:
+    store = BadCaseStore()
+    case_ids = [f"golden-{index}" for index in range(80)]
+    statuses = {case_id: CaseLevelStatus.PASS for case_id in case_ids}
+    statuses.update({
+        case_ids[0]: CaseLevelStatus.OPEN_AGENT,
+        case_ids[1]: CaseLevelStatus.FIXED,
+        case_ids[2]: CaseLevelStatus.INVALID_EVAL,
+        case_ids[3]: CaseLevelStatus.UNCERTAIN,
+    })
+
+    entries = store.reconcile_cases(case_ids, statuses)
+
+    assert len(entries) == 80
+    assert sum(store.case_level_counts().values()) == 80
+    assert store.case_level_counts()[CaseLevelStatus.PASS.value] == 76
+
+
 def test_failure_type_enum_values() -> None:
     assert FailureType.WRONG_CATEGORY.value == "WRONG_CATEGORY"
     assert FailureType.OVER_SPLIT.value == "OVER_SPLIT"
     assert FailureType.UNDER_SPLIT.value == "UNDER_SPLIT"
     assert FailureType.WRONG_TOOL.value == "WRONG_TOOL"
+
+
+def test_failure_analyzer_emits_stable_assertion_ids_per_case() -> None:
+    result = EvalResult(
+        case_id="case-assertions",
+        category="SEMANTIC",
+        user_message="input",
+        passed=False,
+        checks=[
+            EvalCheck(check="semantic_state", expected="A", actual="B", ok=False),
+            EvalCheck(check="temporal_resolution", expected=True, actual=False, ok=False),
+        ],
+    )
+
+    assertions = FailureAnalyzer.analyze(result)
+
+    assert [item.assertion_id for item in assertions] == [
+        "case-assertions:semantic_state",
+        "case-assertions:temporal_resolution",
+    ]
 
 
 # ── FailureAnalyzer classification ────────────────────────────────

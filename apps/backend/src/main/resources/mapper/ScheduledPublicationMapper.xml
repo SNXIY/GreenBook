@@ -48,6 +48,13 @@
         ORDER BY created_at DESC
     </select>
 
+    <select id="countActiveByUserAndDraft" resultType="int">
+        SELECT COUNT(*) FROM scheduled_publications
+        WHERE user_id = #{userId}
+          AND draft_id = #{draftId}
+          AND status IN ('SCHEDULED', 'PROCESSING')
+    </select>
+
     <update id="updateRunAt">
         UPDATE scheduled_publications
         SET run_at = #{runAt}, version = version + 1, updated_at = NOW(3)

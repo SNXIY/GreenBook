@@ -79,6 +79,7 @@ components:
           type: string
         summary:
           type: string
+          maxLength: 50
         tags:
           type: array
           items:
@@ -184,7 +185,7 @@ components:
           description: 正文 Markdown
         summary:
           type: string
-          maxLength: 200
+          maxLength: 50
         visibility:
           type: string
           enum: [public, followers, school, private, unlisted]
@@ -198,6 +199,7 @@ components:
           type: string
         summary:
           type: string
+          maxLength: 50
         tags:
           type: array
           items:
@@ -430,6 +432,8 @@ components:
           type: string
           enum:
             - VALIDATION_ERROR
+            - FIELD_TOO_LONG
+            - INVALID_DRAFT_METADATA
             - AUTHENTICATION_REQUIRED
             - UNAUTHORIZED
             - FORBIDDEN
@@ -508,6 +512,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentPostContext'
+    delete:
+      tags: [Agent Facade]
+      summary: Delete an owned published post
+      operationId: deletePost
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Post deleted
 
   # ── My Posts ──────────────────────────────────────────
   /api/v1/agent/me/posts:
@@ -607,6 +628,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DraftResponse'
+    delete:
+      tags: [Agent Facade]
+      summary: Delete a draft
+      operationId: deleteDraft
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '204':
+          description: Draft deleted
 
   /api/v1/agent/me/drafts:
     get:
@@ -757,6 +793,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentCommentPageResponse'
+
+  /api/v1/agent/comments/{commentId}:
+    get:
+      tags: [Agent Facade]
+      summary: 查询单条评论
+      operationId: getComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 评论详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCommentResponse'
 
   /api/v1/agent/comments/{commentId}/replies:
     post:

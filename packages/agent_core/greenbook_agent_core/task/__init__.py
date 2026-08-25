@@ -12,6 +12,8 @@ __all__ = [
     "InMemoryTaskRepository",
     "Task",
     "TaskManager",
+    "TaskConfirmationConflictError",
+    "TaskConfirmationTransition",
     "TaskManagerError",
     "TaskNotFoundError",
     "PostgresTaskRepository",
@@ -20,6 +22,7 @@ __all__ = [
     "TaskRepositoryError",
     "TaskStateTransitionError",
     "TaskStatus",
+    "TaskConfirmationState",
     "TaskVersionConflict",
     "TaskVersionConflictError",
 ]
@@ -28,12 +31,16 @@ __all__ = [
 def __getattr__(name: str) -> Any:
     if name in {
         "TaskManager",
+        "TaskConfirmationConflictError",
+        "TaskConfirmationTransition",
         "TaskManagerError",
         "TaskNotFoundError",
         "TaskStateTransitionError",
     }:
         from .manager import (
             TaskManager,
+            TaskConfirmationConflictError,
+            TaskConfirmationTransition,
             TaskManagerError,
             TaskNotFoundError,
             TaskStateTransitionError,
@@ -41,14 +48,20 @@ def __getattr__(name: str) -> Any:
 
         return {
             "TaskManager": TaskManager,
+            "TaskConfirmationConflictError": TaskConfirmationConflictError,
+            "TaskConfirmationTransition": TaskConfirmationTransition,
             "TaskManagerError": TaskManagerError,
             "TaskNotFoundError": TaskNotFoundError,
             "TaskStateTransitionError": TaskStateTransitionError,
         }[name]
-    if name in {"Task", "TaskStatus"}:
-        from .models import Task, TaskStatus
+    if name in {"Task", "TaskStatus", "TaskConfirmationState"}:
+        from .models import Task, TaskConfirmationState, TaskStatus
 
-        return {"Task": Task, "TaskStatus": TaskStatus}[name]
+        return {
+            "Task": Task,
+            "TaskStatus": TaskStatus,
+            "TaskConfirmationState": TaskConfirmationState,
+        }[name]
     if name in {
         "InMemoryTaskRepository",
         "TaskRegistryRepository",

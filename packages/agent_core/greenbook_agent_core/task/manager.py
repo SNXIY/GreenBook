@@ -8,7 +8,8 @@ interpret user text and it never calls a tool or worker directly.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,13 +18,24 @@ from greenbook_agent_core.planning.contracts import PlanRevision
 
 from .models import (
     Task,
-    TaskExecutionRef,
-    TaskGoal,
+    TaskConfirmationState,
+    TaskResourceRef,
     TaskRevision,
     TaskRevisionType,
     TaskStatus,
 )
-from .repository import TaskRepository, TaskRepositoryError
+from .execution_projection import (
+    existing_execution_status,
+    is_terminal_execution_status,
+    merge_execution_status,
+    project_execution_ref,
+)
+from .repository import (
+    TaskRepository,
+    TaskRepositoryError,
+    TaskVersionConflictError,
+)
+from .semantic_confirmation import confirmation_identity
 
 
 class TaskManagerError(RuntimeError):
@@ -36,6 +48,18 @@ class TaskNotFoundError(TaskManagerError):
 
 class TaskStateTransitionError(TaskManagerError):
     """A caller attempted an invalid deterministic lifecycle transition."""
+
+
+class TaskConfirmationConflictError(TaskManagerError):
+    """A semantic confirmation command lost its Task-level CAS/version check."""
+
+
+@dataclass(frozen=True, slots=True)
+class TaskConfirmationTransition:
+    """Result of one typed Task confirmation CAS attempt."""
+
+    task: Task
+    changed: bool
 
 
 _ACTIVE_STATUSES = {
@@ -54,6 +78,7 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
         TaskStatus.PLANNING,
         TaskStatus.READY,
         TaskStatus.RUNNING,
+        TaskStatus.WAITING_HUMAN,
         TaskStatus.PAUSED,
         TaskStatus.COMPLETED,
         TaskStatus.FAILED,
@@ -62,6 +87,7 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.PLANNING: {
         TaskStatus.READY,
         TaskStatus.RUNNING,
+        TaskStatus.WAITING_HUMAN,
         TaskStatus.PAUSED,
         TaskStatus.COMPLETED,
         TaskStatus.FAILED,
@@ -69,6 +95,7 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     },
     TaskStatus.READY: {
         TaskStatus.RUNNING,
+        TaskStatus.WAITING_HUMAN,
         TaskStatus.PAUSED,
         TaskStatus.COMPLETED,
         TaskStatus.FAILED,
@@ -76,6 +103,7 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
         TaskStatus.PLANNING,
     },
     TaskStatus.RUNNING: {
+        TaskStatus.READY,
         TaskStatus.WAITING_HUMAN,
         TaskStatus.WAITING_EXTERNAL,
         TaskStatus.PAUSED,
@@ -85,6 +113,7 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
         TaskStatus.PLANNING,
     },
     TaskStatus.IN_PROGRESS: {
+        TaskStatus.READY,
         TaskStatus.WAITING_HUMAN,
         TaskStatus.WAITING_EXTERNAL,
         TaskStatus.PAUSED,
@@ -111,6 +140,10 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.FAILED: {
         TaskStatus.PLANNING,
         TaskStatus.READY,
+        # A Task is an aggregate projection for multiple independent
+        # Objectives.  One failed sibling must not prevent a later, explicitly
+        # targeted sibling execution from binding to the same Task.
+        TaskStatus.RUNNING,
         TaskStatus.CANCELLED,
     },
     # A completed Task is a completed execution of the current GoalTree, not
@@ -120,6 +153,10 @@ _TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
     TaskStatus.COMPLETED: {
         TaskStatus.PLANNING,
         TaskStatus.READY,
+        # Reopen for continued execution (a Task may be marked COMPLETED by a
+        # run projection while a later ActionLoop resume still needs to bind a
+        # queued write to the same durable Task).
+        TaskStatus.RUNNING,
     },
     TaskStatus.CANCELLED: set(),
 }
@@ -218,6 +255,292 @@ class TaskManager:
             raise TaskNotFoundError(f"Task '{task_id}' was not found in scope.")
         return task
 
+    async def set_confirmation_pending(
+        self,
+        task_id: str,
+        *,
+        snapshot_hash: str,
+        resume_run_id: str,
+        expected_task_version: int | None = None,
+    ) -> Task:
+        """Persist a Task-level confirmation gate without entering ActionLoop."""
+
+        task = await self.get_required(task_id)
+        if (
+            expected_task_version is not None
+            and task.version != expected_task_version
+        ):
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' Task version is stale."
+            )
+        snapshot_hash = str(snapshot_hash or "")
+        if task.confirmation_state == TaskConfirmationState.CONFIRMATION_PENDING:
+            if task.confirmation_snapshot_hash == snapshot_hash:
+                return task
+        elif task.confirmation_state == TaskConfirmationState.CANCELLED:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' cannot enter confirmation from "
+                f"{task.confirmation_state.value}."
+            )
+        previous_version = int(task.confirmation_version or 0)
+        if previous_version > 0 and task.confirmation_state in {
+            TaskConfirmationState.CONFIRMATION_PENDING,
+            TaskConfirmationState.CONFIRMED,
+            TaskConfirmationState.SUPERSEDED,
+        }:
+            task.revisions.append(
+                TaskRevision(
+                    task_id=task.task_id,
+                    type=TaskRevisionType.MODIFY_GOAL,
+                    payload={
+                        "kind": "SEMANTIC_CONFIRMATION_SUPERSEDED",
+                        "previous_confirmation_version": previous_version,
+                        "previous_snapshot_hash": task.confirmation_snapshot_hash,
+                        "next_snapshot_hash": snapshot_hash,
+                    },
+                    previous_version=task.version,
+                )
+            )
+        task.requires_confirmation = True
+        task.confirmation_state = TaskConfirmationState.CONFIRMATION_PENDING
+        task.confirmation_version = max(1, previous_version + 1)
+        task.confirmed_version = None
+        task.confirmation_snapshot_hash = snapshot_hash or None
+        task.confirmation_resume_run_id = str(resume_run_id or "") or None
+        task.last_action = "SEMANTIC_CONFIRMATION_PENDING"
+        try:
+            return await self._persist(task)
+        except TaskVersionConflictError as exc:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' changed while entering confirmation."
+            ) from exc
+
+    async def auto_admit_task(self, task_id: str) -> Task:
+        """Record policy-false admission on the canonical Task."""
+
+        task = await self.get_required(task_id)
+        if task.confirmation_state == TaskConfirmationState.AUTO_ADMITTED:
+            return task
+        if task.confirmation_state == TaskConfirmationState.RESOLVED:
+            task.confirmation_state = TaskConfirmationState.AUTO_ADMITTED
+            task.requires_confirmation = False
+            task.last_action = "SEMANTIC_CONFIRMATION_AUTO_ADMITTED"
+            try:
+                return await self._persist(task)
+            except TaskVersionConflictError as exc:
+                raise TaskConfirmationConflictError(
+                    f"Task '{task_id}' changed while entering admission."
+                ) from exc
+        if task.confirmation_state == TaskConfirmationState.CONFIRMED:
+            return task
+        raise TaskConfirmationConflictError(
+            f"Task '{task_id}' cannot be auto-admitted from "
+            f"{task.confirmation_state.value}."
+        )
+
+    async def confirm_task(
+        self,
+        task_id: str,
+        *,
+        expected_confirmation_version: int,
+        expected_task_version: int | None = None,
+        expected_confirmation_id: str | None = None,
+    ) -> Task:
+        """Atomically confirm one Task snapshot; repeated same-version confirm is idempotent."""
+
+        transition = await self.confirm_task_transition(
+            task_id,
+            expected_confirmation_version=expected_confirmation_version,
+            expected_task_version=expected_task_version,
+            expected_confirmation_id=expected_confirmation_id,
+        )
+        return transition.task
+
+    async def confirm_task_transition(
+        self,
+        task_id: str,
+        *,
+        expected_confirmation_version: int,
+        expected_task_version: int | None = None,
+        expected_confirmation_id: str | None = None,
+    ) -> TaskConfirmationTransition:
+        """CAS-confirm a Task and report whether this caller won the CAS."""
+
+        task = await self.get_required(task_id)
+        if (
+            task.confirmation_state == TaskConfirmationState.CONFIRMED
+            and task.confirmed_version == expected_confirmation_version
+        ):
+            self._validate_confirmation_id(task, expected_confirmation_id, task_id=task_id)
+            return TaskConfirmationTransition(task=task, changed=False)
+        if task.confirmation_state != TaskConfirmationState.CONFIRMATION_PENDING:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' is not awaiting semantic confirmation."
+            )
+        if task.confirmation_version != expected_confirmation_version:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' confirmation version is stale."
+            )
+        if (
+            expected_task_version is not None
+            and task.version != expected_task_version
+        ):
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' Task version is stale."
+            )
+        self._validate_confirmation_id(task, expected_confirmation_id, task_id=task_id)
+        task.confirmation_state = TaskConfirmationState.CONFIRMED
+        task.confirmed_version = expected_confirmation_version
+        task.last_action = "SEMANTIC_CONFIRMATION_CONFIRMED"
+        try:
+            return TaskConfirmationTransition(
+                task=await self._persist(task),
+                changed=True,
+            )
+        except TaskVersionConflictError as exc:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' changed while confirming."
+            ) from exc
+
+    async def cancel_confirmation(
+        self,
+        task_id: str,
+        *,
+        expected_confirmation_version: int,
+        expected_task_version: int | None = None,
+        expected_confirmation_id: str | None = None,
+    ) -> Task:
+        """Atomically cancel a pending Task; repeated cancellation is idempotent."""
+
+        transition = await self.cancel_confirmation_transition(
+            task_id,
+            expected_confirmation_version=expected_confirmation_version,
+            expected_task_version=expected_task_version,
+            expected_confirmation_id=expected_confirmation_id,
+        )
+        return transition.task
+
+    async def cancel_confirmation_transition(
+        self,
+        task_id: str,
+        *,
+        expected_confirmation_version: int,
+        expected_task_version: int | None = None,
+        expected_confirmation_id: str | None = None,
+    ) -> TaskConfirmationTransition:
+        """CAS-cancel a Task and report whether this caller won the CAS."""
+
+        task = await self.get_required(task_id)
+        if (
+            task.confirmation_state == TaskConfirmationState.CANCELLED
+            and task.confirmation_version == expected_confirmation_version
+        ):
+            self._validate_confirmation_id(task, expected_confirmation_id, task_id=task_id)
+            return TaskConfirmationTransition(task=task, changed=False)
+        if task.confirmation_state != TaskConfirmationState.CONFIRMATION_PENDING:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' is not awaiting semantic confirmation."
+            )
+        if task.confirmation_version != expected_confirmation_version:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' confirmation version is stale."
+            )
+        if (
+            expected_task_version is not None
+            and task.version != expected_task_version
+        ):
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' Task version is stale."
+            )
+        self._validate_confirmation_id(task, expected_confirmation_id, task_id=task_id)
+        task.confirmation_state = TaskConfirmationState.CANCELLED
+        task.last_action = "SEMANTIC_CONFIRMATION_CANCELLED"
+        try:
+            return TaskConfirmationTransition(
+                task=await self._persist(task),
+                changed=True,
+            )
+        except TaskVersionConflictError as exc:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' changed while cancelling."
+            ) from exc
+
+    async def supersede_confirmation(
+        self,
+        task_id: str,
+        *,
+        expected_confirmation_version: int | None = None,
+        expected_task_version: int | None = None,
+        expected_confirmation_id: str | None = None,
+    ) -> Task:
+        """Make a pending snapshot permanently non-executable for a MODIFY flow."""
+
+        task = await self.get_required(task_id)
+        if task.confirmation_state == TaskConfirmationState.SUPERSEDED:
+            self._validate_confirmation_request(
+                task,
+                expected_confirmation_version=expected_confirmation_version,
+                expected_task_version=expected_task_version,
+                expected_confirmation_id=expected_confirmation_id,
+                task_id=task_id,
+            )
+            return task
+        if task.confirmation_state != TaskConfirmationState.CONFIRMATION_PENDING:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' is not awaiting semantic confirmation."
+            )
+        self._validate_confirmation_request(
+            task,
+            expected_confirmation_version=expected_confirmation_version,
+            expected_task_version=expected_task_version,
+            expected_confirmation_id=expected_confirmation_id,
+            task_id=task_id,
+        )
+        task.confirmation_state = TaskConfirmationState.SUPERSEDED
+        task.confirmed_version = None
+        task.last_action = "SEMANTIC_CONFIRMATION_SUPERSEDED"
+        try:
+            return await self._persist(task)
+        except TaskVersionConflictError as exc:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' changed while superseding."
+            ) from exc
+
+    @staticmethod
+    def _validate_confirmation_id(
+        task: Task,
+        expected_confirmation_id: str | None,
+        *,
+        task_id: str,
+    ) -> None:
+        if expected_confirmation_id and expected_confirmation_id != confirmation_identity(task):
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' confirmation identity is stale."
+            )
+
+    @classmethod
+    def _validate_confirmation_request(
+        cls,
+        task: Task,
+        *,
+        expected_confirmation_version: int | None,
+        expected_task_version: int | None,
+        expected_confirmation_id: str | None,
+        task_id: str,
+    ) -> None:
+        if (
+            expected_confirmation_version is not None
+            and task.confirmation_version != expected_confirmation_version
+        ):
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' confirmation version is stale."
+            )
+        if expected_task_version is not None and task.version != expected_task_version:
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' Task version is stale."
+            )
+        cls._validate_confirmation_id(task, expected_confirmation_id, task_id=task_id)
+
     async def get_active_tasks(
         self,
         conversation_id: str,
@@ -226,9 +549,38 @@ class TaskManager:
         tenant_id: str | None = None,
     ) -> list[Task]:
         tasks = await self._repository.list(conversation_id, statuses=tuple(_ACTIVE_STATUSES))
+        from .objective_reducer import is_context_isolated_task
+
         return [
             task for task in tasks
-            if (user_id is None or task.user_id == user_id)
+            if not is_context_isolated_task(task)
+            and (user_id is None or task.user_id == user_id)
+            and (tenant_id is None or task.tenant_id == tenant_id)
+        ]
+
+    async def get_resolvable_tasks(
+        self,
+        conversation_id: str,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+    ) -> list[Task]:
+        """Tasks a follow-up turn may reference, including terminal work.
+
+        A user can keep steering finished work ("再给它补一段…", "刚刚那篇
+        正文精简一下"), so delta target resolution must see terminal-but-usable
+        tasks.  FAILED remains revisable because its durable resources can be
+        the target of a new outcome.  CANCELLED is the one administrative
+        terminal state excluded from new work.
+        """
+        tasks = await self._repository.list(conversation_id, statuses=None)
+        from .objective_reducer import is_context_isolated_task
+
+        return [
+            task for task in tasks
+            if task.status != TaskStatus.CANCELLED
+            and not is_context_isolated_task(task)
+            and (user_id is None or task.user_id == user_id)
             and (tenant_id is None or task.tenant_id == tenant_id)
         ]
 
@@ -263,7 +615,77 @@ class TaskManager:
                     previous_plan_version=previous_plan_version,
                 )
             )
-        task.goals = [_task_goal(task.task_id, goal) for goal in goal_tree.all_goals()]
+        # Objective is the business-goal truth.  Keep the historical GoalTree
+        # snapshot and existing ``goals`` projection readable, but do not
+        # create new TaskGoal records for a newly bound plan.
+        from greenbook_agent_core.task.objective_compat import goals_to_objectives
+
+        # GoalTree is still a compatibility projection.  Rebinding it must
+        # not replace the canonical Objective history: a later cross-turn
+        # business operation appends a new Goal/Objective while the original
+        # terminal Objective keeps its verified resources and lifecycle.
+        previous_objectives = {
+            str(getattr(item, "objective_id", "")): item
+            for item in (getattr(task, "objectives", ()) or ())
+            if str(getattr(item, "objective_id", ""))
+        }
+        projected_objectives = goals_to_objectives(
+            goal_tree.all_goals(), task.task_id
+        )
+        for projected in projected_objectives:
+            previous = previous_objectives.get(
+                str(getattr(projected, "objective_id", ""))
+            )
+            if previous is None:
+                continue
+            # The newly compiled Goal owns the latest desired constraints;
+            # historical evidence/ownership is monotonic and is carried
+            # forward instead of being reset by the projection.
+            merged_constraints = dict(getattr(previous, "constraints", {}) or {})
+            merged_constraints.update(
+                dict(getattr(projected, "constraints", {}) or {})
+            )
+            projected.constraints = merged_constraints
+            for field in (
+                "related_resource_ids",
+                "related_artifact_ids",
+                "related_operations",
+            ):
+                old_values = list(getattr(previous, field, ()) or ())
+                new_values = list(getattr(projected, field, ()) or ())
+                setattr(
+                    projected,
+                    field,
+                    list(dict.fromkeys([*old_values, *new_values])),
+                )
+            previous_status = getattr(previous, "status", None)
+            previous_status_value = str(
+                getattr(previous_status, "value", previous_status) or ""
+            ).upper()
+            projected_status_value = str(
+                getattr(getattr(projected, "status", None), "value", getattr(projected, "status", ""))
+                or ""
+            ).upper()
+            if previous_status_value in {"COMPLETED", "FAILED", "SUPERSEDED", "WAITING"} and (
+                projected_status_value == "PENDING"
+                or previous_status_value in {"COMPLETED", "FAILED", "SUPERSEDED"}
+            ):
+                projected.status = previous_status
+                projected.completed_at = getattr(previous, "completed_at", None)
+            projected.updated_at = getattr(previous, "updated_at", projected.updated_at)
+        # GoalTree is a compatibility projection and may not contain the
+        # Objective-first mutation allocated by a later cross-turn turn.
+        # Preserve such canonical Objectives instead of letting a legacy
+        # rebind erase their new outcome/resource lineage.
+        projected_ids = {
+            str(getattr(item, "objective_id", ""))
+            for item in projected_objectives
+        }
+        task.objectives = projected_objectives + [
+            item
+            for objective_id, item in previous_objectives.items()
+            if objective_id and objective_id not in projected_ids
+        ]
         task.revisions.append(
             TaskRevision(
                 task_id=task.task_id,
@@ -285,41 +707,6 @@ class TaskManager:
             task.phase = "READY"
             task.completed_at = None
             task.last_error = None
-        return await self._persist(task)
-
-    async def append_goal(
-        self,
-        task_id: str,
-        goal: Goal | str,
-        *,
-        kind: str = "",
-        depends_on_goal_ids: Sequence[str] = (),
-    ) -> Task:
-        task = await self.get_required(task_id)
-        description = goal.description if isinstance(goal, Goal) else str(goal)
-        description = description.strip()
-        if not description:
-            raise TaskManagerError("Appended Goal requires a description.")
-        goal_id = goal.goal_id if isinstance(goal, Goal) else str(uuid.uuid4())
-        task.goals.append(
-            TaskGoal(
-                goal_id=goal_id,
-                task_id=task.task_id,
-                description=description,
-                kind=kind or (goal.goal_type if isinstance(goal, Goal) else ""),
-                depends_on_goal_ids=list(depends_on_goal_ids),
-            )
-        )
-        task.revisions.append(
-            TaskRevision(
-                task_id=task.task_id,
-                type=TaskRevisionType.ADD_GOAL,
-                payload={"goal_id": goal_id, "description": description},
-                previous_version=task.version,
-            )
-        )
-        if task.status in {TaskStatus.READY, TaskStatus.PAUSED, TaskStatus.FAILED}:
-            task.status = self._transition_value(task.status, TaskStatus.PLANNING)
         return await self._persist(task)
 
     async def modify_task(
@@ -357,13 +744,62 @@ class TaskManager:
             task.action_history.append(reason)
         return await self._persist(task)
 
-    async def resume_task(self, task_id: str) -> Task:
+    async def resume_task(
+        self,
+        task_id: str,
+        *,
+        expected_confirmation_version: int | None = None,
+        expected_task_version: int | None = None,
+        expected_confirmation_id: str | None = None,
+    ) -> Task:
         task = await self.get_required(task_id)
-        target = TaskStatus.RUNNING if task.active_execution_id else TaskStatus.READY
+        if expected_confirmation_version is not None:
+            if (
+                task.confirmation_state != TaskConfirmationState.CONFIRMED
+                or task.confirmed_version != expected_confirmation_version
+            ):
+                raise TaskConfirmationConflictError(
+                    f"Task '{task_id}' confirmation is stale."
+                )
+            self._validate_confirmation_request(
+                task,
+                expected_confirmation_version=expected_confirmation_version,
+                expected_task_version=expected_task_version,
+                expected_confirmation_id=expected_confirmation_id,
+                task_id=task_id,
+            )
+        if task.requires_confirmation and (
+            task.confirmation_state != TaskConfirmationState.CONFIRMED
+            or task.confirmed_version != task.confirmation_version
+        ):
+            raise TaskConfirmationConflictError(
+                f"Task '{task_id}' is not confirmed for execution."
+            )
+        # RUNNING is reserved for a Task backed by live Execution work.  A
+        # terminal predecessor can leave another Objective pending, but the
+        # durable Task must pass through READY until the next Execution is
+        # actually bound; this prevents RUNNING + no active Execution residue.
+        from .objective_reducer import has_nonterminal_execution
+
+        if task.status == TaskStatus.RUNNING and (
+            task.active_execution_id or has_nonterminal_execution(task)
+        ):
+            target = TaskStatus.RUNNING
+        elif task.status == TaskStatus.RUNNING:
+            target = TaskStatus.READY
+        else:
+            target = TaskStatus.RUNNING if task.active_execution_id else TaskStatus.READY
         task.status = self._transition_value(task.status, target)
         task.last_action = "RESUME"
         task.last_error = None
-        return await self._persist(task)
+        try:
+            return await self._persist(task)
+        except TaskVersionConflictError as exc:
+            if expected_confirmation_version is not None:
+                raise TaskConfirmationConflictError(
+                    f"Task '{task_id}' changed while resuming confirmation."
+                ) from exc
+            raise
 
     async def cancel_task(self, task_id: str, *, reason: str = "") -> Task:
         task = await self._transition(task_id, TaskStatus.CANCELLED)
@@ -372,8 +808,59 @@ class TaskManager:
             task.action_history.append(reason)
         return await self._persist(task)
 
+    async def wait_for_human(self, task_id: str, *, reason: str = "", goal_id: str = "") -> Task:
+        """Persist a user clarification boundary without stopping siblings.
+
+        Only the Goal identified by ``goal_id`` is paused (independent sibling
+        Goals stay runnable and are not reported as waiting).  When ``goal_id``
+        is empty — single-Goal tasks and legacy callers — every executable
+        Goal is marked WAITING_USER so the Task surfaces the wait.
+        """
+        task = await self.get_required(task_id)
+        task.status = self._transition_value(task.status, TaskStatus.WAITING_HUMAN)
+        task.phase = "WAITING_USER"
+        task.last_action = "WAITING_USER"
+        task.last_error = reason or None
+        from .objective_reducer import mutation_objective_is_superseded
+
+        for objective in task.objectives:
+            if mutation_objective_is_superseded(objective):
+                continue
+            if goal_id and objective.objective_id != goal_id:
+                continue
+            objective.status = "WAITING"
+        return await self._persist(task)
+
     async def complete_task(self, task_id: str, *, result: Mapping[str, Any] | None = None) -> Task:
-        task = await self._transition(task_id, TaskStatus.COMPLETED)
+        task = await self.get_required(task_id)
+        objective_contract = any(
+            bool(getattr(objective, "required_capabilities", None))
+            or bool(getattr(objective, "expected_resource_kind", ""))
+            or any(
+                bool(value)
+                for value in dict(
+                    getattr(objective, "expected_postcondition", None) or {}
+                ).values()
+            )
+            for objective in task.objectives
+        )
+        if task.objectives and objective_contract:
+            # Task terminal-success is an aggregate projection, not a caller
+            # assertion.  Recompute from the canonical evidence reducer and
+            # reject a direct completion while any required Objective is not
+            # verified-success.
+            from .objective_reducer import (
+                ObjectiveStateReducer,
+                all_objectives_satisfied,
+            )
+
+            ObjectiveStateReducer().reduce(task)
+            if not all_objectives_satisfied(task):
+                raise TaskStateTransitionError(
+                    f"Task '{task_id}' cannot complete before all Objectives "
+                    "are verified successfully."
+                )
+        task.status = self._transition_value(task.status, TaskStatus.COMPLETED)
         task.last_action = "COMPLETE"
         task.completed_at = _now()
         if result:
@@ -398,17 +885,91 @@ class TaskManager:
         status: str = "SUBMITTED",
     ) -> Task:
         task = await self.get_required(task_id)
-        task.active_execution_id = execution_id
-        task.execution_refs.append(
-            TaskExecutionRef(
-                execution_id=execution_id,
-                task_id=task.task_id,
-                goal_id=goal_id,
-                status=status,
-            )
+        # Monotonic execution-state projection: a terminal execution is a latch
+        # and is never rebound as active work.  A late QUEUED/RUNNING update for
+        # an already-terminal execution must not regress it.
+        effective = merge_execution_status(
+            existing_execution_status(task.execution_refs, execution_id),
+            status,
         )
-        task.status = self._transition_value(task.status, TaskStatus.RUNNING)
-        task.last_action = "BIND_EXECUTION"
+        task.execution_refs = project_execution_ref(
+            task.execution_refs,
+            execution_id=execution_id,
+            task_id=task.task_id,
+            goal_id=goal_id,
+            status=status,
+        )
+        if is_terminal_execution_status(effective):
+            if task.active_execution_id == execution_id:
+                task.active_execution_id = None
+        else:
+            task.active_execution_id = execution_id
+            task.status = self._transition_value(task.status, TaskStatus.RUNNING)
+            task.last_action = "BIND_EXECUTION"
+        return await self._persist(task)
+
+    async def add_resource(
+        self,
+        task_id: str,
+        *,
+        resource_id: str,
+        resource_kind: str,
+        title: str = "",
+        status: str = "",
+        objective_id: str | None = None,
+    ) -> Task:
+        """Durably bind a real resource to a Task's resource_index (dedupe by id)."""
+        task = await self.get_required(task_id)
+        existing = {
+            (str(r.resource_id), str(r.resource_kind or "").upper())
+            for r in task.resource_index
+        }
+        resource_key = (str(resource_id), str(resource_kind or "").upper())
+        owner_conflict = False
+        if resource_key not in existing:
+            task.resource_index.append(
+                TaskResourceRef(
+                    resource_id=str(resource_id),
+                    resource_kind=str(resource_kind),
+                    objective_id=str(objective_id) if objective_id else None,
+                    title=title or None,
+                    status=status or None,
+                )
+            )
+        else:
+            # A replay may carry fresher ownership/title/status facts for the
+            # same typed resource.  Preserve the single typed row while
+            # allowing the durable owner to be completed below.
+            for resource in task.resource_index:
+                if (
+                    str(resource.resource_id),
+                    str(resource.resource_kind or "").upper(),
+                ) == resource_key:
+                    owner_conflict = bool(
+                        resource.objective_id
+                        and objective_id
+                        and str(resource.objective_id) != str(objective_id)
+                    )
+                    if objective_id and not resource.objective_id:
+                        resource.objective_id = str(objective_id)
+                    if title and not resource.title:
+                        resource.title = title
+                    if status and not resource.status:
+                        resource.status = status
+                    break
+        # Ownership: bind the verified resource to the Objective that initiated
+        # the execution (durable correlation).  Only when objective_id matches an
+        # existing Objective; never guess the current/active Objective.
+        if objective_id and not owner_conflict:
+            for objective in getattr(task, "objectives", ()) or ():
+                if str(getattr(objective, "objective_id", "")) != objective_id:
+                    continue
+                owned = list(getattr(objective, "related_resource_ids", ()) or ())
+                if str(resource_id) not in owned:  # dedupe (replay-safe)
+                    owned.append(str(resource_id))
+                objective.related_resource_ids = owned
+                break
+        task.last_action = "ADD_RESOURCE"
         return await self._persist(task)
 
     async def record_replan(
@@ -456,20 +1017,23 @@ class TaskManager:
             return await self.pause_task(task.task_id, reason="PREEMPTED_BY_HIGHER_PRIORITY_TASK")
         return task
 
-    async def schedule(self, conversation_id: str) -> Task | None:
-        tasks = await self.get_active_tasks(conversation_id)
-        candidates = [
-            task for task in tasks
-            if task.status in {TaskStatus.READY, TaskStatus.CREATED, TaskStatus.PLANNING}
-        ]
-        return candidates[0] if candidates else None
-
     async def _transition(self, task_id: str, target: TaskStatus) -> Task:
         task = await self.get_required(task_id)
         task.status = self._transition_value(task.status, target)
         return task
 
     async def _persist(self, task: Task) -> Task:
+        # Central invariant: RUNNING is a live-execution projection, never a
+        # label for a detached historical predecessor.  Keep approval/waiting
+        # refs live; only the fully detached shape is normalized to READY.
+        from .objective_reducer import has_nonterminal_execution
+
+        if (
+            task.status == TaskStatus.RUNNING
+            and not task.active_execution_id
+            and not has_nonterminal_execution(task)
+        ):
+            task.status = TaskStatus.READY
         task.updated_at = _now()
         try:
             return await self._repository.update(task, expected_version=task.version)
@@ -489,14 +1053,6 @@ class TaskManager:
         return target
 
 
-def _task_goal(task_id: str, goal: Goal) -> TaskGoal:
-    return TaskGoal(
-        goal_id=goal.goal_id,
-        task_id=task_id,
-        description=goal.description,
-        kind=goal.goal_type,
-        depends_on_goal_ids=list(goal.dependencies),
-    )
 
 
 def _now() -> str:
@@ -505,6 +1061,8 @@ def _now() -> str:
 
 __all__ = [
     "TaskManager",
+    "TaskConfirmationConflictError",
+    "TaskConfirmationTransition",
     "TaskManagerError",
     "TaskNotFoundError",
     "TaskStateTransitionError",

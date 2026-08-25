@@ -1,0 +1,17 @@
+[
+  {
+    "name": "L3-natural-failure-confirmation-recovery",
+    "session": "L3",
+    "conversation_title": "多目标内容处理与恢复",
+    "turns": [
+      {"text": "请分别写一篇 Java 后端稳定性文章和一篇 Agent 工程实践文章，都先保存为草稿。", "hitl": "confirm"},
+      {"text": "再分别写一篇 Redis 缓存实践文章和一篇 Python 工程实践文章，都先保存为草稿。", "hitl": "confirm"},
+      {"text": "失败的那篇再写一次，仍然保存为草稿。", "continue_after_waiting": true},
+      {"text": "选择 Agent 工程实践那篇失败的任务重新尝试，仍然保存为草稿。", "hitl": "confirm"},
+      {"text": "把刚才重试成功的 Agent 草稿安排到明天上午十一点发布。", "hitl": "confirm"},
+      {"text": "请确认一下刚才的 Agent 定时发布安排。"},
+      {"text": "再写一篇关于 Redis 缓存实践的文章，先保存为草稿。", "hitl": "confirm"},
+      {"text": "", "action": "reload"}
+    ]
+  }
+]

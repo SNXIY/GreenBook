@@ -8,21 +8,20 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from fastapi import HTTPException
 from datetime import UTC, datetime
 
+from fastapi import HTTPException
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.execution.events import EventType, ExecutionEvent
+from greenbook_agent_core.execution.evidence import ExecutionEvidence
 from greenbook_agent_core.execution.execution_queue import (
     ExecutionQueue,
     ExecutionQueueStatus,
 )
-from greenbook_agent_core.execution.evidence import ExecutionEvidence
 from greenbook_agent_core.execution.models import StepStatus
 from greenbook_agent_core.execution.repository import ExecutionRepository
 from greenbook_agent_core.execution.runtime_manager import RuntimeManager
 from greenbook_agent_core.execution.state_manager import ExecutionStateManager
-from tests.plan_factory import GoalPlanFactory
 from greenbook_agent_core.planning.validation import PlanValidator
 from greenbook_contracts import SideEffectState
 
@@ -30,9 +29,10 @@ from apps.agent_api.greenbook_agent_api.api.runtime_routes import (
     cancel_execution,
     get_execution_control,
     pause_execution,
-    retry_execution_step,
     resume_execution,
+    retry_execution_step,
 )
+from tests.plan_factory import GoalPlanFactory
 
 
 class _Request:

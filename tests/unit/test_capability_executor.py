@@ -44,6 +44,7 @@ async def test_search_community_calls_search_tool(registry: CapabilityRegistry) 
         ordinal=1,
         description="Search Java posts",
         output_artifact_type="SEARCH_RESULT",
+        tool_name="community.search_public_posts",
     )
     result = await executor.execute_step(step)
 
@@ -72,6 +73,7 @@ async def test_search_community_passes_constraints_as_args(registry: CapabilityR
         capability="SEARCH_COMMUNITY",
         ordinal=1,
         output_artifact_type="SEARCH_RESULT",
+        tool_name="community.search_public_posts",
         constraints={"query": "Java", "sort": "hot"},
     )
     await executor.execute_step(step)
@@ -135,7 +137,7 @@ async def test_unknown_capability_returns_error(registry: CapabilityRegistry) ->
 
 
 @pytest.mark.asyncio
-async def test_llm_step_skips_tool_and_returns_artifact(
+async def test_llm_step_reaching_worker_fails_closed(
     registry: CapabilityRegistry,
 ) -> None:
     """ANALYZE_CONTENT_PATTERNS is a pure-LLM step — no tool call."""
@@ -156,11 +158,11 @@ async def test_llm_step_skips_tool_and_returns_artifact(
     )
     result = await executor.execute_step(step)
 
-    assert result.ok is True
+    assert result.ok is False
+    assert result.error_code == "WRONG_EXECUTION_SEMANTICS"
     assert result.tool_name == "(llm)"
     assert call_count == 0  # tool handler never called
-    assert result.artifact is not None
-    assert result.artifact.artifact_type == "ANALYSIS_REPORT"
+    assert result.artifact is None
 
 
 # ── Scenario 4: side_effect capability → approval info ────────────
@@ -226,42 +228,14 @@ async def test_tool_handler_exception_is_caught(registry: CapabilityRegistry) ->
         raise RuntimeError("boom")
 
     executor = CapabilityExecutor(registry, handler)
-    step = PlanStep(capability="SEARCH_COMMUNITY", ordinal=1)
+    step = PlanStep(capability="SEARCH_COMMUNITY", ordinal=1,
+                    tool_name="community.search_public_posts")
 
     result = await executor.execute_step(step)
 
     assert result.ok is False
-    assert result.error_code == "TOOL_EXECUTION_FAILED"
+    assert result.error_code == "INTERNAL_ERROR"
     assert result.retryable is False
-
-
-@pytest.mark.asyncio
-async def test_improve_content_calls_revise_draft(registry: CapabilityRegistry) -> None:
-    handler = _make_handler({
-        "content.revise_draft": {
-            "ok": True,
-            "code": "",
-            "data": {
-                "draft_id": "draft-1",
-                "title": "Revised Java Guide",
-                "status": "DRAFT",
-            },
-        },
-    })
-    executor = CapabilityExecutor(registry, handler)
-
-    step = PlanStep(
-        capability="IMPROVE_CONTENT",
-        ordinal=1,
-        output_artifact_type="DRAFT",
-        constraints={"draft_id": "draft-1", "revision_instruction": "Make it better"},
-    )
-    result = await executor.execute_step(step)
-
-    assert result.ok is True
-    assert result.tool_name == "content.revise_draft"
-    assert result.artifact is not None
-    assert result.artifact.resource_id == "draft-1"
 
 
 @pytest.mark.asyncio
@@ -278,6 +252,7 @@ async def test_result_without_data_has_no_artifact(registry: CapabilityRegistry)
         capability="SEARCH_COMMUNITY",
         ordinal=1,
         output_artifact_type="SEARCH_RESULT",
+        tool_name="community.search_public_posts",
     )
     result = await executor.execute_step(step)
     assert result.ok is True
@@ -304,3 +279,102 @@ async def test_cancel_schedule_calls_correct_tool(registry: CapabilityRegistry) 
 
     assert result.ok is True
     assert result.tool_name == "publication.cancel_schedule"
+
+
+@pytest.mark.asyncio
+async def test_cancel_schedule_binds_only_task_scoped_active_schedule(
+    registry: CapabilityRegistry,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def handler(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+        captured["tool"] = tool_name
+        captured["args"] = dict(tool_args)
+        return {
+            "ok": True,
+            "code": "",
+            "data": {"schedule_id": "schedule-java", "status": "CANCELLED"},
+        }
+
+    executor = CapabilityExecutor(
+        registry,
+        handler,
+        active_draft_id="draft-agent-must-not-leak",
+        active_schedule_id="schedule-java",
+    )
+    await executor.execute_step(PlanStep(capability="CANCEL_SCHEDULE", ordinal=1))
+
+    assert captured["tool"] == "publication.cancel_schedule"
+    assert captured["args"] == {"schedule_id": "schedule-java"}
+
+
+@pytest.mark.asyncio
+async def test_explicit_resource_argument_is_never_overridden_by_scope(
+    registry: CapabilityRegistry,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def handler(tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+        captured["args"] = dict(tool_args)
+        return {
+            "ok": True,
+            "code": "",
+            "data": {"schedule_id": "schedule-explicit", "status": "CANCELLED"},
+        }
+
+    executor = CapabilityExecutor(
+        registry,
+        handler,
+        active_schedule_id="schedule-other-task",
+    )
+    await executor.execute_step(
+        PlanStep(
+            capability="CANCEL_SCHEDULE",
+            ordinal=1,
+            constraints={"schedule_id": "schedule-explicit"},
+        )
+    )
+
+    assert captured["args"] == {"schedule_id": "schedule-explicit"}
+
+
+@pytest.mark.asyncio
+async def test_f1_capability_executor_threads_objective_id(registry: CapabilityRegistry) -> None:
+    """F1: CapabilityExecutor receives objective_id and threads it into the
+    ToolInvocationContext it builds (production wiring, not manual)."""
+    from greenbook_agent_core.planning.contracts import PlanStep
+
+    captured: dict = {}
+
+    async def invoke_fn(ctx):
+        captured["objective_id"] = ctx.objective_id
+        return {"ok": True, "code": "", "data": {"items": [{"post_id": "p1"}]}}
+
+    from greenbook_agent_core.execution.capability_executor import CapabilityExecutor as CE
+    step = PlanStep(capability="SEARCH_COMMUNITY", ordinal=1,
+                    tool_name="community.search_public_posts")
+    executor = CE(registry, invoke_fn=invoke_fn, objective_id="obj-A",
+                  task_id="t1", execution_id="e1")
+    result = await executor.execute_step(step)
+    assert result.ok is True
+    assert captured["objective_id"] == "obj-A"
+
+
+@pytest.mark.asyncio
+async def test_f1_none_compatibility(registry: CapabilityRegistry) -> None:
+    """RuntimeContext.objective_id=None flows through without error."""
+    from greenbook_agent_core.planning.contracts import PlanStep
+    from greenbook_agent_core.execution.capability_executor import CapabilityExecutor as CE
+
+    captured: dict = {}
+
+    async def invoke_fn(ctx):
+        captured["objective_id"] = ctx.objective_id
+        return {"ok": True, "code": "", "data": {"items": [{"post_id": "p1"}]}}
+
+    step = PlanStep(capability="SEARCH_COMMUNITY", ordinal=1,
+                    tool_name="community.search_public_posts")
+    executor = CE(registry, invoke_fn=invoke_fn, objective_id=None, task_id="t1", execution_id="e1")
+    result = await executor.execute_step(step)
+    assert result.ok is True
+    assert captured["objective_id"] is None

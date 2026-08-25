@@ -1,0 +1,8 @@
+{
+  "dataset": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+  "input_results": "D:\\agent\\green-book\\artifacts\\residual_semantic_gate_20260822_full_after2\\results.json",
+  "benchmark_version": "2026-08-22.freeze-1",
+  "primary_non_exact_count": 19,
+  "provider_calls_replayed": 0,
+  "production_code_changed": false
+}

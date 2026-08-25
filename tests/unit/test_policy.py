@@ -14,7 +14,6 @@ def test_read_tools_are_low_risk():
 
 def test_write_tools_are_medium_risk():
     assert tool_risk_level("content.create_draft") == RiskLevel.MEDIUM
-    assert tool_risk_level("content.revise_draft") == RiskLevel.MEDIUM
     assert tool_risk_level("publication.schedule") == RiskLevel.MEDIUM
     assert tool_risk_level("publication.cancel_schedule") == RiskLevel.MEDIUM
 

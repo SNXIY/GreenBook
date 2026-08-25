@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { BellIcon, CreateIcon, HomeIcon, LeafIcon, ProfileIcon, TaskIcon } from "@/components/icons/Icon";
+import { BellIcon, CreateIcon, HomeIcon, LeafIcon, ProfileIcon } from "@/components/icons/Icon";
 import { useAuth } from "@/context/AuthContext";
 import { NOTIFICATION_UNREAD_CHANGED } from "@/services/notificationEvents";
 import { notificationService } from "@/services/notificationService";
@@ -9,9 +9,8 @@ import styles from "./Sidebar.module.css";
 const navItems = [
   { to: "/", label: "首页", Icon: HomeIcon },
   { to: "/create", label: "创作", Icon: CreateIcon },
-  { to: "/tasks", label: "任务", Icon: TaskIcon },
   { to: "/notifications", label: "消息", Icon: BellIcon },
-  { to: "/profile", label: "我的", Icon: ProfileIcon }
+  { to: "/profile", label: "我的内容", Icon: ProfileIcon }
 ] as const;
 
 const Sidebar = () => {

@@ -12,6 +12,7 @@ import com.tongji.knowpost.id.SnowflakeIdGenerator;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPost;
 import com.tongji.knowpost.service.KnowPostService;
+import com.tongji.notification.service.NotificationService;
 import com.tongji.relation.outbox.OutboxMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -37,12 +38,16 @@ public class ScheduledPublicationService {
     private final SnowflakeIdGenerator idGen;
     private final OutboxMapper outboxMapper;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     @Transactional
     public ScheduledPublicationResponse schedule(long userId, ScheduleCreateRequest request, String idempotencyKey) {
         long draftId = parseLong(request.draftId(), "draftId");
 
-        KnowPost draft = knowPostMapper.findById(draftId);
+        // Shares the post-row lock with AgentFacadeService.deleteDraft(), so
+        // a delete cannot race a just-created future schedule into a silent
+        // scheduler failure.
+        KnowPost draft = knowPostMapper.findByIdForUpdate(draftId);
         if (draft == null || draft.getCreatorId() == null || !draft.getCreatorId().equals(userId)) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或不属于当前用户");
         }
@@ -133,11 +138,30 @@ public class ScheduledPublicationService {
 
         if (!alreadyPublished && "published".equals(status)) {
             writeOutboxEvent("publication.published", draftId, userId, Map.of("postId", String.valueOf(draftId)));
+            notifyPublishedSafely(userId, draftId, null);
         }
+        // An immediate publish supersedes any future trigger for the same
+        // draft. Keep this in the Java transaction so the scheduler cannot
+        // observe a published draft with a still-active SCHEDULED row.
+        neutralizeFutureSchedules(userId, draftId);
 
         return new PublishResponse(
                 String.valueOf(draftId), status, alreadyPublished,
                 draft.getPublishTime() != null ? draft.getPublishTime() : Instant.now());
+    }
+
+    private void neutralizeFutureSchedules(long userId, long draftId) {
+        for (ScheduledPublicationRecord record : mapper.findByUser(userId)) {
+            if (record.getDraftId() == null || record.getDraftId() != draftId
+                    || !"SCHEDULED".equals(record.getStatus())) {
+                continue;
+            }
+            if (mapper.cancel(record.getId(), userId, "CANCELLED") > 0) {
+                writeOutboxEvent("publication.cancelled", record.getId(), userId,
+                        Map.of("scheduleId", String.valueOf(record.getId()),
+                                "reason", "PUBLISH_NOW"));
+            }
+        }
     }
 
     @Scheduled(fixedDelayString = "${agent.publication.scheduler-delay-ms:30000}",
@@ -222,6 +246,7 @@ public class ScheduledPublicationService {
             writeOutboxEvent("publication.published", record.getDraftId(), record.getUserId(),
                     Map.of("scheduleId", String.valueOf(record.getId()),
                             "postId", String.valueOf(record.getDraftId())));
+            notifyPublishedSafely(record);
             log.info("Scheduled publication executed: scheduleId={}, postId={}, markPublishedRows={}",
                     record.getId(), record.getDraftId(), mp);
         } else {
@@ -274,6 +299,32 @@ public class ScheduledPublicationService {
                     objectMapper.writeValueAsString(payload));
         } catch (Exception ignored) {
             log.warn("Failed to write outbox event: type={}, aggregateId={}", type, aggregateId);
+        }
+    }
+
+    /**
+     * 发布成功通知是附属能力：失败只能记日志，绝不能把已成功发布的
+     * schedule 状态机回退成 FAILED（executeDuePublications 的异常捕获
+     * 会 markFailed）。
+     */
+    private void notifyPublishedSafely(ScheduledPublicationRecord record) {
+        try {
+            notificationService.notifyPostPublished(
+                    "publication.published:" + record.getId(),
+                    record.getUserId(), record.getDraftId(), record.getId());
+        } catch (Exception ex) {
+            log.warn("Failed to notify scheduled publication: scheduleId={}, error={}",
+                    record.getId(), ex.getMessage());
+        }
+    }
+
+    private void notifyPublishedSafely(long userId, long draftId, Long scheduleId) {
+        try {
+            notificationService.notifyPostPublished(
+                    "publication.published:now:" + draftId, userId, draftId, scheduleId);
+        } catch (Exception ex) {
+            log.warn("Failed to notify immediate publication: userId={}, draftId={}, error={}",
+                    userId, draftId, ex.getMessage());
         }
     }
 }

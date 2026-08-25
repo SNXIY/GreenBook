@@ -63,7 +63,6 @@ function Test-WorkerReady {
 
 $apiBaseUrl = "http://127.0.0.1:" + (Get-Value -Names @("GREENBOOK_AGENT_API_PORT") -Default "8094")
 $javaBaseUrl = Get-Value -Names @("GREENBOOK_JAVA_BASE_URL") -Default "http://127.0.0.1:8080"
-$creatorBaseUrl = Get-Value -Names @("GREENBOOK_CREATOR_BASE_URL") -Default "http://127.0.0.1:8092"
 $databaseUrl = Get-Value -Names @("GREENBOOK_AGENT_DATABASE_URL") -Default ""
 $dispatch = (Get-Value -Names @("GREENBOOK_AGENT_EXECUTION_DISPATCH") -Default "direct").ToLowerInvariant()
 $queueMode = $dispatch -eq "queue"
@@ -79,7 +78,6 @@ $workerReady = if (-not $queueMode) {
   Test-WorkerReady
 }
 $javaReady = Test-HttpReady -BaseUrl $javaBaseUrl -Paths @("/actuator/health")
-$creatorReady = Test-HttpReady -BaseUrl $creatorBaseUrl -Paths @("/actuator/health/ready", "/actuator/health")
 $databaseReady = Test-TcpReady -DatabaseUrl $databaseUrl
 $queueReady = $workerReady -and $queueEnabled
 
@@ -88,7 +86,6 @@ Write-Host ("API:      " + $(if ($apiReady) { "READY" } else { "UNAVAILABLE" }))
 Write-Host ("Worker:   " + $(if (-not $queueMode) { "NOT REQUIRED" } elseif ($workerReady) { "READY" } else { "UNAVAILABLE" }))
 Write-Host ("Queue:    " + $(if (-not $queueMode) { "NOT REQUIRED" } elseif ($queueReady) { "READY" } else { "UNAVAILABLE" }))
 Write-Host ("Database: " + $(if ($databaseReady) { "READY" } else { "UNAVAILABLE" }))
-Write-Host ("Creator:  " + $(if ($creatorReady) { "READY" } else { "UNAVAILABLE" }))
 Write-Host ("Java:     " + $(if ($javaReady) { "READY" } else { "UNAVAILABLE" }))
 
 $dispatchReady = -not $queueMode -or ($workerReady -and $queueReady)

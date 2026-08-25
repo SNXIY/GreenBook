@@ -23,6 +23,23 @@ class ContextBudget(BaseModel):
     max_target_candidates: int = Field(default=80, ge=1)
     max_memory_chars: int = Field(default=1200, ge=200)
     max_operation_chars: int = Field(default=1200, ge=200)
+    max_verified_outcomes: int = Field(default=8, ge=0, le=40)
+
+
+class DerivedConversationContext(BaseModel):
+    """Bounded, per-turn projection shared by semantic consumers.
+
+    This is deliberately not a repository model.  Every identity in this
+    projection is copied from the canonical Task/Objective/Resource/Execution
+    projections, and the projection is discarded after the turn.  The
+    canonical view is used by deterministic resolution; the provider-facing
+    view is sanitized before it leaves the process.
+    """
+
+    relevant_resources: list[dict[str, Any]] = Field(default_factory=list)
+    relevant_objectives: list[dict[str, Any]] = Field(default_factory=list)
+    recent_verified_outcomes: list[dict[str, Any]] = Field(default_factory=list)
+    reference_evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ContextSnapshot(BaseModel):
@@ -52,6 +69,9 @@ class ContextSnapshot(BaseModel):
     unfinished_goals: list[dict[str, Any]] = Field(default_factory=list)
     task_states: list[dict[str, Any]] = Field(default_factory=list)
     recent_operations: list[dict[str, Any]] = Field(default_factory=list)
+    # Bounded receipts read from the existing ActionObservationStore.  This is
+    # a projection input, not a second execution/result source of truth.
+    recent_verified_outcomes: list[dict[str, Any]] = Field(default_factory=list)
     artifacts: list[dict[str, Any]] = Field(default_factory=list)
     execution_states: list[dict[str, Any]] = Field(default_factory=list)
     available_resources: list[dict[str, Any]] = Field(default_factory=list)
@@ -94,4 +114,8 @@ class ContextSnapshot(BaseModel):
         return list(self.target_candidates or self.available_resources)
 
 
-__all__ = ["ContextBudget", "ContextSnapshot"]
+__all__ = [
+    "ContextBudget",
+    "ContextSnapshot",
+    "DerivedConversationContext",
+]

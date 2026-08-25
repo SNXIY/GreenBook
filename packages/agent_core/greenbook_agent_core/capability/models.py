@@ -40,6 +40,10 @@ class Capability(BaseModel):
     output_artifact_type: str = ""
     tags: list[str] = Field(default_factory=list)
     parallelizable: bool = False
+    # Explicit completion kind (DIRECT_RESULT | RESOURCE_MUTATION |
+    # GROUNDED_SYNTHESIS).  When set, it wins over the is_llm_step default so
+    # the result semantics live with the capability, not a heuristic.
+    result_requirement: str = ""
 
 
 class CapabilityMatch(BaseModel):

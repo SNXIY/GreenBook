@@ -11,6 +11,9 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Matches know_posts.description and the Java Agent Facade DTO contract.
+DESCRIPTION_MAX_LENGTH = 50
+
 # ── Enums ────────────────────────────────────────────────────────────
 
 class SortMode(StrEnum):
@@ -42,6 +45,8 @@ class ScheduleStatus(StrEnum):
 
 class AgentErrorCode(StrEnum):
     VALIDATION_ERROR = "VALIDATION_ERROR"
+    FIELD_TOO_LONG = "FIELD_TOO_LONG"
+    INVALID_DRAFT_METADATA = "INVALID_DRAFT_METADATA"
     AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED"
     UNAUTHORIZED = "UNAUTHORIZED"
     FORBIDDEN = "FORBIDDEN"
@@ -120,14 +125,14 @@ class AgentOwnPostSummary(BaseModel):
 class AgentDraftCreateRequest(BaseModel):
     title: str = Field(max_length=256)
     content: str
-    summary: str | None = Field(default=None, max_length=200)
+    summary: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
     visibility: Visibility | None = None
 
 
 class AgentDraftUpdateRequest(BaseModel):
     title: str | None = None
     content: str | None = None
-    summary: str | None = None
+    summary: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
     tags: list[str] | None = None
     visibility: str | None = None
     expected_version: str | None = Field(
@@ -267,3 +272,7 @@ class AgentErrorResponse(BaseModel):
     retryable: bool = False
     request_committed: bool = Field(default=False, alias="requestCommitted")
     trace_id: str | None = Field(default=None, alias="traceId")
+    field: str | None = None
+    max_length: int | None = Field(default=None, alias="maxLength")
+    actual_length: int | None = Field(default=None, alias="actualLength")
+    execution_id: str | None = Field(default=None, alias="executionId")

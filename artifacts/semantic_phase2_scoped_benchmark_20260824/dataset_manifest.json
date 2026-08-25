@@ -1,0 +1,18 @@
+{
+  "dataset_path": "D:\\agent\\green-book\\evaluation\\semantic_longtail\\cases.json",
+  "benchmark": "GreenBook A — Natural-Language Semantic Long-Tail",
+  "version": "2026-08-22.freeze-1",
+  "primary_case_count": 60,
+  "category_counts": {
+    "A_SINGLE_ORAL": 8,
+    "B_MULTI_TARGET": 8,
+    "C_TARGET_REFERENCE": 8,
+    "D_TEMPORAL": 8,
+    "E_NEGATIVE_CONSTRAINT": 8,
+    "F_CROSS_TURN": 8,
+    "G_AMBIGUOUS_INCOMPLETE": 6,
+    "H_PARAPHRASE": 6
+  },
+  "fixed_now": "2026-08-22T10:00:00+08:00",
+  "timezone": "Asia/Shanghai"
+}

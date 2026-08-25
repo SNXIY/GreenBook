@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import CreateHubPage from "./pages/CreateHubPage";
 import ManualCreatePage from "./pages/ManualCreatePage";
-import AiCreatePage from "./pages/AiCreatePage";
 import TaskCenterPage from "./pages/TaskCenterPage";
 import ProfilePage from "./pages/ProfilePage";
 import EditProfilePage from "./pages/EditProfilePage";
@@ -17,7 +16,6 @@ function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/create" element={<CreateHubPage />} />
       <Route path="/create/manual" element={<ManualCreatePage />} />
-      <Route path="/create/ai" element={<AiCreatePage />} />
       <Route path="/tasks" element={<TaskCenterPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/profile/edit" element={<EditProfilePage />} />

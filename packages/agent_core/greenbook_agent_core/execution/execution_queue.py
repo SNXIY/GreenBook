@@ -100,6 +100,14 @@ class ExecutionQueueProtocol(Protocol):
         worker_id: str,
     ) -> ExecutionQueueMessage | None: ...
 
+    def release_deferred(
+        self,
+        message_id: str,
+        *,
+        worker_id: str,
+        delay_seconds: float = 1.0,
+    ) -> ExecutionQueueMessage | None: ...
+
 
 class ExecutionQueue:
     """Thread-safe in-memory queue implementing the durable queue contract."""
@@ -242,6 +250,39 @@ class ExecutionQueue:
             )
             self._messages[message.key] = released
             return released.model_copy(deep=True)
+
+    def release_deferred(
+        self,
+        message_id: str,
+        *,
+        worker_id: str,
+        delay_seconds: float = 1.0,
+    ) -> ExecutionQueueMessage | None:
+        """Release a claim but delay its next availability.
+
+        Used when a message cannot run yet (resource conflict, missing
+        credential): pushing ``available_at`` forward prevents the claim /
+        release busy-loop and gives competing messages a chance (design goal
+        0813 — no starvation)."""
+        with self._lock:
+            message = self._claimed_by(message_id, worker_id)
+            if message is None:
+                return None
+            delayed = message.model_copy(
+                update={
+                    "status": ExecutionQueueStatus.READY,
+                    "claimed_by": None,
+                    "claim_until": None,
+                    "available_at": _iso(
+                        self._now() + timedelta(seconds=max(0.0, delay_seconds))
+                    ),
+                    "attempt": message.attempt + 1,
+                    "updated_at": _iso(self._now()),
+                },
+                deep=True,
+            )
+            self._messages[message.key] = delayed
+            return delayed.model_copy(deep=True)
 
     def list(self) -> list[ExecutionQueueMessage]:
         with self._lock:
@@ -481,6 +522,38 @@ class PostgresExecutionQueue:
     def release(self, message_id: str, *, worker_id: str) -> ExecutionQueueMessage | None:
         return self._finish(message_id, ExecutionQueueStatus.READY, worker_id=worker_id)
 
+    def release_deferred(
+        self,
+        message_id: str,
+        *,
+        worker_id: str,
+        delay_seconds: float = 1.0,
+    ) -> ExecutionQueueMessage | None:
+        """Release a claim and delay the next availability (backoff)."""
+        values: dict[str, Any] = {
+            "status": ExecutionQueueStatus.READY.value,
+            "claimed_by": None,
+            "claim_until": None,
+            "available_at": _iso(
+                _now() + timedelta(seconds=max(0.0, delay_seconds))
+            ),
+            "attempt": execution_queue_messages.c.attempt + 1,
+            "updated_at": _iso(_now()),
+        }
+        with self._connect() as conn:
+            result = conn.execute(
+                sa.update(execution_queue_messages)
+                .where(
+                    execution_queue_messages.c.message_id == message_id,
+                    execution_queue_messages.c.status == ExecutionQueueStatus.CLAIMED.value,
+                    execution_queue_messages.c.claimed_by == worker_id,
+                )
+                .values(**values)
+            )
+            if result.rowcount == 0:
+                return None
+        return self.get(message_id)
+
     def list(self) -> list[ExecutionQueueMessage]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -585,10 +658,55 @@ def _parse(value: str) -> datetime:
     return datetime.fromisoformat(value).astimezone(UTC)
 
 
+def recover_unqueued_executions(repository: Any, queue: ExecutionQueueProtocol) -> int:
+    """Re-publish durable executions whose queue write was interrupted.
+
+    The dispatch envelope is a sanitized snapshot in the existing first-step
+    checkpoint. Only non-terminal executions with no queue row are eligible;
+    waiting human/approval states remain under their existing control path.
+    """
+
+    recovered = 0
+    for persisted_execution in repository.list_all():
+        execution_status = str(
+            getattr(
+                getattr(persisted_execution, "status", None),
+                "value",
+                getattr(persisted_execution, "status", ""),
+            )
+            or ""
+        ).upper()
+        if execution_status not in {"PENDING", "RUNNING"}:
+            continue
+        execution_id = str(getattr(persisted_execution, "execution_id", "") or "")
+        if not execution_id:
+            continue
+        if queue.get_by_execution_id(execution_id) is not None:
+            continue
+        dispatch_payload = None
+        for step in getattr(persisted_execution, "steps", ()) or ():
+            candidate = dict(getattr(step, "checkpoint_data", {}) or {}).get(
+                "dispatch_payload"
+            )
+            if isinstance(candidate, dict):
+                dispatch_payload = candidate
+                break
+        if not dispatch_payload:
+            continue
+        queue.enqueue(
+            execution_id,
+            trace_id=str(dispatch_payload.get("trace_id") or execution_id),
+            payload=dispatch_payload,
+        )
+        recovered += 1
+    return recovered
+
+
 __all__ = [
     "ExecutionQueue",
     "ExecutionQueueMessage",
     "ExecutionQueueProtocol",
     "ExecutionQueueStatus",
     "PostgresExecutionQueue",
+    "recover_unqueued_executions",
 ]

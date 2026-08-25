@@ -25,20 +25,6 @@ finally {
   Pop-Location
 }
 
-foreach ($project in @("creator-agent")) {
-  Write-Host "Installing locked Python environment: $project"
-  Push-Location "$Root\$project"
-  try {
-    uv sync --frozen
-    if ($LASTEXITCODE -ne 0) {
-      throw "uv sync failed for $project."
-    }
-  }
-  finally {
-    Pop-Location
-  }
-}
-
 Write-Host "Installing locked frontend dependencies..."
 Push-Location "$Root\zhiguang-fe"
 try {

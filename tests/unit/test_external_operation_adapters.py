@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from greenbook_agent_core.execution.external_adapters import (
-    CreatorAdapter,
     JavaCommunityAdapter,
     MockExternalOperationAdapter,
 )
@@ -45,22 +44,14 @@ def test_mock_adapter_is_consumed_by_reconciliation_service() -> None:
     ]
 
 
-def test_creator_and_java_adapters_forward_query_identity() -> None:
-    creator_calls: list[dict[str, str | None]] = []
+def test_java_adapter_forwards_query_identity() -> None:
     java_calls: list[dict[str, str | None]] = []
 
-    creator = CreatorAdapter(
-        lambda **identifiers: creator_calls.append(identifiers) or "PROCESSING"
-    )
     java = JavaCommunityAdapter(
         lambda **identifiers: java_calls.append(identifiers) or "FAILED"
     )
 
-    assert creator.query_operation_status(external_operation_id="creator-1") == "PROCESSING"
     assert java.query_operation_status(receipt_id="java-receipt-1") == "FAILED"
-    assert creator_calls == [
-        {"external_operation_id": "creator-1", "receipt_id": None}
-    ]
     assert java_calls == [
         {"external_operation_id": None, "receipt_id": "java-receipt-1"}
     ]

@@ -49,3 +49,9 @@ data/
 var/
 backups/
 refrence/
+
+# Local scratch / diagnostic artifacts
+**/.pytest-temp*/
+**/.pytest-tmp*/
+.tmp*/
+.tmp*

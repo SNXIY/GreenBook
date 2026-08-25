@@ -73,6 +73,79 @@ async def test_create_java_article_produces_one_goal() -> None:
 
 
 @pytest.mark.asyncio
+async def test_multi_goal_decomposition_keeps_publication_semantics_scoped() -> None:
+    command = Command(
+        type=CommandType.CREATE,
+        objective="Create three independently handled content targets",
+        required_capabilities=["GENERATE_CONTENT", "SCHEDULE_PUBLISH"],
+    )
+    tree = await _decompose(
+        {
+            "root": {
+                "goal_id": "root",
+                "description": "Three independent content targets",
+                "goal_type": "COMPOSITE",
+                "children": [
+                    {
+                        "goal_id": "scheduled-a",
+                        "description": "Create content A",
+                        "goal_type": "CREATE",
+                        "required_capabilities": [
+                            "GENERATE_CONTENT",
+                            "SCHEDULE_PUBLISH",
+                        ],
+                        "target": {"topic": "subject-a"},
+                        "temporal_constraint": {
+                            "run_at": "2026-08-13T13:20:00+08:00",
+                        },
+                        "publication_intent": "SCHEDULED_PUBLISH",
+                    },
+                    {
+                        "goal_id": "scheduled-b",
+                        "description": "Create content B",
+                        "goal_type": "CREATE",
+                        "required_capabilities": [
+                            "GENERATE_CONTENT",
+                            "SCHEDULE_PUBLISH",
+                        ],
+                        "target": {"topic": "subject-b"},
+                        "temporal_constraint": {
+                            "run_at": "2026-08-14T15:00:00+08:00",
+                        },
+                        "publication_intent": "SCHEDULED_PUBLISH",
+                    },
+                    {
+                        "goal_id": "draft-only-c",
+                        "description": "Create content C",
+                        "goal_type": "CREATE",
+                        "required_capabilities": ["GENERATE_CONTENT"],
+                        "target": {"topic": "subject-c"},
+                        "publication_intent": "DRAFT_ONLY",
+                    },
+                ],
+            },
+        },
+        command,
+        ["GENERATE_CONTENT", "SCHEDULE_PUBLISH"],
+    )
+
+    goals = {goal.goal_id: goal for goal in tree.executable_goals()}
+    assert set(goals) == {"scheduled-a", "scheduled-b", "draft-only-c"}
+    assert goals["scheduled-a"].temporal_constraint["run_at"] == (
+        "2026-08-13T13:20:00+08:00"
+    )
+    assert goals["scheduled-b"].temporal_constraint["run_at"] == (
+        "2026-08-14T15:00:00+08:00"
+    )
+    assert goals["draft-only-c"].publication_intent == "DRAFT_ONLY"
+
+    plan = GoalCompiler(CapabilityRegistry()).compile_plan(tree, command=command)
+    assert [step.tool_name for step in plan.steps].count("content.create_draft") == 3
+    assert [step.tool_name for step in plan.steps].count("publication.schedule") == 2
+    assert "publication.publish_now" not in [step.tool_name for step in plan.steps]
+
+
+@pytest.mark.asyncio
 async def test_complex_goal_produces_explicit_goal_tree_and_task_graph() -> None:
     tree = await _decompose(
         {
@@ -207,7 +280,7 @@ async def test_planner_compiles_goal_tree_into_existing_task_plan_contract() -> 
     assert plan.steps[0].goal_id == "create_java_article"
 
 
-def test_content_goal_compiles_creator_contract_arguments() -> None:
+def test_content_goal_compiles_draft_contract_arguments() -> None:
     tree = GoalTree(
         root=Goal(
             goal_id="create_agent_article",
@@ -225,6 +298,10 @@ def test_content_goal_compiles_creator_contract_arguments() -> None:
     assert plan.steps[0].constraints["instruction"] == (
         "Write a Chinese draft article about Agent"
     )
+    # The assistant-first direct-write contract carries no Creator strategy
+    # or task inputs; only title/instruction/references/summary are allowed.
+    for key in ("strategy_task_id", "strategy_artifact_id", "creator_task_id"):
+        assert key not in plan.steps[0].constraints
 
 
 def test_content_goal_preserves_command_context_for_nested_generation_step() -> None:
@@ -277,23 +354,6 @@ def test_goal_tree_resolves_flat_child_ids_without_creating_goals() -> None:
 
     tree.validate_tree()
     assert [goal.goal_id for goal in tree.all_goals()] == ["root", "child"]
-
-
-def test_revision_goal_compiles_creator_revision_instruction() -> None:
-    tree = GoalTree(
-        root=Goal(
-            goal_id="revise_agent_article",
-            description="面向刚入门开发者，增加 LangGraph 和 MCP 实际代码案例",
-            goal_type="MODIFY",
-            required_capabilities=["IMPROVE_CONTENT"],
-            constraints=[{"type": "draft_id", "value": "draft-1"}],
-        )
-    )
-
-    plan = GoalCompiler(CapabilityRegistry()).compile_plan(tree)
-
-    assert plan.steps[0].constraints["draft_id"] == "draft-1"
-    assert plan.steps[0].constraints["revision_instruction"] == tree.root.description
 
 
 def test_schedule_goal_normalizes_structured_target_time_and_draft() -> None:
@@ -367,10 +427,18 @@ def test_partial_task_nodes_do_not_truncate_leaf_goal_plan() -> None:
 
     plan = GoalCompiler(CapabilityRegistry()).compile_plan(tree)
 
-    assert [step.capability for step in plan.steps] == [
+    caps = [step.capability for step in plan.steps]
+    # Evidence-bounded analysis: a GET_POST_DETAIL read is deterministically
+    # inserted between SEARCH_COMMUNITY and ANALYZE_CONTENT_PATTERNS.
+    assert caps == [
         "SEARCH_COMMUNITY",
+        "GET_POST_DETAIL",
         "ANALYZE_CONTENT_PATTERNS",
         "GENERATE_CONTENT",
     ]
-    assert plan.steps[1].depends_on == ["research-search"]
-    assert plan.steps[2].depends_on == ["research-search", "research:1"]
+    assert caps.index("SEARCH_COMMUNITY") < caps.index("GET_POST_DETAIL") < caps.index("ANALYZE_CONTENT_PATTERNS")
+    assert plan.steps[1].capability == "GET_POST_DETAIL"
+    assert plan.steps[2].depends_on == ["research-search", "research:evidence-read"]
+    assert plan.steps[3].depends_on == [
+        "research-search", "research:evidence-read", "research:1",
+    ]

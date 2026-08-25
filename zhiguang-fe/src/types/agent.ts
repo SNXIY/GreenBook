@@ -26,6 +26,9 @@ export type AgentToolPart = {
 export type AgentResultArtifact = {
   type: string;
   artifact_id: string;
+  step_id?: string | null;
+  goal_id?: string | null;
+  draft_id?: string | null;
   title?: string | null;
   content?: string | null;
   summary?: string | null;
@@ -38,23 +41,73 @@ export type AgentResultArtifact = {
   payload?: Record<string, unknown>;
 };
 
+export type BusinessState =
+  | "DRAFT"
+  | "SCHEDULED"
+  | "PUBLISHED"
+  | "CANCELLED"
+  | "NEEDS_CONFIRMATION"
+  | "NEEDS_APPROVAL"
+  | "PROCESSING"
+  | "VERIFYING_RESULT"
+  | "FAILED"
+  | "PARTIAL";
+
+export type BusinessProjectionEntity = {
+  kind: string;
+  state: BusinessState;
+  title?: string | null;
+  run_at?: string | null;
+  timezone?: string | null;
+};
+
+export type BusinessProjection = {
+  state?: BusinessState | null;
+  message: string;
+  visible: boolean;
+  entities: BusinessProjectionEntity[];
+  actions: string[];
+  completed_count: number;
+  processing_count: number;
+  failed_count: number;
+  needs_action_count: number;
+};
+
 export type AgentExecutionResultPart = {
   type: "execution_result";
   execution: {
     execution_id: string;
     task_id?: string;
     status: string;
+    /** Task-level completion derived from Goal satisfaction, not this
+     *  Execution's terminal state (COMPLETED / IN_PROGRESS / FAILED / ...). */
+    task_status?: string;
     summary?: string;
     steps?: Array<{
       step_id?: string;
+      goal_id?: string | null;
+      /** Semantic capability used only by the projection layer. */
+      capability?: string;
       label?: string;
       status?: string;
       error?: string | null;
     }>;
+    /** Backend-owned business projection; frontend must not infer it from raw status. */
+    business_projection?: BusinessProjection | null;
   };
   artifacts: AgentResultArtifact[];
   schedule?: Record<string, unknown> | null;
   next_actions: string[];
+};
+
+export type AgentUserFacingInteractionPart = {
+  type: "user_facing_interaction";
+  interaction: {
+    kind: "QUERY_RESULT" | "SYNTHESIS_RESULT";
+    status?: string;
+    result?: Record<string, unknown>;
+    synthesis?: Record<string, unknown>;
+  };
 };
 
 export type AgentClarificationCandidate = {
@@ -85,6 +138,7 @@ export type AgentPolicyDecisionPart = {
 export type AgentMessagePart =
   | AgentToolPart
   | AgentExecutionResultPart
+  | AgentUserFacingInteractionPart
   | AgentTargetClarificationPart
   | AgentPolicyDecisionPart;
 
@@ -100,10 +154,35 @@ export type AgentRunAccepted = {
   error_code?: string | null;
   error?: string | null;
   replayed: boolean;
+  /** First semantic capability decided by AgentLoop; shown as the immediate
+   *  business activity ("正在生成内容…") before the execution snapshot. */
+  first_capability?: string | null;
+  /** Immediate-accept marker: the Run was durably accepted; Agent results
+   *  follow via /runs/{run_id}/stream and the message projection. */
+  created_at?: string | null;
+  /** Mid-turn injection: this Run queues behind the named working Run and
+   *  starts once that parent ends. Shown as a hint, not a separate card. */
+  follow_up_of?: string | null;
+  /** Durable public business-activity SSE, preferred over legacy run events. */
+  activities_url?: string | null;
+};
+
+/** The agent's understanding of a user request, shown before execution so a
+ *  wrong understanding can be stopped early (design goal 0813). */
+export type AgentUnderstandingTask = {
+  description: string;
+  publish_at?: string | null;
+  requires_search?: boolean;
+};
+
+export type AgentUnderstanding = {
+  summary: string;
+  tasks: AgentUnderstandingTask[];
 };
 
 export type AgentRunStep = {
   step_id: string;
+  goal_id?: string | null;
   ordinal: number;
   kind: string;
   tool_name?: string | null;
@@ -126,13 +205,14 @@ export type AgentRun = {
   execution_id?: string | null;
   conversation_id: string;
   goal: string;
-  status: "QUEUED" | "RUNNING" | "RETRYING" | "WAITING_DEPENDENCY" | "WAITING_LANE" | "WAITING_APPROVAL" | "PAUSED" | "COMPLETED" | "FAILED" | "CANCELLED";
-  execution_path: "ROUTING" | "DIRECT" | "TOOL" | "CREATOR" | "ORCHESTRATED";
+  status: "QUEUED" | "RUNNING" | "RETRYING" | "WAITING_DEPENDENCY" | "WAITING_LANE" | "WAITING_APPROVAL" | "WAITING_HUMAN" | "WAITING_USER" | "PAUSED" | "COMPLETED" | "PARTIAL_SUCCESS" | "FAILED" | "CANCELLED" | "ACCEPTED";
+  execution_path: "agent_loop" | "runtime" | "task_delta" | "ORCHESTRATED";
   workload_lane: "ROUTING" | "READ" | "WRITE";
   summary?: string | null;
   final_response?: string | null;
   error?: string | null;
   trace_id: string;
+  follow_up_of?: string | null;
   budget: {
     model_calls: number;
     max_model_calls: number;
@@ -177,7 +257,7 @@ export type AgentRunListItem = {
   trace_id: string;
   approval?: AgentRun["approval"];
   steps: Array<Pick<AgentRunStep, "step_id" | "label" | "status">>;
-  creator_task_ids: string[];
+  follow_up_of?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -208,6 +288,15 @@ export type AgentMemoryProfile = {
   retention_days: number;
   semantic_backend: string;
   embedding_provider: string;
+};
+
+export type AgentMemoryRecord = {
+  memory_id: string;
+  memory_type: string;
+  content: string;
+  importance: number;
+  created_at: string;
+  conversation_id?: string | null;
 };
 
 export type AgentEpisode = {

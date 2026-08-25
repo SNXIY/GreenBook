@@ -5,11 +5,32 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from greenbook_contracts.tool_result import DataProvenance, ToolResult
+from greenbook_contracts.tool_result import (
+    DataProvenance,
+    OperationReceipt,
+    ResourceRef,
+    ToolResult,
+)
 
 from ..context import ToolContext
 
 logger = logging.getLogger(__name__)
+
+
+def _post_ref(
+    post_id: str,
+    *,
+    title: str | None = None,
+    tool: str = "",
+) -> ResourceRef:
+    return ResourceRef(
+        ref=f"post:{post_id}",
+        kind="POST",
+        resource_id=post_id,
+        title=title,
+        source=DataProvenance.COMMUNITY_DATA.value,
+        tool=tool or None,
+    )
 
 
 def _mark_source(result: ToolResult[Any], source: DataProvenance) -> ToolResult[Any]:
@@ -35,6 +56,17 @@ async def search_public_posts(
         trace_id=ctx.trace_id,
         conversation_id=ctx.conversation_id,
     )
+    if result.ok and result.data is not None:
+        refs = [
+            _post_ref(
+                str(getattr(item, "post_id", "") or ""),
+                title=getattr(item, "title", None),
+                tool="community.search_public_posts",
+            )
+            for item in getattr(result.data, "items", ())
+            if str(getattr(item, "post_id", "") or "")
+        ]
+        result = result.model_copy(update={"resource_refs": refs})
     return _mark_source(result, DataProvenance.COMMUNITY_DATA)
 
 
@@ -50,9 +82,20 @@ async def get_post(
         conversation_id=ctx.conversation_id,
     )
     if result.ok and result.data:
+        post_id = str(getattr(result.data, "post_id", "") or "")
+        refs = (
+            [_post_ref(
+                post_id,
+                title=getattr(result.data, "title", None),
+                tool="community.get_post",
+            )]
+            if post_id
+            else []
+        )
         return ToolResult.success(
             result.data.model_dump(mode="json"),
             trace_id=result.trace_id,
+            resource_refs=refs,
             provenance=[DataProvenance.COMMUNITY_DATA],
         )
     return _mark_source(result, DataProvenance.COMMUNITY_DATA)
@@ -73,9 +116,122 @@ async def list_own_posts(
     )
     if result.ok and result.data:
         items = [item.model_dump(mode="json") for item in result.data]
+        refs = [
+            _post_ref(
+                str(getattr(item, "post_id", "") or ""),
+                title=getattr(item, "title", None),
+                tool="community.list_own_posts",
+            )
+            for item in result.data
+            if str(getattr(item, "post_id", "") or "")
+        ]
         return ToolResult.success(
             items,
             trace_id=result.trace_id,
+            resource_refs=refs,
             provenance=[DataProvenance.PERSONAL_DATA],
         )
     return _mark_source(result, DataProvenance.PERSONAL_DATA)
+
+
+async def delete_post(
+    ctx: ToolContext,
+    post_id: str,
+) -> ToolResult[Any]:
+    """Delete one owned post after approval and verify Java truth."""
+    if not ctx.approval_granted:
+        return ToolResult.failure(
+            "APPROVAL_REQUIRED",
+            "community.delete_post requires explicit user approval",
+            "Deleting a post needs your confirmation.",
+            request_sent=False,
+        )
+
+    current = await ctx.java.get_post(
+        post_id,
+        bearer_token=ctx.auth.raw_access_token,
+        trace_id=ctx.trace_id,
+        conversation_id=ctx.conversation_id,
+    )
+    if not current.ok or current.data is None:
+        return current
+    owner_id = str(getattr(current.data, "author_id", "") or "")
+    if owner_id and owner_id != str(ctx.auth.user_id):
+        return ToolResult.permission_denied("Post is not owned by the authenticated user")
+
+    key = ctx.idempotency_key("delete_post", scope=post_id)
+    result = await ctx.java.delete_post(
+        post_id,
+        bearer_token=ctx.auth.raw_access_token,
+        idempotency_key=key,
+        trace_id=ctx.trace_id,
+        conversation_id=ctx.conversation_id,
+        agent_run_id=ctx.agent_run_id,
+        tool_call_id=ctx.tool_call_id,
+    )
+    if not result.ok:
+        return result
+
+    verified = await ctx.java.list_own_posts(
+        bearer_token=ctx.auth.raw_access_token,
+        trace_id=ctx.trace_id,
+        conversation_id=ctx.conversation_id,
+    )
+    if not verified.ok:
+        return ToolResult.failure(
+            "RESULT_UNKNOWN",
+            f"Post {post_id} deletion was accepted but is still visible",
+            "The post deletion is still being verified.",
+            request_sent=True,
+            trace_id=ctx.trace_id,
+        ).model_copy(update={
+            "resource_refs": [_post_ref(post_id)],
+            "operation_receipt": OperationReceipt(
+                operation_id=key,
+                semantic_action="DELETE_POST",
+                resource_ref=_post_ref(post_id),
+                idempotency_key=key,
+                request_sent=True,
+                downstream_accepted=True,
+                side_effect_started=True,
+                result_known=False,
+                status="RESULT_UNKNOWN",
+            ),
+        })
+    if any(str(getattr(item, "post_id", "")) == post_id for item in (verified.data or [])):
+        return ToolResult.failure(
+            "RESULT_UNKNOWN",
+            f"Post {post_id} deletion could not be verified",
+            "The post deletion is still being verified.",
+            request_sent=True,
+            trace_id=ctx.trace_id,
+        )
+
+    ctx.session.record_entity(
+        ref=f"post:{post_id}",
+        kind="POST",
+        entity_id=post_id,
+        label=getattr(current.data, "title", None),
+        status="DELETED",
+        run_id=ctx.agent_run_id,
+    )
+    return ToolResult.success(
+        {"post_id": post_id, "status": "deleted"},
+        trace_id=ctx.trace_id,
+        receipt_id=result.receipt_id,
+        resource_refs=[_post_ref(post_id)],
+        provenance=[DataProvenance.PERSONAL_DATA],
+        operation_receipt=OperationReceipt(
+            operation_id=key,
+            semantic_action="DELETE_POST",
+            resource_ref=_post_ref(post_id),
+            idempotency_key=key,
+            request_sent=True,
+            downstream_accepted=True,
+            side_effect_started=True,
+            result_known=True,
+            observed_state={"post_id": post_id, "status": "deleted"},
+            verification_evidence={"list_own_posts_excludes_post": True},
+            status="COMPLETED",
+        ),
+    )

@@ -21,8 +21,12 @@ _CATALOG: list[Capability] = [
     # ── SEARCH ───────────────────────────────────────────────────
     Capability(
         name="SEARCH_COMMUNITY",
-        description="Search public posts in the GreenBook community by keywords",
+        description="Search public posts in the GreenBook community by keywords and read the selected post details",
         category=CapabilityCategory.SEARCH,
+        # Single canonical tool so single-tool auto-selection stays valid for
+        # orchestrated/worker plans.  get_post remains reachable on this
+        # capability via its ``serves=("SEARCH_COMMUNITY",)`` declaration, not
+        # by being a second positional tool here.
         tools=["community.search_public_posts"],
         inputs=CapabilityInput(required=["query"], optional=["sort", "page", "size"]),
         output_artifact_type="SEARCH_RESULT",
@@ -54,6 +58,7 @@ _CATALOG: list[Capability] = [
         is_llm_step=True,
         inputs=CapabilityInput(required=["source_artifact"]),
         output_artifact_type="ANALYSIS_REPORT",
+        result_requirement="GROUNDED_SYNTHESIS",
     ),
     Capability(
         name="ANALYZE_PERFORMANCE",
@@ -72,48 +77,18 @@ _CATALOG: list[Capability] = [
     # ── CREATE ───────────────────────────────────────────────────
     Capability(
         name="GENERATE_CONTENT",
-        description="Create a new draft post via Creator Service",
+        description="Create a new draft post via the assistant-first generator",
         category=CapabilityCategory.CREATE,
         tools=["content.create_draft"],
-        # ``content.create_draft`` consumes an instruction/brief.  The
-        # generated document is produced by Creator and is not an input
-        # supplied to the handler.
+        # ``content.create_draft`` consumes an instruction/brief; the host
+        # LLM writes the body in one round trip, then Java persists the draft.
         inputs=CapabilityInput(
             required=["title", "instruction"],
             optional=[
                 "references",
                 "summary",
-                "strategy_task_id",
-                "strategy_artifact_id",
             ],
         ),
-        output_artifact_type="DRAFT",
-    ),
-    Capability(
-        name="DESIGN_CONTENT_STRATEGY",
-        description=(
-            "Build an evidence-aware content strategy or series plan via the "
-            "Creator Service without creating a Java draft"
-        ),
-        category=CapabilityCategory.CREATE,
-        tools=["content.build_strategy"],
-        inputs=CapabilityInput(
-            required=["instruction"],
-            optional=["references", "constraints"],
-        ),
-        output_artifact_type="CONTENT_STRATEGY",
-    ),
-    Capability(
-        name="IMPROVE_CONTENT",
-        description="Revise an existing draft via Creator Service",
-        category=CapabilityCategory.CREATE,
-        tools=["content.revise_draft"],
-        inputs=CapabilityInput(required=["draft_id", "revision_instruction"],
-                               optional=[
-                                   "title",
-                                   "revision_scope",
-                                   "expected_version",
-                               ]),
         output_artifact_type="DRAFT",
     ),
     Capability(
@@ -132,6 +107,30 @@ _CATALOG: list[Capability] = [
         inputs=CapabilityInput(),
         output_artifact_type="",
     ),
+    Capability(
+        name="MANAGE_DRAFT",
+        description="Partially update a specific existing draft without replacing omitted fields",
+        category=CapabilityCategory.CREATE,
+        tools=["content.update_draft"],
+        inputs=CapabilityInput(required=[], optional=["draft_id", "title", "content"]),
+        output_artifact_type="DRAFT",
+    ),
+    Capability(
+        name="DELETE_DRAFT",
+        description="Soft-delete a draft after explicit user approval",
+        category=CapabilityCategory.CREATE,
+        tools=["content.delete_draft"],
+        inputs=CapabilityInput(optional=["draft_id"]),
+        output_artifact_type="",
+    ),
+    Capability(
+        name="DELETE_POST",
+        description="Delete one owned published post after explicit user approval",
+        category=CapabilityCategory.PUBLISH,
+        tools=["community.delete_post"],
+        inputs=CapabilityInput(required=["post_id"]),
+        output_artifact_type="",
+    ),
 
     # ── VALIDATE ─────────────────────────────────────────────────
     Capability(
@@ -142,6 +141,7 @@ _CATALOG: list[Capability] = [
         is_llm_step=True,
         inputs=CapabilityInput(required=["draft_artifact"]),
         output_artifact_type="VALIDATION_REPORT",
+        result_requirement="GROUNDED_SYNTHESIS",
     ),
 
     # ── PUBLISH ──────────────────────────────────────────────────
@@ -312,29 +312,89 @@ class CapabilityRegistry:
         self,
         requirement: dict[str, str],
     ) -> CapabilityMatch:
-        """Map a requirement dict {type: "SEARCH", ...} to a Capability.
+        """Map a structured requirement to one Capability without guessing.
 
-        Phase 3.0 strategy: simple type → name mapping.
+        Legacy callers supplied only a broad ``type`` such as ``UPDATE``.
+        That is no longer enough to choose a write capability: updating a
+        Draft and updating a Schedule have different Java postconditions.
+        Prefer the canonical semantic action; a bare ambiguous ``UPDATE``
+        fails closed rather than silently selecting schedule management.
         """
         req_type = (requirement.get("type") or "").strip().upper()
+        semantic_action = (
+            requirement.get("semantic_action")
+            or requirement.get("semantic_operation")
+            or ""
+        ).strip().upper()
+        semantic_mapping: dict[str, str] = {
+            "SEARCH_POSTS": "SEARCH_COMMUNITY",
+            "GET_POST": "GET_POST_DETAIL",
+            "LIST_OWN_POSTS": "LIST_OWN_POSTS",
+            "CREATE_DRAFT": "GENERATE_CONTENT",
+            "GET_DRAFT": "GET_DRAFT",
+            "LIST_DRAFTS": "LIST_DRAFTS",
+            "UPDATE_DRAFT": "MANAGE_DRAFT",
+            "DELETE_DRAFT": "DELETE_DRAFT",
+            "DELETE_POST": "DELETE_POST",
+            "CREATE_SCHEDULE": "SCHEDULE_PUBLISH",
+            "GET_SCHEDULE": "GET_SCHEDULE_STATUS",
+            "UPDATE_SCHEDULE": "MANAGE_SCHEDULE",
+            "CANCEL_SCHEDULE": "CANCEL_SCHEDULE",
+            "PUBLISH_NOW": "PUBLISH_NOW",
+            "LIST_COMMENTS": "LIST_COMMENTS",
+            "REPLY_COMMENT": "REPLY_USER",
+            "GET_POST_PERFORMANCE": "ANALYZE_PERFORMANCE",
+            "GET_ACCOUNT_SUMMARY": "ANALYZE_PERFORMANCE",
+        }
+        if semantic_action:
+            cap_name = semantic_mapping.get(semantic_action)
+            if cap_name is None:
+                return CapabilityMatch(
+                    requirement=requirement,
+                    confidence=0.0,
+                    error=f"No capability for semantic action: {semantic_action}",
+                )
+            cap = self.get(cap_name)
+            return CapabilityMatch(
+                requirement=requirement,
+                capability=cap,
+                confidence=0.98 if cap is not None else 0.0,
+                error="" if cap is not None else f"Capability '{cap_name}' not found",
+            )
+
+        resource_kind = (
+            requirement.get("resource_kind")
+            or requirement.get("target_kind")
+            or requirement.get("kind")
+            or ""
+        ).strip().upper()
         mapping: dict[str, str] = {
             "SEARCH":     "SEARCH_COMMUNITY",
             "ANALYZE":    "ANALYZE_CONTENT_PATTERNS",
             "CREATE":     "GENERATE_CONTENT",
-            "IMPROVE":    "IMPROVE_CONTENT",
             "VALIDATE":   "VALIDATE_QUALITY",
             "PUBLISH":    "SCHEDULE_PUBLISH",
             "REPLY":      "REPLY_USER",
             "QUERY":      "GET_DRAFT",
             "CANCEL":     "CANCEL_SCHEDULE",
-            "UPDATE":     "MANAGE_SCHEDULE",
         }
-        cap_name = mapping.get(req_type)
+        if req_type == "UPDATE":
+            cap_name = {
+                "DRAFT": "MANAGE_DRAFT",
+                "SCHEDULE": "MANAGE_SCHEDULE",
+            }.get(resource_kind)
+        else:
+            cap_name = mapping.get(req_type)
         if cap_name is None:
+            detail = (
+                "Use semantic_action or a typed resource_kind for UPDATE."
+                if req_type == "UPDATE"
+                else f"No capability for requirement type: {req_type}"
+            )
             return CapabilityMatch(
                 requirement=requirement,
                 confidence=0.0,
-                error=f"No capability for requirement type: {req_type}",
+                error=detail,
             )
         cap = self.get(cap_name)
         return CapabilityMatch(

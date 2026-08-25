@@ -44,12 +44,6 @@ class _CallbackExternalOperationAdapter:
         )
 
 
-class CreatorAdapter(_CallbackExternalOperationAdapter):
-    """Runtime adapter boundary for future Creator operation queries."""
-
-    name = "creator"
-
-
 class JavaCommunityAdapter(_CallbackExternalOperationAdapter):
     """Runtime adapter boundary for future Java Community operation queries."""
 
@@ -111,7 +105,6 @@ class MockExternalOperationAdapter:
 
 
 __all__ = [
-    "CreatorAdapter",
     "ExternalOperationAdapter",
     "ExternalStatus",
     "ExternalStatusQuery",

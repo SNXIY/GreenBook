@@ -1,7 +1,7 @@
 name: greenbook
 
 # Development Compose intentionally contains infrastructure only.
-# Run Java, Vite, Creator Service and Agent API/Worker on the host so their
+# Run Java, Vite, the Agent API/Worker and Frontend on the host so their
 # logs, breakpoints and hot reload remain visible during development.
 
 x-restart: &restart
@@ -59,7 +59,9 @@ services:
 
   creator-postgres:
     <<: *restart
-    # Shared PostgreSQL instance: Creator Service and Agent Runtime use mindflow_creator.
+    # Shared PostgreSQL: the Agent Runtime persists executions/observations here
+    # (mindflow_creator database). The service name is retained for compatibility
+    # with existing named volumes and local .env files.
     container_name: greenbook-postgres
     image: postgres:17-alpine
     ports:
@@ -78,7 +80,7 @@ services:
 
   creator-redis:
     <<: *restart
-    # Shared Redis instance: Creator Service/Agent Runtime DB0 and Java DB1.
+    # Shared Redis: Agent Runtime uses DB0 and Java uses DB1.
     container_name: greenbook-redis
     image: redis:8.0-alpine
     ports:

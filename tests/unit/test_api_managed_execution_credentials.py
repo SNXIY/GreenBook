@@ -4,7 +4,6 @@ import base64
 import json
 
 import pytest
-
 from greenbook_agent_api.services.execution_credential_broker import (
     ExecutionCredentialBroker,
 )

@@ -4,6 +4,7 @@ import { authService } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 import type { IdentifierType, RegisterRequest } from "@/types/auth";
 import styles from "./RegisterPage.module.css";
+import { userFacingErrorMessage } from "@/services/userFacingError";
 // 注册方式固定为手机号
 
 const RegisterPage = () => {
@@ -53,7 +54,7 @@ const RegisterPage = () => {
       setMessage("验证码已发送，请注意查收");
       setCountdown(60);
     } catch (err) {
-      const info = err instanceof Error ? err.message : "验证码发送失败";
+      const info = userFacingErrorMessage(err, "验证码暂时无法发送，请稍后重试。");
       setError(info);
     } finally {
       setSendingCode(false);
@@ -81,7 +82,7 @@ const RegisterPage = () => {
         navigate(from, { replace: true });
       }, 400);
     } catch (err) {
-      const info = err instanceof Error ? err.message : "注册失败，请稍后重试";
+      const info = userFacingErrorMessage(err, "注册暂时无法完成，请稍后重试。");
       setError(info);
     } finally {
       setSubmitting(false);

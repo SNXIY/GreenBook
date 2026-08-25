@@ -100,6 +100,23 @@ class RetryBackgroundWorker:
                 )
                 self._release(task)
                 continue
+            # A denied retry returns the step unchanged (still FAILED*): the
+            # task must not be recorded as completed — release it so the next
+            # poll can apply the retry policy, and its budget eventually
+            # terminates it instead of pretending the retry happened (design
+            # goal 0813 — a denied retry is never reported as applied).
+            step_status = str(getattr(step, "status", "") or "")
+            if hasattr(step_status, "value"):
+                step_status = str(step_status.value)
+            if step_status.upper() != "PENDING":
+                logger.warning(
+                    "Retry task not applied execution_id=%s step_id=%s status=%s",
+                    task.execution_id,
+                    task.step_id,
+                    step_status,
+                )
+                self._release(task)
+                continue
             if self._execution_queue is not None and queue_message is not None:
                 try:
                     queued = self._execution_queue.enqueue(

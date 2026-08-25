@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.execution.events import EventType
 from greenbook_agent_core.execution.models import ExecutionStatus, StepStatus
@@ -21,8 +20,9 @@ from greenbook_agent_core.execution.reconciliation import (
 )
 from greenbook_agent_core.execution.repository import ExecutionRepository
 from greenbook_agent_core.execution.state_manager import ExecutionStateManager
-from tests.plan_factory import GoalPlanFactory
 from greenbook_agent_core.planning.validation import PlanValidator
+
+from tests.plan_factory import GoalPlanFactory
 
 
 @pytest.fixture(autouse=True)
