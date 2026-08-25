@@ -53,5 +53,9 @@ refrence/
 # Local scratch / diagnostic artifacts
 **/.pytest-temp*/
 **/.pytest-tmp*/
+**/.pytest_tmp*/
 .tmp*/
 .tmp*
+
+# Local Codex/assistant permissions (never commit machine-local settings)
+**/.claude/settings.local.json
