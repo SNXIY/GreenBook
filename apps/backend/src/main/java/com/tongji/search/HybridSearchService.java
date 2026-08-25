@@ -72,7 +72,9 @@ public class HybridSearchService {
             List<RankedItem> ranked = new ArrayList<>();
             for (RankedCandidate candidate : fused) {
                 KnowPostDetailRow row = byId.get(candidate.postId());
-                if (row != null) ranked.add(new RankedItem(candidate, mysql.toItem(row)));
+                if (row != null && mysql.matchesQuery(row, normalized)) {
+                    ranked.add(new RankedItem(candidate, mysql.toItem(row)));
+                }
             }
             ranked.sort(Comparator.comparingDouble(RankedItem::finalScore).reversed()
                     .thenComparingLong(value -> value.item().publishedAt() == null

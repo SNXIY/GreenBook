@@ -116,6 +116,22 @@ public class MySqlSearchProvider {
         return rows;
     }
 
+    /** Keep hybrid candidate rows consistent with the MySQL truth/count predicate. */
+    public boolean matchesQuery(KnowPostDetailRow row, String query) {
+        if (row == null || !"published".equals(row.getStatus()) || !"public".equals(row.getVisible())) {
+            return false;
+        }
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return true;
+        }
+        List<String> tokens = tokenize(normalized);
+        if (tokens.isEmpty()) {
+            return containsSearchField(row, normalized);
+        }
+        return tokens.stream().anyMatch(token -> containsSearchField(row, token));
+    }
+
     public SearchPostItem toItem(KnowPostDetailRow row) {
         Map<String, Long> counts = counterService.getCounts("knowpost",
                 String.valueOf(row.getId()), List.of("like", "fav"));
@@ -154,6 +170,16 @@ public class MySqlSearchProvider {
         } catch (Exception ignored) {
             return List.of();
         }
+    }
+
+    private boolean containsSearchField(KnowPostDetailRow row, String value) {
+        return contains(row.getTitle(), value)
+                || contains(row.getDescription(), value)
+                || contains(row.getTags(), value);
+    }
+
+    private boolean contains(String field, String value) {
+        return field != null && field.toLowerCase(Locale.ROOT).contains(value);
     }
 
     private String normalizeSort(String sort) {
