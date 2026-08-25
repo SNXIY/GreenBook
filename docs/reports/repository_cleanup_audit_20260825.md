@@ -143,6 +143,13 @@ reports remain visible to Git.
 - Integration smoke: Frontend `:5173`, Agent API `:8094`, and Java `:8080`
   returned HTTP 200. Canonical listeners were present on `25432`, `33306`,
   `26379`, `39092`, `26333`, and `26334`.
+- Runtime recovery note: while deleting the ignored `.uv-cache`, the live
+  WatchFiles reloader observed the cache churn and began a reload while the
+  browser held SSE connections. The API was temporarily non-responsive; only
+  the verified stuck Agent API/reloader processes were stopped and the original
+  `scripts/start-agent.ps1` configuration was started again. `/health` returned
+  200 after recovery. No source, database, queue, Java truth, or formal
+  evidence changed.
 - The expensive full L1/L2/L3, semantic, safety, and performance matrices were
   not rerun.
 
