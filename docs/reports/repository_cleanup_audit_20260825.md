@@ -44,6 +44,7 @@ CDP profile and the formal `round1-final-v2` evidence set.
 | `.runtime/convergence-e2e/`, `e2e/`, `e2e-p0-case10*`, `focused-e2e/`, `golden-e2e/`, `golden-final-closure/`, `golden-p0-*`, `long-session-final-20260824/`, `tmp-inspect/` | generated browser/E2E output; harnesses recreate their output directories | `scripts/dev/phase_p0_e2e.py`, `scripts/dev/semantic_confirmation_e2e.py`, and `tests/e2e/golden_final_closure.py` are the producers; exact old output paths had no formal-report consumer |
 | unreferenced root `.runtime/*.log` | historical process/debug logs, not runtime configuration | exact filename scan across README, docs, scripts, tests, evaluation, and runtime entrypoints; the four report/health-referenced logs were retained |
 | `zhiguang-fe/dist/` | Vite production output | `zhiguang-fe/package.json` (`npm run build`); frontend `.gitignore`; build passed and the output was deleted after validation |
+| `agentgreen-book.tmp-perf-p1-p4.py` | one-off profiling/debug script with no active consumer; it also contained machine-local test credentials | `rg` across source/docs/CI/scripts returned no reference; `git log` showed it was only part of the baseline first commit |
 
 The first cleanup pass had 311 validated target paths and measured 395,758,820
 bytes. Eight targets were not deleted because they were locked or ACL-blocked.
@@ -56,6 +57,8 @@ frontend `dist/` directory.
   approximately 395.6 MB after excluding the locked targets.
 - 443 source/test-tree `__pycache__` directories and the regenerated frontend
   `dist/` output, measured at approximately 14.75 MB.
+- The unreferenced tracked `agentgreen-book.tmp-perf-p1-p4.py` profiling residue
+  was removed after a content and full-reference scan proved it had no consumer.
 - The 20 tracked files under the four `.pytest_tmp_residual_*` directories are
   staged as generated test residue deletions; no production file is in the diff.
 - Formal evidence was not deleted: `docs/reports/`, `.runtime/round1-final-v2/`,
@@ -145,9 +148,9 @@ reports remain visible to Git.
 
 ## SIZE BEFORE / AFTER
 
-- tracked files: baseline HEAD **3585**; the cleanup diff removes **20** tracked
-  generated residue files; with this report added, the post-commit tree will
-  contain **3566** tracked files.
+- tracked files: baseline HEAD **3585**; the cleanup diff removes **21** tracked
+  residue files (20 pytest outputs plus the unreferenced profiling script); with
+  this report added, the post-commit tree will contain **3565** tracked files.
 - measured generated cleanup: approximately **395.6 MB** in the successful
   first pass plus **14.75 MB** of post-validation compiler/frontend output.
 - full working-tree size: intentionally not stated as authoritative because
@@ -161,7 +164,7 @@ reports remain visible to Git.
 The intended tracked diff is limited to:
 
 - `.gitignore` additions described above;
-- deletion of the 20 tracked pytest residue files;
+- deletion of the 20 tracked pytest residue files and the unreferenced profiling script;
 - this audit report.
 
 No production source, test source, CI, manifest, formal report, or baseline tag
