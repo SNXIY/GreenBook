@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS know_posts (
     content_etag VARCHAR(128) NULL COMMENT 'OSS ETag（用于校验）',
     content_size BIGINT UNSIGNED NULL COMMENT '正文字节大小',
     content_sha256 CHAR(64) NULL COMMENT '正文SHA-256哈希（hex）',
+    event_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Monotonic post mutation version for projections',
     creator_id BIGINT UNSIGNED NOT NULL,
     is_top TINYINT(1) NOT NULL DEFAULT 0,
     type VARCHAR(32) NOT NULL DEFAULT 'image_text',

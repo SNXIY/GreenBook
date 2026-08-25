@@ -23,6 +23,7 @@ public class KnowPostDetailRow {
     private String authorNickname;
     private String authorTagJson;
     private Instant publishTime;
+    private Long eventVersion;
     private Boolean isTop;
     private String visible;
     private String type;

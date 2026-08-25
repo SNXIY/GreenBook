@@ -54,12 +54,22 @@ public interface KnowPostMapper {
     KnowPostDetailRow findDetailById(@Param("id") Long id);
 
     List<KnowPostDetailRow> searchPublicForAgent(@Param("query") String query,
-                                                    @Param("limit") int limit);
+                                                    @Param("limit") int limit,
+                                                    @Param("offset") int offset);
+
+    long countPublicForAgent(@Param("query") String query);
 
     /** 词元感知检索：按多个词元做 OR 召回并按字段加权相关性打分排序。 */
     List<KnowPostDetailRow> searchPublicForAgentTokens(@Param("query") String query,
                                                         @Param("tokens") List<String> tokens,
-                                                        @Param("limit") int limit);
+                                                        @Param("limit") int limit,
+                                                        @Param("offset") int offset);
+
+    long countPublicForAgentTokens(@Param("query") String query,
+                                   @Param("tokens") List<String> tokens);
+
+    List<KnowPost> listPublicForSearchRebuild(@Param("limit") int limit,
+                                              @Param("offset") int offset);
 
     List<KnowPost> listOwnPostsForAgent(
             @Param("creatorId") long creatorId,

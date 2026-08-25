@@ -16,6 +16,8 @@ import com.tongji.knowpost.model.KnowPostDetailRow;
 import com.tongji.knowpost.service.KnowPostService;
 import com.tongji.relation.mapper.RelationMapper;
 import com.tongji.storage.OssStorageService;
+import com.tongji.search.HybridSearchService;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,9 +43,18 @@ public class AgentFacadeService {
     private final RelationMapper relationMapper;
     private final OssStorageService ossStorageService;
     private final ScheduledPublicationMapper scheduledPublicationMapper;
+    private HybridSearchService hybridSearchService;
+
+    @Autowired(required = false)
+    public void setHybridSearchService(HybridSearchService hybridSearchService) {
+        this.hybridSearchService = hybridSearchService;
+    }
 
     @Transactional(readOnly = true)
     public SearchPageResponse searchPosts(String query, String sort, int page, int size) {
+        if (hybridSearchService != null) {
+            return hybridSearchService.search(query, sort, page, size);
+        }
         int boundedSize = Math.min(Math.max(size, 1), 50);
         int boundedPage = Math.max(page, 1);
         String normalizedQuery = query != null ? query.trim() : "";
@@ -54,15 +65,29 @@ public class AgentFacadeService {
         } else if (normalizedQuery.length() > 100) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "搜索关键词不能超过100字");
         }
+        String normalizedSort = switch (sort == null ? "latest" : sort.toLowerCase(Locale.ROOT)) {
+            case "hot" -> "hot";
+            case "relevant" -> "relevant";
+            default -> "latest";
+        };
         List<String> tokens = tokenizeSearchQuery(normalizedQuery);
+        long total = tokens.isEmpty()
+                ? knowPostMapper.countPublicForAgent(normalizedQuery)
+                : knowPostMapper.countPublicForAgentTokens(normalizedQuery, tokens);
+        long rawOffset = ((long) Math.max(page, 1) - 1L) * boundedSize;
+        int offset = (int) Math.min(rawOffset, Integer.MAX_VALUE - 1L);
+        int fetchOffset = "relevant".equals(normalizedSort) ? offset : 0;
+        int fetchLimit = "relevant".equals(normalizedSort)
+                ? boundedSize
+                : (int) Math.min(Math.max(total, boundedSize), 10_000L);
         if (tokens.isEmpty()) {
-            rows = knowPostMapper.searchPublicForAgent(normalizedQuery, Math.min(boundedSize * 3, 150));
+            rows = knowPostMapper.searchPublicForAgent(normalizedQuery, fetchLimit, fetchOffset);
         } else {
             // Token-aware retrieval: OR recall with field-weighted relevance
             // ranking, so multi-word queries ("Java 后端 面试") hit posts
             // matching any token instead of requiring the exact phrase.
             rows = knowPostMapper.searchPublicForAgentTokens(
-                    normalizedQuery, tokens, Math.min(boundedSize * 3, 150));
+                    normalizedQuery, tokens, fetchLimit, fetchOffset);
         }
 
         List<SearchPostItem> items = rows.stream()
@@ -104,12 +129,18 @@ public class AgentFacadeService {
 
         // Sort if needed
         List<SearchPostItem> sorted = items;
-        if ("hot".equals(sort)) {
+        if ("hot".equals(normalizedSort)) {
             sorted = items.stream()
                     .sorted((a, b) -> Double.compare(b.hotScore() != null ? b.hotScore() : 0,
                             a.hotScore() != null ? a.hotScore() : 0))
                     .toList();
-        } else if ("latest".equals(sort)) {
+            if (offset < sorted.size()) {
+                int end = (int) Math.min((long) offset + boundedSize, sorted.size());
+                sorted = sorted.subList(offset, end);
+            } else {
+                sorted = List.of();
+            }
+        } else if ("latest".equals(normalizedSort)) {
             sorted = items.stream()
                     .sorted((a, b) -> {
                         Instant ta = a.publishedAt() != null ? a.publishedAt() : Instant.EPOCH;
@@ -117,12 +148,18 @@ public class AgentFacadeService {
                         return tb.compareTo(ta);
                     })
                     .toList();
+            if (offset < sorted.size()) {
+                int end = (int) Math.min((long) offset + boundedSize, sorted.size());
+                sorted = sorted.subList(offset, end);
+            } else {
+                sorted = List.of();
+            }
         }
 
         return new SearchPageResponse(sorted, boundedPage, boundedSize,
-                sorted.size(),
-                (int) Math.ceil((double) sorted.size() / boundedSize),
-                sorted.size() >= boundedSize, sort);
+                total,
+                (int) Math.ceil((double) total / boundedSize),
+                (long) offset + sorted.size() < total, normalizedSort, "mysql", false);
     }
 
     @Transactional(readOnly = true)

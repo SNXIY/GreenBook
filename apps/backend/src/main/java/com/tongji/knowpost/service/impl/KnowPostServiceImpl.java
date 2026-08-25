@@ -13,6 +13,8 @@ import com.tongji.knowpost.id.SnowflakeIdGenerator;
 import com.tongji.knowpost.mapper.KnowPostMapper;
 import com.tongji.knowpost.model.KnowPost;
 import com.tongji.knowpost.model.KnowPostDetailRow;
+import com.tongji.knowpost.event.PostLifecycleEventService;
+import com.tongji.knowpost.event.PostLifecycleEventType;
 import com.tongji.knowpost.api.dto.KnowPostDetailResponse;
 import com.tongji.knowpost.api.dto.PostTaskItemResponse;
 import com.tongji.knowpost.api.dto.PublishStatusResponse;
@@ -57,6 +59,7 @@ public class KnowPostServiceImpl implements KnowPostService {
     private final FeedIndexService feedIndexService;
     private final OssStorageService ossStorageService;
     private final ThreadPoolTaskExecutor taskExecutor;
+    private final PostLifecycleEventService postLifecycleEventService;
 
     // 手动编写构造器，Spring的@Qualifier直接标注在参数上（核心）
     public KnowPostServiceImpl(
@@ -70,7 +73,8 @@ public class KnowPostServiceImpl implements KnowPostService {
             HotKeyDetector hotKey,
             FeedIndexService feedIndexService,
             OssStorageService ossStorageService,
-            @Qualifier("taskExecutor") ThreadPoolTaskExecutor taskExecutor
+            @Qualifier("taskExecutor") ThreadPoolTaskExecutor taskExecutor,
+            PostLifecycleEventService postLifecycleEventService
     ) {
         this.mapper = mapper;
         this.idGen = idGen;
@@ -83,6 +87,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         this.feedIndexService = feedIndexService;
         this.ossStorageService = ossStorageService;
         this.taskExecutor = taskExecutor;
+        this.postLifecycleEventService = postLifecycleEventService;
     }
     @Transactional
     public long createDraft(long creatorId) {
@@ -143,6 +148,10 @@ public class KnowPostServiceImpl implements KnowPostService {
                 .build();
 
         int updated = mapper.updateContent(post);
+        if (updated != 0) {
+            postLifecycleEventService.emit(PostLifecycleEventType.PostContentUpdated,
+                    mapper.findById(id));
+        }
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
@@ -159,6 +168,7 @@ public class KnowPostServiceImpl implements KnowPostService {
         validateDescription(description);
         invalidateCache(id);
 
+        KnowPost before = mapper.findById(id);
         KnowPost post = KnowPost.builder()
                 .id(id)
                 .creatorId(creatorId)
@@ -174,6 +184,14 @@ public class KnowPostServiceImpl implements KnowPostService {
                 .build();
 
         int updated = mapper.updateMetadata(post);
+        if (updated != 0) {
+            KnowPost current = mapper.findById(id);
+            PostLifecycleEventType eventType = before != null && current != null
+                    && !java.util.Objects.equals(before.getVisible(), current.getVisible())
+                    ? PostLifecycleEventType.PostVisibilityChanged
+                    : PostLifecycleEventType.PostUpdated;
+            postLifecycleEventService.emit(eventType, current);
+        }
 
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
@@ -205,6 +223,9 @@ public class KnowPostServiceImpl implements KnowPostService {
         }
 
         int updated = mapper.publish(id, creatorId);
+        if (updated != 0) {
+            postLifecycleEventService.emit(PostLifecycleEventType.PostPublished, mapper.findById(id));
+        }
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }
@@ -265,6 +286,9 @@ public class KnowPostServiceImpl implements KnowPostService {
         invalidateCache(id);
 
         int updated = mapper.updateTop(id, creatorId, isTop);
+        if (updated != 0) {
+            postLifecycleEventService.emit(PostLifecycleEventType.PostUpdated, mapper.findById(id));
+        }
 
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
@@ -285,6 +309,10 @@ public class KnowPostServiceImpl implements KnowPostService {
         invalidateCache(id);
 
         int updated = mapper.updateVisibility(id, creatorId, visible);
+        if (updated != 0) {
+            postLifecycleEventService.emit(PostLifecycleEventType.PostVisibilityChanged,
+                    mapper.findById(id));
+        }
 
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
@@ -309,6 +337,9 @@ public class KnowPostServiceImpl implements KnowPostService {
         invalidateCache(id);
 
         int updated = mapper.softDelete(id, creatorId);
+        if (updated != 0) {
+            postLifecycleEventService.emit(PostLifecycleEventType.PostDeleted, mapper.findById(id));
+        }
         if (updated == 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "草稿不存在或无权限");
         }

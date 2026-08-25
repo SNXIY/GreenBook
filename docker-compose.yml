@@ -104,9 +104,29 @@ services:
     volumes:
       - greenbook-qdrant-data:/qdrant/storage
 
+  elasticsearch:
+    <<: *restart
+    container_name: greenbook-elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:${ELASTICSEARCH_HTTP_HOST_PORT:-29200}:9200"
+    volumes:
+      - greenbook-elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
 volumes:
   zhiguang-mysql-data:
   zhiguang-kafka-data:
   creator-postgres-data:
   creator-redis-data:
   greenbook-qdrant-data:
+  greenbook-elasticsearch-data:

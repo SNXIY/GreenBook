@@ -18,6 +18,12 @@ canal:
   host: ${CANAL_HOST:canal}
   port: ${CANAL_PORT:11111}
 
+search:
+  elasticsearch:
+    base-url: ${SEARCH_ELASTICSEARCH_URL:http://elasticsearch:9200}
+  qdrant:
+    base-url: ${SEARCH_QDRANT_URL:http://greenbook-qdrant:6333}
+
 oss:
   access-key-id: ${OSS_ACCESS_KEY_ID:}
   access-key-secret: ${OSS_ACCESS_KEY_SECRET:}

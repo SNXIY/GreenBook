@@ -10,5 +10,7 @@ public final class OutboxTopics {
      */
     private OutboxTopics() {}
     public static final String CANAL_OUTBOX = "canal-outbox";
+    /** Dedicated topic for the canonical post search projection consumers. */
+    public static final String POST_SEARCH_PROJECTION = "post-search-projection";
 }
 

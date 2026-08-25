@@ -36,4 +36,6 @@ public class KnowPost {
     private Instant createTime;
     private Instant updateTime;
     private Instant publishTime;
+    /** Monotonic business version used by search projections for stale-event guards. */
+    private Long eventVersion;
 }

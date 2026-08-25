@@ -24,6 +24,7 @@
         <result property="createTime" column="create_time" />
         <result property="updateTime" column="update_time" />
         <result property="publishTime" column="publish_time" />
+        <result property="eventVersion" column="event_version" />
     </resultMap>
 
     <insert id="insertDraft" parameterType="com.tongji.knowpost.model.KnowPost">
@@ -51,7 +52,8 @@
             <if test="contentEtag != null">content_etag = #{contentEtag},</if>
             <if test="contentSize != null">content_size = #{contentSize},</if>
             <if test="contentSha256 != null">content_sha256 = #{contentSha256},</if>
-            update_time = #{updateTime}
+            update_time = #{updateTime},
+            event_version = event_version + 1
         </set>
         WHERE id = #{id} AND creator_id = #{creatorId}
     </update>
@@ -67,14 +69,16 @@
             <if test="isTop != null">is_top = #{isTop},</if>
             <if test="description != null">description = #{description},</if>
             <if test="type != null">type = #{type},</if>
-            update_time = #{updateTime}
+            update_time = #{updateTime},
+            event_version = event_version + 1
         </set>
         WHERE id = #{id} AND creator_id = #{creatorId}
     </update>
 
     <update id="publish">
         UPDATE know_posts
-        SET status = 'published', publish_time = NOW(), update_time = NOW()
+        SET status = 'published', publish_time = NOW(), update_time = NOW(),
+            event_version = event_version + 1
         WHERE id = #{id} AND creator_id = #{creatorId}
           AND status = 'draft'
     </update>
@@ -82,21 +86,21 @@
     <!-- 设置置顶 -->
     <update id="updateTop">
         UPDATE know_posts
-        SET is_top = #{isTop}, update_time = NOW()
+        SET is_top = #{isTop}, update_time = NOW(), event_version = event_version + 1
         WHERE id = #{id} AND creator_id = #{creatorId}
     </update>
 
     <!-- 设置可见性 -->
     <update id="updateVisibility">
         UPDATE know_posts
-        SET visible = #{visible}, update_time = NOW()
+        SET visible = #{visible}, update_time = NOW(), event_version = event_version + 1
         WHERE id = #{id} AND creator_id = #{creatorId}
     </update>
 
     <!-- 软删除（保留记录，仅状态修改） -->
     <update id="softDelete">
         UPDATE know_posts
-        SET status = 'deleted', update_time = NOW()
+        SET status = 'deleted', update_time = NOW(), event_version = event_version + 1
         WHERE id = #{id} AND creator_id = #{creatorId}
     </update>
 
@@ -250,7 +254,7 @@
         ORDER BY
           CASE WHEN LOWER(COALESCE(p.title, '')) LIKE CONCAT('%', LOWER(#{query}), '%') THEN 0 ELSE 1 END,
           p.publish_time DESC
-        LIMIT #{limit}
+        LIMIT #{limit} OFFSET #{offset}
     </select>
 
     <!--
@@ -301,7 +305,33 @@
             </foreach>
           )
         ORDER BY relevance DESC, p.publish_time DESC
-        LIMIT #{limit}
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countPublicForAgent" resultType="long">
+        SELECT COUNT(1)
+        FROM know_posts p
+        WHERE p.status = 'published'
+          AND p.visible = 'public'
+          AND (
+            LOWER(COALESCE(p.title, '')) LIKE CONCAT('%', LOWER(#{query}), '%')
+            OR LOWER(COALESCE(p.description, '')) LIKE CONCAT('%', LOWER(#{query}), '%')
+            OR LOWER(COALESCE(p.tags, '')) LIKE CONCAT('%', LOWER(#{query}), '%')
+          )
+    </select>
+
+    <select id="countPublicForAgentTokens" resultType="long">
+        SELECT COUNT(1)
+        FROM know_posts p
+        WHERE p.status = 'published'
+          AND p.visible = 'public'
+          AND (
+            <foreach collection="tokens" item="tok" separator=" OR ">
+                (LOWER(COALESCE(p.title, '')) LIKE CONCAT('%', LOWER(#{tok}), '%')
+                 OR LOWER(COALESCE(p.tags, '')) LIKE CONCAT('%', LOWER(#{tok}), '%')
+                 OR LOWER(COALESCE(p.description, '')) LIKE CONCAT('%', LOWER(#{tok}), '%'))
+            </foreach>
+          )
     </select>
 
     <select id="listOwnPostsForAgent" resultMap="KnowPostResultMap">
@@ -310,6 +340,15 @@
         WHERE creator_id = #{creatorId}
           AND status != 'deleted'
         ORDER BY create_time DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="listPublicForSearchRebuild" resultMap="KnowPostResultMap">
+        SELECT *
+        FROM know_posts
+        WHERE status = 'published'
+          AND visible = 'public'
+        ORDER BY id
         LIMIT #{limit} OFFSET #{offset}
     </select>
 

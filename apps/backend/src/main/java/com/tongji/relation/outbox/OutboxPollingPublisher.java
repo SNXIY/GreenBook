@@ -41,7 +41,8 @@ public class OutboxPollingPublisher {
             return;
         }
 
-        ArrayNode data = objectMapper.createArrayNode();
+        ArrayNode legacyData = objectMapper.createArrayNode();
+        ArrayNode searchData = objectMapper.createArrayNode();
         List<Long> ids = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             Object id = row.get("id");
@@ -56,25 +57,56 @@ public class OutboxPollingPublisher {
             put(node, "type", row.get("type"));
             put(node, "payload", row.get("payload"));
             put(node, "status", row.get("status"));
-            data.add(node);
+            if (isSearchLifecycle(row)) {
+                searchData.add(node);
+            } else {
+                legacyData.add(node);
+            }
         }
         if (ids.isEmpty()) {
             return;
         }
 
+        try {
+            if (!legacyData.isEmpty()) {
+                sendBatch(OutboxTopics.CANAL_OUTBOX, legacyData);
+            }
+            if (!searchData.isEmpty()) {
+                sendBatch(OutboxTopics.POST_SEARCH_PROJECTION, searchData);
+            }
+            outboxMapper.markPublished(ids);
+            log.info("Outbox polling published {} events", ids.size());
+        } catch (Exception ex) {
+            outboxMapper.recordPublishFailure(ids, truncate(ex.getMessage(), 512));
+            log.warn("Outbox polling publish failed, ids={}, error={}", ids, ex.getMessage());
+        }
+    }
+
+    private void sendBatch(String topic, ArrayNode data) throws Exception {
         ObjectNode message = objectMapper.createObjectNode();
         message.put("table", "outbox");
         message.put("type", "INSERT");
         message.set("data", data);
+        kafka.send(topic, objectMapper.writeValueAsString(message))
+                .get(10, TimeUnit.SECONDS);
+    }
 
-        try {
-            kafka.send(OutboxTopics.CANAL_OUTBOX, objectMapper.writeValueAsString(message))
-                    .get(10, TimeUnit.SECONDS);
-            outboxMapper.markPublished(ids);
-            log.info("Outbox polling published {} events", ids.size());
-        } catch (Exception ex) {
-            log.warn("Outbox polling publish failed, ids={}, error={}", ids, ex.getMessage());
+    private boolean isSearchLifecycle(Map<String, Object> row) {
+        String aggregateType = String.valueOf(row.get("aggregate_type"));
+        String type = String.valueOf(row.get("type"));
+        return "post".equalsIgnoreCase(aggregateType)
+                && (type.equals("PostPublished")
+                || type.equals("PostUpdated")
+                || type.equals("PostDeleted")
+                || type.equals("PostVisibilityChanged")
+                || type.equals("PostContentUpdated"));
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null) {
+            return "unknown publish failure";
         }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     private void put(ObjectNode node, String field, Object value) {

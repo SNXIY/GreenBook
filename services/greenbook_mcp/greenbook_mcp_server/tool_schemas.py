@@ -42,7 +42,7 @@ class SearchPublicPostsArguments(BaseModel):
     query: str = Field(min_length=1, description="Search keywords or topic")
     sort: str = Field(default="latest", description="Sort order")
     page: int = Field(default=1, ge=1)
-    size: int = Field(default=20, ge=1, le=100)
+    size: int = Field(default=20, ge=1, le=50)
 
 
 class GetPostArguments(BaseModel):

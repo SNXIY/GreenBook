@@ -29,6 +29,8 @@ public interface OutboxMapper {
 
     int markPublished(@Param("ids") List<Long> ids);
 
+    int recordPublishFailure(@Param("ids") List<Long> ids, @Param("error") String error);
+
     List<Map<String, Object>> selectNew(@Param("limit") int limit);
 
     int deletePublishedBefore(@Param("retentionDays") int retentionDays,

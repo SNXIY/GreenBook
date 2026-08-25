@@ -1,0 +1,100 @@
+{"query_id":"hs-001","query":"Java 后端稳定性","language":"mixed","kind":"exact_title","qrels":{"350329167449034752":2,"350308965579624448":1,"350297994190524416":1}}
+{"query_id":"hs-002","query":"Java backend reliability","language":"en","kind":"cross_language","qrels":{"350308965579624448":2,"350297994190524416":1,"350249029386506240":1}}
+{"query_id":"hs-003","query":"后端稳定性实践 Java","language":"mixed","kind":"paraphrase","qrels":{"350297994190524416":2,"350249029386506240":1,"350227936244273152":1}}
+{"query_id":"hs-004","query":"Java 从入门到精通","language":"mixed","kind":"multi_term","qrels":{"350249029386506240":2,"350227936244273152":1,"350192904104448000":1}}
+{"query_id":"hs-005","query":"learn Java programming","language":"en","kind":"long_tail","qrels":{"350227936244273152":2,"350192904104448000":1,"350125174705754112":1}}
+{"query_id":"hs-006","query":"Java 稳定性验证","language":"mixed","kind":"exact_title","qrels":{"350192904104448000":2,"350125174705754112":1,"350118465648070656":1}}
+{"query_id":"hs-007","query":"Java 后端架构","language":"mixed","kind":"cross_language","qrels":{"350125174705754112":2,"350118465648070656":1,"350059300833595392":1}}
+{"query_id":"hs-008","query":"Java programming language","language":"en","kind":"paraphrase","qrels":{"350118465648070656":2,"350059300833595392":1,"350058952274350080":1}}
+{"query_id":"hs-009","query":"Java 编程语言入门","language":"mixed","kind":"multi_term","qrels":{"350059300833595392":2,"350058952274350080":1,"350329167449034752":1}}
+{"query_id":"hs-010","query":"Java 发布迁移指南","language":"mixed","kind":"long_tail","qrels":{"350058952274350080":2,"350329167449034752":1,"350308965579624448":1}}
+{"query_id":"hs-011","query":"Redis 缓存实践","language":"mixed","kind":"exact_title","qrels":{"350444831992057856":2,"350326942672752640":1,"350301679532511232":1}}
+{"query_id":"hs-012","query":"Redis cache production","language":"en","kind":"cross_language","qrels":{"350326942672752640":2,"350301679532511232":1,"350276616603176960":1}}
+{"query_id":"hs-013","query":"Redis 缓存避坑","language":"mixed","kind":"paraphrase","qrels":{"350301679532511232":2,"350276616603176960":1,"350169155699347456":1}}
+{"query_id":"hs-014","query":"Redis 持久化 RDB AOF","language":"mixed","kind":"multi_term","qrels":{"350276616603176960":2,"350169155699347456":1,"350137614227083264":1}}
+{"query_id":"hs-015","query":"RDB vs AOF","language":"en","kind":"fresh_popular","qrels":{"350169155699347456":2,"350137614227083264":1,"350057110207336448":1}}
+{"query_id":"hs-016","query":"Redis 高可用","language":"mixed","kind":"exact_title","qrels":{"350137614227083264":2,"350057110207336448":1,"350052215903358976":1}}
+{"query_id":"hs-017","query":"Redis 实战缓存性能","language":"mixed","kind":"cross_language","qrels":{"350057110207336448":2,"350052215903358976":1,"350039280040677376":1}}
+{"query_id":"hs-018","query":"Redis pub sub messaging","language":"en","kind":"paraphrase","qrels":{"350052215903358976":2,"350039280040677376":1,"349853528392601600":1}}
+{"query_id":"hs-019","query":"Redis 发布订阅","language":"mixed","kind":"multi_term","qrels":{"350039280040677376":2,"349853528392601600":1,"350444831992057856":1}}
+{"query_id":"hs-020","query":"redis latest popular","language":"en","kind":"fresh_popular","qrels":{"349853528392601600":2,"350444831992057856":1,"350326942672752640":1}}
+{"query_id":"hs-021","query":"Agent 工程实践","language":"mixed","kind":"exact_title","qrels":{"350329484899127296":2,"350309267875696640":1,"350275996995424256":1}}
+{"query_id":"hs-022","query":"agent engineering production","language":"en","kind":"cross_language","qrels":{"350309267875696640":2,"350275996995424256":1,"350231237295738880":1}}
+{"query_id":"hs-023","query":"智能体从原型到生产","language":"zh","kind":"paraphrase","qrels":{"350275996995424256":2,"350231237295738880":1,"350190663578554368":1}}
+{"query_id":"hs-024","query":"Agent 设计到落地","language":"mixed","kind":"multi_term","qrels":{"350231237295738880":2,"350190663578554368":1,"350059055273873408":1}}
+{"query_id":"hs-025","query":"AI agent workflow","language":"en","kind":"semantic","qrels":{"350190663578554368":2,"350059055273873408":1,"350054191386988544":1}}
+{"query_id":"hs-026","query":"智能体关键步骤","language":"zh","kind":"exact_title","qrels":{"350059055273873408":2,"350054191386988544":1,"350041161068580864":1}}
+{"query_id":"hs-027","query":"Agent 协作","language":"mixed","kind":"cross_language","qrels":{"350054191386988544":2,"350041161068580864":1,"350048814830325760":1}}
+{"query_id":"hs-028","query":"multi-agent collaboration","language":"en","kind":"paraphrase","qrels":{"350041161068580864":2,"350048814830325760":1,"349855990751039488":1}}
+{"query_id":"hs-029","query":"智能体实践指南","language":"zh","kind":"multi_term","qrels":{"350048814830325760":2,"349855990751039488":1,"350329484899127296":1}}
+{"query_id":"hs-030","query":"greenbook agent","language":"en","kind":"semantic","qrels":{"349855990751039488":2,"350329484899127296":1,"350309267875696640":1}}
+{"query_id":"hs-031","query":"Python 学习","language":"mixed","kind":"exact_title","qrels":{"349997625120002048":2,"349979791899889664":1,"350345168794292224":1}}
+{"query_id":"hs-032","query":"learn Python programming","language":"en","kind":"cross_language","qrels":{"349979791899889664":2,"350345168794292224":1,"349997252569337856":1}}
+{"query_id":"hs-033","query":"Python 从零到一","language":"mixed","kind":"paraphrase","qrels":{"350345168794292224":2,"349997252569337856":1,"349979334259380224":1}}
+{"query_id":"hs-034","query":"稳定扩散模型 Python","language":"mixed","kind":"multi_term","qrels":{"349997252569337856":2,"349979334259380224":1,"350013010842095616":1}}
+{"query_id":"hs-035","query":"AI 学习指南","language":"mixed","kind":"semantic","qrels":{"349979334259380224":2,"350013010842095616":1,"350168574914072576":1}}
+{"query_id":"hs-036","query":"AI learning practical guide","language":"en","kind":"exact_title","qrels":{"350013010842095616":2,"350168574914072576":1,"350159359080271872":1}}
+{"query_id":"hs-037","query":"中文社区稳定扩散","language":"zh","kind":"cross_language","qrels":{"350168574914072576":2,"350159359080271872":1,"350136954475646976":1}}
+{"query_id":"hs-038","query":"stable diffusion Python","language":"en","kind":"paraphrase","qrels":{"350159359080271872":2,"350136954475646976":1,"350165577848983552":1}}
+{"query_id":"hs-039","query":"Python 编程思维","language":"mixed","kind":"multi_term","qrels":{"350136954475646976":2,"350165577848983552":1,"349997625120002048":1}}
+{"query_id":"hs-040","query":"AI agent Python","language":"en","kind":"semantic","qrels":{"350165577848983552":2,"349997625120002048":1,"349979791899889664":1}}
+{"query_id":"hs-041","query":"JVM 字节码机器码","language":"mixed","kind":"multi_term","qrels":{"350225194213838848":2,"350217230593691648":1,"350057459060183040":1}}
+{"query_id":"hs-042","query":"JVM bytecode machine code","language":"en","kind":"cross_language","qrels":{"350217230593691648":2,"350057459060183040":1,"350052549258252288":1}}
+{"query_id":"hs-043","query":"虚拟机底层原理","language":"zh","kind":"semantic","qrels":{"350057459060183040":2,"350052549258252288":1,"350039591018958848":1}}
+{"query_id":"hs-044","query":"Spring Boot REST 服务","language":"mixed","kind":"exact_title","qrels":{"350052549258252288":2,"350039591018958848":1,"349815269180444672":1}}
+{"query_id":"hs-045","query":"Spring Boot quick start","language":"en","kind":"paraphrase","qrels":{"350039591018958848":2,"349815269180444672":1,"350057564173635584":1}}
+{"query_id":"hs-046","query":"搭建第一个 Spring Boot 应用","language":"mixed","kind":"multi_term","qrels":{"349815269180444672":2,"350057564173635584":1,"350052643432960000":1}}
+{"query_id":"hs-047","query":"Java 并发编程","language":"mixed","kind":"cross_language","qrels":{"350057564173635584":2,"350052643432960000":1,"350039709411577856":1}}
+{"query_id":"hs-048","query":"Spring Boot 应用","language":"mixed","kind":"semantic","qrels":{"350052643432960000":2,"350039709411577856":1,"349996995919876096":1}}
+{"query_id":"hs-049","query":"JVM 探秘","language":"mixed","kind":"exact_title","qrels":{"350039709411577856":2,"349996995919876096":1,"350225194213838848":1}}
+{"query_id":"hs-050","query":"Spring production","language":"en","kind":"paraphrase","qrels":{"349996995919876096":2,"350225194213838848":1,"350217230593691648":1}}
+{"query_id":"hs-051","query":"Java 集合","language":"mixed","kind":"short_query","qrels":{"350224772220719104":2,"350216805425483776":1,"350057905573203968":1}}
+{"query_id":"hs-052","query":"Java collections List Map","language":"en","kind":"multi_term","qrels":{"350216805425483776":2,"350057905573203968":1,"350056745890091008":1}}
+{"query_id":"hs-053","query":"List 到 Map Java","language":"mixed","kind":"paraphrase","qrels":{"350057905573203968":2,"350056745890091008":1,"350053055330390016":1}}
+{"query_id":"hs-054","query":"HashMap 源码","language":"mixed","kind":"exact_title","qrels":{"350056745890091008":2,"350053055330390016":1,"350040104657620992":1}}
+{"query_id":"hs-055","query":"Java HashMap internals","language":"en","kind":"cross_language","qrels":{"350053055330390016":2,"350040104657620992":1,"349815551603904512":1}}
+{"query_id":"hs-056","query":"集合框架实用指南","language":"zh","kind":"short_query","qrels":{"350040104657620992":2,"349815551603904512":1,"350224772220719104":1}}
+{"query_id":"hs-057","query":"HashMap source code","language":"en","kind":"multi_term","qrels":{"349815551603904512":2,"350224772220719104":1,"350057905573203968":1}}
+{"query_id":"hs-058","query":"List Map tutorial","language":"en","kind":"paraphrase","qrels":{"350224772220719104":2,"350057905573203968":1,"350053055330390016":1}}
+{"query_id":"hs-059","query":"Java 集合框架","language":"mixed","kind":"exact_title","qrels":{"350057905573203968":2,"350053055330390016":1,"350224772220719104":1}}
+{"query_id":"hs-060","query":"集合源码解析","language":"zh","kind":"cross_language","qrels":{"350053055330390016":2,"350224772220719104":1,"350216805425483776":1}}
+{"query_id":"hs-061","query":"任务调度器","language":"zh","kind":"exact_title","qrels":{"350060052645810176":2,"350055116658839552":1,"350042237624782848":1}}
+{"query_id":"hs-062","query":"scheduler ScheduledExecutorService","language":"en","kind":"multi_term","qrels":{"350055116658839552":2,"350042237624782848":1,"350038249634402304":1}}
+{"query_id":"hs-063","query":"Java 定时任务","language":"mixed","kind":"cross_language","qrels":{"350042237624782848":2,"350038249634402304":1,"350034495153508352":1}}
+{"query_id":"hs-064","query":"调度与 Redis","language":"mixed","kind":"semantic","qrels":{"350038249634402304":2,"350034495153508352":1,"350036151307997184":1}}
+{"query_id":"hs-065","query":"任务调度系统实践","language":"zh","kind":"paraphrase","qrels":{"350034495153508352":2,"350036151307997184":1,"350035241458601984":1}}
+{"query_id":"hs-066","query":"scheduler smoke test","language":"en","kind":"exact_title","qrels":{"350036151307997184":2,"350035241458601984":1,"349985466369576960":1}}
+{"query_id":"hs-067","query":"稳定调度代理","language":"zh","kind":"multi_term","qrels":{"350035241458601984":2,"349985466369576960":1,"349985073908551680":1}}
+{"query_id":"hs-068","query":"publication scheduling","language":"en","kind":"cross_language","qrels":{"349985466369576960":2,"349985073908551680":1,"349984605513846784":1}}
+{"query_id":"hs-069","query":"定时发布实践","language":"zh","kind":"semantic","qrels":{"349985073908551680":2,"349984605513846784":1,"350060052645810176":1}}
+{"query_id":"hs-070","query":"更新计划与调度","language":"zh","kind":"paraphrase","qrels":{"349984605513846784":2,"350060052645810176":1,"350055116658839552":1}}
+{"query_id":"hs-071","query":"前端团队实战","language":"zh","kind":"exact_title","qrels":{"350168574914072576":2,"350165577848983552":1,"350159359080271872":1}}
+{"query_id":"hs-072","query":"frontend monitoring core metrics","language":"en","kind":"multi_term","qrels":{"350165577848983552":2,"350159359080271872":1,"350136954475646976":1}}
+{"query_id":"hs-073","query":"前端监控体系","language":"zh","kind":"paraphrase","qrels":{"350159359080271872":2,"350136954475646976":1,"350168574914072576":1}}
+{"query_id":"hs-074","query":"frontend team guide","language":"en","kind":"cross_language","qrels":{"350136954475646976":2,"350168574914072576":1,"350165577848983552":1}}
+{"query_id":"hs-075","query":"前端监控实践","language":"zh","kind":"long_tail","qrels":{"350168574914072576":2,"350165577848983552":1,"350159359080271872":1}}
+{"query_id":"hs-076","query":"web performance monitoring","language":"en","kind":"exact_title","qrels":{"350165577848983552":2,"350159359080271872":1,"350136954475646976":1}}
+{"query_id":"hs-077","query":"前端开发团队","language":"zh","kind":"multi_term","qrels":{"350159359080271872":2,"350136954475646976":1}}
+{"query_id":"hs-078","query":"monitoring dashboard frontend","language":"en","kind":"paraphrase","qrels":{"350136954475646976":2,"350159359080271872":1}}
+{"query_id":"hs-079","query":"前端核心指标","language":"zh","kind":"cross_language","qrels":{"350159359080271872":2,"350136954475646976":1,"350168574914072576":1}}
+{"query_id":"hs-080","query":"frontend practice","language":"en","kind":"long_tail","qrels":{"350136954475646976":2,"350168574914072576":1,"350165577848983552":1}}
+{"query_id":"hs-081","query":"Java 后端 Redis 缓存","language":"mixed","kind":"mixed","qrels":{"350329167449034752":2,"350444831992057856":1}}
+{"query_id":"hs-082","query":"Agent Java reliability","language":"en","kind":"mixed","qrels":{"350309267875696640":2,"350326942672752640":1}}
+{"query_id":"hs-083","query":"搜索 Java and Redis","language":"mixed","kind":"mixed","qrels":{"350297994190524416":2,"350301679532511232":1}}
+{"query_id":"hs-084","query":"Agent 与调度器","language":"zh","kind":"mixed","qrels":{"350231237295738880":2,"350276616603176960":1}}
+{"query_id":"hs-085","query":"Spring Boot Java backend","language":"en","kind":"mixed","qrels":{"350227936244273152":2,"350169155699347456":1}}
+{"query_id":"hs-086","query":"Python AI learning","language":"en","kind":"mixed","qrels":{"350059055273873408":2,"350137614227083264":1}}
+{"query_id":"hs-087","query":"Redis 与 Java 稳定性","language":"zh","kind":"mixed","qrels":{"350125174705754112":2,"350057110207336448":1}}
+{"query_id":"hs-088","query":"Agent workflow and publication","language":"en","kind":"mixed","qrels":{"350041161068580864":2,"350052215903358976":1}}
+{"query_id":"hs-089","query":"JVM 和缓存性能","language":"zh","kind":"mixed","qrels":{"350059300833595392":2,"350039280040677376":1}}
+{"query_id":"hs-090","query":"frontend monitoring metrics","language":"en","kind":"multi_term","qrels":{"349855990751039488":2,"349853528392601600":1}}
+{"query_id":"hs-091","query":"搜索不到的随机主题 quantum banana","language":"en","kind":"no_result","qrels":{}}
+{"query_id":"hs-092","query":"不存在的主题 medieval telescope","language":"en","kind":"no_result","qrels":{}}
+{"query_id":"hs-093","query":"量子烘焙数据库","language":"zh","kind":"no_result","qrels":{}}
+{"query_id":"hs-094","query":"unrelated oceanic botany","language":"en","kind":"no_result","qrels":{}}
+{"query_id":"hs-095","query":"完全虚构的火星菜谱","language":"zh","kind":"no_result","qrels":{}}
+{"query_id":"hs-096","query":"","language":"zh","kind":"empty_query","qrels":{"350444831992057856":2,"350326942672752640":1}}
+{"query_id":"hs-097","query":"Java","language":"zh","kind":"short_query","qrels":{"350329167449034752":2,"350308965579624448":1}}
+{"query_id":"hs-098","query":"Redis","language":"en","kind":"short_query","qrels":{"350444831992057856":2,"350326942672752640":1}}
+{"query_id":"hs-099","query":"Agent","language":"en","kind":"short_query","qrels":{"350329167449034752":2,"350308965579624448":1}}
+{"query_id":"hs-100","query":"Spring","language":"en","kind":"short_query","qrels":{"350444831992057856":2,"350326942672752640":1}}

@@ -68,12 +68,42 @@ canal:
   intervalMs: ${CANAL_INTERVAL_MS:1000}
 
 outbox:
+  polling:
+    enabled: ${OUTBOX_POLLING_ENABLED:true}
+    batch-size: ${OUTBOX_POLLING_BATCH_SIZE:100}
+    fixed-delay-ms: ${OUTBOX_POLLING_FIXED_DELAY_MS:3000}
+    initial-delay-ms: ${OUTBOX_POLLING_INITIAL_DELAY_MS:5000}
   cleanup:
     enabled: true
     retention-days: 7
     batch-size: 1000
     initial-delay-ms: 60000
     fixed-delay-ms: 3600000
+
+search:
+  hybrid:
+    enabled: ${SEARCH_HYBRID_ENABLED:true}
+    candidate-limit: ${SEARCH_HYBRID_CANDIDATE_LIMIT:100}
+  lifecycle:
+    tenant-id: ${SEARCH_TENANT_ID:zhiguang}
+  elasticsearch:
+    enabled: ${SEARCH_ELASTICSEARCH_ENABLED:true}
+    base-url: ${SEARCH_ELASTICSEARCH_URL:http://127.0.0.1:29200}
+    index: ${SEARCH_ELASTICSEARCH_INDEX:greenbook_posts_v1}
+  qdrant:
+    enabled: ${SEARCH_QDRANT_ENABLED:true}
+    base-url: ${SEARCH_QDRANT_URL:http://127.0.0.1:26333}
+    collection: ${SEARCH_QDRANT_COLLECTION:posts_dense}
+  embedding:
+    provider: ${SEARCH_EMBEDDING_PROVIDER:hashing}
+    model: ${SEARCH_EMBEDDING_MODEL:greenbook-post-hashing-256-v1}
+    vector-version: ${SEARCH_EMBEDDING_VECTOR_VERSION:posts-dense-v1}
+    dimension: ${SEARCH_EMBEDDING_DIMENSION:256}
+  provider:
+    connect-timeout-ms: ${SEARCH_PROVIDER_CONNECT_TIMEOUT_MS:800}
+    request-timeout-ms: ${SEARCH_PROVIDER_REQUEST_TIMEOUT_MS:2500}
+  mysql:
+    max-hot-candidates: ${SEARCH_MYSQL_MAX_HOT_CANDIDATES:10000}
 
 counter:
   rebuild:

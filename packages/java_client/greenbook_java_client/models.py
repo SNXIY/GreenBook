@@ -87,6 +87,8 @@ class SearchPageResponse(BaseModel):
     total_pages: int = Field(default=0, alias="totalPages")
     has_more: bool = Field(default=False, alias="hasMore")
     sort: str | None = None
+    provider: str | None = None
+    degraded: bool = False
 
 
 # ── Post ─────────────────────────────────────────────────────────────

@@ -44,6 +44,7 @@ public class CanalKafkaBridge implements SmartLifecycle {
     private final String filter;
     private final int batchSize;
     private final long intervalMs;
+    private final boolean pollingEnabled;
 
     private volatile boolean running;
     private CanalConnector connector;
@@ -60,7 +61,8 @@ public class CanalKafkaBridge implements SmartLifecycle {
                             @Value("${canal.password}") String password,
                             @Value("${canal.filter}") String filter,
                             @Value("${canal.batchSize}") int batchSize,
-                            @Value("${canal.intervalMs}") long intervalMs) {
+                            @Value("${canal.intervalMs}") long intervalMs,
+                            @Value("${outbox.polling.enabled:true}") boolean pollingEnabled) {
         this.kafka = kafka;
         this.objectMapper = objectMapper;
         this.outboxMapper = outboxMapper;
@@ -74,6 +76,7 @@ public class CanalKafkaBridge implements SmartLifecycle {
         this.filter = filter;
         this.batchSize = batchSize;
         this.intervalMs = intervalMs;
+        this.pollingEnabled = pollingEnabled;
     }
 
     @Override
@@ -81,7 +84,10 @@ public class CanalKafkaBridge implements SmartLifecycle {
         if (running) {
             return;
         }
-        if (!enabled) {
+        if (!enabled || pollingEnabled) {
+            if (enabled && pollingEnabled) {
+                log.warn("Canal bridge disabled because OutboxPollingPublisher is the canonical publisher");
+            }
             log.info("Canal bridge disabled");
             return;
         }
