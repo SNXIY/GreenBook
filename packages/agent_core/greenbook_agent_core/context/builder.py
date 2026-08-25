@@ -200,6 +200,7 @@ class ContextBuilder:
             )),
             tracked("context_verified_outcomes_ready", self._load_recent_observations(
                 {item.get("task_id") for item in task_values},
+                conversation_id=conversation_id,
                 limit=self._budget.max_verified_outcomes,
             )),
             tracked("context_preferences_ready", self._load_preferences(user_id)),
@@ -413,6 +414,7 @@ class ContextBuilder:
         self,
         task_ids: set[Any],
         *,
+        conversation_id: str = "",
         limit: int,
     ) -> list[dict[str, Any]]:
         """Read only recent receipts for this bounded Task set.
@@ -435,7 +437,21 @@ class ContextBuilder:
         except TypeError:
             value = finder(normalized, limit)
         values = await value if inspect.isawaitable(value) else value
-        return [_compact_observation(item) for item in (values or ())]
+        scoped: list[Any] = []
+        for item in (values or ()):
+            item_conversation_id = str(
+                getattr(item, "conversation_id", "")
+                or (item.get("conversation_id", "") if isinstance(item, Mapping) else "")
+                or ""
+            )
+            # New durable receipts carry conversation_id and must agree with
+            # the current Task scope.  Legacy ActionObservation projections
+            # without that column remain task-scoped until the schema can be
+            # hardened without dropping historical evidence.
+            if conversation_id and item_conversation_id and item_conversation_id != str(conversation_id):
+                continue
+            scoped.append(item)
+        return [_compact_observation(item) for item in scoped]
 
     async def _load_preferences(self, user_id: str) -> list[dict[str, Any]]:
         provider = self._preference_provider

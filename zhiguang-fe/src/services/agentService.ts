@@ -76,12 +76,19 @@ export const agentService = {
   }),
 
   listConversations: (token: string, contextPostId?: string, signal?: AbortSignal) => {
-    const query = contextPostId ? `?context_post_id=${encodeURIComponent(contextPostId)}` : "";
+    const params = new URLSearchParams({ page: "1", size: "100" });
+    if (contextPostId) params.set("context_post_id", contextPostId);
     return request<AgentConversation[] | { items: AgentConversation[] }>(
-      `/api/v1/agent/conversations${query}`,
+      `/api/v1/agent/conversations?${params.toString()}`,
       { token, signal }
     ).then(result => Array.isArray(result) ? result : result.items);
   },
+
+  getConversation: (token: string, conversationId: string, signal?: AbortSignal) =>
+    request<AgentConversation>(
+      `/api/v1/agent/conversations/${encodeURIComponent(conversationId)}`,
+      { token, signal }
+    ),
 
   listMessages: (token: string, conversationId: string, signal?: AbortSignal) =>
     request<AgentMessage[]>(
@@ -95,7 +102,8 @@ export const agentService = {
     content: string,
     contextPostId?: string,
     contextCommentId?: string,
-    command?: Record<string, unknown>
+    command?: Record<string, unknown>,
+    signal?: AbortSignal
   ) => request<AgentRunAccepted>(
     `/api/v1/agent/conversations/${conversationId}/messages`,
     {
@@ -108,7 +116,8 @@ export const agentService = {
         context_comment_id: contextCommentId,
         client_timezone: getDisplayTimezone(),
         command
-      }
+      },
+      signal
     }
   ),
 

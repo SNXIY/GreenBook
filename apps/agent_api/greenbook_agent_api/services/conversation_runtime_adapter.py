@@ -1636,7 +1636,7 @@ class ConversationRuntimeAdapter:
         """
 
         if await _conversation_has_exhausted_reconciliation(
-            self._external_operation_store,
+            getattr(self, "_external_operation_store", None),
             conversation_id,
         ):
             raise TaskDeltaGroundingError(
@@ -1979,7 +1979,7 @@ class ConversationRuntimeAdapter:
             tenant_id=tenant_id,
         )
         exhausted = await _conversation_has_exhausted_reconciliation(
-            self._external_operation_store,
+            getattr(self, "_external_operation_store", None),
             conversation_id,
         )
         resolver = getattr(self, "_target_resolver", None) or TargetResolver()
@@ -3375,7 +3375,7 @@ class ConversationRuntimeAdapter:
         conversation_id: str,
     ) -> list[Task]:
         exhausted = await _conversation_has_exhausted_reconciliation(
-            self._external_operation_store,
+            getattr(self, "_external_operation_store", None),
             conversation_id,
         )
         return [

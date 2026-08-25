@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import AgentMarkdown from "@/components/content/AgentMarkdown";
@@ -75,6 +75,16 @@ import {
 import UserActivityCluster from "./UserActivityCluster";
 import SemanticConfirmationCard from "./SemanticConfirmationCard";
 import styles from "./AgentPanel.module.css";
+import {
+  clearSelectedConversationId,
+  conversationStorageKey,
+  hasCustomConversationTitle,
+  isConversationSelectionCurrent,
+  readSelectedConversationId,
+  titleFromFirstMessage,
+  tokenTenantId,
+  writeSelectedConversationId
+} from "./conversationLifecycle";
 
 type Props = {
   open: boolean;
@@ -137,6 +147,13 @@ type FollowUpHint = {
 const agentMessageCount = (items: AgentMessage[]) =>
   items.filter(item => item.role === "assistant").length;
 
+const recentConversationDate = (value?: string | null): string => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
 const isExecutionResultPart = (
   part: AgentMessagePart
 ): part is AgentExecutionResultPart => part.type === "execution_result";
@@ -185,9 +202,13 @@ const refreshMessagesAfterExecution = async (
 };
 
 const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) => {
-  const { tokens, isLoading: authLoading } = useAuth();
+  const { tokens, user, isLoading: authLoading } = useAuth();
   const token = tokens?.accessToken;
   const [conversation, setConversation] = useState<AgentConversation | null>(null);
+  const [recentConversations, setRecentConversations] = useState<AgentConversation[]>([]);
+  const [conversationListLoading, setConversationListLoading] = useState(false);
+  const [creatingConversation, setCreatingConversation] = useState(false);
+  const [selectionVersion, setSelectionVersion] = useState(0);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [content, setContent] = useState("");
   const [run, setRun] = useState<AgentRun | null>(null);
@@ -228,9 +249,103 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
   const panelRef = useRef<HTMLElement>(null);
   const runControllerRef = useRef<AbortController | null>(null);
   const runControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const hydrationControllerRef = useRef<AbortController | null>(null);
+  const conversationGenerationRef = useRef(0);
+  const activeConversationIdRef = useRef<string | null>(null);
+  const selectionRequestRef = useRef<string | null>(null);
   const activityCursorRef = useRef(0);
   const semanticActionKeysRef = useRef<Set<string>>(new Set());
   const semanticModifySupersededKeysRef = useRef<Set<string>>(new Set());
+
+  const conversationStorageKeyValue = useMemo(() => conversationStorageKey({
+    userId: String(user?.id ?? "anonymous"),
+    tenantId: tokenTenantId(token),
+    surface,
+    contextPostId
+  }), [contextPostId, surface, token, user?.id]);
+
+  const isCurrentConversation = useCallback((conversationId: string, generation?: number): boolean =>
+    isConversationSelectionCurrent(
+      activeConversationIdRef.current,
+      conversationGenerationRef.current,
+      conversationId,
+      generation ?? conversationGenerationRef.current
+    ), []);
+
+  const clearConversationTransientState = useCallback(() => {
+    hydrationControllerRef.current?.abort();
+    runControllerRef.current?.abort();
+    runControllerRef.current = null;
+    runControllersRef.current.forEach(controller => controller.abort());
+    runControllersRef.current.clear();
+    setMessages([]);
+    setRun(null);
+    setConcurrentRuns({});
+    setConcurrentActivities({});
+    setUserActivities([]);
+    setSemanticConfirmationStates({});
+    setSemanticConfirmationErrors({});
+    setResolvedApprovalActivityIds({});
+    setFollowUpHints({});
+    setUnderstanding(null);
+    setExecution(null);
+    setExecutions([]);
+    setProjectionPending(false);
+    setRunsHydrated(false);
+    setError(null);
+    setContent("");
+    setLoading(false);
+    setComposerState("READY");
+    activityCursorRef.current = 0;
+    semanticActionKeysRef.current.clear();
+    semanticModifySupersededKeysRef.current.clear();
+  }, []);
+
+  const activateConversation = useCallback((next: AgentConversation): number => {
+    const generation = conversationGenerationRef.current + 1;
+    conversationGenerationRef.current = generation;
+    activeConversationIdRef.current = next.conversation_id;
+    clearConversationTransientState();
+    setConversation(next);
+    setRecentConversations(previous => {
+      const withoutCurrent = previous.filter(item => item.conversation_id !== next.conversation_id);
+      return [next, ...withoutCurrent].sort((left, right) =>
+        String(right.updated_at || "").localeCompare(String(left.updated_at || ""))
+      );
+    });
+    writeSelectedConversationId(conversationStorageKeyValue, next.conversation_id);
+    return generation;
+  }, [clearConversationTransientState, conversationStorageKeyValue]);
+
+  const requestConversationSelection = useCallback((conversationId: string) => {
+    selectionRequestRef.current = conversationId;
+    conversationGenerationRef.current += 1;
+    activeConversationIdRef.current = null;
+    clearConversationTransientState();
+    setConversation(null);
+    setSelectionVersion(previous => previous + 1);
+    writeSelectedConversationId(conversationStorageKeyValue, conversationId);
+  }, [clearConversationTransientState, conversationStorageKeyValue]);
+
+  const createNewConversation = useCallback(async () => {
+    if (!token || creatingConversation) return;
+    const controller = new AbortController();
+    setCreatingConversation(true);
+    setError(null);
+    try {
+      const created = await agentService.createConversation(token, {
+        surface,
+        context_post_id: contextPostId
+      }, controller.signal);
+      if (!controller.signal.aborted) requestConversationSelection(created.conversation_id);
+    } catch (caught) {
+      if ((caught as DOMException)?.name !== "AbortError") {
+        setError(friendlyClientError(caught));
+      }
+    } finally {
+      if (!controller.signal.aborted) setCreatingConversation(false);
+    }
+  }, [contextPostId, creatingConversation, requestConversationSelection, surface, token]);
 
   const mergeUserActivities = useCallback((incoming: UserActivityEvent[]) => {
     if (!incoming.length) return;
@@ -244,6 +359,12 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
   useEffect(() => {
     if (!open || !token || authLoading) return;
     const controller = new AbortController();
+    const effectGeneration = conversationGenerationRef.current + 1;
+    conversationGenerationRef.current = effectGeneration;
+    activeConversationIdRef.current = null;
+    clearConversationTransientState();
+    setConversation(null);
+    setConversationListLoading(true);
     const prepare = async () => {
       setLoading(true);
       setError(null);
@@ -255,21 +376,57 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
           contextPostId,
           controller.signal
         );
-        const current = existing[0] ?? await agentService.createConversation(token, {
+        if (controller.signal.aborted || conversationGenerationRef.current !== effectGeneration) return;
+        const requestedId = selectionRequestRef.current;
+        const storedId = requestedId || readSelectedConversationId(conversationStorageKeyValue);
+        let available = existing;
+        let selected = storedId
+          ? existing.find(item => item.conversation_id === storedId)
+          : undefined;
+        if (!selected && storedId) {
+          try {
+            const verified = await agentService.getConversation(
+              token,
+              storedId,
+              controller.signal
+            );
+            if (controller.signal.aborted || conversationGenerationRef.current !== effectGeneration) return;
+            selected = verified;
+            available = [
+              verified,
+              ...existing.filter(item => item.conversation_id !== verified.conversation_id)
+            ];
+          } catch {
+            // A missing or foreign selected ID falls back to the newest owned item.
+            if (controller.signal.aborted || conversationGenerationRef.current !== effectGeneration) return;
+          }
+        }
+        if (storedId && !selected) clearSelectedConversationId(conversationStorageKeyValue);
+        selectionRequestRef.current = null;
+        setRecentConversations(available);
+        const current = selected ?? available[0] ?? await agentService.createConversation(token, {
           surface,
           context_post_id: contextPostId
         }, controller.signal);
         if (controller.signal.aborted) return;
-        setConversation(current);
+        const generation = activateConversation(current);
+        hydrationControllerRef.current = controller;
         const [nextMessages, nextMemoryProfile] = await Promise.all([
           agentService.listMessages(token, current.conversation_id, controller.signal),
           agentService.getMemoryProfile(token, controller.signal)
         ]);
+        if (!controller.signal.aborted && isCurrentConversation(current.conversation_id, generation)) {
+          setConversationListLoading(false);
+        } else {
+          return;
+        }
         setMessages(nextMessages);
         setMemoryProfile(nextMemoryProfile);
         try {
           const records = await agentService.listMemoryRecords(token, controller.signal);
-          if (!controller.signal.aborted) setMemoryRecords(records ?? []);
+          if (!controller.signal.aborted && isCurrentConversation(current.conversation_id, generation)) {
+            setMemoryRecords(records ?? []);
+          }
         } catch {
           // Memory records are optional UI enrichment; failure must not block chat.
         }
@@ -283,6 +440,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
           .sort((left, right) =>
             (right.created_at || "").localeCompare(left.created_at || "")
           );
+        if (controller.signal.aborted || !isCurrentConversation(current.conversation_id, generation)) return;
         const restoredViews = Object.fromEntries(activeRuns.map(item => [
           item.run_id,
           {
@@ -292,7 +450,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             follow_up_of: item.follow_up_of
           }
         ]));
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && isCurrentConversation(current.conversation_id, generation)) {
           setConcurrentRuns(restoredViews);
           setRunsHydrated(true);
         }
@@ -310,15 +468,20 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             };
           }
         }
-        if (!controller.signal.aborted && Object.keys(restoredHints).length) {
+        if (
+          !controller.signal.aborted
+          && isCurrentConversation(current.conversation_id, generation)
+          && Object.keys(restoredHints).length
+        ) {
           setFollowUpHints(previous => ({ ...previous, ...restoredHints }));
         }
         const activeRun = activeRuns[0];
-        if (activeRun && !controller.signal.aborted) {
+        if (activeRun && !controller.signal.aborted && isCurrentConversation(current.conversation_id, generation)) {
           const activeStatus = activeRun.status as string;
           if (activeStatus === "WAITING_APPROVAL" || activeStatus === "WAITING_HUMAN") {
             if (activeRun.execution_id) {
               const snapshot = await executionService.get(token, activeRun.execution_id, controller.signal);
+              if (!isCurrentConversation(current.conversation_id, generation)) return;
               setExecution(snapshot);
               setExecutions([snapshot]);
             }
@@ -329,6 +492,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             }
           } else if (activeStatus === "PAUSED" && activeRun.execution_id) {
             const snapshot = await executionService.get(token, activeRun.execution_id, controller.signal);
+            if (!isCurrentConversation(current.conversation_id, generation)) return;
             setExecution(snapshot);
             setExecutions([snapshot]);
           } else if (activeRun.execution_id) {
@@ -336,13 +500,14 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
               token,
               activeRun.execution_id,
               snapshot => {
+                if (!isCurrentConversation(current.conversation_id, generation)) return;
                 setExecution(snapshot);
                 if (isTerminalExecution(snapshot.status)) setProjectionPending(true);
               },
               undefined,
               controller.signal
             ).then(async completed => {
-              if (controller.signal.aborted) return;
+              if (controller.signal.aborted || !isCurrentConversation(current.conversation_id, generation)) return;
               setExecutions([completed]);
               if (["COMPLETED", "FAILED", "CANCELLED"].includes(completed.status)) {
                 setProjectionPending(true);
@@ -353,6 +518,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                   [completed.execution_id],
                   controller.signal
                 );
+                if (!isCurrentConversation(current.conversation_id, generation)) return;
                 setMessages(refreshed.messages);
                 setRun(null);
                 if (refreshed.projected) {
@@ -364,13 +530,19 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
                 }
               }
             }).catch(caught => {
-              if (!controller.signal.aborted && (caught as DOMException)?.name !== "AbortError") {
+              if (
+                !controller.signal.aborted
+                && isCurrentConversation(current.conversation_id, generation)
+                && (caught as DOMException)?.name !== "AbortError"
+              ) {
                 setError(friendlyClientError(caught));
               }
             });
           } else {
             try {
-              setRun(await agentService.getRun(token, activeRun.run_id, controller.signal));
+              const restoredRun = await agentService.getRun(token, activeRun.run_id, controller.signal);
+              if (!isCurrentConversation(current.conversation_id, generation)) return;
+              setRun(restoredRun);
             } catch {
               setError("任务状态暂时无法恢复，请稍后刷新对话。");
               return;
@@ -378,22 +550,30 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             void waitForAgentRun(
               token,
               activeRun.run_id,
-              setRun,
+              next => {
+                if (isCurrentConversation(current.conversation_id, generation)) setRun(next);
+              },
               controller.signal
             ).then(async completed => {
-              if (controller.signal.aborted) return;
+              if (controller.signal.aborted || !isCurrentConversation(current.conversation_id, generation)) return;
               if (completed.status === "COMPLETED" || completed.status === "CANCELLED") {
-                setMessages(await agentService.listMessages(
+                const restoredMessages = await agentService.listMessages(
                   token,
                   current.conversation_id,
                   controller.signal
-                ));
+                );
+                if (!isCurrentConversation(current.conversation_id, generation)) return;
+                setMessages(restoredMessages);
                 setRun(null);
-              } else {
+              } else if (isCurrentConversation(current.conversation_id, generation)) {
                 setRun(completed);
               }
             }).catch(caught => {
-              if (!controller.signal.aborted && (caught as DOMException)?.name !== "AbortError") {
+              if (
+                !controller.signal.aborted
+                && isCurrentConversation(current.conversation_id, generation)
+                && (caught as DOMException)?.name !== "AbortError"
+              ) {
                 setError(friendlyClientError(caught));
               }
             });
@@ -408,8 +588,24 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
       }
     };
     void prepare();
-    return () => controller.abort();
-  }, [authLoading, contextPostId, open, surface, token]);
+    return () => {
+      controller.abort();
+      if (hydrationControllerRef.current === controller) hydrationControllerRef.current = null;
+      conversationGenerationRef.current += 1;
+      activeConversationIdRef.current = null;
+    };
+  }, [
+    activateConversation,
+    authLoading,
+    clearConversationTransientState,
+    contextPostId,
+    conversationStorageKeyValue,
+    isCurrentConversation,
+    open,
+    selectionVersion,
+    surface,
+    token
+  ]);
 
   // User progress comes from the durable Activity projection, not Run/Event/
   // Step heuristics.  SSE is the low-latency path; cursor polling is a
@@ -417,6 +613,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
   useEffect(() => {
     if (!open || !token || !conversation) return;
     const controller = new AbortController();
+    const activityConversationId = conversation.conversation_id;
     activityCursorRef.current = 0;
     setUserActivities([]);
     setSemanticConfirmationStates({});
@@ -429,11 +626,13 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
       try {
         const response = await userActivityService.list(
           token,
-          conversation.conversation_id,
+          activityConversationId,
           activityCursorRef.current,
           controller.signal
         );
-        mergeUserActivities(response.items);
+        if (!controller.signal.aborted && isCurrentConversation(activityConversationId)) {
+          mergeUserActivities(response.items);
+        }
       } catch {
         // The SSE reconnect loop and next poll will recover.  A transport
         // failure must not be rendered as a failed business operation.
@@ -443,8 +642,10 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     void sync();
     void subscribeUserActivities(
       token,
-      conversation.conversation_id,
-      event => mergeUserActivities([event]),
+      activityConversationId,
+      event => {
+        if (isCurrentConversation(activityConversationId)) mergeUserActivities([event]);
+      },
       { signal: controller.signal }
     ).catch(() => {
       // Abort and polling fallback are both expected terminal paths here.
@@ -454,7 +655,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
       controller.abort();
       window.clearInterval(pollingFallback);
     };
-  }, [conversation, mergeUserActivities, open, token]);
+  }, [conversation, isCurrentConversation, mergeUserActivities, open, token]);
 
   useEffect(() => {
     if (!open) return;
@@ -638,11 +839,13 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         // so the live panel can render the actual user action, not only the
         // activity placeholder.
         try {
-          setMessages(await agentService.listMessages(
+          const completedMessages = await agentService.listMessages(
             token,
             conversation.conversation_id,
             controller.signal
-          ));
+          );
+          if (!isCurrentConversation(conversation.conversation_id)) return;
+          setMessages(completedMessages);
         } catch {
           // Keep the durable run/activity projection if message sync is
           // temporarily unavailable; the next panel sync can recover it.
@@ -740,6 +943,23 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     const prompt = (suggestion ?? content).trim();
     if (!token || !conversation) return;
     if (!canSubmitNaturalLanguage(prompt, composerState, true)) return;
+    const conversationId = conversation.conversation_id;
+    const conversationGeneration = conversationGenerationRef.current;
+    const isLiveConversation = () => isCurrentConversation(conversationId, conversationGeneration);
+    const firstMessageTitle = titleFromFirstMessage(prompt);
+    if (firstMessageTitle && !hasCustomConversationTitle(conversation)) {
+      const updatedAt = new Date().toISOString();
+      setConversation(previous => (
+        previous?.conversation_id === conversationId && !hasCustomConversationTitle(previous)
+          ? { ...previous, title: firstMessageTitle, updated_at: updatedAt }
+          : previous
+      ));
+      setRecentConversations(previous => previous.map(item => (
+        item.conversation_id === conversationId && !hasCustomConversationTitle(item)
+          ? { ...item, title: firstMessageTitle, updated_at: updatedAt }
+          : item
+      )));
+    }
     const approvalPendingBeforeSend = isApprovalPending(execution, run);
     const optimistic: AgentMessage = {
       message_id: crypto.randomUUID(),
@@ -770,15 +990,18 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     setComposerState("SUBMITTING");
     setLoading(true);
     const controller = new AbortController();
+    runControllerRef.current = controller;
     try {
       const accepted = await agentService.send(
         token,
-        conversation.conversation_id,
+        conversationId,
         prompt,
         contextPostId,
         undefined,
-        commandOverride
+        commandOverride,
+        controller.signal
       );
+      if (!isLiveConversation()) return;
       // Show the first decided semantic action as an immediate business
       // activity while the execution snapshot is still on its way.
       const executionIds = accepted.execution_ids?.length
@@ -817,16 +1040,20 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
           const completed = await waitForAgentRun(
             token,
             accepted.run_id,
-            next => setConcurrentRuns(previous => ({
+            next => {
+              if (!isLiveConversation()) return;
+              setConcurrentRuns(previous => ({
               ...previous,
               [accepted.run_id]: {
                 ...(previous[accepted.run_id] || { title: "正在处理一项事情" }),
                 status: next.status,
                 error: next.error
               }
-            })),
+              }));
+            },
             controller.signal
           );
+          if (!isLiveConversation()) return;
           if (completed.status === "FAILED") {
             // The run-keyed concurrent item is the terminal projection for a
             // 202-accepted Run. Rendering the generic alert as well creates a
@@ -848,15 +1075,17 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
           }
           if (["WAITING_APPROVAL", "WAITING_HUMAN", "WAITING_USER", "PAUSED"].includes(completed.status)) {
             try {
-              setMessages(await agentService.listMessages(
+              const waitingMessages = await agentService.listMessages(
                 token,
-                conversation.conversation_id,
+                conversationId,
                 controller.signal
-              ));
+              );
+              if (!isLiveConversation()) return;
+              setMessages(waitingMessages);
             } catch {
               // Keep the waiting run visible; message polling can recover.
             }
-            setRun(completed);
+            if (isLiveConversation()) setRun(completed);
             runControllersRef.current.delete(accepted.run_id);
             return;
           }
@@ -875,11 +1104,11 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             delete next[accepted.run_id];
             return next;
           });
-          if (run?.run_id === accepted.run_id) setRun(null);
+          if (isLiveConversation() && run?.run_id === accepted.run_id) setRun(null);
           // The parent finished: start any mid-turn follow-ups queued behind it.
           maybeAttachFollowUps([accepted.run_id]);
         } catch (caught) {
-          if ((caught as DOMException)?.name !== "AbortError") {
+          if (isLiveConversation() && (caught as DOMException)?.name !== "AbortError") {
             setError(friendlyClientError(caught));
           }
         }
@@ -892,6 +1121,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             token,
             executionId,
             snapshot => {
+              if (!isLiveConversation()) return;
               setExecutions(previous => upsertExecution(previous, snapshot));
               if (executionIds.length === 1) {
                 setExecution(snapshot);
@@ -902,6 +1132,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
             controller.signal
           )
         ));
+        if (!isLiveConversation()) return;
         const waitingForAction = completedExecutions.some(item =>
           ["WAITING_APPROVAL", "WAITING_HUMAN", "PAUSED"].includes(item.status)
         );
@@ -911,7 +1142,9 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         if (waitingForAction) {
           setProjectionPending(false);
           try {
-            setRun(await agentService.getRun(token, accepted.run_id, controller.signal));
+            const waitingRun = await agentService.getRun(token, accepted.run_id, controller.signal);
+            if (!isLiveConversation()) return;
+            setRun(waitingRun);
           } catch {
             // Keep the activity card when the compatibility projection is unavailable.
           }
@@ -920,11 +1153,12 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         setProjectionPending(true);
         const refreshed = await refreshMessagesAfterExecution(
           token,
-          conversation.conversation_id,
+          conversationId,
           previousAgentCount,
           executionIds,
           controller.signal
         );
+        if (!isLiveConversation()) return;
         setMessages(refreshed.messages);
         setRun(null);
         if (refreshed.projected) {
@@ -937,45 +1171,57 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         return;
       }
       if (accepted.error_code === "AMBIGUOUS_TARGET") {
-        setMessages(await agentService.listMessages(
+        const clarificationMessages = await agentService.listMessages(
           token,
-          conversation.conversation_id,
+          conversationId,
           controller.signal
-        ));
+        );
+        if (!isLiveConversation()) return;
+        setMessages(clarificationMessages);
         setRun(null);
         return;
       }
       const completed = await waitForAgentRun(
         token,
         accepted.run_id,
-        setRun,
+        next => {
+          if (isLiveConversation()) setRun(next);
+        },
         controller.signal
       );
+      if (!isLiveConversation()) return;
       if (completed.status === "FAILED") {
         throw new Error(completed.error || "任务执行失败");
       }
       if (["WAITING_APPROVAL", "WAITING_HUMAN", "WAITING_USER", "PAUSED"].includes(completed.status)) {
         try {
-          setMessages(await agentService.listMessages(
+          const completedMessages = await agentService.listMessages(
             token,
-            conversation.conversation_id,
+            conversationId,
             controller.signal
-          ));
+          );
+          if (!isLiveConversation()) return;
+          setMessages(completedMessages);
         } catch {
           // Keep the waiting run visible; message polling can recover.
         }
-        setRun(completed);
+        if (isLiveConversation()) setRun(completed);
         return;
       }
-      setMessages(await agentService.listMessages(token, conversation.conversation_id));
+      const completedMessages = await agentService.listMessages(token, conversationId, controller.signal);
+      if (!isLiveConversation()) return;
+      setMessages(completedMessages);
       setRun(null);
     } catch (caught) {
-      if ((caught as DOMException)?.name !== "AbortError") {
+      if (isLiveConversation() && (caught as DOMException)?.name !== "AbortError") {
         setError(friendlyClientError(caught));
       }
     } finally {
-      setLoading(false);
-      setComposerState("READY");
+      if (runControllerRef.current === controller) runControllerRef.current = null;
+      if (isLiveConversation()) {
+        setLoading(false);
+        setComposerState("READY");
+      }
     }
   };
 
@@ -1483,6 +1729,45 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         ) : (
           <>
             <div className={styles.thread} ref={scrollRef} aria-live="polite">
+              <nav className={styles.conversationSwitcher} aria-label="Conversation list">
+                <div className={styles.conversationSwitcherHeader}>
+                  <strong>最近会话</strong>
+                  <button
+                    className={styles.newConversationButton}
+                    data-testid="new-conversation"
+                    type="button"
+                    onClick={() => void createNewConversation()}
+                    disabled={creatingConversation}
+                  >
+                    + 新建会话
+                  </button>
+                </div>
+                <div className={styles.conversationList}>
+                  {recentConversations.slice(0, 8).map(item => {
+                    const selected = item.conversation_id === conversation?.conversation_id;
+                    return (
+                      <button
+                        className={`${styles.conversationItem} ${selected ? styles.conversationItemActive : ""}`}
+                        data-conversation-id={item.conversation_id}
+                        key={item.conversation_id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => {
+                          if (!selected) requestConversationSelection(item.conversation_id);
+                        }}
+                      >
+                        <span className={styles.conversationItemTitle}>
+                          {item.title?.trim() || "新会话"}
+                        </span>
+                        <time dateTime={item.updated_at}>{recentConversationDate(item.updated_at)}</time>
+                      </button>
+                    );
+                  })}
+                  {!recentConversations.length ? (
+                    <span className={styles.conversationEmpty}>暂无会话</span>
+                  ) : null}
+                </div>
+              </nav>
               <details className={styles.memorySettings}>
                 <summary>Agent记忆 <small>当前为只读</small></summary>
                 <p className={styles.memoryNote}>记忆写入功能暂未开放，偏好会在对话中被自动记录。</p>
