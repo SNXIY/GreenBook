@@ -1,0 +1,1178 @@
+{
+  "dataset_version": "rag_evidence_v2",
+  "generated_at": "2026-08-25",
+  "source_table": "post_chunks",
+  "collection": "post_chunks_multilingual_v1",
+  "dimension": 384,
+  "annotation_scope": "explicit gold evidence chunks only",
+  "chunks": {
+    "349537913240948736": {
+      "chunk_indices": [
+        3,
+        8,
+        12
+      ]
+    },
+    "349570392173711360": {
+      "chunk_indices": [
+        37
+      ]
+    },
+    "349572349512781824": {
+      "chunk_indices": [
+        9
+      ]
+    },
+    "349605598142271488": {
+      "chunk_indices": [
+        11
+      ]
+    },
+    "349768387200684032": {
+      "chunk_indices": [
+        4,
+        6
+      ]
+    },
+    "349815075202273280": {
+      "chunk_indices": [
+        11,
+        12,
+        15,
+        18
+      ]
+    },
+    "349853528392601600": {
+      "chunk_indices": [
+        3,
+        24,
+        29
+      ]
+    },
+    "349979791899889664": {
+      "chunk_indices": [
+        2,
+        4,
+        6,
+        8,
+        26
+      ]
+    },
+    "349997252569337856": {
+      "chunk_indices": [
+        6,
+        9,
+        13
+      ]
+    },
+    "349997625120002048": {
+      "chunk_indices": [
+        0,
+        3,
+        7,
+        10,
+        13
+      ]
+    },
+    "350052643432960000": {
+      "chunk_indices": [
+        6,
+        16,
+        18,
+        35,
+        40
+      ]
+    },
+    "350057459060183040": {
+      "chunk_indices": [
+        15,
+        25
+      ]
+    },
+    "350057564173635584": {
+      "chunk_indices": [
+        2,
+        7,
+        18,
+        23
+      ]
+    },
+    "350059300833595392": {
+      "chunk_indices": [
+        2
+      ]
+    },
+    "350118465648070656": {
+      "chunk_indices": [
+        3
+      ]
+    },
+    "350125174705754112": {
+      "chunk_indices": [
+        5,
+        11,
+        13
+      ]
+    },
+    "350190663578554368": {
+      "chunk_indices": [
+        0,
+        4,
+        6,
+        10
+      ]
+    },
+    "350192904104448000": {
+      "chunk_indices": [
+        3,
+        12
+      ]
+    },
+    "350217230593691648": {
+      "chunk_indices": [
+        3,
+        10,
+        12
+      ]
+    },
+    "350225194213838848": {
+      "chunk_indices": [
+        3,
+        17
+      ]
+    },
+    "350231237295738880": {
+      "chunk_indices": [
+        7,
+        13
+      ]
+    },
+    "350234112948310016": {
+      "chunk_indices": [
+        12
+      ]
+    },
+    "350249029386506240": {
+      "chunk_indices": [
+        8
+      ]
+    },
+    "350275996995424256": {
+      "chunk_indices": [
+        5,
+        8,
+        11,
+        12,
+        22
+      ]
+    },
+    "350297994190524416": {
+      "chunk_indices": [
+        6
+      ]
+    },
+    "350308965579624448": {
+      "chunk_indices": [
+        5,
+        14
+      ]
+    },
+    "350309267875696640": {
+      "chunk_indices": [
+        4,
+        12,
+        15,
+        24
+      ]
+    },
+    "350329167449034752": {
+      "chunk_indices": [
+        23
+      ]
+    },
+    "350329484899127296": {
+      "chunk_indices": [
+        3,
+        11,
+        15
+      ]
+    }
+  },
+  "evidence_chunks": [
+    {
+      "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+      "post_id": "349537913240948736",
+      "chunk_index": 3,
+      "content": "Redis 的所有数据都保存在内存中，因此读写速度极快，通常可以达到每秒数十万次操作。同时，它支持持久化（RDB 快照和 AOF 日志），可以在重启后恢复数据，兼顾了性能与数据安全。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+      "post_id": "349537913240948736",
+      "chunk_index": 8,
+      "content": "### 4. 高可用与分布式\nRedis 支持主从复制、哨兵（Sentinel）模式实现高可用，以及 Redis Cluster 实现数据分片和水平扩展。这些特性使得 Redis 可以支撑大规模生产环境。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "6324e49c-10d8-335b-b8f3-88d9dc25de55",
+      "post_id": "349537913240948736",
+      "chunk_index": 12,
+      "content": "1. **合理设计键名**：使用冒号分隔的命名空间，如 `user:1001:info`，便于管理和避免冲突。\n2. **控制键的过期时间**：为缓存设置合理的 TTL，避免内存无限增长。\n3. **避免大 Key**：大 Key 会导致阻塞和内存不均，应拆分或使用 Hash 结构。\n4. **使用 Pipeline 和 Lua 脚本**：减少网络往返，提升批量操作效率。\n5. **监控与告警**：关注内存使用、命中率、慢查询等指标，及时调整配置。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "0a23191d-9e4c-386f-a1a2-ca166fa48e5d",
+      "post_id": "349570392173711360",
+      "chunk_index": 37,
+      "content": "- **主从复制**：一个主节点多个从节点，从节点实时同步数据，实现读写分离。\n- **哨兵（Sentinel）**：监控主从节点，自动故障转移，保证服务可用性。\n- **集群（Cluster）**：数据分片存储在多台机器上，支持水平扩展，每个节点负责一部分槽位。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+      "post_id": "349572349512781824",
+      "chunk_index": 9,
+      "content": "- **RDB 快照**：在指定时间间隔内生成数据快照，文件紧凑，恢复速度快，但可能丢失最后一次快照后的数据。\n- **AOF 日志**：记录每次写操作，以追加方式写入文件，数据安全性高，但文件体积较大，恢复速度较慢。\n- **混合持久化**：Redis 4.0 后支持将 RDB 和 AOF 结合，兼顾恢复速度和数据安全。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "7114b7e6-30ba-388f-bee4-3b0347521214",
+      "post_id": "349605598142271488",
+      "chunk_index": 11,
+      "content": "当环境中存在多个 Agent 时，它们之间的交互使得学习更加复杂。多智能体学习涉及合作、竞争或混合场景，需要处理非平稳性问题。典型算法包括 MADDPG、QMIX 等。多智能体学习在交通调度、无人机编队等领域有重要应用。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+      "post_id": "349768387200684032",
+      "chunk_index": 4,
+      "content": "- **穿透**：查询不存在的数据，请求直击数据库。解决：布隆过滤器拦截，或缓存空值（短过期）。\n- **击穿**：热点 key 过期瞬间，大量请求同时访问数据库。解决：互斥锁（setnx）或逻辑过期。\n- **雪崩**：大量 key 同时过期，数据库压力骤增。解决：过期时间加随机值，或多级缓存。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67",
+      "post_id": "349768387200684032",
+      "chunk_index": 6,
+      "content": "- **先更新数据库，再删除缓存**：最常用，但删除失败有风险。可引入消息队列重试，或使用 Canal 订阅 binlog。\n- **延迟双删**：更新后先删缓存，等待 500ms 再删一次，避免并发不一致。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+      "post_id": "349815075202273280",
+      "chunk_index": 11,
+      "content": "- **RDB**：快照方式，适合备份和恢复，但可能丢失最后一次快照后的数据。\n- **AOF**：记录每次写操作，数据更安全，但文件较大，恢复速度慢。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "73919788-d3d3-315e-a039-43cd69e71b71",
+      "post_id": "349815075202273280",
+      "chunk_index": 12,
+      "content": "建议同时开启，并配置合理的策略。例如，AOF 使用 `everysec` 每秒同步，兼顾性能与安全。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "7a82316a-5a9f-311c-a9d4-874297a84313",
+      "post_id": "349815075202273280",
+      "chunk_index": 15,
+      "content": "- **主从复制**：主节点负责写，从节点负责读，实现读写分离。但主节点故障时，需要手动切换。\n- **哨兵（Sentinel）**：监控主从节点，自动故障转移。当主节点宕机，哨兵会选举新的主节点，并通知客户端。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "cfd81b0e-09a6-3ced-8b26-71a65989e039",
+      "post_id": "349815075202273280",
+      "chunk_index": 18,
+      "content": "- **避免大 key**：大 key 会导致阻塞和内存不均，应拆分或使用压缩。\n- **合理设置过期时间**：避免内存泄漏，但也要防止雪崩。\n- **使用 Pipeline**：批量操作时，Pipeline 能减少网络往返，大幅提升吞吐量。\n- **监控慢查询**：通过 `SLOWLOG` 定位慢命令，优化数据结构或逻辑。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "ae8df7f4-bf3d-3fcd-8c58-d087472c85ca",
+      "post_id": "349853528392601600",
+      "chunk_index": 3,
+      "content": "Redis 的发布/订阅是一种消息通信模式：**发布者（Publisher）** 发送消息到指定的**频道（Channel）**，而**订阅者（Subscriber）** 可以订阅一个或多个频道，并实时接收发布者发送的消息。这种模式实现了消息的生产者与消费者的完全解耦，双方无需知道彼此的存在。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "6fd37df8-84f4-3598-b7fb-b22d2e63e3b2",
+      "post_id": "349853528392601600",
+      "chunk_index": 24,
+      "content": "在微服务架构中，服务之间需要同步状态或触发事件。例如，用户服务更新用户信息后，发布 `user.updated` 事件，其他服务（如缓存服务、搜索服务）订阅该事件并更新自己的数据。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "6c573f34-26a6-31bc-b5a8-18ef4e96abca",
+      "post_id": "349853528392601600",
+      "chunk_index": 29,
+      "content": "- **消息不持久化**：如果订阅者不在线，消息会丢失。Redis Pub/Sub 是“即发即弃”模式，没有消息队列的持久化能力。\n- **无消息确认机制**：消费者处理失败，消息不会重发。\n- **性能瓶颈**：当订阅者数量巨大时，Redis 需要复制消息给所有订阅者，可能成为瓶颈。\n- **不适合可靠消息传递**：对于需要保证消息不丢失、不重复的场景，应使用 Redis Streams 或专业的消息队列（如 RabbitMQ、Kafka）。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "318c96b7-ef45-326f-8698-c0dbec20e311",
+      "post_id": "349979791899889664",
+      "chunk_index": 2,
+      "content": "Stable Diffusion 的推理依赖 PyTorch、Transformers、Diffusers 等库。建议使用 Python 3.10+ 和 CUDA 11.8 以上的 GPU 环境。以下是一个经过验证的依赖组合：",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "f4bca0f2-aa45-3cb2-a89c-7b1af6cde13f",
+      "post_id": "349979791899889664",
+      "chunk_index": 4,
+      "content": "注意：`diffusers` 库的版本迭代较快，建议锁定版本号以保证稳定性。例如，`diffusers==0.24.0` 在多数场景下表现良好。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "3f504141-58d1-3b11-8354-293fe50c8852",
+      "post_id": "349979791899889664",
+      "chunk_index": 6,
+      "content": "Diffusers 提供了多种管线（Pipeline），其中 `StableDiffusionPipeline` 是最常用的。加载模型时，建议使用 `from_pretrained` 方法，并指定 `torch_dtype=torch.float16` 以节省显存：",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "1a3b35fc-12e5-3269-af83-044f33627c87",
+      "post_id": "349979791899889664",
+      "chunk_index": 8,
+      "content": "pipe = StableDiffusionPipeline.from_pretrained(\n    \"runwayml/stable-diffusion-v1-5\",\n    torch_dtype=torch.float16,\n    safety_checker=None  # 可选，关闭安全检查以提升速度\n)\npipe = pipe.to(\"cuda\")\n```",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "c06cf612-6aa1-3143-aa06-ba01a65d5148",
+      "post_id": "349979791899889664",
+      "chunk_index": 26,
+      "content": "GB-STABLE-R1-CONFIRM-PYTHON 项目验证了在 Python 环境中稳定运行 Stable Diffusion 的可行性。关键在于合理配置环境、选择合适的管线、调优推理参数，并针对常见问题采取预防措施。随着 Diffusers 库的持续更新，未来部署将更加简便。希望本文能为你的生成式AI实践提供参考。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+      "post_id": "349997252569337856",
+      "chunk_index": 6,
+      "content": "AI的核心是数学和编程。数学方面，线性代数、概率论和微积分是三大支柱。线性代数用于理解向量和矩阵运算，概率论支撑模型的不确定性处理，微积分则用于优化算法。编程方面，Python是AI领域的首选语言，其丰富的库（如NumPy、Pandas）和框架（如TensorFlow、PyTorch）大大降低了开发门槛。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+      "post_id": "349997252569337856",
+      "chunk_index": 9,
+      "content": "机器学习是AI的核心。建议从经典算法入手，如线性回归、逻辑回归、决策树、支持向量机等。理解这些算法的原理、适用场景和优缺点，是后续学习深度学习的基础。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "5832848a-a106-3346-8eee-6d6e54d254ab",
+      "post_id": "349997252569337856",
+      "chunk_index": 13,
+      "content": "深度学习是机器学习的一个分支，近年来在图像、语音、自然语言处理等领域取得了突破性进展。学习深度学习需要掌握神经网络的基本结构（如全连接层、卷积层、循环层），以及常见的优化算法（如梯度下降、Adam）。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "0ad027f8-be39-3227-abeb-adb098acdf1c",
+      "post_id": "349997625120002048",
+      "chunk_index": 0,
+      "content": "Python 作为一门简洁优雅的编程语言，近年来热度持续攀升。无论是数据分析、人工智能、Web 开发还是自动化脚本，Python 都展现出了强大的生命力。对于初学者而言，Python 的语法接近自然语言，上手门槛低，是踏入编程世界的不二之选。但学习 Python 不仅仅是记住语法，更重要的是构建编程思维。本文将从学习路径、核心概念、实践技巧三个维度，为你梳理一条清晰的 Python 学习之路。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+      "post_id": "349997625120002048",
+      "chunk_index": 3,
+      "content": "- **转行开发**：需要系统学习数据结构、算法、面向对象、网络编程，并掌握至少一个 Web 框架（如 Django、Flask）。\n- **数据分析**：重点掌握 NumPy、Pandas、Matplotlib 等库，以及 SQL 基础。\n- **自动化办公**：学习文件操作、正则表达式、requests 库，以及 pyautogui 等自动化工具。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "f217cd27-50e9-312a-acc8-e0b695405cef",
+      "post_id": "349997625120002048",
+      "chunk_index": 7,
+      "content": "1. **变量与数据类型**：整数、浮点数、字符串、布尔值，以及列表、元组、字典、集合等容器类型。理解可变与不可变对象的区别，是避免 bug 的关键。\n2. **控制流**：if-elif-else、for、while 循环。学会用循环处理重复任务，用条件判断实现逻辑分支。\n3. **函数**：函数是代码复用的基础。理解参数传递、返回值、作用域，以及 lambda 匿名函数。\n4. **面向对象**：类与对象、继承、多态。虽然 Python 支持多范式，但面向对象是大型项目的基石。\n5. **异常处理**：try-except 语句，让程序在出错时优雅地降级，而不是直接崩溃。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "05b02f3c-ec6e-39a2-a1b6-cab00b219f80",
+      "post_id": "349997625120002048",
+      "chunk_index": 10,
+      "content": "- **开发环境**：推荐 VS Code 或 PyCharm，配置好 Python 解释器和代码补全。初学者建议使用 Jupyter Notebook 进行交互式学习，便于即时反馈。\n- **官方文档**：Python 官方文档是最权威的参考，遇到问题先查文档。\n- **优质教程**：如《Python 编程：从入门到实践》、廖雪峰的 Python 教程、Real Python 等。\n- **社区与问答**：Stack Overflow、GitHub、知乎、掘金等平台，遇到问题先搜索，再提问。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "56e99972-d2d8-3266-a26c-e287652771b4",
+      "post_id": "349997625120002048",
+      "chunk_index": 13,
+      "content": "- **入门项目**：命令行贪吃蛇、待办事项管理器、爬取网页标题。\n- **进阶项目**：数据分析报告（如分析股票数据）、Flask 博客系统、自动化邮件发送脚本。\n- **挑战项目**：参与开源项目，或复现一个经典算法（如机器学习中的线性回归）。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "acfa665c-896b-30e7-8301-fab6254f12ab",
+      "post_id": "350052643432960000",
+      "chunk_index": 6,
+      "content": "最简单的方式是使用 [Spring Initializr](https://start.spring.io/)。在网页上选择构建工具（Maven）、语言（Java）、Spring Boot 版本，然后添加你需要的依赖。对于入门项目，我们至少需要添加 `Spring Web` 依赖。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "f34febea-ee76-35d4-b4f2-2a54f5c0e356",
+      "post_id": "350052643432960000",
+      "chunk_index": 16,
+      "content": "```java\n@RestController\npublic class HelloController {",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "2b55210a-02a4-349e-a5e1-bcb59af54c78",
+      "post_id": "350052643432960000",
+      "chunk_index": 18,
+      "content": "`@RestController` 表明这是一个控制器，每个方法返回的内容会直接写入 HTTP 响应体。`@GetMapping` 将 HTTP GET 请求映射到 `sayHello` 方法。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "227cc0d5-c341-3435-8ba2-47d5fbbf8756",
+      "post_id": "350052643432960000",
+      "chunk_index": 35,
+      "content": "Spring Boot 提供了强大的测试支持。在 `src/test/java` 下创建测试类，使用 `@SpringBootTest` 注解加载应用上下文，然后注入 `MockMvc` 进行接口测试。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "0bf93e99-e4dd-37a3-9886-c3b4d43bda60",
+      "post_id": "350052643432960000",
+      "chunk_index": 40,
+      "content": "执行 `mvn package` 会生成一个可执行的 JAR 包，里面包含了内嵌的 Tomcat 服务器。你可以直接运行：",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "b7fe8536-6ef5-3470-be3e-d21b2aac6360",
+      "post_id": "350057459060183040",
+      "chunk_index": 15,
+      "content": "- **解释执行**：逐条解释字节码并执行，启动速度快，但执行效率较低。\n- **即时编译（JIT）**：在运行过程中，将热点代码（频繁执行的代码）编译为本地机器码，提高执行效率。HotSpot 虚拟机采用混合模式，先解释执行，再对热点代码进行 JIT 编译。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "9f604828-39c7-39d3-a740-1631f379d61a",
+      "post_id": "350057459060183040",
+      "chunk_index": 25,
+      "content": "此外，使用 JVM 监控工具（如 JConsole、VisualVM）可以实时查看内存使用、线程状态和 GC 情况，帮助定位性能瓶颈。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "3f72f248-8da9-387f-a835-a69d1788fb6f",
+      "post_id": "350057564173635584",
+      "chunk_index": 2,
+      "content": "传统 Spring 项目需要大量 XML 或注解配置，而 Spring Boot 通过自动配置（Auto-Configuration）和起步依赖（Starter）机制，让开发者只需关注业务逻辑。它内嵌了 Tomcat、Jetty 等服务器，无需单独部署 WAR 包，直接运行 `main` 方法即可启动应用。此外，Spring Boot 提供了生产级特性，如健康检查、外部化配置和监控端点，非常适合构建微服务。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "7d0c2f73-f50e-3e9f-8142-441ac256710f",
+      "post_id": "350057564173635584",
+      "chunk_index": 7,
+      "content": "最简单的方式是使用 [Spring Initializr](https://start.spring.io/)。在网页上选择构建工具（Maven）、语言（Java）、Spring Boot 版本，并添加依赖：`Spring Web`（用于构建 REST API）和 `Spring Boot DevTools`（可选，用于热部署）。点击“Generate”下载压缩包，解压后用 IDE 打开。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "d216a5a1-35f2-3608-acb5-361076358282",
+      "post_id": "350057564173635584",
+      "chunk_index": 18,
+      "content": "@GetMapping(\"/hello\")\n    public String sayHello() {\n        return \"Hello, Spring Boot!\";\n    }\n}\n```",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "4ba6634f-dcb7-3a27-af83-43c639b42139",
+      "post_id": "350057564173635584",
+      "chunk_index": 23,
+      "content": "启动成功后，控制台会显示类似 `Tomcat started on port(s): 8080` 的日志。打开浏览器访问 `http://localhost:8080/hello`，你将看到 `Hello, Spring Boot!` 的响应。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "a774fb6a-da8a-31b6-aaa0-59643bb6cd73",
+      "post_id": "350059300833595392",
+      "chunk_index": 2,
+      "content": "- **跨平台性**：Java 通过 Java 虚拟机（JVM）实现“一次编写，到处运行”，编译后的字节码可在任何安装了 JVM 的系统上执行。\n- **面向对象**：Java 强制使用类与对象，支持封装、继承和多态，有助于构建模块化、可维护的代码。\n- **丰富的生态**：从 Spring 框架到 Hadoop，Java 拥有庞大的开源库和工具，几乎覆盖所有开发场景。\n- **就业前景**：Java 开发者需求稳定，尤其在金融、电商和云计算领域。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+      "post_id": "350118465648070656",
+      "chunk_index": 3,
+      "content": "1. **基础语法阶段**：掌握 Java 基本语法、数据类型、运算符、流程控制、数组等。\n2. **面向对象阶段**：理解类与对象、封装、继承、多态、接口、抽象类等核心概念。\n3. **核心类库阶段**：熟悉常用 API，如集合框架、异常处理、IO 流、多线程、网络编程等。\n4. **进阶提升阶段**：学习 JVM 内存模型、垃圾回收、并发编程、设计模式、数据结构与算法。\n5. **框架与实战阶段**：掌握 Spring、Spring Boot、MyBatis 等主流框架，并完成项目实战。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7",
+      "post_id": "350125174705754112",
+      "chunk_index": 5,
+      "content": "压力测试是稳定性验证的基础。通过工具如JMeter、Gatling或自研压测平台，模拟真实用户请求，观察系统在不同并发下的表现。重点指标包括：",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749",
+      "post_id": "350125174705754112",
+      "chunk_index": 11,
+      "content": "使用工具如Chaos Monkey、Toxiproxy或自研故障注入框架，可以在测试环境或预发环境进行演练。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+      "post_id": "350125174705754112",
+      "chunk_index": 13,
+      "content": "稳定性验证离不开对系统资源的持续监控。通过Prometheus、Grafana等监控工具，实时采集JVM指标（堆内存、GC频率）、线程状态、数据库连接池等数据。当发现异常时，及时进行调优，如调整JVM参数、优化线程池配置、增加缓存等。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "cd410bd2-74b5-3347-9316-3aba6260ccea",
+      "post_id": "350190663578554368",
+      "chunk_index": 0,
+      "content": "在人工智能领域，Agent 的概念已经从学术研究走向了工程实践。无论是智能客服、自动化运维，还是复杂的决策支持系统，Agent 都扮演着越来越重要的角色。然而，将 Agent 从原型推向生产环境，并非易事。本文将基于实际工程经验，总结五个关键步骤，帮助开发者更好地应对 Agent 工程化的挑战。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+      "post_id": "350190663578554368",
+      "chunk_index": 4,
+      "content": "对话管理是 Agent 的核心。一个健壮的对话管理模块，需要能够处理多轮对话、上下文保持、意图识别和槽位填充等任务。在实践中，我们通常采用基于状态机或框架（如 Rasa、Dialogflow）的方案。关键在于设计好对话流程的状态转移，以及异常处理机制。例如，当用户输入模糊或超出预设意图时，Agent 应能优雅地引导用户澄清，而不是陷入死循环或给出错误回答。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "8c771379-ded7-3616-b156-e75562cfb80f",
+      "post_id": "350190663578554368",
+      "chunk_index": 6,
+      "content": "Agent 的价值往往体现在与外部系统的交互上。无论是查询数据库、调用 API，还是访问知识库，都需要进行良好的集成。在工程实践中，我们建议将外部工具封装为独立的服务，通过标准接口（如 RESTful API）与 Agent 通信。这样既便于维护，也利于扩展。同时，要注意数据的安全性和隐私保护，确保敏感信息不被泄露。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+      "post_id": "350190663578554368",
+      "chunk_index": 10,
+      "content": "最后，生产环境的 Agent 需要完善的监控与运维机制。你需要实时监控 Agent 的运行状态，包括响应时间、错误率、资源消耗等。一旦出现异常，能够及时告警并快速恢复。此外，还要考虑版本更新和回滚策略，确保在引入新功能时不会影响现有服务。一个可靠的运维体系，是 Agent 长期稳定运行的保障。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "12b02805-c057-3359-be43-717bf92e6496",
+      "post_id": "350192904104448000",
+      "chunk_index": 3,
+      "content": "- **参数校验**：所有外部输入（包括接口参数、配置文件、数据库数据）都应当进行合法性校验，避免空指针、越界等异常。\n- **异常处理**：合理使用 try-catch，避免捕获后吞掉异常，同时要区分业务异常和系统异常，分别处理。\n- **资源释放**：使用 try-with-resources 或 finally 块确保流、连接等资源被正确关闭，防止资源泄漏。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+      "post_id": "350192904104448000",
+      "chunk_index": 12,
+      "content": "- 设计降级开关，当依赖服务不可用时，返回默认值或缓存数据，保证核心功能可用。\n- 使用重试机制（注意幂等性）和超时控制，避免长时间阻塞。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "5408e19b-5158-3cfd-b607-f27d0a80408f",
+      "post_id": "350217230593691648",
+      "chunk_index": 3,
+      "content": "当我们使用 `javac` 编译 `.java` 文件时，得到的是 `.class` 文件，其中包含的是字节码（bytecode）。字节码是一种中间表示，它既不是源代码，也不是机器码，而是 JVM 能够理解的指令集。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "6ac9effb-6551-3176-aabf-b127926a2342",
+      "post_id": "350217230593691648",
+      "chunk_index": 10,
+      "content": "类加载完成后，执行引擎开始工作。早期的 JVM 采用纯解释执行，即逐条翻译字节码为机器码并执行，速度较慢。现代 JVM 引入了 JIT（Just-In-Time）编译器，它会在运行时将热点代码（频繁执行的方法）编译为本地机器码，从而大幅提升性能。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "70e6b5f7-bfef-3233-b1c2-317307e8325e",
+      "post_id": "350217230593691648",
+      "chunk_index": 12,
+      "content": "此外，JVM 还提供了分层编译（C1 和 C2 编译器），C1 编译速度快但优化程度低，C2 编译慢但优化程度高。JVM 会根据方法的调用频率动态选择编译级别，在启动速度和峰值性能之间取得平衡。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "b5bd0342-92c4-3381-b84a-bf09ef8d4525",
+      "post_id": "350225194213838848",
+      "chunk_index": 3,
+      "content": "Java 源代码经过编译后，生成的不是机器码，而是字节码（Bytecode）。字节码是一种中间表示形式，它不依赖于任何特定的硬件平台，只依赖于 JVM。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "2b4bf078-fec2-3960-acae-6786206efecb",
+      "post_id": "350225194213838848",
+      "chunk_index": 17,
+      "content": "1. **解释执行**：逐条解释字节码并执行，启动快，但执行速度较慢。\n2. **编译执行**：通过即时编译器（JIT）将热点代码编译为机器码，执行速度快，但编译过程需要时间。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "293cbd5e-9f10-3101-910e-2682f04cbe1d",
+      "post_id": "350231237295738880",
+      "chunk_index": 7,
+      "content": "**实践要点**：\n- 为每个 Agent 请求生成唯一 trace ID，贯穿所有日志和工具调用。\n- 记录每次 LLM 调用的输入、输出、token 消耗、延迟。\n- 对工具调用进行结构化日志，包括参数、返回状态、耗时。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "698a1024-718c-3b63-914d-1e2767f1fb67",
+      "post_id": "350231237295738880",
+      "chunk_index": 13,
+      "content": "外部服务可能变慢或不可用。为每个工具调用设置超时时间（如 5 秒），超时后返回预设的降级结果，并通知决策层调整策略。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "92d82d5d-7798-336e-9d15-3b00a535eea3",
+      "post_id": "350234112948310016",
+      "chunk_index": 12,
+      "content": "常见的更新策略有：\n- **Cache Aside**：先更新数据库，再删除缓存。\n- **Read Through**：缓存层负责读取数据，若未命中则从数据库加载。\n- **Write Through**：先更新缓存，再同步更新数据库。\n- **Write Behind**：先更新缓存，异步批量更新数据库。",
+      "event_version": 1,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "83a34d1f-00e4-3b0a-91f9-225270095f6e",
+      "post_id": "350249029386506240",
+      "chunk_index": 8,
+      "content": "- **熔断降级**：引入Hystrix或Resilience4j，当依赖服务故障时快速失败，避免级联故障。\n- **负载均衡**：通过Nginx或Spring Cloud LoadBalancer实现多实例负载均衡，提升系统可用性。\n- **重试机制**：对幂等操作（如查询）可配置重试，但需注意重试风暴，建议配合退避策略。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "78d79da5-9e7c-30f1-bb20-0e5a607c0955",
+      "post_id": "350275996995424256",
+      "chunk_index": 5,
+      "content": "**实践建议**：在系统设计时，将任务拆分为“确定性部分”和“非确定性部分”。确定性部分用代码实现，非确定性部分才交给 Agent。这样既能保证稳定性，又能发挥 Agent 的灵活性。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422",
+      "post_id": "350275996995424256",
+      "chunk_index": 8,
+      "content": "- **工具粒度**：工具不宜过大或过小。过大的工具（如“执行整个业务流程”）会让 Agent 难以控制，过小的工具（如“获取单个字段”）会增加调用次数和出错概率。建议将工具粒度控制在“一个可独立验证的原子操作”。\n- **工具描述**：工具描述要清晰、无歧义，最好包含参数说明、返回值格式和典型使用场景。Agent 的 LLM 依赖描述来理解工具，描述不清晰会导致误用。\n- **错误处理**：工具必须返回结构化错误信息，而不是抛出异常。Agent 需要根据错误信息调整策略，例如重试、换工具或向用户求助。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "fce2c8b8-5b45-361a-80ac-5d3f4deab63f",
+      "post_id": "350275996995424256",
+      "chunk_index": 11,
+      "content": "- **短期状态**：放在内存中，但要注意上下文长度限制。可以定期总结历史，压缩上下文。\n- **长期状态**：持久化到数据库或对象存储，用于跨会话恢复或审计。\n- **状态一致性**：在 Agent 执行多步操作时，要确保状态的一致性。例如，如果 Agent 调用工具 A 成功但工具 B 失败，需要决定是回滚还是继续。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "93cee2cf-0481-3abb-a434-23d2e05b6325",
+      "post_id": "350275996995424256",
+      "chunk_index": 12,
+      "content": "**实践建议**：为 Agent 设计一个显式的“状态机”，定义每个状态下的合法动作和转移条件。这能显著减少不可控行为。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+      "post_id": "350275996995424256",
+      "chunk_index": 22,
+      "content": "Agent 工程化不是一蹴而就的，需要在实践中不断迭代。以上五个问题只是起点，实际中还会遇到更多细节问题。但只要我们坚持“任务边界清晰、工具设计稳健、状态管理可靠、可观测性透明、安全成本可控”的原则，就能构建出稳定、高效的 Agent 系统。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "d2665fbc-a38a-3670-9245-7864b3744540",
+      "post_id": "350297994190524416",
+      "chunk_index": 6,
+      "content": "服务之间的依赖关系是稳定性的大敌。我们需要梳理核心链路，对非核心依赖进行降级处理。例如，在商品详情页中，推荐服务不可用时，可以降级为默认推荐列表，而不是直接报错。使用Hystrix或Resilience4j等熔断器组件，可以自动实现依赖隔离和降级。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "ee64efa0-ced8-3d09-8079-94640e528b96",
+      "post_id": "350308965579624448",
+      "chunk_index": 5,
+      "content": "- 区分业务异常（如参数错误）和系统异常（如DB连接失败），分别处理。业务异常应返回明确错误码，系统异常需记录完整堆栈并触发告警。\n- 在调用外部依赖（RPC、HTTP、DB）时，设置超时时间（如`HttpClient`的`connectTimeout`和`readTimeout`），并捕获超时异常进行降级处理。\n- 使用`try-catch`包裹可能抛出的受检异常，但避免捕获`Throwable`，防止吞掉`OutOfMemoryError`等致命错误。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "8d20fe21-8cdb-37f7-983d-d1df1448f5c8",
+      "post_id": "350308965579624448",
+      "chunk_index": 14,
+      "content": "- 生产者端：设置发送超时和重试机制，但需防止重复发送导致的消息重复消费。\n- 消费者端：消费逻辑必须幂等，使用唯一业务ID去重；消费失败时，根据异常类型决定重试或进入死信队列。\n- 监控消费积压：通过`lag`指标告警，及时扩容消费者或优化消费速度。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+      "post_id": "350309267875696640",
+      "chunk_index": 4,
+      "content": "同时，要清晰界定 Agent 的能力边界。不要试图让 Agent 解决所有问题，而是聚焦于它擅长的领域。对于超出能力范围的任务，应该设计好降级策略，比如转人工或返回默认结果。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "0201c4a2-b0a1-3225-9b3f-7e34167e03c0",
+      "post_id": "350309267875696640",
+      "chunk_index": 12,
+      "content": "- **参数校验**：在调用工具前，对 LLM 生成的参数进行严格校验，避免因格式错误或类型不匹配导致调用失败。\n- **错误处理**：设计完善的错误处理机制，包括超时、重试、降级等。例如，当外部 API 返回错误时，Agent 应该能够根据错误类型决定是重试还是更换策略。\n- **上下文管理**：在多次工具调用中，保持上下文的连贯性。可以使用记忆模块来存储关键信息，避免重复询问用户。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "09377971-4054-38b2-bbaa-268c631e1b51",
+      "post_id": "350309267875696640",
+      "chunk_index": 15,
+      "content": "- **权限控制**：Agent 只能访问其被授权的资源和操作，避免越权行为。例如，在金融场景中，Agent 不能随意执行转账操作，必须经过用户确认。\n- **内容过滤**：对 Agent 生成的内容进行过滤，防止输出有害或违规信息。可以使用内容审核 API 或自定义规则。\n- **审计日志**：记录 Agent 的所有决策和操作，便于事后追溯和问题排查。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+      "post_id": "350309267875696640",
+      "chunk_index": 24,
+      "content": "Agent 工程实践是一个复杂而充满挑战的领域，但也是未来 AI 应用的重要方向。从明确边界到任务规划，从工具调用到安全合规，每一步都需要精心设计。希望我的这些经验能帮助你少走一些弯路，让你的 Agent 更快地从原型走向生产。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "138dc67d-0551-32c2-8f3f-2538dfb96e80",
+      "post_id": "350329167449034752",
+      "chunk_index": 23,
+      "content": "- **数据库慢查询**：定期分析慢日志，优化索引和 SQL，必要时引入读写分离。\n- **内存泄漏**：使用 MAT 或 JProfiler 分析堆转储，排查大对象和未释放的引用。\n- **配置错误**：配置中心统一管理，变更前进行灰度发布，并支持快速回滚。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "a7bff3a9-e869-392e-aa74-30cfc46b244e",
+      "post_id": "350329484899127296",
+      "chunk_index": 3,
+      "content": "- **定义输入输出**：明确 Agent 接收什么类型的请求，输出什么格式的结果。\n- **设定失败模式**：当 Agent 无法完成任务时，应如何响应？是返回错误码，还是转交人工？\n- **划定知识边界**：Agent 能访问哪些数据源？哪些操作是禁止的？",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "e1178112-c1dd-323a-8360-48dc4d2db525",
+      "post_id": "350329484899127296",
+      "chunk_index": 11,
+      "content": "- **统一接口**：所有工具遵循相同的输入输出规范，便于 Agent 理解和调用。\n- **错误处理**：工具应返回明确的错误信息，而不是抛出异常，以便 Agent 能根据错误调整策略。\n- **超时与重试**：为外部 API 调用设置超时，并实现指数退避重试，避免因网络抖动导致 Agent 卡死。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    },
+    {
+      "chunk_id": "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc",
+      "post_id": "350329484899127296",
+      "chunk_index": 15,
+      "content": "- **输入过滤**：对用户输入进行清洗，防止提示注入攻击。\n- **操作审批**：对于高风险操作（如删除数据、发送邮件），要求人工审批或二次确认。\n- **最小权限原则**：Agent 使用的 API 密钥应仅具有完成任务所需的最小权限，并定期轮换。",
+      "event_version": 0,
+      "embedding_model": "multilingual-e5-small",
+      "embedding_version": "v1",
+      "dimension": 384,
+      "status": "published",
+      "visible": "public",
+      "searchable": true
+    }
+  ]
+}

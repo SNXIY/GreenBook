@@ -331,6 +331,18 @@ def main() -> int:
         for issue in item["dataset_issues"]
     )
 
+    v2_annotated = all(
+        row.get("category") == "no_answer"
+        or (
+            isinstance(row.get("gold_answer"), str)
+            and bool(row["gold_answer"].strip())
+            and isinstance(row.get("gold_chunk_ids"), list)
+            and bool(row["gold_chunk_ids"])
+            and isinstance(row.get("evidence_claims"), list)
+            and bool(row["evidence_claims"])
+        )
+        for row in validation.get("valid_rows", [])
+    )
     output = {
         "status": "VALID",
         "dataset_validation": {
@@ -347,8 +359,13 @@ def main() -> int:
             "dataset_issue_gold_chunk_count": sum(
                 len(item["gold_chunks"]) for item in diagnostics if item["dataset_issues"]
             ),
-            "answer_containing_evidence": "NOT_ANNOTATED",
-            "note": "Current gold chunks are post-level qrel -> chunk_index 0 mappings; no gold_answer/evidence annotation exists.",
+            "answer_containing_evidence": "ANNOTATED" if v2_annotated else "NOT_ANNOTATED",
+            "note": (
+                "Dataset v2 uses explicit gold_chunk_ids and human-audited evidence claims; "
+                "no qrel-to-chunk fallback is used."
+                if v2_annotated
+                else "Gold chunks are not accompanied by explicit answer/evidence annotations."
+            ),
         },
         "metrics": {
             "POST_RECALL@5": post5,

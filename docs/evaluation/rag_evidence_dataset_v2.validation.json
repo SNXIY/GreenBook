@@ -1,0 +1,2340 @@
+{
+  "dataset_version": "rag_evidence_v2",
+  "status": "VALID",
+  "dataset": "docs\\evaluation\\rag_evidence_dataset_v2.jsonl",
+  "chunk_fixture": "docs\\evaluation\\rag_evidence_chunk_fixture_v2.json",
+  "TOTAL_QUERY_COUNT": 50,
+  "VALID_QUERY_COUNT": 50,
+  "VALID_QREL_COUNT": 66,
+  "GOLD_CHUNK_COUNT": 104,
+  "INDEX_ZERO_GOLD_REFERENCE_COUNT": 2,
+  "NONZERO_GOLD_REFERENCE_COUNT": 102,
+  "AUTOMATIC_INDEX_ZERO_MAPPING_DETECTED": false,
+  "UNIQUE_GOLD_CHUNK_COUNT": 75,
+  "ANNOTATION_COVERAGE": {
+    "answerable_queries": 45,
+    "answerable_queries_with_valid_annotations": 45,
+    "answerable_query_coverage": 1.0,
+    "gold_chunk_reference_count": 104,
+    "unique_gold_chunk_count": 75,
+    "unique_gold_post_count": 29
+  },
+  "MISSING_FIXTURE_COUNT": 0,
+  "MISSING_CHUNK_COUNT": 0,
+  "REMOVED_INVALID_COUNT": 0,
+  "chunk_snapshot_count": 75,
+  "file_issues": [],
+  "invalid_rows": [],
+  "missing_chunks": [],
+  "valid_rows": [
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-001",
+      "query": "Java 后端可靠性实践有哪些核心原则？",
+      "question": "Java 后端可靠性实践有哪些核心原则？",
+      "category": "fact",
+      "gold_answer": "可靠的 Java 后端需要同时处理代码、架构和依赖故障：校验输入、正确处理异常和资源，并对外部依赖设置超时、重试与降级；监控和测试用于持续验证。",
+      "gold_post_ids": [
+        "350308965579624448",
+        "350192904104448000"
+      ],
+      "gold_chunk_ids": [
+        "ee64efa0-ced8-3d09-8079-94640e528b96",
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "ee64efa0-ced8-3d09-8079-94640e528b96",
+          "post_id": "350308965579624448",
+          "chunk_index": 5
+        },
+        {
+          "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+          "post_id": "350192904104448000",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "ee64efa0-ced8-3d09-8079-94640e528b96",
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "可靠的 Java 后端需要同时处理代码、架构和依赖故障：校验输入、正确处理异常和资源，并对外部依赖设置超时、重试与降级；监控和测试用于持续验证。",
+          "chunk_ids": [
+            "ee64efa0-ced8-3d09-8079-94640e528b96",
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350308965579624448": 2,
+        "350192904104448000": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-002",
+      "query": "What are the main practices for reliable Java backends?",
+      "question": "What are the main practices for reliable Java backends?",
+      "category": "fact",
+      "gold_answer": "Reliable Java backends validate inputs, distinguish business and system failures, bound dependency calls with timeouts, and use idempotent retry/dead-letter handling plus graceful degradation.",
+      "gold_post_ids": [
+        "350308965579624448",
+        "350192904104448000"
+      ],
+      "gold_chunk_ids": [
+        "ee64efa0-ced8-3d09-8079-94640e528b96",
+        "8d20fe21-8cdb-37f7-983d-d1df1448f5c8",
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "ee64efa0-ced8-3d09-8079-94640e528b96",
+          "post_id": "350308965579624448",
+          "chunk_index": 5
+        },
+        {
+          "chunk_id": "8d20fe21-8cdb-37f7-983d-d1df1448f5c8",
+          "post_id": "350308965579624448",
+          "chunk_index": 14
+        },
+        {
+          "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+          "post_id": "350192904104448000",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "ee64efa0-ced8-3d09-8079-94640e528b96",
+        "8d20fe21-8cdb-37f7-983d-d1df1448f5c8",
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Reliable Java backends validate inputs, distinguish business and system failures, bound dependency calls with timeouts, and use idempotent retry/dead-letter handling plus graceful degradation.",
+          "chunk_ids": [
+            "ee64efa0-ced8-3d09-8079-94640e528b96",
+            "8d20fe21-8cdb-37f7-983d-d1df1448f5c8",
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350308965579624448": 2,
+        "350192904104448000": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-003",
+      "query": "如何在 Java 服务中实现后端稳定性？",
+      "question": "如何在 Java 服务中实现后端稳定性？",
+      "category": "fact",
+      "gold_answer": "Java 服务稳定性可以通过非核心依赖降级、熔断隔离、负载均衡、对幂等操作进行带退避的重试来实现。",
+      "gold_post_ids": [
+        "350297994190524416",
+        "350249029386506240"
+      ],
+      "gold_chunk_ids": [
+        "d2665fbc-a38a-3670-9245-7864b3744540",
+        "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "d2665fbc-a38a-3670-9245-7864b3744540",
+          "post_id": "350297994190524416",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "83a34d1f-00e4-3b0a-91f9-225270095f6e",
+          "post_id": "350249029386506240",
+          "chunk_index": 8
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "d2665fbc-a38a-3670-9245-7864b3744540",
+        "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Java 服务稳定性可以通过非核心依赖降级、熔断隔离、负载均衡、对幂等操作进行带退避的重试来实现。",
+          "chunk_ids": [
+            "d2665fbc-a38a-3670-9245-7864b3744540",
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350297994190524416": 2,
+        "350249029386506240": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-004",
+      "query": "从 Java 入门到生产实践需要掌握哪些可靠性要点？",
+      "question": "从 Java 入门到生产实践需要掌握哪些可靠性要点？",
+      "category": "fact",
+      "gold_answer": "从 Java 入门到生产实践，应逐步掌握语法与面向对象、核心类库和并发网络，再进入 JVM/GC、并发与框架实战；生产阶段还要监控 JVM、线程和连接池等资源。",
+      "gold_post_ids": [
+        "350118465648070656",
+        "350125174705754112"
+      ],
+      "gold_chunk_ids": [
+        "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+        "d682c77c-29ed-3c52-b728-90e5e27d7b99"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+          "post_id": "350118465648070656",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+          "post_id": "350125174705754112",
+          "chunk_index": 13
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+        "d682c77c-29ed-3c52-b728-90e5e27d7b99"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "从 Java 入门到生产实践，应逐步掌握语法与面向对象、核心类库和并发网络，再进入 JVM/GC、并发与框架实战；生产阶段还要监控 JVM、线程和连接池等资源。",
+          "chunk_ids": [
+            "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+            "d682c77c-29ed-3c52-b728-90e5e27d7b99"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350118465648070656": 2,
+        "350125174705754112": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-005",
+      "query": "What should a learner know to build production Java services?",
+      "question": "What should a learner know to build production Java services?",
+      "category": "fact",
+      "gold_answer": "A learner building production Java services should learn the language and core libraries first, then JVM/concurrency/framework practice, while applying parameter validation, resource safety, and concurrency-safe coding.",
+      "gold_post_ids": [
+        "350118465648070656",
+        "350192904104448000"
+      ],
+      "gold_chunk_ids": [
+        "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+        "12b02805-c057-3359-be43-717bf92e6496"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+          "post_id": "350118465648070656",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "12b02805-c057-3359-be43-717bf92e6496",
+          "post_id": "350192904104448000",
+          "chunk_index": 3
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+        "12b02805-c057-3359-be43-717bf92e6496"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "A learner building production Java services should learn the language and core libraries first, then JVM/concurrency/framework practice, while applying parameter validation, resource safety, and concurrency-safe coding.",
+          "chunk_ids": [
+            "dfef4e49-4c1c-37f1-930d-1fc17bacf62b",
+            "12b02805-c057-3359-be43-717bf92e6496"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350118465648070656": 2,
+        "350192904104448000": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-006",
+      "query": "Java 稳定性验证通常包括哪些内容？",
+      "question": "Java 稳定性验证通常包括哪些内容？",
+      "category": "fact",
+      "gold_answer": "Java 稳定性验证通常包括压力测试、故障注入、资源监控与代码级检查，并通过 JMeter/Gatling、Chaos 工具以及 Prometheus/Grafana 等手段观察结果。",
+      "gold_post_ids": [
+        "350125174705754112"
+      ],
+      "gold_chunk_ids": [
+        "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7",
+        "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749",
+        "d682c77c-29ed-3c52-b728-90e5e27d7b99"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7",
+          "post_id": "350125174705754112",
+          "chunk_index": 5
+        },
+        {
+          "chunk_id": "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749",
+          "post_id": "350125174705754112",
+          "chunk_index": 11
+        },
+        {
+          "chunk_id": "d682c77c-29ed-3c52-b728-90e5e27d7b99",
+          "post_id": "350125174705754112",
+          "chunk_index": 13
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7",
+        "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749",
+        "d682c77c-29ed-3c52-b728-90e5e27d7b99"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Java 稳定性验证通常包括压力测试、故障注入、资源监控与代码级检查，并通过 JMeter/Gatling、Chaos 工具以及 Prometheus/Grafana 等手段观察结果。",
+          "chunk_ids": [
+            "a25e1e4e-0f0b-3913-be50-2a9c37f5b2a7",
+            "d369e2e1-d8cf-3cb3-a56e-c40bdfd17749",
+            "d682c77c-29ed-3c52-b728-90e5e27d7b99"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350125174705754112": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-007",
+      "query": "Java 后端架构设计如何支持可靠性？",
+      "question": "Java 后端架构设计如何支持可靠性？",
+      "category": "fact",
+      "gold_answer": "Java 后端架构通过依赖降级、熔断隔离、负载均衡和带幂等约束的重试来支撑可靠性。",
+      "gold_post_ids": [
+        "350297994190524416",
+        "350249029386506240"
+      ],
+      "gold_chunk_ids": [
+        "d2665fbc-a38a-3670-9245-7864b3744540",
+        "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "d2665fbc-a38a-3670-9245-7864b3744540",
+          "post_id": "350297994190524416",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "83a34d1f-00e4-3b0a-91f9-225270095f6e",
+          "post_id": "350249029386506240",
+          "chunk_index": 8
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "d2665fbc-a38a-3670-9245-7864b3744540",
+        "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Java 后端架构通过依赖降级、熔断隔离、负载均衡和带幂等约束的重试来支撑可靠性。",
+          "chunk_ids": [
+            "d2665fbc-a38a-3670-9245-7864b3744540",
+            "83a34d1f-00e4-3b0a-91f9-225270095f6e"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350297994190524416": 2,
+        "350249029386506240": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-008",
+      "query": "What is the Java programming language used for in backend systems?",
+      "question": "What is the Java programming language used for in backend systems?",
+      "category": "fact",
+      "gold_answer": "Java backend systems use the JVM for cross-platform execution, object-oriented modularity, and a broad ecosystem such as Spring and Hadoop.",
+      "gold_post_ids": [
+        "350059300833595392"
+      ],
+      "gold_chunk_ids": [
+        "a774fb6a-da8a-31b6-aaa0-59643bb6cd73"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "a774fb6a-da8a-31b6-aaa0-59643bb6cd73",
+          "post_id": "350059300833595392",
+          "chunk_index": 2
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "a774fb6a-da8a-31b6-aaa0-59643bb6cd73"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Java backend systems use the JVM for cross-platform execution, object-oriented modularity, and a broad ecosystem such as Spring and Hadoop.",
+          "chunk_ids": [
+            "a774fb6a-da8a-31b6-aaa0-59643bb6cd73"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350059300833595392": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-009",
+      "query": "Java 服务如何处理异常、重试与稳定性？",
+      "question": "Java 服务如何处理异常、重试与稳定性？",
+      "category": "fact",
+      "gold_answer": "Java services handle failures by distinguishing business from system exceptions, setting dependency timeouts, and using retry/degradation controls with idempotency awareness.",
+      "gold_post_ids": [
+        "350308965579624448",
+        "350192904104448000"
+      ],
+      "gold_chunk_ids": [
+        "ee64efa0-ced8-3d09-8079-94640e528b96",
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "ee64efa0-ced8-3d09-8079-94640e528b96",
+          "post_id": "350308965579624448",
+          "chunk_index": 5
+        },
+        {
+          "chunk_id": "a4840bc3-f35a-333c-b1ae-40d28c43bc44",
+          "post_id": "350192904104448000",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "ee64efa0-ced8-3d09-8079-94640e528b96",
+        "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Java services handle failures by distinguishing business from system exceptions, setting dependency timeouts, and using retry/degradation controls with idempotency awareness.",
+          "chunk_ids": [
+            "ee64efa0-ced8-3d09-8079-94640e528b96",
+            "a4840bc3-f35a-333c-b1ae-40d28c43bc44"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350308965579624448": 2,
+        "350192904104448000": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-010",
+      "query": "Java 后端迁移与升级有哪些实践要点？",
+      "question": "Java 后端迁移与升级有哪些实践要点？",
+      "category": "fact",
+      "gold_answer": "Java backend migration and upgrades should use centrally managed configuration, gray releases, and a fast rollback path while checking slow queries, indexes, and resource behavior.",
+      "gold_post_ids": [
+        "350329167449034752"
+      ],
+      "gold_chunk_ids": [
+        "138dc67d-0551-32c2-8f3f-2538dfb96e80"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "138dc67d-0551-32c2-8f3f-2538dfb96e80",
+          "post_id": "350329167449034752",
+          "chunk_index": 23
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "138dc67d-0551-32c2-8f3f-2538dfb96e80"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Java backend migration and upgrades should use centrally managed configuration, gray releases, and a fast rollback path while checking slow queries, indexes, and resource behavior.",
+          "chunk_ids": [
+            "138dc67d-0551-32c2-8f3f-2538dfb96e80"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350329167449034752": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-011",
+      "query": "Redis 缓存的生产实践有哪些？",
+      "question": "Redis 缓存的生产实践有哪些？",
+      "category": "fact",
+      "gold_answer": "Redis 生产缓存应设置合理 TTL、避免大 Key，使用 Pipeline/Lua 减少往返，并持续监控内存、命中率和慢查询。",
+      "gold_post_ids": [
+        "349537913240948736"
+      ],
+      "gold_chunk_ids": [
+        "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "6324e49c-10d8-335b-b8f3-88d9dc25de55",
+          "post_id": "349537913240948736",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Redis 生产缓存应设置合理 TTL、避免大 Key，使用 Pipeline/Lua 减少往返，并持续监控内存、命中率和慢查询。",
+          "chunk_ids": [
+            "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349537913240948736": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-012",
+      "query": "What are reliable Redis cache practices in production?",
+      "question": "What are reliable Redis cache practices in production?",
+      "category": "fact",
+      "gold_answer": "Reliable Redis caching addresses penetration, breakdown, and avalanche with Bloom filters or empty-value caching, mutex/logical expiry, randomized TTLs, and operational monitoring.",
+      "gold_post_ids": [
+        "349768387200684032",
+        "349537913240948736"
+      ],
+      "gold_chunk_ids": [
+        "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+        "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+          "post_id": "349768387200684032",
+          "chunk_index": 4
+        },
+        {
+          "chunk_id": "6324e49c-10d8-335b-b8f3-88d9dc25de55",
+          "post_id": "349537913240948736",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+        "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Reliable Redis caching addresses penetration, breakdown, and avalanche with Bloom filters or empty-value caching, mutex/logical expiry, randomized TTLs, and operational monitoring.",
+          "chunk_ids": [
+            "6c769e67-f3b9-3237-b3cb-13d88f8ed184",
+            "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349768387200684032": 2,
+        "349537913240948736": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-013",
+      "query": "如何设计 Redis 缓存架构？",
+      "question": "如何设计 Redis 缓存架构？",
+      "category": "fact",
+      "gold_answer": "Redis cache architecture can choose Cache Aside, Read Through, Write Through, or Write Behind, while consistency commonly uses database-first update followed by cache deletion or delayed double delete.",
+      "gold_post_ids": [
+        "350234112948310016",
+        "349768387200684032"
+      ],
+      "gold_chunk_ids": [
+        "92d82d5d-7798-336e-9d15-3b00a535eea3",
+        "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "92d82d5d-7798-336e-9d15-3b00a535eea3",
+          "post_id": "350234112948310016",
+          "chunk_index": 12
+        },
+        {
+          "chunk_id": "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67",
+          "post_id": "349768387200684032",
+          "chunk_index": 6
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "92d82d5d-7798-336e-9d15-3b00a535eea3",
+        "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Redis cache architecture can choose Cache Aside, Read Through, Write Through, or Write Behind, while consistency commonly uses database-first update followed by cache deletion or delayed double delete.",
+          "chunk_ids": [
+            "92d82d5d-7798-336e-9d15-3b00a535eea3",
+            "8571d2fe-d1d9-3679-9c4d-a9b10e3cdd67"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350234112948310016": 2,
+        "349768387200684032": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-014",
+      "query": "Redis 的 RDB 和 AOF 持久化有什么区别？",
+      "question": "Redis 的 RDB 和 AOF 持久化有什么区别？",
+      "category": "fact",
+      "gold_answer": "RDB is a compact periodic snapshot with fast recovery but possible loss after the last snapshot; AOF records writes with stronger durability but larger files and slower recovery. Hybrid persistence combines both.",
+      "gold_post_ids": [
+        "349572349512781824"
+      ],
+      "gold_chunk_ids": [
+        "dab4a7d7-2935-3600-aaf7-d035c71c8bce"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "dab4a7d7-2935-3600-aaf7-d035c71c8bce",
+          "post_id": "349572349512781824",
+          "chunk_index": 9
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "dab4a7d7-2935-3600-aaf7-d035c71c8bce"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "RDB is a compact periodic snapshot with fast recovery but possible loss after the last snapshot; AOF records writes with stronger durability but larger files and slower recovery. Hybrid persistence combines both.",
+          "chunk_ids": [
+            "dab4a7d7-2935-3600-aaf7-d035c71c8bce"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349572349512781824": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-015",
+      "query": "When should a Redis system use RDB or AOF?",
+      "question": "When should a Redis system use RDB or AOF?",
+      "category": "fact",
+      "gold_answer": "Use RDB when compact snapshots and backup/recovery are the priority; use AOF when write durability matters more. Enabling both, with AOF every second, balances recovery speed and data safety.",
+      "gold_post_ids": [
+        "349815075202273280"
+      ],
+      "gold_chunk_ids": [
+        "2e4a054f-408f-3697-9be4-3081464164f1",
+        "73919788-d3d3-315e-a039-43cd69e71b71"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "2e4a054f-408f-3697-9be4-3081464164f1",
+          "post_id": "349815075202273280",
+          "chunk_index": 11
+        },
+        {
+          "chunk_id": "73919788-d3d3-315e-a039-43cd69e71b71",
+          "post_id": "349815075202273280",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "2e4a054f-408f-3697-9be4-3081464164f1",
+        "73919788-d3d3-315e-a039-43cd69e71b71"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Use RDB when compact snapshots and backup/recovery are the priority; use AOF when write durability matters more. Enabling both, with AOF every second, balances recovery speed and data safety.",
+          "chunk_ids": [
+            "2e4a054f-408f-3697-9be4-3081464164f1",
+            "73919788-d3d3-315e-a039-43cd69e71b71"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349815075202273280": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-016",
+      "query": "Redis 高可用部署需要注意什么？",
+      "question": "Redis 高可用部署需要注意什么？",
+      "category": "fact",
+      "gold_answer": "Redis high availability uses replication, Sentinel for monitoring and automatic failover, and Cluster for sharding and horizontal scaling; production should avoid a single Sentinel or direct single-primary dependency.",
+      "gold_post_ids": [
+        "349570392173711360",
+        "349815075202273280"
+      ],
+      "gold_chunk_ids": [
+        "0a23191d-9e4c-386f-a1a2-ca166fa48e5d",
+        "7a82316a-5a9f-311c-a9d4-874297a84313"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "0a23191d-9e4c-386f-a1a2-ca166fa48e5d",
+          "post_id": "349570392173711360",
+          "chunk_index": 37
+        },
+        {
+          "chunk_id": "7a82316a-5a9f-311c-a9d4-874297a84313",
+          "post_id": "349815075202273280",
+          "chunk_index": 15
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "0a23191d-9e4c-386f-a1a2-ca166fa48e5d",
+        "7a82316a-5a9f-311c-a9d4-874297a84313"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Redis high availability uses replication, Sentinel for monitoring and automatic failover, and Cluster for sharding and horizontal scaling; production should avoid a single Sentinel or direct single-primary dependency.",
+          "chunk_ids": [
+            "0a23191d-9e4c-386f-a1a2-ca166fa48e5d",
+            "7a82316a-5a9f-311c-a9d4-874297a84313"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349570392173711360": 2,
+        "349815075202273280": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-017",
+      "query": "Redis 实战中的性能与可靠性如何保障？",
+      "question": "Redis 实战中的性能与可靠性如何保障？",
+      "category": "architecture",
+      "gold_answer": "Redis performance comes from in-memory reads and writes, while reliability comes from RDB/AOF persistence, TTL discipline, large-key control, batching, and monitoring.",
+      "gold_post_ids": [
+        "349537913240948736"
+      ],
+      "gold_chunk_ids": [
+        "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+        "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+          "post_id": "349537913240948736",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "6324e49c-10d8-335b-b8f3-88d9dc25de55",
+          "post_id": "349537913240948736",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+        "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Redis performance comes from in-memory reads and writes, while reliability comes from RDB/AOF persistence, TTL discipline, large-key control, batching, and monitoring.",
+          "chunk_ids": [
+            "8d7f77f9-bd99-31e5-be70-cd1bc03ac4d4",
+            "6324e49c-10d8-335b-b8f3-88d9dc25de55"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349537913240948736": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-018",
+      "query": "How does Redis Pub/Sub support messaging?",
+      "question": "How does Redis Pub/Sub support messaging?",
+      "category": "architecture",
+      "gold_answer": "Redis Pub/Sub publishes messages to channels for real-time broadcast, but it is fire-and-forget: messages are not persisted, there is no acknowledgement/retry, and Streams or Kafka/RabbitMQ are better for reliable delivery.",
+      "gold_post_ids": [
+        "349853528392601600"
+      ],
+      "gold_chunk_ids": [
+        "ae8df7f4-bf3d-3fcd-8c58-d087472c85ca",
+        "6c573f34-26a6-31bc-b5a8-18ef4e96abca"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "ae8df7f4-bf3d-3fcd-8c58-d087472c85ca",
+          "post_id": "349853528392601600",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "6c573f34-26a6-31bc-b5a8-18ef4e96abca",
+          "post_id": "349853528392601600",
+          "chunk_index": 29
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "ae8df7f4-bf3d-3fcd-8c58-d087472c85ca",
+        "6c573f34-26a6-31bc-b5a8-18ef4e96abca"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Redis Pub/Sub publishes messages to channels for real-time broadcast, but it is fire-and-forget: messages are not persisted, there is no acknowledgement/retry, and Streams or Kafka/RabbitMQ are better for reliable delivery.",
+          "chunk_ids": [
+            "ae8df7f4-bf3d-3fcd-8c58-d087472c85ca",
+            "6c573f34-26a6-31bc-b5a8-18ef4e96abca"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349853528392601600": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-019",
+      "query": "Redis 集群与消息机制如何协同？",
+      "question": "Redis 集群与消息机制如何协同？",
+      "category": "architecture",
+      "gold_answer": "Redis Cluster provides sharding and horizontal scale, while Pub/Sub can distribute state-change events such as user.updated to services that update their own projections.",
+      "gold_post_ids": [
+        "349537913240948736",
+        "349853528392601600"
+      ],
+      "gold_chunk_ids": [
+        "0a6d6135-2042-347e-85e3-5015430e5420",
+        "6fd37df8-84f4-3598-b7fb-b22d2e63e3b2"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "0a6d6135-2042-347e-85e3-5015430e5420",
+          "post_id": "349537913240948736",
+          "chunk_index": 8
+        },
+        {
+          "chunk_id": "6fd37df8-84f4-3598-b7fb-b22d2e63e3b2",
+          "post_id": "349853528392601600",
+          "chunk_index": 24
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "0a6d6135-2042-347e-85e3-5015430e5420",
+        "6fd37df8-84f4-3598-b7fb-b22d2e63e3b2"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Redis Cluster provides sharding and horizontal scale, while Pub/Sub can distribute state-change events such as user.updated to services that update their own projections.",
+          "chunk_ids": [
+            "0a6d6135-2042-347e-85e3-5015430e5420",
+            "6fd37df8-84f4-3598-b7fb-b22d2e63e3b2"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349537913240948736": 2,
+        "349853528392601600": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-020",
+      "query": "What are the operational concerns for a popular Redis deployment?",
+      "question": "What are the operational concerns for a popular Redis deployment?",
+      "category": "architecture",
+      "gold_answer": "Operationally, a popular Redis deployment must account for Pub/Sub loss and lack of acknowledgements, key size and expiry policy, Pipeline use, slow-query monitoring, and safe lock expiry.",
+      "gold_post_ids": [
+        "349853528392601600",
+        "349815075202273280"
+      ],
+      "gold_chunk_ids": [
+        "6c573f34-26a6-31bc-b5a8-18ef4e96abca",
+        "cfd81b0e-09a6-3ced-8b26-71a65989e039"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "6c573f34-26a6-31bc-b5a8-18ef4e96abca",
+          "post_id": "349853528392601600",
+          "chunk_index": 29
+        },
+        {
+          "chunk_id": "cfd81b0e-09a6-3ced-8b26-71a65989e039",
+          "post_id": "349815075202273280",
+          "chunk_index": 18
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "6c573f34-26a6-31bc-b5a8-18ef4e96abca",
+        "cfd81b0e-09a6-3ced-8b26-71a65989e039"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Operationally, a popular Redis deployment must account for Pub/Sub loss and lack of acknowledgements, key size and expiry policy, Pipeline use, slow-query monitoring, and safe lock expiry.",
+          "chunk_ids": [
+            "6c573f34-26a6-31bc-b5a8-18ef4e96abca",
+            "cfd81b0e-09a6-3ced-8b26-71a65989e039"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349853528392601600": 2,
+        "349815075202273280": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-021",
+      "query": "Agent 工程实践通常包括哪些内容？",
+      "question": "Agent 工程实践通常包括哪些内容？",
+      "category": "architecture",
+      "gold_answer": "Agent engineering covers clear task boundaries, robust tools, state and observability, security/cost controls, evaluation, and continuous iteration from prototype to production.",
+      "gold_post_ids": [
+        "350275996995424256",
+        "350309267875696640"
+      ],
+      "gold_chunk_ids": [
+        "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+        "05d06fdc-d3dd-3471-9999-cf0977c9f1f7"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+          "post_id": "350275996995424256",
+          "chunk_index": 22
+        },
+        {
+          "chunk_id": "05d06fdc-d3dd-3471-9999-cf0977c9f1f7",
+          "post_id": "350309267875696640",
+          "chunk_index": 24
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+        "05d06fdc-d3dd-3471-9999-cf0977c9f1f7"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Agent engineering covers clear task boundaries, robust tools, state and observability, security/cost controls, evaluation, and continuous iteration from prototype to production.",
+          "chunk_ids": [
+            "32fa8b13-4048-3269-8c6c-a656ccf0bfeb",
+            "05d06fdc-d3dd-3471-9999-cf0977c9f1f7"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350275996995424256": 2,
+        "350309267875696640": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-022",
+      "query": "How should an agent system be designed for production engineering?",
+      "question": "How should an agent system be designed for production engineering?",
+      "category": "architecture",
+      "gold_answer": "A production agent should have a narrow capability boundary with a fallback, validated and retryable tool calls, and explicit authorization, filtering, and audit logging.",
+      "gold_post_ids": [
+        "350309267875696640"
+      ],
+      "gold_chunk_ids": [
+        "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+        "0201c4a2-b0a1-3225-9b3f-7e34167e03c0",
+        "09377971-4054-38b2-bbaa-268c631e1b51"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+          "post_id": "350309267875696640",
+          "chunk_index": 4
+        },
+        {
+          "chunk_id": "0201c4a2-b0a1-3225-9b3f-7e34167e03c0",
+          "post_id": "350309267875696640",
+          "chunk_index": 12
+        },
+        {
+          "chunk_id": "09377971-4054-38b2-bbaa-268c631e1b51",
+          "post_id": "350309267875696640",
+          "chunk_index": 15
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+        "0201c4a2-b0a1-3225-9b3f-7e34167e03c0",
+        "09377971-4054-38b2-bbaa-268c631e1b51"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "A production agent should have a narrow capability boundary with a fallback, validated and retryable tool calls, and explicit authorization, filtering, and audit logging.",
+          "chunk_ids": [
+            "49fb5863-33c2-3d1f-a815-3aa7829d487c",
+            "0201c4a2-b0a1-3225-9b3f-7e34167e03c0",
+            "09377971-4054-38b2-bbaa-268c631e1b51"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350309267875696640": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-023",
+      "query": "如何从 Agent 原型演进到可靠系统？",
+      "question": "如何从 Agent 原型演进到可靠系统？",
+      "category": "architecture",
+      "gold_answer": "从 Agent 原型到可靠系统，应把确定性部分交给代码、把非确定性部分交给 Agent，并为工具统一接口、结构化错误、超时和指数退避重试。",
+      "gold_post_ids": [
+        "350275996995424256",
+        "350329484899127296"
+      ],
+      "gold_chunk_ids": [
+        "78d79da5-9e7c-30f1-bb20-0e5a607c0955",
+        "e1178112-c1dd-323a-8360-48dc4d2db525"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "78d79da5-9e7c-30f1-bb20-0e5a607c0955",
+          "post_id": "350275996995424256",
+          "chunk_index": 5
+        },
+        {
+          "chunk_id": "e1178112-c1dd-323a-8360-48dc4d2db525",
+          "post_id": "350329484899127296",
+          "chunk_index": 11
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "78d79da5-9e7c-30f1-bb20-0e5a607c0955",
+        "e1178112-c1dd-323a-8360-48dc4d2db525"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "从 Agent 原型到可靠系统，应把确定性部分交给代码、把非确定性部分交给 Agent，并为工具统一接口、结构化错误、超时和指数退避重试。",
+          "chunk_ids": [
+            "78d79da5-9e7c-30f1-bb20-0e5a607c0955",
+            "e1178112-c1dd-323a-8360-48dc4d2db525"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350275996995424256": 2,
+        "350329484899127296": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-024",
+      "query": "Agent 如何编排工具、状态和工作流？",
+      "question": "Agent 如何编排工具、状态和工作流？",
+      "category": "architecture",
+      "gold_answer": "Agent 工作流应把工具设计成可独立验证的原子操作，显式管理短期/长期状态及一致性，并用状态机约束合法转移。",
+      "gold_post_ids": [
+        "350275996995424256"
+      ],
+      "gold_chunk_ids": [
+        "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422",
+        "fce2c8b8-5b45-361a-80ac-5d3f4deab63f",
+        "93cee2cf-0481-3abb-a434-23d2e05b6325"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422",
+          "post_id": "350275996995424256",
+          "chunk_index": 8
+        },
+        {
+          "chunk_id": "fce2c8b8-5b45-361a-80ac-5d3f4deab63f",
+          "post_id": "350275996995424256",
+          "chunk_index": 11
+        },
+        {
+          "chunk_id": "93cee2cf-0481-3abb-a434-23d2e05b6325",
+          "post_id": "350275996995424256",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422",
+        "fce2c8b8-5b45-361a-80ac-5d3f4deab63f",
+        "93cee2cf-0481-3abb-a434-23d2e05b6325"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Agent 工作流应把工具设计成可独立验证的原子操作，显式管理短期/长期状态及一致性，并用状态机约束合法转移。",
+          "chunk_ids": [
+            "182cfb4e-4bb1-3c92-bdc3-29a21f5cc422",
+            "fce2c8b8-5b45-361a-80ac-5d3f4deab63f",
+            "93cee2cf-0481-3abb-a434-23d2e05b6325"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350275996995424256": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-025",
+      "query": "What is an AI agent workflow in a community system?",
+      "question": "What is an AI agent workflow in a community system?",
+      "category": "architecture",
+      "gold_answer": "An AI agent workflow starts with a defined goal and boundary, maintains multi-turn state and intent, and calls external systems through separately managed standard interfaces.",
+      "gold_post_ids": [
+        "350190663578554368"
+      ],
+      "gold_chunk_ids": [
+        "cd410bd2-74b5-3347-9316-3aba6260ccea",
+        "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+        "8c771379-ded7-3616-b156-e75562cfb80f"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "cd410bd2-74b5-3347-9316-3aba6260ccea",
+          "post_id": "350190663578554368",
+          "chunk_index": 0
+        },
+        {
+          "chunk_id": "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+          "post_id": "350190663578554368",
+          "chunk_index": 4
+        },
+        {
+          "chunk_id": "8c771379-ded7-3616-b156-e75562cfb80f",
+          "post_id": "350190663578554368",
+          "chunk_index": 6
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "cd410bd2-74b5-3347-9316-3aba6260ccea",
+        "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+        "8c771379-ded7-3616-b156-e75562cfb80f"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "An AI agent workflow starts with a defined goal and boundary, maintains multi-turn state and intent, and calls external systems through separately managed standard interfaces.",
+          "chunk_ids": [
+            "cd410bd2-74b5-3347-9316-3aba6260ccea",
+            "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+            "8c771379-ded7-3616-b156-e75562cfb80f"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350190663578554368": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-026",
+      "query": "Agent 系统的关键组件如何协作？",
+      "question": "Agent 系统的关键组件如何协作？",
+      "category": "architecture",
+      "gold_answer": "Agent components cooperate through conversation/state management, traceable tool calls, and bounded timeout/degradation behavior for unavailable external services.",
+      "gold_post_ids": [
+        "350190663578554368",
+        "350231237295738880"
+      ],
+      "gold_chunk_ids": [
+        "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+        "293cbd5e-9f10-3101-910e-2682f04cbe1d",
+        "698a1024-718c-3b63-914d-1e2767f1fb67"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+          "post_id": "350190663578554368",
+          "chunk_index": 4
+        },
+        {
+          "chunk_id": "293cbd5e-9f10-3101-910e-2682f04cbe1d",
+          "post_id": "350231237295738880",
+          "chunk_index": 7
+        },
+        {
+          "chunk_id": "698a1024-718c-3b63-914d-1e2767f1fb67",
+          "post_id": "350231237295738880",
+          "chunk_index": 13
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+        "293cbd5e-9f10-3101-910e-2682f04cbe1d",
+        "698a1024-718c-3b63-914d-1e2767f1fb67"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Agent components cooperate through conversation/state management, traceable tool calls, and bounded timeout/degradation behavior for unavailable external services.",
+          "chunk_ids": [
+            "3970be92-f7b6-3057-ba83-c0e1d0f48710",
+            "293cbd5e-9f10-3101-910e-2682f04cbe1d",
+            "698a1024-718c-3b63-914d-1e2767f1fb67"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350190663578554368": 2,
+        "350231237295738880": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-027",
+      "query": "Agent 协作有哪些工程模式？",
+      "question": "Agent 协作有哪些工程模式？",
+      "category": "architecture",
+      "gold_answer": "Agent collaboration patterns include cooperative, competitive, and mixed multi-agent settings; safe engineering adds input filtering, approval, and least privilege.",
+      "gold_post_ids": [
+        "349605598142271488",
+        "350329484899127296"
+      ],
+      "gold_chunk_ids": [
+        "7114b7e6-30ba-388f-bee4-3b0347521214",
+        "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "7114b7e6-30ba-388f-bee4-3b0347521214",
+          "post_id": "349605598142271488",
+          "chunk_index": 11
+        },
+        {
+          "chunk_id": "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc",
+          "post_id": "350329484899127296",
+          "chunk_index": 15
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "7114b7e6-30ba-388f-bee4-3b0347521214",
+        "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Agent collaboration patterns include cooperative, competitive, and mixed multi-agent settings; safe engineering adds input filtering, approval, and least privilege.",
+          "chunk_ids": [
+            "7114b7e6-30ba-388f-bee4-3b0347521214",
+            "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349605598142271488": 2,
+        "350329484899127296": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-028",
+      "query": "How can multiple agents collaborate safely?",
+      "question": "How can multiple agents collaborate safely?",
+      "category": "architecture",
+      "gold_answer": "Multiple agents can collaborate safely when their interaction mode is explicit and high-risk inputs/actions are filtered, approved, and restricted by least privilege.",
+      "gold_post_ids": [
+        "349605598142271488",
+        "350329484899127296"
+      ],
+      "gold_chunk_ids": [
+        "7114b7e6-30ba-388f-bee4-3b0347521214",
+        "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "7114b7e6-30ba-388f-bee4-3b0347521214",
+          "post_id": "349605598142271488",
+          "chunk_index": 11
+        },
+        {
+          "chunk_id": "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc",
+          "post_id": "350329484899127296",
+          "chunk_index": 15
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "7114b7e6-30ba-388f-bee4-3b0347521214",
+        "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Multiple agents can collaborate safely when their interaction mode is explicit and high-risk inputs/actions are filtered, approved, and restricted by least privilege.",
+          "chunk_ids": [
+            "7114b7e6-30ba-388f-bee4-3b0347521214",
+            "ab5b09f7-60b7-3aaf-95a2-1c657f9759cc"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349605598142271488": 2,
+        "350329484899127296": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-029",
+      "query": "Agent 工程落地需要哪些步骤？",
+      "question": "Agent 工程落地需要哪些步骤？",
+      "category": "architecture",
+      "gold_answer": "Agent 落地需要先定义输入输出、失败模式和知识边界，再建设统一且可重试的工具层，并补齐生产监控、告警、版本更新和回滚。",
+      "gold_post_ids": [
+        "350329484899127296",
+        "350190663578554368"
+      ],
+      "gold_chunk_ids": [
+        "a7bff3a9-e869-392e-aa74-30cfc46b244e",
+        "e1178112-c1dd-323a-8360-48dc4d2db525",
+        "072a0bed-6137-3a79-b81a-786ad6dfc228"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "a7bff3a9-e869-392e-aa74-30cfc46b244e",
+          "post_id": "350329484899127296",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "e1178112-c1dd-323a-8360-48dc4d2db525",
+          "post_id": "350329484899127296",
+          "chunk_index": 11
+        },
+        {
+          "chunk_id": "072a0bed-6137-3a79-b81a-786ad6dfc228",
+          "post_id": "350190663578554368",
+          "chunk_index": 10
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "a7bff3a9-e869-392e-aa74-30cfc46b244e",
+        "e1178112-c1dd-323a-8360-48dc4d2db525",
+        "072a0bed-6137-3a79-b81a-786ad6dfc228"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Agent 落地需要先定义输入输出、失败模式和知识边界，再建设统一且可重试的工具层，并补齐生产监控、告警、版本更新和回滚。",
+          "chunk_ids": [
+            "a7bff3a9-e869-392e-aa74-30cfc46b244e",
+            "e1178112-c1dd-323a-8360-48dc4d2db525",
+            "072a0bed-6137-3a79-b81a-786ad6dfc228"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350329484899127296": 2,
+        "350190663578554368": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-030",
+      "query": "How does GreenBook apply agent engineering?",
+      "question": "How does GreenBook apply agent engineering?",
+      "category": "no_answer",
+      "gold_answer": "当前社区资料不足",
+      "gold_post_ids": [],
+      "gold_chunk_ids": [],
+      "gold_chunks": [],
+      "answer_evidence_chunk_ids": [],
+      "evidence_claims": [],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "No-answer probe; the query asks for GreenBook-specific Agent engineering evidence, but the corpus has no directly attributable public chunk.",
+      "qrels": {}
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-031",
+      "query": "Python 学习路线包含哪些内容？",
+      "question": "Python 学习路线包含哪些内容？",
+      "category": "architecture",
+      "gold_answer": "Python 学习路线包括明确目标、掌握变量/控制流/函数/面向对象/异常处理，并通过入门、进阶和挑战项目巩固实践。",
+      "gold_post_ids": [
+        "349997625120002048"
+      ],
+      "gold_chunk_ids": [
+        "0ad027f8-be39-3227-abeb-adb098acdf1c",
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "56e99972-d2d8-3266-a26c-e287652771b4"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "0ad027f8-be39-3227-abeb-adb098acdf1c",
+          "post_id": "349997625120002048",
+          "chunk_index": 0
+        },
+        {
+          "chunk_id": "f217cd27-50e9-312a-acc8-e0b695405cef",
+          "post_id": "349997625120002048",
+          "chunk_index": 7
+        },
+        {
+          "chunk_id": "56e99972-d2d8-3266-a26c-e287652771b4",
+          "post_id": "349997625120002048",
+          "chunk_index": 13
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "0ad027f8-be39-3227-abeb-adb098acdf1c",
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "56e99972-d2d8-3266-a26c-e287652771b4"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Python 学习路线包括明确目标、掌握变量/控制流/函数/面向对象/异常处理，并通过入门、进阶和挑战项目巩固实践。",
+          "chunk_ids": [
+            "0ad027f8-be39-3227-abeb-adb098acdf1c",
+            "f217cd27-50e9-312a-acc8-e0b695405cef",
+            "56e99972-d2d8-3266-a26c-e287652771b4"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349997625120002048": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-032",
+      "query": "What should a beginner learn to program in Python?",
+      "question": "What should a beginner learn to program in Python?",
+      "category": "architecture",
+      "gold_answer": "A beginner should learn Python according to their goal, then practice data structures, control flow, functions, OOP, exceptions, and use official documentation and small projects.",
+      "gold_post_ids": [
+        "349997625120002048"
+      ],
+      "gold_chunk_ids": [
+        "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "05b02f3c-ec6e-39a2-a1b6-cab00b219f80"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+          "post_id": "349997625120002048",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "f217cd27-50e9-312a-acc8-e0b695405cef",
+          "post_id": "349997625120002048",
+          "chunk_index": 7
+        },
+        {
+          "chunk_id": "05b02f3c-ec6e-39a2-a1b6-cab00b219f80",
+          "post_id": "349997625120002048",
+          "chunk_index": 10
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "05b02f3c-ec6e-39a2-a1b6-cab00b219f80"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "A beginner should learn Python according to their goal, then practice data structures, control flow, functions, OOP, exceptions, and use official documentation and small projects.",
+          "chunk_ids": [
+            "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+            "f217cd27-50e9-312a-acc8-e0b695405cef",
+            "05b02f3c-ec6e-39a2-a1b6-cab00b219f80"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349997625120002048": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-033",
+      "query": "如何从 Python 基础逐步进入 AI 开发？",
+      "question": "如何从 Python 基础逐步进入 AI 开发？",
+      "category": "multi_hop",
+      "gold_answer": "从 Python 基础进入 AI 开发，需要先掌握变量、控制流、函数、面向对象和异常处理，再补齐线性代数、概率、微积分，并使用 NumPy/Pandas 及 TensorFlow/PyTorch。",
+      "gold_post_ids": [
+        "349997625120002048",
+        "349997252569337856"
+      ],
+      "gold_chunk_ids": [
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "3cb1c517-6acb-3ffd-a991-c2ab7efeff57"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "f217cd27-50e9-312a-acc8-e0b695405cef",
+          "post_id": "349997625120002048",
+          "chunk_index": 7
+        },
+        {
+          "chunk_id": "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+          "post_id": "349997252569337856",
+          "chunk_index": 6
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "3cb1c517-6acb-3ffd-a991-c2ab7efeff57"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "从 Python 基础进入 AI 开发，需要先掌握变量、控制流、函数、面向对象和异常处理，再补齐线性代数、概率、微积分，并使用 NumPy/Pandas 及 TensorFlow/PyTorch。",
+          "chunk_ids": [
+            "f217cd27-50e9-312a-acc8-e0b695405cef",
+            "3cb1c517-6acb-3ffd-a991-c2ab7efeff57"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349997625120002048": 2,
+        "349997252569337856": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-034",
+      "query": "Python 稳定扩展模块时有哪些工程要点？",
+      "question": "Python 稳定扩展模块时有哪些工程要点？",
+      "category": "multi_hop",
+      "gold_answer": "Python 扩展或 AI 模块要稳定运行，应固定 Python/CUDA/依赖组合，并锁定快速迭代库的版本，避免环境漂移。",
+      "gold_post_ids": [
+        "349979791899889664"
+      ],
+      "gold_chunk_ids": [
+        "318c96b7-ef45-326f-8698-c0dbec20e311",
+        "f4bca0f2-aa45-3cb2-a89c-7b1af6cde13f"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "318c96b7-ef45-326f-8698-c0dbec20e311",
+          "post_id": "349979791899889664",
+          "chunk_index": 2
+        },
+        {
+          "chunk_id": "f4bca0f2-aa45-3cb2-a89c-7b1af6cde13f",
+          "post_id": "349979791899889664",
+          "chunk_index": 4
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "318c96b7-ef45-326f-8698-c0dbec20e311",
+        "f4bca0f2-aa45-3cb2-a89c-7b1af6cde13f"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Python 扩展或 AI 模块要稳定运行，应固定 Python/CUDA/依赖组合，并锁定快速迭代库的版本，避免环境漂移。",
+          "chunk_ids": [
+            "318c96b7-ef45-326f-8698-c0dbec20e311",
+            "f4bca0f2-aa45-3cb2-a89c-7b1af6cde13f"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349979791899889664": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-035",
+      "query": "AI 学习的实践路线如何规划？",
+      "question": "AI 学习的实践路线如何规划？",
+      "category": "multi_hop",
+      "gold_answer": "AI 学习实践路线是先打好数学和 Python 编程基础，再学习经典机器学习、深度学习网络与优化，并通过项目实践巩固。",
+      "gold_post_ids": [
+        "349997252569337856"
+      ],
+      "gold_chunk_ids": [
+        "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+        "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+        "5832848a-a106-3346-8eee-6d6e54d254ab"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+          "post_id": "349997252569337856",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+          "post_id": "349997252569337856",
+          "chunk_index": 9
+        },
+        {
+          "chunk_id": "5832848a-a106-3346-8eee-6d6e54d254ab",
+          "post_id": "349997252569337856",
+          "chunk_index": 13
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+        "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+        "5832848a-a106-3346-8eee-6d6e54d254ab"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "AI 学习实践路线是先打好数学和 Python 编程基础，再学习经典机器学习、深度学习网络与优化，并通过项目实践巩固。",
+          "chunk_ids": [
+            "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+            "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+            "5832848a-a106-3346-8eee-6d6e54d254ab"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349997252569337856": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-036",
+      "query": "What is a practical guide for learning AI?",
+      "question": "What is a practical guide for learning AI?",
+      "category": "multi_hop",
+      "gold_answer": "A practical AI learning guide starts with math and Python, moves through classical machine learning, and then studies neural networks, deep learning, and optimizers through practice.",
+      "gold_post_ids": [
+        "349997252569337856"
+      ],
+      "gold_chunk_ids": [
+        "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+        "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+        "5832848a-a106-3346-8eee-6d6e54d254ab"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+          "post_id": "349997252569337856",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+          "post_id": "349997252569337856",
+          "chunk_index": 9
+        },
+        {
+          "chunk_id": "5832848a-a106-3346-8eee-6d6e54d254ab",
+          "post_id": "349997252569337856",
+          "chunk_index": 13
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+        "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+        "5832848a-a106-3346-8eee-6d6e54d254ab"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "A practical AI learning guide starts with math and Python, moves through classical machine learning, and then studies neural networks, deep learning, and optimizers through practice.",
+          "chunk_ids": [
+            "3cb1c517-6acb-3ffd-a991-c2ab7efeff57",
+            "aa4320d4-8fa1-3fc9-b037-769271d64ccd",
+            "5832848a-a106-3346-8eee-6d6e54d254ab"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349997252569337856": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-037",
+      "query": "如何通过 Python 构建稳定的 AI 应用？",
+      "question": "如何通过 Python 构建稳定的 AI 应用？",
+      "category": "multi_hop",
+      "gold_answer": "可以用 Python 配置稳定的 AI 应用环境，选择 Diffusers pipeline，合理设置精度和推理参数，并通过版本锁定与问题预防保证稳定运行。",
+      "gold_post_ids": [
+        "349979791899889664"
+      ],
+      "gold_chunk_ids": [
+        "318c96b7-ef45-326f-8698-c0dbec20e311",
+        "3f504141-58d1-3b11-8354-293fe50c8852",
+        "c06cf612-6aa1-3143-aa06-ba01a65d5148"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "318c96b7-ef45-326f-8698-c0dbec20e311",
+          "post_id": "349979791899889664",
+          "chunk_index": 2
+        },
+        {
+          "chunk_id": "3f504141-58d1-3b11-8354-293fe50c8852",
+          "post_id": "349979791899889664",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "c06cf612-6aa1-3143-aa06-ba01a65d5148",
+          "post_id": "349979791899889664",
+          "chunk_index": 26
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "318c96b7-ef45-326f-8698-c0dbec20e311",
+        "3f504141-58d1-3b11-8354-293fe50c8852",
+        "c06cf612-6aa1-3143-aa06-ba01a65d5148"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "可以用 Python 配置稳定的 AI 应用环境，选择 Diffusers pipeline，合理设置精度和推理参数，并通过版本锁定与问题预防保证稳定运行。",
+          "chunk_ids": [
+            "318c96b7-ef45-326f-8698-c0dbec20e311",
+            "3f504141-58d1-3b11-8354-293fe50c8852",
+            "c06cf612-6aa1-3143-aa06-ba01a65d5148"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349979791899889664": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-038",
+      "query": "How is Python used with stable diffusion?",
+      "question": "How is Python used with stable diffusion?",
+      "category": "multi_hop",
+      "gold_answer": "Python is the runtime and orchestration environment for Stable Diffusion: install its PyTorch/Transformers/Diffusers stack, load StableDiffusionPipeline, and move it to CUDA with fp16 when appropriate.",
+      "gold_post_ids": [
+        "349979791899889664"
+      ],
+      "gold_chunk_ids": [
+        "318c96b7-ef45-326f-8698-c0dbec20e311",
+        "3f504141-58d1-3b11-8354-293fe50c8852",
+        "1a3b35fc-12e5-3269-af83-044f33627c87"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "318c96b7-ef45-326f-8698-c0dbec20e311",
+          "post_id": "349979791899889664",
+          "chunk_index": 2
+        },
+        {
+          "chunk_id": "3f504141-58d1-3b11-8354-293fe50c8852",
+          "post_id": "349979791899889664",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "1a3b35fc-12e5-3269-af83-044f33627c87",
+          "post_id": "349979791899889664",
+          "chunk_index": 8
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "318c96b7-ef45-326f-8698-c0dbec20e311",
+        "3f504141-58d1-3b11-8354-293fe50c8852",
+        "1a3b35fc-12e5-3269-af83-044f33627c87"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Python is the runtime and orchestration environment for Stable Diffusion: install its PyTorch/Transformers/Diffusers stack, load StableDiffusionPipeline, and move it to CUDA with fp16 when appropriate.",
+          "chunk_ids": [
+            "318c96b7-ef45-326f-8698-c0dbec20e311",
+            "3f504141-58d1-3b11-8354-293fe50c8852",
+            "1a3b35fc-12e5-3269-af83-044f33627c87"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349979791899889664": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-039",
+      "query": "Python 工程思维如何帮助 AI 开发？",
+      "question": "Python 工程思维如何帮助 AI 开发？",
+      "category": "multi_hop",
+      "gold_answer": "Python engineering thinking helps AI development by separating goals and modules, choosing appropriate libraries, handling errors explicitly, and validating ideas through small-to-large projects.",
+      "gold_post_ids": [
+        "349997625120002048"
+      ],
+      "gold_chunk_ids": [
+        "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "56e99972-d2d8-3266-a26c-e287652771b4"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+          "post_id": "349997625120002048",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "f217cd27-50e9-312a-acc8-e0b695405cef",
+          "post_id": "349997625120002048",
+          "chunk_index": 7
+        },
+        {
+          "chunk_id": "56e99972-d2d8-3266-a26c-e287652771b4",
+          "post_id": "349997625120002048",
+          "chunk_index": 13
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+        "f217cd27-50e9-312a-acc8-e0b695405cef",
+        "56e99972-d2d8-3266-a26c-e287652771b4"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Python engineering thinking helps AI development by separating goals and modules, choosing appropriate libraries, handling errors explicitly, and validating ideas through small-to-large projects.",
+          "chunk_ids": [
+            "5ce07a29-f1db-3ffc-a5c9-7e5234e19eed",
+            "f217cd27-50e9-312a-acc8-e0b695405cef",
+            "56e99972-d2d8-3266-a26c-e287652771b4"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "349997625120002048": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-040",
+      "query": "How do AI agents and Python fit together?",
+      "question": "How do AI agents and Python fit together?",
+      "category": "multi_hop",
+      "gold_answer": "Agents and Python fit together as an integration layer: Python can host the AI model/dependency environment, while the Agent exposes external knowledge or APIs through standard service interfaces.",
+      "gold_post_ids": [
+        "350190663578554368",
+        "349979791899889664"
+      ],
+      "gold_chunk_ids": [
+        "8c771379-ded7-3616-b156-e75562cfb80f",
+        "318c96b7-ef45-326f-8698-c0dbec20e311"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "8c771379-ded7-3616-b156-e75562cfb80f",
+          "post_id": "350190663578554368",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "318c96b7-ef45-326f-8698-c0dbec20e311",
+          "post_id": "349979791899889664",
+          "chunk_index": 2
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "8c771379-ded7-3616-b156-e75562cfb80f",
+        "318c96b7-ef45-326f-8698-c0dbec20e311"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Agents and Python fit together as an integration layer: Python can host the AI model/dependency environment, while the Agent exposes external knowledge or APIs through standard service interfaces.",
+          "chunk_ids": [
+            "8c771379-ded7-3616-b156-e75562cfb80f",
+            "318c96b7-ef45-326f-8698-c0dbec20e311"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350190663578554368": 2,
+        "349979791899889664": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-041",
+      "query": "JVM 字节码如何执行？",
+      "question": "JVM 字节码如何执行？",
+      "category": "multi_hop",
+      "gold_answer": "JVM 字节码先由 javac 从 Java 源码生成并由类加载器装入 JVM；执行时可以解释执行，也可以由 JIT 把热点代码编译成机器码。",
+      "gold_post_ids": [
+        "350225194213838848"
+      ],
+      "gold_chunk_ids": [
+        "b5bd0342-92c4-3381-b84a-bf09ef8d4525",
+        "2b4bf078-fec2-3960-acae-6786206efecb"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "b5bd0342-92c4-3381-b84a-bf09ef8d4525",
+          "post_id": "350225194213838848",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "2b4bf078-fec2-3960-acae-6786206efecb",
+          "post_id": "350225194213838848",
+          "chunk_index": 17
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "b5bd0342-92c4-3381-b84a-bf09ef8d4525",
+        "2b4bf078-fec2-3960-acae-6786206efecb"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "JVM 字节码先由 javac 从 Java 源码生成并由类加载器装入 JVM；执行时可以解释执行，也可以由 JIT 把热点代码编译成机器码。",
+          "chunk_ids": [
+            "b5bd0342-92c4-3381-b84a-bf09ef8d4525",
+            "2b4bf078-fec2-3960-acae-6786206efecb"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350225194213838848": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-042",
+      "query": "How does JVM bytecode become machine code?",
+      "question": "How does JVM bytecode become machine code?",
+      "category": "multi_hop",
+      "gold_answer": "JVM bytecode becomes machine code through class loading and the execution engine: it may be interpreted first, then hot methods are JIT-compiled; tiered C1/C2 compilation balances startup and peak performance.",
+      "gold_post_ids": [
+        "350217230593691648"
+      ],
+      "gold_chunk_ids": [
+        "5408e19b-5158-3cfd-b607-f27d0a80408f",
+        "6ac9effb-6551-3176-aabf-b127926a2342",
+        "70e6b5f7-bfef-3233-b1c2-317307e8325e"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "5408e19b-5158-3cfd-b607-f27d0a80408f",
+          "post_id": "350217230593691648",
+          "chunk_index": 3
+        },
+        {
+          "chunk_id": "6ac9effb-6551-3176-aabf-b127926a2342",
+          "post_id": "350217230593691648",
+          "chunk_index": 10
+        },
+        {
+          "chunk_id": "70e6b5f7-bfef-3233-b1c2-317307e8325e",
+          "post_id": "350217230593691648",
+          "chunk_index": 12
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "5408e19b-5158-3cfd-b607-f27d0a80408f",
+        "6ac9effb-6551-3176-aabf-b127926a2342",
+        "70e6b5f7-bfef-3233-b1c2-317307e8325e"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "JVM bytecode becomes machine code through class loading and the execution engine: it may be interpreted first, then hot methods are JIT-compiled; tiered C1/C2 compilation balances startup and peak performance.",
+          "chunk_ids": [
+            "5408e19b-5158-3cfd-b607-f27d0a80408f",
+            "6ac9effb-6551-3176-aabf-b127926a2342",
+            "70e6b5f7-bfef-3233-b1c2-317307e8325e"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350217230593691648": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-043",
+      "query": "JVM 底层执行原理和性能有什么关系？",
+      "question": "JVM 底层执行原理和性能有什么关系？",
+      "category": "multi_hop",
+      "gold_answer": "JVM 底层通过解释执行和 JIT 将字节码转为机器指令；GC、内存和线程监控则帮助定位性能瓶颈，选择合适的收集器和参数进行调优。",
+      "gold_post_ids": [
+        "350057459060183040"
+      ],
+      "gold_chunk_ids": [
+        "b7fe8536-6ef5-3470-be3e-d21b2aac6360",
+        "9f604828-39c7-39d3-a740-1631f379d61a"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "b7fe8536-6ef5-3470-be3e-d21b2aac6360",
+          "post_id": "350057459060183040",
+          "chunk_index": 15
+        },
+        {
+          "chunk_id": "9f604828-39c7-39d3-a740-1631f379d61a",
+          "post_id": "350057459060183040",
+          "chunk_index": 25
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "b7fe8536-6ef5-3470-be3e-d21b2aac6360",
+        "9f604828-39c7-39d3-a740-1631f379d61a"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "JVM 底层通过解释执行和 JIT 将字节码转为机器指令；GC、内存和线程监控则帮助定位性能瓶颈，选择合适的收集器和参数进行调优。",
+          "chunk_ids": [
+            "b7fe8536-6ef5-3470-be3e-d21b2aac6360",
+            "9f604828-39c7-39d3-a740-1631f379d61a"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350057459060183040": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-044",
+      "query": "Spring Boot REST 服务如何设计？",
+      "question": "Spring Boot REST 服务如何设计？",
+      "category": "multi_hop",
+      "gold_answer": "Spring Boot REST 服务可以从 Initializr 创建项目并加入 Spring Web，使用 @RestController 和 @GetMapping 暴露 HTTP 接口，自动配置减少样板代码。",
+      "gold_post_ids": [
+        "350052643432960000"
+      ],
+      "gold_chunk_ids": [
+        "acfa665c-896b-30e7-8301-fab6254f12ab",
+        "f34febea-ee76-35d4-b4f2-2a54f5c0e356",
+        "2b55210a-02a4-349e-a5e1-bcb59af54c78"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "acfa665c-896b-30e7-8301-fab6254f12ab",
+          "post_id": "350052643432960000",
+          "chunk_index": 6
+        },
+        {
+          "chunk_id": "f34febea-ee76-35d4-b4f2-2a54f5c0e356",
+          "post_id": "350052643432960000",
+          "chunk_index": 16
+        },
+        {
+          "chunk_id": "2b55210a-02a4-349e-a5e1-bcb59af54c78",
+          "post_id": "350052643432960000",
+          "chunk_index": 18
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "acfa665c-896b-30e7-8301-fab6254f12ab",
+        "f34febea-ee76-35d4-b4f2-2a54f5c0e356",
+        "2b55210a-02a4-349e-a5e1-bcb59af54c78"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "Spring Boot REST 服务可以从 Initializr 创建项目并加入 Spring Web，使用 @RestController 和 @GetMapping 暴露 HTTP 接口，自动配置减少样板代码。",
+          "chunk_ids": [
+            "acfa665c-896b-30e7-8301-fab6254f12ab",
+            "f34febea-ee76-35d4-b4f2-2a54f5c0e356",
+            "2b55210a-02a4-349e-a5e1-bcb59af54c78"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350052643432960000": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-045",
+      "query": "What is a quick start path for a Spring Boot REST service?",
+      "question": "What is a quick start path for a Spring Boot REST service?",
+      "category": "multi_hop",
+      "gold_answer": "A quick start is to generate a Spring Boot project with Spring Web, create a @RestController endpoint, run the embedded server, and verify the URL response.",
+      "gold_post_ids": [
+        "350057564173635584"
+      ],
+      "gold_chunk_ids": [
+        "7d0c2f73-f50e-3e9f-8142-441ac256710f",
+        "d216a5a1-35f2-3608-acb5-361076358282",
+        "4ba6634f-dcb7-3a27-af83-43c639b42139"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "7d0c2f73-f50e-3e9f-8142-441ac256710f",
+          "post_id": "350057564173635584",
+          "chunk_index": 7
+        },
+        {
+          "chunk_id": "d216a5a1-35f2-3608-acb5-361076358282",
+          "post_id": "350057564173635584",
+          "chunk_index": 18
+        },
+        {
+          "chunk_id": "4ba6634f-dcb7-3a27-af83-43c639b42139",
+          "post_id": "350057564173635584",
+          "chunk_index": 23
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "7d0c2f73-f50e-3e9f-8142-441ac256710f",
+        "d216a5a1-35f2-3608-acb5-361076358282",
+        "4ba6634f-dcb7-3a27-af83-43c639b42139"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "A quick start is to generate a Spring Boot project with Spring Web, create a @RestController endpoint, run the embedded server, and verify the URL response.",
+          "chunk_ids": [
+            "7d0c2f73-f50e-3e9f-8142-441ac256710f",
+            "d216a5a1-35f2-3608-acb5-361076358282",
+            "4ba6634f-dcb7-3a27-af83-43c639b42139"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350057564173635584": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-046",
+      "query": "如何搭建一个可维护的 Spring Boot 应用？",
+      "question": "如何搭建一个可维护的 Spring Boot 应用？",
+      "category": "multi_hop",
+      "gold_answer": "可维护的 Spring Boot 应用应利用自动配置和外部化配置降低样板代码，使用 MockMvc 做接口测试，并通过可执行 JAR/内嵌 Tomcat保持部署简单。",
+      "gold_post_ids": [
+        "350057564173635584",
+        "350052643432960000"
+      ],
+      "gold_chunk_ids": [
+        "3f72f248-8da9-387f-a835-a69d1788fb6f",
+        "227cc0d5-c341-3435-8ba2-47d5fbbf8756",
+        "0bf93e99-e4dd-37a3-9886-c3b4d43bda60"
+      ],
+      "gold_chunks": [
+        {
+          "chunk_id": "3f72f248-8da9-387f-a835-a69d1788fb6f",
+          "post_id": "350057564173635584",
+          "chunk_index": 2
+        },
+        {
+          "chunk_id": "227cc0d5-c341-3435-8ba2-47d5fbbf8756",
+          "post_id": "350052643432960000",
+          "chunk_index": 35
+        },
+        {
+          "chunk_id": "0bf93e99-e4dd-37a3-9886-c3b4d43bda60",
+          "post_id": "350052643432960000",
+          "chunk_index": 40
+        }
+      ],
+      "answer_evidence_chunk_ids": [
+        "3f72f248-8da9-387f-a835-a69d1788fb6f",
+        "227cc0d5-c341-3435-8ba2-47d5fbbf8756",
+        "0bf93e99-e4dd-37a3-9886-c3b4d43bda60"
+      ],
+      "evidence_claims": [
+        {
+          "claim": "可维护的 Spring Boot 应用应利用自动配置和外部化配置降低样板代码，使用 MockMvc 做接口测试，并通过可执行 JAR/内嵌 Tomcat保持部署简单。",
+          "chunk_ids": [
+            "3f72f248-8da9-387f-a835-a69d1788fb6f",
+            "227cc0d5-c341-3435-8ba2-47d5fbbf8756",
+            "0bf93e99-e4dd-37a3-9886-c3b4d43bda60"
+          ]
+        }
+      ],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "Human-selected canonical chunk(s); the answer is a concise annotation to audit against the stored content snapshot. No qrel-to-index fallback was used.",
+      "qrels": {
+        "350057564173635584": 2,
+        "350052643432960000": 2
+      }
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-047",
+      "query": "社区资料中是否有关于深海量子茶园部署的实践？",
+      "question": "社区资料中是否有关于深海量子茶园部署的实践？",
+      "category": "no_answer",
+      "gold_answer": "当前社区资料不足",
+      "gold_post_ids": [],
+      "gold_chunk_ids": [],
+      "gold_chunks": [],
+      "answer_evidence_chunk_ids": [],
+      "evidence_claims": [],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "No-answer probe; no supporting public/searchable evidence was annotated.",
+      "qrels": {}
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-048",
+      "query": "社区资料是否讨论过火星城市的实时操作系统？",
+      "question": "社区资料是否讨论过火星城市的实时操作系统？",
+      "category": "no_answer",
+      "gold_answer": "当前社区资料不足",
+      "gold_post_ids": [],
+      "gold_chunk_ids": [],
+      "gold_chunks": [],
+      "answer_evidence_chunk_ids": [],
+      "evidence_claims": [],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "No-answer probe; no supporting public/searchable evidence was annotated.",
+      "qrels": {}
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-049",
+      "query": "有没有关于古典诗歌声纹数据库的社区工程方案？",
+      "question": "有没有关于古典诗歌声纹数据库的社区工程方案？",
+      "category": "no_answer",
+      "gold_answer": "当前社区资料不足",
+      "gold_post_ids": [],
+      "gold_chunk_ids": [],
+      "gold_chunks": [],
+      "answer_evidence_chunk_ids": [],
+      "evidence_claims": [],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "No-answer probe; no supporting public/searchable evidence was annotated.",
+      "qrels": {}
+    },
+    {
+      "dataset_version": "rag_evidence_v2",
+      "query_id": "rag-050",
+      "query": "社区里是否有关于水下无人机区块链共识的资料？",
+      "question": "社区里是否有关于水下无人机区块链共识的资料？",
+      "category": "no_answer",
+      "gold_answer": "当前社区资料不足",
+      "gold_post_ids": [],
+      "gold_chunk_ids": [],
+      "gold_chunks": [],
+      "answer_evidence_chunk_ids": [],
+      "evidence_claims": [],
+      "annotation_method": "manual_evidence_annotation",
+      "annotation_status": "human_audited",
+      "annotation_notes": "No-answer probe; no supporting public/searchable evidence was annotated.",
+      "qrels": {}
+    }
+  ]
+}
