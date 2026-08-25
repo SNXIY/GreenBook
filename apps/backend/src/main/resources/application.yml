@@ -113,6 +113,19 @@ search:
   mysql:
     max-hot-candidates: ${SEARCH_MYSQL_MAX_HOT_CANDIDATES:10000}
 
+rag:
+  enabled: ${RAG_ENABLED:true}
+  rebuild-on-start: ${RAG_REBUILD_ON_START:false}
+  qdrant:
+    collection: ${RAG_QDRANT_COLLECTION:post_chunks_multilingual_v1}
+  chunk:
+    max-chars: ${RAG_CHUNK_MAX_CHARS:1200}
+    overlap-chars: ${RAG_CHUNK_OVERLAP_CHARS:160}
+    max-source-bytes: ${RAG_CHUNK_MAX_SOURCE_BYTES:524288}
+  retrieval:
+    candidate-posts: ${RAG_CANDIDATE_POSTS:8}
+    top-chunks: ${RAG_TOP_CHUNKS:8}
+
 counter:
   rebuild:
     enabled: false

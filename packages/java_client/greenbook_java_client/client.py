@@ -28,6 +28,7 @@ from greenbook_java_client.models import (
     AgentOwnPostSummary,
     AgentPostContext,
     DraftResponse,
+    KnowledgeEvidenceResponse,
     PostAnalyticsResponse,
     PublishNowRequest,
     PublishResponse,
@@ -552,6 +553,36 @@ class JavaClient:
         )
         if result.ok and isinstance(result.data, list):
             result.data = [AgentOwnPostSummary.model_validate(item) for item in result.data]
+        return result
+
+    async def retrieve_knowledge_evidence(
+        self,
+        question: str,
+        *,
+        top_posts: int = 8,
+        top_chunks: int = 8,
+        bearer_token: str | None = None,
+        trace_id: str | None = None,
+        conversation_id: str | None = None,
+    ) -> ToolResult[KnowledgeEvidenceResponse]:
+        """Call the domain evidence capability, never a raw vector backend."""
+        headers = self._headers(
+            bearer_token=bearer_token,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+        )
+        result = await self._request(
+            "POST",
+            "/api/v1/agent/community/knowledge/evidence",
+            headers=headers,
+            body={
+                "question": question,
+                "topPosts": top_posts,
+                "topChunks": top_chunks,
+            },
+        )
+        if result.ok and result.data is not None:
+            result.data = KnowledgeEvidenceResponse.model_validate(result.data)
         return result
 
     async def delete_post(

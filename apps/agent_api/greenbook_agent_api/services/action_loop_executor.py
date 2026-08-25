@@ -18,6 +18,7 @@ from greenbook_agent_core.actionloop import (
     ActionDecision,
     ActionLoop,
 )
+from greenbook_agent_core.actionloop.loop import _default_resolver as _core_default_resolver
 from greenbook_agent_core.execution.runtime_result import RuntimeResult
 from greenbook_agent_core.llm_compat import structured_call
 from greenbook_agent_core.task.models import TaskRevision, TaskRevisionType
@@ -53,7 +54,7 @@ artifacts, resources, execution statuses, and (when present) an action plan.
 
 Decision semantics:
 - CALL_TOOL: execute one canonical semantic_action from the active capability
-  catalog (SEARCH_POSTS, GET_POST, GET_DRAFT, LIST_DRAFTS, GET_SCHEDULE,
+  catalog (SEARCH_POSTS, ANSWER_FROM_KNOWLEDGE, GET_POST, GET_DRAFT, LIST_DRAFTS, GET_SCHEDULE,
   LIST_OWN_POSTS, UPDATE_DRAFT, DELETE_DRAFT, UPDATE_SCHEDULE,
   CANCEL_SCHEDULE, PUBLISH_NOW, CREATE_SCHEDULE, CREATE_DRAFT).  Do not set
   tool_name; the runtime resolves it.
@@ -79,6 +80,13 @@ draft_id and no mutation field — an empty update would be rejected and the
 user's edit would be lost.  Read the current draft from the observation when
 available so you can rewrite it coherently.
 """
+
+
+def _resolve_semantic_action(action: str) -> tuple[str, str] | None:
+    """Extend the runtime wiring without changing ActionLoop core mappings."""
+    if str(action or "").upper() == "ANSWER_FROM_KNOWLEDGE":
+        return "ANSWER_FROM_KNOWLEDGE", "community.answer_from_knowledge"
+    return _core_default_resolver(action)
 
 _UPDATE_CONTENT_PROMPT = """You rewrite a GreenBook draft body per a user edit.
 
@@ -380,6 +388,7 @@ class ActionLoopExecutor:
 
         self._action_loop = action_loop or ActionLoop(
             decision_maker=self._decision_maker,
+            semantic_resolver=_resolve_semantic_action,
             read_handler=self._read_handler,
             write_submitter=self._write_submitter,
             context_assembler=self._context_assembler,

@@ -29,6 +29,7 @@ class SemanticAction(StrEnum):
     """Business operation vocabulary, independent from Goal/Task mutations."""
 
     SEARCH_POSTS = "SEARCH_POSTS"
+    ANSWER_FROM_KNOWLEDGE = "ANSWER_FROM_KNOWLEDGE"
     GET_POST = "GET_POST"
     LIST_OWN_POSTS = "LIST_OWN_POSTS"
     CREATE_DRAFT = "CREATE_DRAFT"
@@ -231,6 +232,9 @@ def _policy(
 # handlers against this mapping and the security gate reads the same objects.
 TOOL_POLICY_CATALOG: dict[str, ToolPolicyMetadata] = {
     "community.search_public_posts": _policy("READ"),
+    "community.answer_from_knowledge": _policy(
+        "READ", external_systems=("java", "llm"), timeout_seconds=120.0
+    ),
     "community.get_post": _policy("READ"),
     "community.list_own_posts": _policy("READ"),
     "content.create_draft": _policy(
@@ -309,6 +313,7 @@ TOOL_POLICY_CATALOG: dict[str, ToolPolicyMetadata] = {
 
 TOOL_SEMANTIC_ACTIONS: dict[str, SemanticAction] = {
     "community.search_public_posts": SemanticAction.SEARCH_POSTS,
+    "community.answer_from_knowledge": SemanticAction.ANSWER_FROM_KNOWLEDGE,
     "community.get_post": SemanticAction.GET_POST,
     "community.list_own_posts": SemanticAction.LIST_OWN_POSTS,
     "content.create_draft": SemanticAction.CREATE_DRAFT,

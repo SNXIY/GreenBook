@@ -21,6 +21,7 @@ from greenbook_contracts.tool_result import ToolResult
 from pydantic import BaseModel
 
 from .tool_schemas import (
+    AnswerFromKnowledgeArguments,
     CancelScheduleArguments,
     CreateDraftArguments,
     DeleteDraftArguments,
@@ -80,6 +81,15 @@ _register(
     description="Search public posts in the GreenBook community",
     category="community",
     input_schema=SearchPublicPostsArguments,
+)
+_register(
+    "community.answer_from_knowledge",
+    community.answer_from_knowledge,
+    capability="ANSWER_FROM_KNOWLEDGE",
+    operations=("QUERY_CONTENT",),
+    description="Answer a community knowledge question using cited evidence chunks",
+    category="community",
+    input_schema=AnswerFromKnowledgeArguments,
 )
 _register(
     "community.get_post",

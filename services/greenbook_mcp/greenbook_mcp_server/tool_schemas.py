@@ -45,6 +45,14 @@ class SearchPublicPostsArguments(BaseModel):
     size: int = Field(default=20, ge=1, le=50)
 
 
+class AnswerFromKnowledgeArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    question: str = Field(min_length=1, max_length=1000)
+    top_posts: int = Field(default=8, ge=1, le=20)
+    top_chunks: int = Field(default=8, ge=1, le=20)
+
+
 class GetPostArguments(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

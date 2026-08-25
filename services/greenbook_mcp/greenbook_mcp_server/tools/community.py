@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
+import time
 from typing import Any
 
 from greenbook_contracts.tool_result import (
@@ -15,6 +18,19 @@ from greenbook_contracts.tool_result import (
 from ..context import ToolContext
 
 logger = logging.getLogger(__name__)
+
+_INSUFFICIENT_EVIDENCE = "当前社区资料不足"
+_GROUNDED_ANSWER_PROMPT = """You answer a community knowledge question from evidence chunks.
+
+Rules:
+- Use only the supplied evidence. Do not use general model knowledge.
+- If the evidence does not establish the answer, return exactly
+  "当前社区资料不足" and an empty sources array.
+- Every non-empty answer must cite one or more supplied chunk IDs in sources.
+- Never invent a post ID, title, or chunk ID. Sources must use exact supplied IDs.
+- Return JSON only with {"answer": string, "sources": [{"postId": string,
+  "title": string, "chunkId": string}]}.
+"""
 
 
 def _post_ref(
@@ -68,6 +84,174 @@ async def search_public_posts(
         ]
         result = result.model_copy(update={"resource_refs": refs})
     return _mark_source(result, DataProvenance.COMMUNITY_DATA)
+
+
+async def answer_from_knowledge(
+    ctx: ToolContext,
+    question: str,
+    top_posts: int = 8,
+    top_chunks: int = 8,
+) -> ToolResult[Any]:
+    """Retrieve post-scoped evidence, then answer only from those chunks."""
+    result = await ctx.java.retrieve_knowledge_evidence(
+        question,
+        top_posts=top_posts,
+        top_chunks=top_chunks,
+        bearer_token=ctx.auth.raw_access_token,
+        trace_id=ctx.trace_id,
+        conversation_id=ctx.conversation_id,
+    )
+    if not result.ok or result.data is None:
+        return _mark_source(result, DataProvenance.COMMUNITY_DATA)
+
+    evidence = list(result.data.chunks or [])
+    if not evidence:
+        return ToolResult.success(
+            {"answer": _INSUFFICIENT_EVIDENCE, "sources": []},
+            trace_id=result.trace_id,
+            provenance=[DataProvenance.COMMUNITY_DATA],
+        )
+    if ctx.llm is None:
+        return ToolResult.failure(
+            "GENERATION_UNAVAILABLE",
+            "Grounded answer generation requires the configured host LLM",
+            "当前暂时无法生成基于社区资料的回答。",
+            retryable=True,
+            trace_id=result.trace_id,
+        )
+
+    evidence_payload = [
+        {
+            "chunkId": chunk.chunk_id,
+            "postId": chunk.post_id,
+            "title": chunk.title or "",
+            "content": chunk.content,
+            "startOffset": chunk.start_offset,
+            "endOffset": chunk.end_offset,
+        }
+        for chunk in evidence
+    ]
+    try:
+        from greenbook_agent_core.llm_compat import structured_call
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "answer": {"type": "string"},
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "postId": {"type": "string"},
+                            "title": {"type": "string"},
+                            "chunkId": {"type": "string"},
+                        },
+                        "required": ["postId", "title", "chunkId"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["answer", "sources"],
+            "additionalProperties": False,
+        }
+        generation_started = time.perf_counter()
+        response = await structured_call(
+            ctx.llm,
+            ctx.model or "deepseek-chat",
+            _GROUNDED_ANSWER_PROMPT,
+            "community_grounded_answer",
+            schema,
+            {"question": question, "evidence": evidence_payload},
+        )
+        payload = _grounded_payload(response)
+        answer = str(payload.get("answer") or "").strip() if isinstance(payload, dict) else ""
+        raw_sources = payload.get("sources") if isinstance(payload, dict) else []
+        if answer == _INSUFFICIENT_EVIDENCE:
+            sources = []
+        else:
+            sources = _validated_sources(raw_sources, evidence)
+            if not answer or not sources:
+                answer = _INSUFFICIENT_EVIDENCE
+                sources = []
+        refs = [
+            ResourceRef(
+                ref=f"post:{chunk.post_id}:chunk:{chunk.chunk_id}",
+                kind="POST_CHUNK",
+                resource_id=chunk.chunk_id,
+                title=chunk.title,
+                version=chunk.event_version,
+                source=DataProvenance.COMMUNITY_DATA.value,
+                tool="community.answer_from_knowledge",
+            )
+            for chunk in evidence
+            if any(source["chunkId"] == chunk.chunk_id for source in sources)
+        ]
+        answer_result = ToolResult.success(
+            {"answer": answer, "sources": sources},
+            trace_id=result.trace_id,
+            resource_refs=refs,
+            provenance=[DataProvenance.COMMUNITY_DATA, DataProvenance.MODEL_INFERENCE],
+        )
+        answer_result.state = {
+            "evidence_count": len(evidence),
+            "candidate_post_count": result.data.candidate_post_count,
+            "embedding_latency_ms": result.data.embedding_latency_ms,
+            "chunk_retrieval_latency_ms": result.data.chunk_retrieval_latency_ms,
+            "generation_latency_ms": round((time.perf_counter() - generation_started) * 1000, 3),
+        }
+        return answer_result
+    except Exception as exc:  # fail closed on malformed or unavailable generation
+        logger.warning("grounded_answer_generation_failed", exc_info=True)
+        return ToolResult.failure(
+            "GENERATION_FAILED",
+            str(exc)[:500],
+            "当前暂时无法生成基于社区资料的回答。",
+            retryable=True,
+            trace_id=result.trace_id,
+        )
+
+
+def _grounded_payload(response: Any) -> Any:
+    message = response.choices[0].message
+    parsed = getattr(message, "parsed", None)
+    if parsed is not None:
+        return parsed.model_dump(mode="python") if hasattr(parsed, "model_dump") else parsed
+    content = getattr(message, "content", None)
+    if isinstance(content, dict):
+        return content
+    if not isinstance(content, str) or not content.strip():
+        return None
+    match = re.search(r"\{.*\}", content.strip(), re.DOTALL)
+    if match is None:
+        return None
+    try:
+        value = json.loads(match.group(0))
+        return value if isinstance(value, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _validated_sources(raw_sources: Any, evidence: list[Any]) -> list[dict[str, str]]:
+    by_chunk = {chunk.chunk_id: chunk for chunk in evidence}
+    if not isinstance(raw_sources, list):
+        return []
+    result: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for raw in raw_sources:
+        if not isinstance(raw, dict):
+            continue
+        chunk_id = str(raw.get("chunkId") or raw.get("chunk_id") or "")
+        chunk = by_chunk.get(chunk_id)
+        if chunk is None or chunk_id in seen:
+            continue
+        seen.add(chunk_id)
+        result.append({
+            "postId": chunk.post_id,
+            "title": chunk.title or "",
+            "chunkId": chunk.chunk_id,
+        })
+    return result
 
 
 async def get_post(

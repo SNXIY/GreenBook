@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tongji.search.rag.mapper.PostChunkMapper">
+
+    <resultMap id="PostChunkResultMap" type="com.tongji.search.rag.model.PostChunk">
+        <id property="chunkId" column="chunk_id" />
+        <result property="postId" column="post_id" />
+        <result property="chunkIndex" column="chunk_index" />
+        <result property="content" column="content" />
+        <result property="tokenCount" column="token_count" />
+        <result property="startOffset" column="start_offset" />
+        <result property="endOffset" column="end_offset" />
+        <result property="embeddingModel" column="embedding_model" />
+        <result property="embeddingVersion" column="embedding_version" />
+        <result property="dimension" column="dimension" />
+        <result property="eventVersion" column="event_version" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+    </resultMap>
+
+    <delete id="deleteByPostId">
+        DELETE FROM post_chunks WHERE post_id = #{postId}
+    </delete>
+
+    <select id="findMaxEventVersion" resultType="long">
+        SELECT MAX(event_version) FROM post_chunks WHERE post_id = #{postId}
+    </select>
+
+    <insert id="insertBatch">
+        INSERT INTO post_chunks (
+            chunk_id, post_id, chunk_index, content, token_count,
+            start_offset, end_offset, embedding_model, embedding_version,
+            dimension, event_version, created_at, updated_at
+        ) VALUES
+        <foreach collection="chunks" item="chunk" separator=",">
+            (
+                #{chunk.chunkId}, #{chunk.postId}, #{chunk.chunkIndex}, #{chunk.content},
+                #{chunk.tokenCount}, #{chunk.startOffset}, #{chunk.endOffset},
+                #{chunk.embeddingModel}, #{chunk.embeddingVersion}, #{chunk.dimension},
+                #{chunk.eventVersion}, #{chunk.createdAt}, #{chunk.updatedAt}
+            )
+        </foreach>
+    </insert>
+
+    <select id="findByIds" resultMap="PostChunkResultMap">
+        SELECT * FROM post_chunks WHERE chunk_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="findByPostIds" resultMap="PostChunkResultMap">
+        SELECT * FROM post_chunks WHERE post_id IN
+        <foreach collection="postIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY post_id, chunk_index
+    </select>
+</mapper>

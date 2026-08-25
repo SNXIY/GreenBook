@@ -1,0 +1,2387 @@
+{
+  "dataset": "docs\\evaluation\\rag_evidence_dataset_v1.jsonl",
+  "fixture": "docs\\evaluation\\hybrid_search_retrieval_fixture_20260825.json",
+  "chunk_fixture": "docs\\evaluation\\rag_chunk_fixture_20260825.json",
+  "status": "VALID",
+  "VALID_QUERY_COUNT": 50,
+  "VALID_QREL_COUNT": 138,
+  "REMOVED_INVALID_COUNT": 0,
+  "MISSING_FIXTURE_COUNT": 0,
+  "MISSING_CHUNK_FIXTURE_COUNT": 0,
+  "NON_SEARCHABLE_QREL_COUNT": 3,
+  "fixture_post_count": 67,
+  "chunk_fixture_post_count": 47,
+  "file_issues": [],
+  "invalid_rows": [],
+  "missing_fixture": [],
+  "missing_chunk_fixture": [],
+  "non_searchable_qrels": [
+    {
+      "query_id": "rag-031",
+      "post_id": "350345168794292224",
+      "relevance": 1,
+      "line": 31,
+      "fixture": {
+        "post_id": "350345168794292224",
+        "exists": true,
+        "status": "draft",
+        "visible": "public",
+        "public": false,
+        "searchable": false,
+        "event_version": 0
+      }
+    },
+    {
+      "query_id": "rag-032",
+      "post_id": "350345168794292224",
+      "relevance": 1,
+      "line": 32,
+      "fixture": {
+        "post_id": "350345168794292224",
+        "exists": true,
+        "status": "draft",
+        "visible": "public",
+        "public": false,
+        "searchable": false,
+        "event_version": 0
+      }
+    },
+    {
+      "query_id": "rag-033",
+      "post_id": "350345168794292224",
+      "relevance": 2,
+      "line": 33,
+      "fixture": {
+        "post_id": "350345168794292224",
+        "exists": true,
+        "status": "draft",
+        "visible": "public",
+        "public": false,
+        "searchable": false,
+        "event_version": 0
+      }
+    }
+  ],
+  "valid_rows": [
+    {
+      "query_id": "rag-001",
+      "question": "Java 后端可靠性实践有哪些核心原则？",
+      "category": "fact",
+      "qrels": {
+        "350329167449034752": 2,
+        "350308965579624448": 1,
+        "350297994190524416": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350329167449034752",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350308965579624448",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350297994190524416",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350329167449034752": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350308965579624448": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350297994190524416": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-002",
+      "question": "What are the main practices for reliable Java backends?",
+      "category": "fact",
+      "qrels": {
+        "350308965579624448": 2,
+        "350297994190524416": 1,
+        "350249029386506240": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350308965579624448",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350297994190524416",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350249029386506240",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350308965579624448": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350297994190524416": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350249029386506240": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-003",
+      "question": "如何在 Java 服务中实现后端稳定性？",
+      "category": "fact",
+      "qrels": {
+        "350297994190524416": 2,
+        "350249029386506240": 1,
+        "350227936244273152": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350297994190524416",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350249029386506240",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350227936244273152",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350297994190524416": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350249029386506240": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350227936244273152": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-004",
+      "question": "从 Java 入门到生产实践需要掌握哪些可靠性要点？",
+      "category": "fact",
+      "qrels": {
+        "350249029386506240": 2,
+        "350227936244273152": 1,
+        "350192904104448000": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350249029386506240",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350227936244273152",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350192904104448000",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350249029386506240": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350227936244273152": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350192904104448000": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-005",
+      "question": "What should a learner know to build production Java services?",
+      "category": "fact",
+      "qrels": {
+        "350227936244273152": 2,
+        "350192904104448000": 1,
+        "350125174705754112": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350227936244273152",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350192904104448000",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350125174705754112",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350227936244273152": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350192904104448000": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350125174705754112": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-006",
+      "question": "Java 稳定性验证通常包括哪些内容？",
+      "category": "fact",
+      "qrels": {
+        "350192904104448000": 2,
+        "350125174705754112": 1,
+        "350118465648070656": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350192904104448000",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350125174705754112",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350118465648070656",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350192904104448000": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350125174705754112": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350118465648070656": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-007",
+      "question": "Java 后端架构设计如何支持可靠性？",
+      "category": "fact",
+      "qrels": {
+        "350125174705754112": 2,
+        "350118465648070656": 1,
+        "350059300833595392": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350125174705754112",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350118465648070656",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350059300833595392",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350125174705754112": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350118465648070656": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350059300833595392": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-008",
+      "question": "What is the Java programming language used for in backend systems?",
+      "category": "fact",
+      "qrels": {
+        "350118465648070656": 2,
+        "350059300833595392": 1,
+        "350058952274350080": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350118465648070656",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350059300833595392",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350058952274350080",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350118465648070656": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350059300833595392": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350058952274350080": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-009",
+      "question": "Java 服务如何处理异常、重试与稳定性？",
+      "category": "fact",
+      "qrels": {
+        "350059300833595392": 2,
+        "350058952274350080": 1,
+        "350329167449034752": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350059300833595392",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350058952274350080",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350329167449034752",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350059300833595392": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350058952274350080": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350329167449034752": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-010",
+      "question": "Java 后端迁移与升级有哪些实践要点？",
+      "category": "fact",
+      "qrels": {
+        "350058952274350080": 2,
+        "350329167449034752": 1,
+        "350308965579624448": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350058952274350080",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350329167449034752",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350308965579624448",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350058952274350080": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350329167449034752": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350308965579624448": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-011",
+      "question": "Redis 缓存的生产实践有哪些？",
+      "category": "fact",
+      "qrels": {
+        "350444831992057856": 2,
+        "350326942672752640": 1,
+        "350301679532511232": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350444831992057856",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350326942672752640",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350301679532511232",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350444831992057856": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350326942672752640": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350301679532511232": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-012",
+      "question": "What are reliable Redis cache practices in production?",
+      "category": "fact",
+      "qrels": {
+        "350326942672752640": 2,
+        "350301679532511232": 1,
+        "350276616603176960": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350326942672752640",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350301679532511232",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350276616603176960",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350326942672752640": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350301679532511232": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350276616603176960": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-013",
+      "question": "如何设计 Redis 缓存架构？",
+      "category": "fact",
+      "qrels": {
+        "350301679532511232": 2,
+        "350276616603176960": 1,
+        "350169155699347456": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350301679532511232",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350276616603176960",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350169155699347456",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350301679532511232": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350276616603176960": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350169155699347456": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-014",
+      "question": "Redis 的 RDB 和 AOF 持久化有什么区别？",
+      "category": "fact",
+      "qrels": {
+        "350276616603176960": 2,
+        "350169155699347456": 1,
+        "350137614227083264": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350276616603176960",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350169155699347456",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350137614227083264",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350276616603176960": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350169155699347456": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350137614227083264": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-015",
+      "question": "When should a Redis system use RDB or AOF?",
+      "category": "fact",
+      "qrels": {
+        "350169155699347456": 2,
+        "350137614227083264": 1,
+        "350057110207336448": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350169155699347456",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350137614227083264",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350057110207336448",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350169155699347456": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350137614227083264": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350057110207336448": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-016",
+      "question": "Redis 高可用部署需要注意什么？",
+      "category": "fact",
+      "qrels": {
+        "350137614227083264": 2,
+        "350057110207336448": 1,
+        "350052215903358976": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350137614227083264",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350057110207336448",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350052215903358976",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350137614227083264": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350057110207336448": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350052215903358976": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-017",
+      "question": "Redis 实战中的性能与可靠性如何保障？",
+      "category": "architecture",
+      "qrels": {
+        "350057110207336448": 2,
+        "350052215903358976": 1,
+        "350039280040677376": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350057110207336448",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350052215903358976",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350039280040677376",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350057110207336448": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350052215903358976": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350039280040677376": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-018",
+      "question": "How does Redis Pub/Sub support messaging?",
+      "category": "architecture",
+      "qrels": {
+        "350052215903358976": 2,
+        "350039280040677376": 1,
+        "349853528392601600": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350052215903358976",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350039280040677376",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349853528392601600",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350052215903358976": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350039280040677376": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349853528392601600": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-019",
+      "question": "Redis 集群与消息机制如何协同？",
+      "category": "architecture",
+      "qrels": {
+        "350039280040677376": 2,
+        "349853528392601600": 1,
+        "350444831992057856": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350039280040677376",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349853528392601600",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350444831992057856",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350039280040677376": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349853528392601600": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350444831992057856": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-020",
+      "question": "What are the operational concerns for a popular Redis deployment?",
+      "category": "architecture",
+      "qrels": {
+        "349853528392601600": 2,
+        "350444831992057856": 1,
+        "350326942672752640": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349853528392601600",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350444831992057856",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350326942672752640",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "349853528392601600": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350444831992057856": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350326942672752640": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-021",
+      "question": "Agent 工程实践通常包括哪些内容？",
+      "category": "architecture",
+      "qrels": {
+        "350329484899127296": 2,
+        "350309267875696640": 1,
+        "350275996995424256": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350329484899127296",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350309267875696640",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350275996995424256",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350329484899127296": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350309267875696640": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350275996995424256": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-022",
+      "question": "How should an agent system be designed for production engineering?",
+      "category": "architecture",
+      "qrels": {
+        "350309267875696640": 2,
+        "350275996995424256": 1,
+        "350231237295738880": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350309267875696640",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350275996995424256",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350231237295738880",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350309267875696640": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350275996995424256": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350231237295738880": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-023",
+      "question": "如何从 Agent 原型演进到可靠系统？",
+      "category": "architecture",
+      "qrels": {
+        "350275996995424256": 2,
+        "350231237295738880": 1,
+        "350190663578554368": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350275996995424256",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350231237295738880",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350190663578554368",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350275996995424256": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350231237295738880": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350190663578554368": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-024",
+      "question": "Agent 如何编排工具、状态和工作流？",
+      "category": "architecture",
+      "qrels": {
+        "350231237295738880": 2,
+        "350190663578554368": 1,
+        "350059055273873408": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350231237295738880",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350190663578554368",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350059055273873408",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350231237295738880": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350190663578554368": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350059055273873408": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-025",
+      "question": "What is an AI agent workflow in a community system?",
+      "category": "architecture",
+      "qrels": {
+        "350190663578554368": 2,
+        "350059055273873408": 1,
+        "350054191386988544": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350190663578554368",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350059055273873408",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350054191386988544",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350190663578554368": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350059055273873408": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350054191386988544": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-026",
+      "question": "Agent 系统的关键组件如何协作？",
+      "category": "architecture",
+      "qrels": {
+        "350059055273873408": 2,
+        "350054191386988544": 1,
+        "350041161068580864": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350059055273873408",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350054191386988544",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350041161068580864",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350059055273873408": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350054191386988544": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350041161068580864": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-027",
+      "question": "Agent 协作有哪些工程模式？",
+      "category": "architecture",
+      "qrels": {
+        "350054191386988544": 2,
+        "350041161068580864": 1,
+        "350048814830325760": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350054191386988544",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350041161068580864",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350048814830325760",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350054191386988544": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350041161068580864": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350048814830325760": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-028",
+      "question": "How can multiple agents collaborate safely?",
+      "category": "architecture",
+      "qrels": {
+        "350041161068580864": 2,
+        "350048814830325760": 1,
+        "349855990751039488": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350041161068580864",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350048814830325760",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349855990751039488",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350041161068580864": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350048814830325760": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349855990751039488": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-029",
+      "question": "Agent 工程落地需要哪些步骤？",
+      "category": "architecture",
+      "qrels": {
+        "350048814830325760": 2,
+        "349855990751039488": 1,
+        "350329484899127296": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350048814830325760",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349855990751039488",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350329484899127296",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350048814830325760": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349855990751039488": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350329484899127296": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-030",
+      "question": "How does GreenBook apply agent engineering?",
+      "category": "architecture",
+      "qrels": {
+        "349855990751039488": 2,
+        "350329484899127296": 1,
+        "350309267875696640": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349855990751039488",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350329484899127296",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350309267875696640",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "349855990751039488": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350329484899127296": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350309267875696640": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-031",
+      "question": "Python 学习路线包含哪些内容？",
+      "category": "architecture",
+      "qrels": {
+        "349997625120002048": 2,
+        "349979791899889664": 1,
+        "350345168794292224": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349997625120002048",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349979791899889664",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "349997625120002048": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349979791899889664": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350345168794292224": {
+          "exists": true,
+          "public": false,
+          "searchable": false,
+          "status": "draft",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-032",
+      "question": "What should a beginner learn to program in Python?",
+      "category": "architecture",
+      "qrels": {
+        "349979791899889664": 2,
+        "350345168794292224": 1,
+        "349997252569337856": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349979791899889664",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349997252569337856",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "349979791899889664": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350345168794292224": {
+          "exists": true,
+          "public": false,
+          "searchable": false,
+          "status": "draft",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349997252569337856": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-033",
+      "question": "如何从 Python 基础逐步进入 AI 开发？",
+      "category": "multi_hop",
+      "qrels": {
+        "350345168794292224": 2,
+        "349997252569337856": 1,
+        "349979334259380224": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349997252569337856",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349979334259380224",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350345168794292224": {
+          "exists": true,
+          "public": false,
+          "searchable": false,
+          "status": "draft",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349997252569337856": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349979334259380224": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-034",
+      "question": "Python 稳定扩展模块时有哪些工程要点？",
+      "category": "multi_hop",
+      "qrels": {
+        "349997252569337856": 2,
+        "349979334259380224": 1,
+        "350013010842095616": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349997252569337856",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349979334259380224",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350013010842095616",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "349997252569337856": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349979334259380224": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350013010842095616": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-035",
+      "question": "AI 学习的实践路线如何规划？",
+      "category": "multi_hop",
+      "qrels": {
+        "349979334259380224": 2,
+        "350013010842095616": 1,
+        "350168574914072576": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349979334259380224",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350013010842095616",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350168574914072576",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "349979334259380224": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350013010842095616": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350168574914072576": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-036",
+      "question": "What is a practical guide for learning AI?",
+      "category": "multi_hop",
+      "qrels": {
+        "350013010842095616": 2,
+        "350168574914072576": 1,
+        "350159359080271872": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350013010842095616",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350168574914072576",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350159359080271872",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350013010842095616": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350168574914072576": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350159359080271872": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-037",
+      "question": "如何通过 Python 构建稳定的 AI 应用？",
+      "category": "multi_hop",
+      "qrels": {
+        "350168574914072576": 2,
+        "350159359080271872": 1,
+        "350136954475646976": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350168574914072576",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350159359080271872",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350136954475646976",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350168574914072576": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350159359080271872": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350136954475646976": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-038",
+      "question": "How is Python used with stable diffusion?",
+      "category": "multi_hop",
+      "qrels": {
+        "350159359080271872": 2,
+        "350136954475646976": 1,
+        "350165577848983552": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350159359080271872",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350136954475646976",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350165577848983552",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350159359080271872": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350136954475646976": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350165577848983552": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-039",
+      "question": "Python 工程思维如何帮助 AI 开发？",
+      "category": "multi_hop",
+      "qrels": {
+        "350136954475646976": 2,
+        "350165577848983552": 1,
+        "349997625120002048": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350136954475646976",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350165577848983552",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349997625120002048",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350136954475646976": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350165577848983552": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349997625120002048": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-040",
+      "question": "How do AI agents and Python fit together?",
+      "category": "multi_hop",
+      "qrels": {
+        "350165577848983552": 2,
+        "349997625120002048": 1,
+        "349979791899889664": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350165577848983552",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349997625120002048",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349979791899889664",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350165577848983552": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349997625120002048": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349979791899889664": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-041",
+      "question": "JVM 字节码如何执行？",
+      "category": "multi_hop",
+      "qrels": {
+        "350225194213838848": 2,
+        "350217230593691648": 1,
+        "350057459060183040": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350225194213838848",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350217230593691648",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350057459060183040",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350225194213838848": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350217230593691648": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350057459060183040": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-042",
+      "question": "How does JVM bytecode become machine code?",
+      "category": "multi_hop",
+      "qrels": {
+        "350217230593691648": 2,
+        "350057459060183040": 1,
+        "350052549258252288": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350217230593691648",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350057459060183040",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350052549258252288",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350217230593691648": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350057459060183040": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350052549258252288": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-043",
+      "question": "JVM 底层执行原理和性能有什么关系？",
+      "category": "multi_hop",
+      "qrels": {
+        "350057459060183040": 2,
+        "350052549258252288": 1,
+        "350039591018958848": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350057459060183040",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350052549258252288",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350039591018958848",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350057459060183040": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350052549258252288": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350039591018958848": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-044",
+      "question": "Spring Boot REST 服务如何设计？",
+      "category": "multi_hop",
+      "qrels": {
+        "350052549258252288": 2,
+        "350039591018958848": 1,
+        "349815269180444672": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350052549258252288",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350039591018958848",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349815269180444672",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350052549258252288": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350039591018958848": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349815269180444672": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-045",
+      "question": "What is a quick start path for a Spring Boot REST service?",
+      "category": "multi_hop",
+      "qrels": {
+        "350039591018958848": 2,
+        "349815269180444672": 1,
+        "350057564173635584": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "350039591018958848",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "349815269180444672",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350057564173635584",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "350039591018958848": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "349815269180444672": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350057564173635584": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-046",
+      "question": "如何搭建一个可维护的 Spring Boot 应用？",
+      "category": "multi_hop",
+      "qrels": {
+        "349815269180444672": 2,
+        "350057564173635584": 1,
+        "350052643432960000": 1
+      },
+      "gold_chunks": [
+        {
+          "post_id": "349815269180444672",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350057564173635584",
+          "chunk_index": 0
+        },
+        {
+          "post_id": "350052643432960000",
+          "chunk_index": 0
+        }
+      ],
+      "qrel_status": {
+        "349815269180444672": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350057564173635584": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        },
+        "350052643432960000": {
+          "exists": true,
+          "public": true,
+          "searchable": true,
+          "status": "published",
+          "visible": "public",
+          "event_version": 0
+        }
+      }
+    },
+    {
+      "query_id": "rag-047",
+      "question": "社区资料中是否有关于深海量子茶园部署的实践？",
+      "category": "no_answer",
+      "qrels": {},
+      "gold_chunks": [],
+      "qrel_status": {}
+    },
+    {
+      "query_id": "rag-048",
+      "question": "社区资料是否讨论过火星城市的实时操作系统？",
+      "category": "no_answer",
+      "qrels": {},
+      "gold_chunks": [],
+      "qrel_status": {}
+    },
+    {
+      "query_id": "rag-049",
+      "question": "有没有关于古典诗歌声纹数据库的社区工程方案？",
+      "category": "no_answer",
+      "qrels": {},
+      "gold_chunks": [],
+      "qrel_status": {}
+    },
+    {
+      "query_id": "rag-050",
+      "question": "社区里是否有关于水下无人机区块链共识的资料？",
+      "category": "no_answer",
+      "qrels": {},
+      "gold_chunks": [],
+      "qrel_status": {}
+    }
+  ]
+}

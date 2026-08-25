@@ -102,6 +102,7 @@ logger = logging.getLogger(__name__)
 # text, chooses a resource, or invokes a Tool.
 _SEMANTIC_ACTION_CAPABILITIES: dict[str, str] = {
     SemanticAction.SEARCH_POSTS.value: "SEARCH_COMMUNITY",
+    SemanticAction.ANSWER_FROM_KNOWLEDGE.value: "ANSWER_FROM_KNOWLEDGE",
     SemanticAction.GET_POST.value: "GET_POST_DETAIL",
     SemanticAction.LIST_OWN_POSTS.value: "LIST_OWN_POSTS",
     SemanticAction.CREATE_DRAFT.value: "GENERATE_CONTENT",

@@ -91,6 +91,30 @@ class SearchPageResponse(BaseModel):
     degraded: bool = False
 
 
+class EvidenceChunk(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    chunk_id: str = Field(alias="chunkId")
+    post_id: str = Field(alias="postId")
+    title: str | None = None
+    content: str
+    score: float
+    start_offset: int = Field(alias="startOffset")
+    end_offset: int = Field(alias="endOffset")
+    event_version: int = Field(default=0, alias="eventVersion")
+    updated_at: datetime | None = Field(default=None, alias="updatedAt")
+
+
+class KnowledgeEvidenceResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    chunks: list[EvidenceChunk] = Field(default_factory=list)
+    candidate_post_count: int = Field(default=0, alias="candidatePostCount")
+    embedding_latency_ms: int = Field(default=0, alias="embeddingLatencyMs")
+    chunk_retrieval_latency_ms: int = Field(default=0, alias="chunkRetrievalLatencyMs")
+    degraded: bool = False
+
+
 # ── Post ─────────────────────────────────────────────────────────────
 
 class AgentPostContext(BaseModel):

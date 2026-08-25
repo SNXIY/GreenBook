@@ -1,0 +1,52 @@
+{
+  "status": "VALID",
+  "dataset": {
+    "VALID_QUERY_COUNT": 50,
+    "VALID_QREL_COUNT": 138,
+    "REMOVED_INVALID_COUNT": 0,
+    "MISSING_FIXTURE_COUNT": 0,
+    "MISSING_CHUNK_FIXTURE_COUNT": 0,
+    "NON_SEARCHABLE_QREL_COUNT": 3
+  },
+  "providers": {
+    "rag_evidence": {
+      "quality": {
+        "recall5": 0.101449,
+        "recall10": 0.15942,
+        "evidence_expected_chunk_count": 135,
+        "retrieval_miss_count_at10": 114,
+        "RETRIEVAL_MISS": 114,
+        "no_answer_query_count": 4,
+        "no_answer_false_positive_at10": 40
+      },
+      "citation": {
+        "citation_correctness_structural": null,
+        "citation_checks": 0,
+        "faithfulness_structural_proxy": null,
+        "faithfulness_labeled": null,
+        "citation_correctness_labeled": null,
+        "generation_labeled_query_count": 0,
+        "generation_observed_query_count": 0
+      },
+      "latency_ms": {
+        "chunk_retrieval": {
+          "p50": 21.0,
+          "p95": 24.55
+        },
+        "embedding": {
+          "p50": 7.0,
+          "p95": 8.0
+        },
+        "generation": {
+          "p50": null,
+          "p95": null
+        },
+        "total": {
+          "p50": 271.666,
+          "p95": 320.644
+        }
+      },
+      "run_missing_query_count": 0
+    }
+  }
+}

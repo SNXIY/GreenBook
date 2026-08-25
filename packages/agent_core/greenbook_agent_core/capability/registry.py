@@ -33,6 +33,18 @@ _CATALOG: list[Capability] = [
         parallelizable=True,
     ),
     Capability(
+        name="ANSWER_FROM_KNOWLEDGE",
+        description="Answer a community knowledge question from cited evidence chunks",
+        category=CapabilityCategory.SEARCH,
+        tools=["community.answer_from_knowledge"],
+        inputs=CapabilityInput(
+            required=["question"],
+            optional=["top_posts", "top_chunks"],
+        ),
+        output_artifact_type="KNOWLEDGE_ANSWER",
+        result_requirement="DIRECT_RESULT",
+    ),
+    Capability(
         name="GET_POST_DETAIL",
         description="Retrieve full details of a single post by ID",
         category=CapabilityCategory.SEARCH,
@@ -298,6 +310,7 @@ class CapabilityRegistry:
         ).strip().upper()
         semantic_mapping: dict[str, str] = {
             "SEARCH_POSTS": "SEARCH_COMMUNITY",
+            "ANSWER_FROM_KNOWLEDGE": "ANSWER_FROM_KNOWLEDGE",
             "GET_POST": "GET_POST_DETAIL",
             "LIST_OWN_POSTS": "LIST_OWN_POSTS",
             "CREATE_DRAFT": "GENERATE_CONTENT",
