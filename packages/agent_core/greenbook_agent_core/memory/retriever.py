@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .models import MemoryQuery, MemoryRecord
+from .relevance import MemoryRelevanceGate, lexical_relevance
 
 _WORD_RE = re.compile(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]")
 
@@ -21,9 +22,20 @@ class MemoryRetriever:
     search remains the safe fallback.
     """
 
-    def __init__(self, repository: Any, *, candidate_provider: Any | None = None) -> None:
+    def __init__(
+        self,
+        repository: Any,
+        *,
+        candidate_provider: Any | None = None,
+        relevance_threshold: float = 0.1,
+        confidence_threshold: float = 0.0,
+    ) -> None:
         self._repository = repository
         self._candidate_provider = candidate_provider
+        self._relevance_gate = MemoryRelevanceGate(
+            relevance_threshold=relevance_threshold,
+            confidence_threshold=confidence_threshold,
+        )
 
     async def retrieve(
         self,
@@ -77,9 +89,17 @@ class MemoryRetriever:
             key=lambda item: _score(item, terms, conversation_id, task_id),
             reverse=True,
         )
-        selected = [item for item in ranked if _score(item, terms, conversation_id, task_id) > 0][:limit]
-        if not selected and not terms:
-            selected = ranked[:limit]
+        relevance = self._relevance_gate.evaluate(
+            ranked,
+            score=lambda item: _relevance_score(
+                item,
+                terms,
+                conversation_id,
+                task_id,
+            ),
+            limit=limit,
+        )
+        selected = list(relevance.selected)
         record_stage("memory_ranking_ready", run_id=run_id)
         record_stage("memory_touch_start", run_id=run_id)
         touched: list[MemoryRecord] = list(selected)
@@ -134,6 +154,24 @@ def _score(item: MemoryRecord, terms: list[str], conversation_id: str, task_id: 
         relation += 0.5
     recency = _recency(item.updated_at)
     return overlap * 1.0 + relation + item.importance * 0.25 + item.confidence * 0.2 + recency * 0.1
+
+
+def _relevance_score(
+    item: MemoryRecord,
+    terms: list[str],
+    conversation_id: str,
+    task_id: str,
+) -> float:
+    relation = 0.0
+    if conversation_id and item.conversation_id == conversation_id:
+        relation = max(relation, 1.0)
+    if task_id and item.task_id == task_id:
+        relation = max(relation, 1.0)
+    lexical = lexical_relevance(
+        " ".join([item.content, str(item.metadata)]),
+        terms,
+    )
+    return max(lexical, relation)
 
 
 def _recency(value: str) -> float:

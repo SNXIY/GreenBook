@@ -15,6 +15,12 @@ from .manager import MemoryManager
 from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .policy import MemoryWriteDecision, MemoryWritePolicy
 from .preference_retriever import PreferenceRetriever
+from .relevance import (
+    MemoryRelevanceGate,
+    MemoryRelevanceResult,
+    ScoredMemory,
+    lexical_relevance,
+)
 from .repository import (
     InMemoryMemoryRepository,
     MemoryRepository,
@@ -30,6 +36,10 @@ __all__ = [
     "MemoryRepository",
     "MemoryRetriever",
     "PreferenceRetriever",
+    "MemoryRelevanceGate",
+    "MemoryRelevanceResult",
+    "ScoredMemory",
+    "lexical_relevance",
     "MemoryManager",
     "StrategyRetriever",
     "ProceduralMemoryExtractor",

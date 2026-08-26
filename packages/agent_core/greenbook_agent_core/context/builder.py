@@ -257,7 +257,14 @@ class ContextBuilder:
             if str(item.get("memory_type", "")) in {"SEMANTIC", "PREFERENCE"}
             and item.get("structured_metadata", {}).get("preference_type")
         ]
-        preferences = preferences or recalled_preferences
+        # When a canonical memory retriever is configured, its relevance gate
+        # is authoritative. An empty recalled result is an explicit
+        # no-memory outcome and must not be replaced by an unfiltered legacy
+        # preference-provider dump.
+        if self._memory_retriever is not None and recall_enabled:
+            preferences = recalled_preferences
+        else:
+            preferences = preferences or recalled_preferences
         preferences = [
             _compact_preference(item) for item in preferences[:memory_limit]
         ]

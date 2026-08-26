@@ -45,7 +45,7 @@ async def test_preference_retrieval_is_scoped_and_capped() -> None:
         repository.save(_preference(
             user_id="u1",
             tenant_id="tenant-a",
-            value=f"preference-{index}",
+            value=f"prefer concise replies {index}",
         ))
     repository.save(_preference(
         user_id="u2",
@@ -67,7 +67,7 @@ async def test_preference_retrieval_is_scoped_and_capped() -> None:
     values = await PreferenceRetriever(repository).retrieve(
         user_id="u1",
         tenant_id="tenant-a",
-        query="write an article",
+        query="write concise replies",
         limit=99,
     )
 
@@ -111,7 +111,7 @@ async def test_new_conversation_retrieves_preference_before_interpreter() -> Non
         conversation_id="new-conversation",
         user_id="u1",
         tenant_id="tenant-a",
-        user_input="写一篇 Java 文章",
+        user_input="Write a technical deep article",
     )
 
     assert assembled.snapshot.memory_ids_used == [record.memory_id]
@@ -148,3 +148,50 @@ async def test_disabled_memory_does_not_retrieve_or_touch() -> None:
     assert snapshot.recalled_memories == []
     assert snapshot.user_preferences == []
     assert repository.get(record.memory_id).access_count == 0
+
+
+@pytest.mark.asyncio
+async def test_relevance_gate_returns_no_memory_for_unrelated_request() -> None:
+    repository = InMemoryMemoryRepository()
+    repository.save(_preference(
+        user_id="u1",
+        tenant_id="tenant-a",
+        value="prefer technical deep articles",
+    ))
+    repository.save(_preference(
+        user_id="u1",
+        tenant_id="tenant-a",
+        value="use Java technology stack",
+    ))
+    repository.save(_preference(
+        user_id="u1",
+        tenant_id="tenant-a",
+        value="prefer concise replies",
+    ))
+
+    values = await PreferenceRetriever(repository).retrieve(
+        user_id="u1",
+        tenant_id="tenant-a",
+        query="Schedule a post tomorrow about Java runtime",
+    )
+
+    assert values == []
+
+
+@pytest.mark.asyncio
+async def test_relevance_gate_enforces_confidence_threshold() -> None:
+    repository = InMemoryMemoryRepository()
+    low_confidence = _preference(
+        user_id="u1",
+        tenant_id="tenant-a",
+        value="prefer concise replies",
+    ).model_copy(update={"confidence": 0.4})
+    repository.save(low_confidence)
+
+    values = await PreferenceRetriever(repository).retrieve(
+        user_id="u1",
+        tenant_id="tenant-a",
+        query="Give concise replies",
+    )
+
+    assert values == []

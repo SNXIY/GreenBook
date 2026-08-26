@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
+from .relevance import MemoryRelevanceGate, lexical_relevance
 
 _WORD_RE = re.compile(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]")
 _MAX_PREFERENCE_RECALL = 5
@@ -17,9 +18,20 @@ _MAX_PREFERENCE_RECALL = 5
 class PreferenceRetriever:
     """Retrieve bounded, active preferences for one authenticated scope."""
 
-    def __init__(self, repository: Any, *, default_limit: int = 5) -> None:
+    def __init__(
+        self,
+        repository: Any,
+        *,
+        default_limit: int = 5,
+        relevance_threshold: float = 0.5,
+        confidence_threshold: float = 0.5,
+    ) -> None:
         self._repository = repository
         self._default_limit = max(1, min(int(default_limit), _MAX_PREFERENCE_RECALL))
+        self._relevance_gate = MemoryRelevanceGate(
+            relevance_threshold=relevance_threshold,
+            confidence_threshold=confidence_threshold,
+        )
 
     async def retrieve(
         self,
@@ -65,7 +77,13 @@ class PreferenceRetriever:
             values,
             key=lambda item: self._score(item, terms),
             reverse=True,
-        )[:selected_limit]
+        )
+        relevance = self._relevance_gate.evaluate(
+            ranked,
+            score=lambda item: self._relevance_score(item, terms),
+            limit=selected_limit,
+        )
+        ranked = list(relevance.selected)
         if not touch:
             return ranked
 
@@ -112,12 +130,8 @@ class PreferenceRetriever:
 
     @staticmethod
     def _score(item: MemoryRecord, terms: list[str]) -> float:
-        haystack = " ".join([
-            item.content,
-            str(item.metadata.get("preference_type", "")),
-            str(item.metadata.get("value", "")),
-        ]).casefold()
-        overlap = sum(1 for term in terms if term in haystack)
+        haystack = PreferenceRetriever._candidate_text(item)
+        overlap = sum(1 for term in terms if term in haystack.casefold())
         recency = 0.0
         try:
             age = (datetime.now(UTC) - datetime.fromisoformat(item.updated_at)).total_seconds()
@@ -125,6 +139,18 @@ class PreferenceRetriever:
         except (TypeError, ValueError):
             pass
         return overlap * 2.0 + item.confidence * 0.8 + item.importance * 0.3 + recency * 0.1
+
+    @staticmethod
+    def _candidate_text(item: MemoryRecord) -> str:
+        return " ".join([
+            item.content,
+            str(item.metadata.get("preference_type", "")),
+            str(item.metadata.get("value", "")),
+        ])
+
+    @classmethod
+    def _relevance_score(cls, item: MemoryRecord, terms: list[str]) -> float:
+        return lexical_relevance(cls._candidate_text(item), terms)
 
 
 __all__ = ["PreferenceRetriever"]

@@ -14,6 +14,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import argparse
 import json
 import subprocess
 from collections import Counter
@@ -393,6 +394,89 @@ async def evaluate_retrieval(cases: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _retriever_for_variant(
+    repository: InMemoryMemoryRepository,
+    *,
+    optimized: bool,
+) -> PreferenceRetriever:
+    if optimized:
+        return PreferenceRetriever(repository)
+    # Reproduce the V1 baseline's unfiltered top-five behavior without
+    # changing or importing the pre-optimization production implementation.
+    return PreferenceRetriever(
+        repository,
+        relevance_threshold=0.0,
+        confidence_threshold=0.0,
+    )
+
+
+async def evaluate_retrieval_variant(
+    cases: list[dict[str, Any]],
+    *,
+    optimized: bool,
+) -> dict[str, Any]:
+    """Evaluate one retrieval variant while preserving V1/V2 evidence."""
+
+    repository = build_retrieval_fixture()
+    retriever = _retriever_for_variant(repository, optimized=optimized)
+    evaluated: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+    sums: dict[str, dict[str, float]] = {}
+    for case in cases:
+        values = await retriever.retrieve(
+            user_id=case["user_id"],
+            tenant_id=case["tenant_id"],
+            query=case["query"],
+            limit=5,
+        )
+        actual_keys = [str(item.metadata.get("preference_type") or "") for item in values]
+        actual_ids = [item.memory_id for item in values]
+        evaluated_case = {**case, "actual_keys": actual_keys, "actual_ids": actual_ids}
+        evaluated.append(evaluated_case)
+        expected = set(case["expected_keys"])
+        if expected:
+            for k in (1, 3, 5):
+                prefix = actual_keys[:k]
+                hit_count = len(set(prefix) & expected)
+                metric = sums.setdefault(str(k), {
+                    "recall_sum": 0.0,
+                    "precision_sum": 0.0,
+                    "returned_precision_sum": 0.0,
+                    "count": 0.0,
+                })
+                metric["recall_sum"] += hit_count / len(expected)
+                metric["precision_sum"] += hit_count / k
+                metric["returned_precision_sum"] += (
+                    hit_count / len(prefix) if prefix else 0.0
+                )
+                metric["count"] += 1
+            if not expected.issubset(set(actual_keys[:5])):
+                failures.append(evaluated_case)
+        elif actual_keys:
+            failures.append({**evaluated_case, "failure": "irrelevant_memory_returned"})
+    metrics = {
+        key: {
+            "recall_at_k": value["recall_sum"] / value["count"],
+            "precision_at_k": value["precision_sum"] / value["count"],
+            "returned_precision_at_k": value["returned_precision_sum"] / value["count"],
+            "eligible_cases": int(value["count"]),
+        }
+        for key, value in sums.items()
+    }
+    irrelevant = [item for item in evaluated if not item["expected_keys"]]
+    return {
+        "variant": "V2 optimized" if optimized else "V1 baseline",
+        "dataset_count": len(cases),
+        "metrics": metrics,
+        "irrelevant_cases": len(irrelevant),
+        "irrelevant_memory_return_rate": sum(
+            bool(item["actual_keys"]) for item in irrelevant
+        ) / len(irrelevant),
+        "failures": failures[:30],
+        "cases": evaluated,
+    }
+
+
 def build_isolation_fixture() -> InMemoryMemoryRepository:
     repository = InMemoryMemoryRepository()
     repository.save(_preference_record(
@@ -662,6 +746,68 @@ async def evaluate_injection(cases: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+async def evaluate_injection_variant(
+    cases: list[dict[str, Any]],
+    *,
+    optimized: bool,
+) -> dict[str, Any]:
+    """Measure context injection for the V1 and V2 retrieval variants."""
+
+    repository = build_retrieval_fixture()
+    builder = ContextBuilder(
+        memory_retriever=_retriever_for_variant(repository, optimized=optimized),
+    )
+    evaluated: list[dict[str, Any]] = []
+    for case in cases:
+        snapshot = await builder.build(
+            conversation_id=f"injection-conversation-{case['id']}",
+            user_id="u1",
+            tenant_id="tenant-a",
+            target_query=case["query"],
+        )
+        provider_view = project_interpreter_context(CommandContext.from_any(snapshot))
+        injected_keys = [
+            str(item.get("key") or "")
+            for item in provider_view["user_preferences"]
+        ]
+        expected = set(case["expected_keys"])
+        aligned = bool(expected & set(injected_keys))
+        harmful = not expected and bool(injected_keys)
+        evaluated.append({
+            **case,
+            "injected_keys": injected_keys,
+            "aligned_with_preference": aligned,
+            "unnecessary_injection": harmful,
+            "harmful_injection_candidate": harmful,
+        })
+    positive = [item for item in evaluated if item["expected_keys"]]
+    negative = [item for item in evaluated if not item["expected_keys"]]
+    harmful = [item for item in evaluated if item["harmful_injection_candidate"]]
+    return {
+        "variant": "V2 optimized" if optimized else "V1 baseline",
+        "dataset_count": len(cases),
+        "metrics": {
+            "positive_alignment_rate": sum(
+                item["aligned_with_preference"] for item in positive
+            ) / len(positive),
+            "unnecessary_injection_rate": sum(
+                item["unnecessary_injection"] for item in negative
+            ) / len(negative),
+            # Keep the original report's denominator for direct comparison:
+            # harmful candidates / all injection cases.
+            "harmful_injection_rate": len(harmful) / len(evaluated),
+        },
+        "positive_examples": [
+            item for item in positive if item["aligned_with_preference"]
+        ][:5],
+        "negative_examples": [
+            item for item in positive if not item["aligned_with_preference"]
+        ][:5],
+        "unnecessary_injection_cases": harmful[:10],
+        "cases": evaluated,
+    }
+
+
 def architecture_review() -> dict[str, Any]:
     allowed_prefixes = (
         "docs/evaluation/",
@@ -900,6 +1046,90 @@ retrieval-threshold/product decision before any prompt-level expansion.
 """
 
 
+def render_retrieval_optimization_report(
+    v1_retrieval: dict[str, Any],
+    v2_retrieval: dict[str, Any],
+    v1_injection: dict[str, Any],
+    v2_injection: dict[str, Any],
+) -> str:
+    retrieval_rows = []
+    for k in ("1", "3", "5"):
+        v1 = v1_retrieval["metrics"][k]
+        v2 = v2_retrieval["metrics"][k]
+        retrieval_rows.append(
+            f"| {k} | {_metric(v1['recall_at_k'])} | {_metric(v2['recall_at_k'])} "
+            f"| {_metric(v1['precision_at_k'])} | {_metric(v2['precision_at_k'])} "
+            f"| {_metric(v1['returned_precision_at_k'])} "
+            f"| {_metric(v2['returned_precision_at_k'])} |"
+        )
+    v1_injection_metrics = v1_injection["metrics"]
+    v2_injection_metrics = v2_injection["metrics"]
+    v2_failures = "\n".join(
+        f"- `{item['id']}` ({item.get('failure', 'miss')}): "
+        f"`{item['query']}` -> `{item.get('actual_keys', item.get('injected_keys', []))}`"
+        for item in v2_retrieval["failures"][:20]
+    ) or "- None"
+    harmful = "\n".join(
+        f"- `{item['query']}` -> `{item['injected_keys']}`"
+        for item in v1_injection["unnecessary_injection_cases"][:10]
+    ) or "- None"
+    return f"""# Memory Retrieval Optimization Report
+
+V1 baseline checkpoint: `4ef8240` (`test: add memory evaluation baseline`).
+V2 is the working-tree implementation of the storage-neutral relevance gate.
+This report was generated without changing storage schema, extraction,
+Task/Objectives, ActionLoop, MCP, or RAG.
+
+## V2 Gate
+
+- Candidate input: current user request plus scoped memory candidates.
+- Preference relevance threshold: `0.5`.
+- Preference confidence threshold: `0.5`.
+- Output: selected memories, normalized relevance scores, or an explicit
+  empty/no-memory result.
+- ContextBuilder treats an empty result as authoritative and does not fall
+  back to an unfiltered preference dump.
+
+## Retrieval Comparison
+
+`Precision@K` keeps the V1 harness definition (`hits / K`). The additional
+`returned precision` column measures precision among the candidates actually
+returned up to K, which makes the effect of no-memory filtering visible.
+
+| K | V1 Recall@K | V2 Recall@K | V1 Precision@K | V2 Precision@K | V1 Returned Precision | V2 Returned Precision |
+|---:|---:|---:|---:|---:|---:|---:|
+{chr(10).join(retrieval_rows)}
+
+| Metric | V1 baseline | V2 optimized |
+|---|---:|---:|
+| Irrelevant-query memory-return rate | {_pct(v1_retrieval['irrelevant_memory_return_rate'])} | {_pct(v2_retrieval['irrelevant_memory_return_rate'])} |
+
+### V2 Retrieval Failures
+
+{v2_failures}
+
+## Injection Comparison
+
+| Metric | V1 baseline | V2 optimized |
+|---|---:|---:|
+| Positive preference alignment | {_metric(v1_injection_metrics['positive_alignment_rate'])} | {_metric(v2_injection_metrics['positive_alignment_rate'])} |
+| Unnecessary injection rate (negative cases) | {_metric(v1_injection_metrics['unnecessary_injection_rate'])} | {_metric(v2_injection_metrics['unnecessary_injection_rate'])} |
+| Harmful injection rate (all cases) | {_metric(v1_injection_metrics['harmful_injection_rate'])} | {_metric(v2_injection_metrics['harmful_injection_rate'])} |
+
+### V1 Unnecessary Injection Examples
+
+{harmful}
+
+## Interpretation
+
+V2 preserves targeted retrieval recall while rejecting same-scope memories
+that do not clear the relevance and confidence gates. The fixed-K precision
+metric may remain unchanged when a single relevant result occupies fewer than
+K slots; returned precision and unnecessary/harmful injection rates expose the
+actual payload-quality improvement.
+"""
+
+
 def render_final_report(
     extraction: dict[str, Any],
     retrieval: dict[str, Any],
@@ -970,7 +1200,58 @@ preference evidence. Keep that change separate from this evaluation-only run.
 """
 
 
+def run_retrieval_optimization() -> None:
+    retrieval_cases = build_retrieval_cases()
+    v1_retrieval = asyncio.run(evaluate_retrieval_variant(
+        retrieval_cases,
+        optimized=False,
+    ))
+    v2_retrieval = asyncio.run(evaluate_retrieval_variant(
+        retrieval_cases,
+        optimized=True,
+    ))
+    injection_cases = build_injection_cases()
+    v1_injection = asyncio.run(evaluate_injection_variant(
+        injection_cases,
+        optimized=False,
+    ))
+    v2_injection = asyncio.run(evaluate_injection_variant(
+        injection_cases,
+        optimized=True,
+    ))
+    _write_report(
+        REPORT_DIR / "MEMORY_RETRIEVAL_OPTIMIZATION_REPORT.md",
+        render_retrieval_optimization_report(
+            v1_retrieval,
+            v2_retrieval,
+            v1_injection,
+            v2_injection,
+        ),
+    )
+    print(json.dumps({
+        "retrieval_cases": len(retrieval_cases),
+        "injection_cases": len(injection_cases),
+        "v1_retrieval": v1_retrieval["metrics"],
+        "v2_retrieval": v2_retrieval["metrics"],
+        "v1_irrelevant_return_rate": v1_retrieval["irrelevant_memory_return_rate"],
+        "v2_irrelevant_return_rate": v2_retrieval["irrelevant_memory_return_rate"],
+        "v1_injection": v1_injection["metrics"],
+        "v2_injection": v2_injection["metrics"],
+    }, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--optimization",
+        action="store_true",
+        help="run V1/V2 retrieval and injection comparison only",
+    )
+    args = parser.parse_args()
+    if args.optimization:
+        run_retrieval_optimization()
+        return
+
     extraction_cases = build_extraction_cases()
     extraction_result = evaluate_extraction(extraction_cases)
     _write_json(EVALUATION_DIR / "memory_extraction_dataset.json", {
