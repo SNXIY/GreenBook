@@ -54,9 +54,13 @@ from greenbook_agent_core.execution.topology import validate_single_consumer
 from greenbook_agent_core.human import PostgresApprovalRequestStore
 from greenbook_agent_core.human.approval_runtime_service import ApprovalRuntimeService
 from greenbook_agent_core.memory import (
+    EpisodicMemoryProjector,
+    EpisodicMemoryService,
+    MemoryRetriever,
+    MemoryStatus,
+    MemoryType,
     PostgresMemoryRepository,
     PreferenceMemoryService,
-    PreferenceRetriever,
 )
 from greenbook_agent_core.memory.manager import MemoryManager
 from greenbook_agent_core.observability.metrics import MemoryMetricsCollector
@@ -1013,16 +1017,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         memory_manager,
         enabled=memory_enabled,
     )
-    preference_retriever = PreferenceRetriever(
+    memory_retriever = MemoryRetriever(
         durable_memory_repository or memory_manager.store,
+        memory_types=(MemoryType.PREFERENCE, MemoryType.EPISODIC),
+        status=MemoryStatus.ACTIVE,
+        include_legacy_episodic=False,
+        require_tenant_scope=True,
+        relevance_threshold=0.5,
+        confidence_threshold=0.5,
     )
     app.state.memory_store = durable_memory_repository or memory_manager.store
+    app.state.memory_retriever = memory_retriever
+    # Keep the old state name as a compatibility alias; both consumers now
+    # share this one canonical retriever and relevance gate.
+    app.state.preference_retriever = memory_retriever
     app.state.memory_enabled = memory_enabled
     app.state.preference_memory_service = preference_memory_service
     preference_provider = MemoryUserPreferenceProvider(memory_manager)
     task_provider = TaskProvider()
     await task_provider.ensure_storage()
     logger.info("Task persistence ready")
+    episodic_memory_service = EpisodicMemoryService(
+        memory_manager,
+        enabled=memory_enabled,
+    )
+    episodic_memory_projector = EpisodicMemoryProjector(
+        service=episodic_memory_service,
+        execution_repository=execution_repository,
+        task_provider=task_provider,
+    )
+    app.state.episodic_memory_service = episodic_memory_service
     task_manager = TaskManager(task_provider.canonical_repository())
     runtime_agent_service = RuntimeAgentService(
         container=runtime_container,
@@ -1089,7 +1113,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         approval_service=approval_runtime_service,
         preference_provider=preference_provider,
         conversation_service=conversation_service,
-        memory_retriever=preference_retriever,
+        memory_retriever=memory_retriever,
         memory_enabled=memory_enabled,
         max_concurrent_work_per_conversation=int(
             _env_first(
@@ -1123,7 +1147,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             external_operation_store=runtime_persistence.external_operation_store,
             artifact_store=runtime_persistence.artifact_store,
             observation_store=runtime_persistence.observation_store,
-            memory_retriever=preference_retriever,
+            memory_retriever=memory_retriever,
             preference_provider=preference_provider,
             task_scope_factory=TaskScope,
             memory_enabled=memory_enabled,
@@ -1456,6 +1480,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         observation_writer = ActionObservationWriter(
             store=runtime_persistence.observation_store,
             artifact_store=runtime_persistence.artifact_store,
+            on_saved=episodic_memory_projector,
         )
         queue_handler = RuntimeExecutionQueueHandler(
             service=runtime_agent_service,

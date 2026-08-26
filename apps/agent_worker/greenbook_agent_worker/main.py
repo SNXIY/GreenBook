@@ -224,7 +224,11 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                 from greenbook_agent_core.human.approval_runtime_service import (
                     ApprovalRuntimeService,
                 )
-                from greenbook_agent_core.memory import PostgresMemoryRepository
+                from greenbook_agent_core.memory import (
+                    EpisodicMemoryProjector,
+                    EpisodicMemoryService,
+                    PostgresMemoryRepository,
+                )
                 from greenbook_agent_core.memory.manager import MemoryManager
                 from greenbook_agent_core.task.provider import TaskProvider
                 from greenbook_mcp_server.server import GreenBookMCPServer
@@ -270,6 +274,16 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                 )
                 task_provider = TaskProvider()
                 await task_provider.ensure_storage()
+                episodic_memory_service = EpisodicMemoryService(
+                    memory_manager,
+                    enabled=os.getenv("MEMORY_ENABLED", "true").strip().lower()
+                    in {"1", "true", "yes", "on"},
+                )
+                episodic_memory_projector = EpisodicMemoryProjector(
+                    service=episodic_memory_service,
+                    execution_repository=persistence.execution_repository,
+                    task_provider=task_provider,
+                )
                 approval_service = ApprovalRuntimeService(
                     store=PostgresApprovalRequestStore(),
                     runtime_manager=runtime_manager,
@@ -293,6 +307,7 @@ async def main(*, execution_handler: ExecutionHandler | None = None) -> None:
                     store=persistence.observation_store
                     or PostgresActionObservationStore(persistence.bind),
                     artifact_store=persistence.artifact_store,
+                    on_saved=episodic_memory_projector,
                 )
                 for queued_message in persistence.execution_queue.list()[-100:]:
                     persisted_execution = persistence.execution_repository.find_by_id(

@@ -9,8 +9,7 @@ from dataclasses import dataclass
 
 from .models import MemoryRecord
 
-
-_WORD_RE = re.compile(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]")
+_WORD_RE = re.compile(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]+")
 
 
 @dataclass(frozen=True)
@@ -112,11 +111,15 @@ def lexical_relevance(candidate_text: str, query_terms: Iterable[str]) -> float:
 
 
 def _terms(value: str) -> list[str]:
-    return list(dict.fromkeys(
-        term.casefold()
-        for term in _WORD_RE.findall(value.casefold())
-        if len(term) > 1
-    ))
+    terms: list[str] = []
+    for token in _WORD_RE.findall(value.casefold()):
+        if all("\u4e00" <= char <= "\u9fff" for char in token):
+            if len(token) > 1:
+                terms.append(token)
+                terms.extend(token[index:index + 2] for index in range(len(token) - 1))
+        elif len(token) > 1:
+            terms.append(token)
+    return list(dict.fromkeys(terms))
 
 
 def _terms_match(left: str, right: str) -> bool:

@@ -314,6 +314,16 @@ class PostgresMemoryRepository:
         if query.status:
             clauses.append("status = :status")
             params["status"] = query.status.value
+        if query.metadata_filters:
+            # JSONB containment is the existing metadata boundary used to
+            # distinguish canonical Episodic V1 rows from legacy EPISODIC
+            # history.  No schema or second table is required.
+            clauses.append("structured_metadata @> CAST(:metadata_filters AS jsonb)")
+            params["metadata_filters"] = json.dumps(
+                query.metadata_filters,
+                ensure_ascii=False,
+                default=str,
+            )
         order = {
             "created_at": "created_at DESC",
             "access_count": "access_count DESC",

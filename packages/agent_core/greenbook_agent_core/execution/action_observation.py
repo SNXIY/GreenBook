@@ -12,8 +12,11 @@ AgentLoop context without re-interpreting the user request.
 
 from __future__ import annotations
 
+import inspect
+import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -31,6 +34,8 @@ INCREMENTAL_PLAN_SOURCE = "AGENT_INCREMENTAL"
 OBSERVATION_PENDING = "PENDING"
 OBSERVATION_DISPATCHED = "DISPATCHED"
 OBSERVATION_DONE = "DONE"
+
+logger = logging.getLogger(__name__)
 
 
 class ActionObservation(BaseModel):
@@ -428,6 +433,7 @@ class ActionObservationWriter:
     store: ActionObservationStore | PostgresActionObservationStore
     artifact_store: ArtifactStore | None = None
     result_resolver: ResultResolver | None = None
+    on_saved: Callable[..., Any] | None = None
 
     def _resolve(self, result: RuntimeResult, execution: Any | None = None) -> RuntimeResult:
         resolver = self.result_resolver or ResultResolver(
@@ -530,7 +536,25 @@ class ActionObservationWriter:
         *,
         execution: Any | None = None,
     ) -> ActionObservation | None:
-        return self.write(message, result, auth, execution=execution)
+        observation = self.write(message, result, auth, execution=execution)
+        if observation is not None and self.on_saved is not None:
+            try:
+                callback_result = self.on_saved(
+                    observation=observation,
+                    message=message,
+                    result=result,
+                    auth=auth,
+                    execution=execution,
+                )
+                if inspect.isawaitable(callback_result):
+                    await callback_result
+            except Exception:  # noqa: BLE001 - Memory must not break Runtime completion
+                logger.warning(
+                    "Post-observation Memory projection failed execution_id=%s",
+                    observation.execution_id,
+                    exc_info=True,
+                )
+        return observation
 
 
 __all__ = [

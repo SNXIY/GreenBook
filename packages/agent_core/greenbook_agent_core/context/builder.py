@@ -661,6 +661,13 @@ def _compact_operation(value: Mapping[str, Any], limit: int) -> dict[str, Any]:
 def _compact_memory(value: Mapping[str, Any], limit: int) -> dict[str, Any]:
     """Project recalled memory as bounded evidence, never as an article body."""
 
+    memory_type = str(value.get("memory_type") or "").upper()
+    metadata = value.get("structured_metadata")
+    preference_like = (
+        memory_type in {"SEMANTIC", "PREFERENCE"}
+        and isinstance(metadata, Mapping)
+        and bool(metadata.get("preference_type"))
+    )
     result = {
         key: item
         for key, item in value.items()
@@ -680,13 +687,25 @@ def _compact_memory(value: Mapping[str, Any], limit: int) -> dict[str, Any]:
             "expires_at",
         }
     }
+    if preference_like:
+        result["memory_role"] = "preference"
+    elif memory_type == "EPISODIC":
+        result["memory_role"] = "relevant_past_experience"
     result["content"] = _bounded_text(value.get("content"), limit)
-    metadata = value.get("structured_metadata")
     if isinstance(metadata, Mapping):
         result["structured_metadata"] = {
             str(key): _bounded_text(item, limit // 2)
             for key, item in list(metadata.items())[:20]
-            if key not in {"body", "content", "embedding", "raw_result"}
+            if key not in {
+                "body",
+                "content",
+                "embedding",
+                "raw_result",
+                # Provenance remains an internal audit field.  The provider
+                # projection also strips identity keys defensively, but it
+                # should not receive this branch of metadata at all.
+                "provenance",
+            }
         }
     return result
 

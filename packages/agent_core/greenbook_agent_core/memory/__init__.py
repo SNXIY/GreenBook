@@ -11,6 +11,22 @@ from .extractor import (
     PreferenceMemoryService,
     ProceduralMemoryExtractor,
 )
+from .episodic import (
+    CONTENT_PUBLICATION_CATEGORY,
+    CONTENT_PUBLICATION_OUTCOME,
+    DEFAULT_EPISODE_SUMMARY,
+    EPISODIC_MEMORY_CONTRACT,
+    EPISODIC_MEMORY_VERSION,
+    EPISODIC_SOURCE_TYPE,
+    EpisodeCandidate,
+    EpisodeCandidateBuilder,
+    EpisodicMemoryProjector,
+    EpisodicMemoryService,
+    VerifiedBusinessOutcome,
+    WorthRememberingDecision,
+    WorthRememberingPolicy,
+    WorthRememberingResult,
+)
 from .manager import MemoryManager
 from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .policy import MemoryWriteDecision, MemoryWritePolicy
@@ -51,4 +67,18 @@ __all__ = [
     "MemoryWriteDecision",
     "MemoryWritePolicy",
     "PostgresMemoryRepository",
+    "CONTENT_PUBLICATION_CATEGORY",
+    "CONTENT_PUBLICATION_OUTCOME",
+    "DEFAULT_EPISODE_SUMMARY",
+    "EPISODIC_MEMORY_CONTRACT",
+    "EPISODIC_MEMORY_VERSION",
+    "EPISODIC_SOURCE_TYPE",
+    "EpisodeCandidate",
+    "EpisodeCandidateBuilder",
+    "EpisodicMemoryProjector",
+    "EpisodicMemoryService",
+    "VerifiedBusinessOutcome",
+    "WorthRememberingDecision",
+    "WorthRememberingPolicy",
+    "WorthRememberingResult",
 ]

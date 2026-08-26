@@ -4,14 +4,42 @@ from __future__ import annotations
 
 import inspect
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from .models import MemoryQuery, MemoryRecord
+from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .relevance import MemoryRelevanceGate, lexical_relevance
 
-_WORD_RE = re.compile(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]")
+_WORD_RE = re.compile(r"[A-Za-z0-9_]+|[\u4e00-\u9fff]+")
+_STOPWORDS = frozenset({
+    "a",
+    "an",
+    "and",
+    "are",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "give",
+    "how",
+    "in",
+    "is",
+    "it",
+    "me",
+    "of",
+    "on",
+    "or",
+    "please",
+    "the",
+    "to",
+    "use",
+    "what",
+    "when",
+    "with",
+    "you",
+})
 
 
 class MemoryRetriever:
@@ -29,9 +57,17 @@ class MemoryRetriever:
         candidate_provider: Any | None = None,
         relevance_threshold: float = 0.1,
         confidence_threshold: float = 0.0,
+        memory_types: Iterable[MemoryType | str] | None = None,
+        status: MemoryStatus | None = None,
+        include_legacy_episodic: bool = True,
+        require_tenant_scope: bool = False,
     ) -> None:
         self._repository = repository
         self._candidate_provider = candidate_provider
+        self._memory_types = _normalise_memory_types(memory_types)
+        self._status = status
+        self._include_legacy_episodic = bool(include_legacy_episodic)
+        self._require_tenant_scope = bool(require_tenant_scope)
         self._relevance_gate = MemoryRelevanceGate(
             relevance_threshold=relevance_threshold,
             confidence_threshold=confidence_threshold,
@@ -41,6 +77,7 @@ class MemoryRetriever:
         self,
         *,
         user_id: str,
+        tenant_id: str = "",
         conversation_id: str = "",
         task_id: str = "",
         command: Any | None = None,
@@ -57,33 +94,63 @@ class MemoryRetriever:
         )
 
         record_stage("memory_retrieval_start", run_id=run_id)
+        if self._require_tenant_scope and not str(tenant_id or "").strip():
+            record_stage("memory_candidates_ready", run_id=run_id)
+            record_stage("memory_ranking_ready", run_id=run_id)
+            record_stage("memory_touch_start", run_id=run_id)
+            record_stage("memory_touch_ready", run_id=run_id)
+            record_stage("memory_retrieval_ready", run_id=run_id)
+            record_memory_retrieval(
+                source="repository",
+                candidate_count=0,
+                selected_count=0,
+                memory_types=[],
+                run_id=run_id,
+            )
+            return []
         terms = _query_terms(command, goal, context)
-        terms.extend(_WORD_RE.findall(target_query.casefold()))
-        terms = list(dict.fromkeys(term for term in terms if len(term) > 1))
-        query = MemoryQuery(
-            user_id=user_id,
-            # Long-term memory is intentionally cross-conversation.  Relation
-            # fields are reranking evidence, not hard filters.
-            conversation_id=None,
-            task_id=None,
-            keywords=terms[:12],
-            limit=max(limit * 5, limit),
-            sort_by="created_at",
-        )
+        terms.extend(_tokenize(target_query))
+        terms = _meaningful_terms(terms)
         provider = self._candidate_provider
         if provider is not None and callable(getattr(provider, "retrieve", None)):
-            candidates = provider.retrieve(
+            try:
+                candidates = provider.retrieve(
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                    query_terms=terms,
+                    limit=max(limit * 5, limit),
+                )
+            except TypeError:
+                # Candidate providers from the pre-tenant contract remain
+                # usable, while the canonical retriever still applies the
+                # scope/type/legacy filters below.
+                candidates = provider.retrieve(
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    task_id=task_id,
+                    query_terms=terms,
+                    limit=max(limit * 5, limit),
+                )
+        else:
+            candidates = self._search_repository(
                 user_id=user_id,
-                conversation_id=conversation_id,
-                task_id=task_id,
-                query_terms=terms,
+                tenant_id=tenant_id,
+                terms=terms,
                 limit=max(limit * 5, limit),
             )
-        else:
-            candidates = self._repository.search(query)
         candidates = await candidates if inspect.isawaitable(candidates) else candidates
         record_stage("memory_candidates_ready", run_id=run_id)
-        values = [item if isinstance(item, MemoryRecord) else MemoryRecord.model_validate(item) for item in candidates]
+        values = [
+            item if isinstance(item, MemoryRecord) else MemoryRecord.model_validate(item)
+            for item in (candidates or ())
+        ]
+        values = [
+            item
+            for item in values
+            if self._allowed_candidate(item, user_id=user_id, tenant_id=tenant_id)
+        ]
         ranked = sorted(
             values,
             key=lambda item: _score(item, terms, conversation_id, task_id),
@@ -108,7 +175,14 @@ class MemoryRetriever:
             for item in selected:
                 touch_fn = getattr(self._repository, "touch", None)
                 if callable(touch_fn):
-                    value = touch_fn(item.memory_id)
+                    try:
+                        value = touch_fn(
+                            item.memory_id,
+                            user_id=user_id,
+                            tenant_id=tenant_id if self._require_tenant_scope else None,
+                        )
+                    except TypeError:
+                        value = touch_fn(item.memory_id)
                     value = await value if inspect.isawaitable(value) else value
                     touched.append(value or item)
                 else:
@@ -123,6 +197,115 @@ class MemoryRetriever:
             run_id=run_id,
         )
         return touched
+
+    async def _search_repository(
+        self,
+        *,
+        user_id: str,
+        tenant_id: str,
+        terms: list[str],
+        limit: int,
+    ) -> list[MemoryRecord]:
+        """Search all configured types through one repository and one gate.
+
+        Episodic V1 uses the existing ``agent_memories`` table but carries an
+        explicit contract marker.  A per-type query keeps legacy EPISODIC rows
+        out of the canonical path without introducing a second retriever or
+        relevance policy.  The non-strict default retains compatibility with
+        old unscoped in-memory callers; production passes ``require_tenant_scope``.
+        """
+
+        queries = self._queries(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            terms=terms,
+            limit=limit,
+        )
+        values: list[MemoryRecord] = []
+        for query in queries:
+            found = self._repository.search(query)
+            found = await found if inspect.isawaitable(found) else found
+            values.extend(
+                item if isinstance(item, MemoryRecord) else MemoryRecord.model_validate(item)
+                for item in (found or ())
+            )
+        return _dedupe(values)
+
+    def _queries(
+        self,
+        *,
+        user_id: str,
+        tenant_id: str,
+        terms: list[str],
+        limit: int,
+    ) -> list[MemoryQuery]:
+        memory_types = self._memory_types
+        # The legacy-compatible default historically searched the empty tenant
+        # value.  Strict production composition uses the authenticated tenant.
+        tenants = [tenant_id] if self._require_tenant_scope else list(
+            dict.fromkeys(value for value in ("", tenant_id) if value is not None)
+        )
+        if not tenants:
+            tenants = [""]
+        queries: list[MemoryQuery] = []
+        for query_tenant in tenants:
+            if memory_types is not None:
+                for memory_type in memory_types:
+                    metadata_filters = {}
+                    if (
+                        memory_type == MemoryType.EPISODIC
+                        and not self._include_legacy_episodic
+                    ):
+                        metadata_filters = {
+                            "memory_contract": "EPISODIC_V1",
+                        }
+                    queries.append(MemoryQuery(
+                        user_id=user_id,
+                        tenant_id=query_tenant,
+                        type=memory_type,
+                        status=self._status,
+                        metadata_filters=metadata_filters,
+                        conversation_id=None,
+                        task_id=None,
+                        keywords=terms[:12],
+                        limit=limit,
+                        sort_by="created_at",
+                    ))
+                continue
+            queries.append(MemoryQuery(
+                user_id=user_id,
+                tenant_id=query_tenant,
+                status=self._status,
+                conversation_id=None,
+                task_id=None,
+                keywords=terms[:12],
+                limit=limit,
+                sort_by="created_at",
+            ))
+        return queries
+
+    def _allowed_candidate(
+        self,
+        item: MemoryRecord,
+        *,
+        user_id: str,
+        tenant_id: str,
+    ) -> bool:
+        if item.user_id != user_id:
+            return False
+        if self._require_tenant_scope and item.tenant_id != tenant_id:
+            return False
+        if not self._require_tenant_scope and tenant_id and item.tenant_id not in {"", tenant_id}:
+            return False
+        if self._memory_types is not None and item.memory_type not in self._memory_types:
+            return False
+        if self._status is not None and item.status != self._status:
+            return False
+        return not (
+            item.memory_type == MemoryType.EPISODIC
+            and not self._include_legacy_episodic
+            and item.metadata.get("memory_contract") != "EPISODIC_V1"
+        )
 
 
 def _query_terms(command: Any, goal: Any, context: Any) -> list[str]:
@@ -140,8 +323,28 @@ def _query_terms(command: Any, goal: Any, context: Any) -> list[str]:
             values.extend(str(item.get("goal", "")) for item in payload.get("active_tasks", []) if isinstance(item, Mapping))
     terms: list[str] = []
     for value in values:
-        terms.extend(_WORD_RE.findall(value.casefold()))
-    return list(dict.fromkeys(term for term in terms if len(term) > 1))
+        terms.extend(_tokenize(value))
+    return _meaningful_terms(terms)
+
+
+def _meaningful_terms(values: Iterable[str]) -> list[str]:
+    return list(dict.fromkeys(
+        term.casefold()
+        for term in values
+        if len(term) > 1 and term.casefold() not in _STOPWORDS
+    ))
+
+
+def _tokenize(value: Any) -> list[str]:
+    terms: list[str] = []
+    for token in _WORD_RE.findall(str(value or "").casefold()):
+        if token and all("\u4e00" <= char <= "\u9fff" for char in token):
+            if len(token) > 1:
+                terms.append(token)
+                terms.extend(token[index:index + 2] for index in range(len(token) - 1))
+        else:
+            terms.append(token)
+    return terms
 
 
 def _score(item: MemoryRecord, terms: list[str], conversation_id: str, task_id: str) -> float:
@@ -180,6 +383,39 @@ def _recency(value: str) -> float:
     except (TypeError, ValueError):
         return 0.0
     return max(0.0, 1.0 - age / (86400 * 30))
+
+
+def _normalise_memory_types(
+    values: Iterable[MemoryType | str] | None,
+) -> tuple[MemoryType, ...] | None:
+    if values is None:
+        return None
+    result: list[MemoryType] = []
+    for value in values:
+        if isinstance(value, MemoryType):
+            memory_type = value
+        else:
+            raw = str(value or "").strip().upper()
+            if raw == "PREFERENCE":
+                raw = MemoryType.PREFERENCE.value
+            try:
+                memory_type = MemoryType(raw)
+            except ValueError:
+                continue
+        if memory_type not in result:
+            result.append(memory_type)
+    return tuple(result)
+
+
+def _dedupe(values: Iterable[MemoryRecord]) -> list[MemoryRecord]:
+    result: list[MemoryRecord] = []
+    seen: set[str] = set()
+    for value in values:
+        if value.memory_id in seen:
+            continue
+        seen.add(value.memory_id)
+        result.append(value)
+    return result
 
 
 __all__ = ["MemoryRetriever"]
