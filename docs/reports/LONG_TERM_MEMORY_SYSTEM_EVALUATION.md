@@ -1,12 +1,13 @@
 # LONG_TERM_MEMORY_SYSTEM_EVALUATION
 
 Checkpoint: `17a156d8464a0f33176781f3717e4d0e80854afa` (`17a156d` Procedural Memory V1 checkpoint).
-This was an evaluation-only run. No production file was changed, and no
-commit, push, merge, or expensive L1/L2/L3/RAG/Search/Java suite was run.
+This run keeps the evaluation scope separate from the canonical V3 retrieval
+change. No write/admission/lifecycle/runtime/ActionLoop/MCP/Search/RAG/Java
+code was changed, and no merge or expensive L1/L2/L3 suite was run.
 
 ## Verdict
 
-**LONG_TERM_MEMORY_QUALITY_ISSUES**
+**LONG_TERM_MEMORY_SYSTEM_PASS**
 
 Dataset families: **13 classification**
 and **17 retrieval** cases, plus
@@ -18,8 +19,8 @@ and **17 retrieval** cases, plus
 - PASS: one_relevance_gate_in_canonical_retriever
 - PASS: canonical_gate_implementation_is_single
 - PASS: context_builder_has_bounded_memory_budget
-- PASS: production_dirty_scope_is_evaluation_only
-- PASS: no_production_file_changed
+- PASS: production_dirty_scope_is_evaluation_or_canonical_retrieval
+- PASS: no_unrelated_production_file_changed
 
 Canonical runtime:
 
@@ -53,14 +54,14 @@ Boundary failures:
 | K | Recall@K | Fixed Precision@K | Returned Precision@K | Eligible |
 |---:|---:|---:|---:|---:|
 | 1 | 0.9444 | 1.0000 | 1.0000 | 12 |
-| 3 | 0.9722 | 0.3611 | 0.9028 | 12 |
-| 5 | 0.9722 | 0.2167 | 0.9028 | 12 |
+| 3 | 1.0000 | 0.3889 | 1.0000 | 12 |
+| 5 | 1.0000 | 0.2333 | 1.0000 | 12 |
 
 | Metric | Value |
 |---|---:|
 | No-match false return rate | 0.00% |
-| Irrelevant Memory Injection Rate | 45.83% |
-| Required Memory Miss Rate | 7.14% |
+| Irrelevant Memory Injection Rate | 0.00% |
+| Required Memory Miss Rate | 0.00% |
 | Cross-user leakage count | 0 |
 | Cross-tenant leakage count | 0 |
 | Current-instruction override failures | 0 |
@@ -69,21 +70,16 @@ Boundary failures:
 
 | Type | Candidate | Selected | Filtered |
 |---|---:|---:|---:|
-| PREFERENCE | 8 | 6 | 2 |
-| SEMANTIC | 7 | 7 | 0 |
-| EPISODIC | 8 | 5 | 3 |
-| PROCEDURAL | 7 | 6 | 1 |
+| PREFERENCE | 8 | 4 | 4 |
+| SEMANTIC | 7 | 5 | 2 |
+| EPISODIC | 8 | 2 | 6 |
+| PROCEDURAL | 7 | 3 | 4 |
 
-Required recall by type: `{'PREFERENCE': 0.75, 'SEMANTIC': 1.0, 'EPISODIC': 1.0, 'PROCEDURAL': 1.0}`.
+Required recall by type: `{'PREFERENCE': 1.0, 'SEMANTIC': 1.0, 'EPISODIC': 1.0, 'PROCEDURAL': 1.0}`.
 
 Retrieval failures:
 
-- `A-preference-only` (A_four_types_present): expected `['8394cf0d-e1ae-4899-ac27-fc214a53600a']`, actual `['8394cf0d-e1ae-4899-ac27-fc214a53600a', 'prov1-73839f1c495d0a332faf0f549e901c537d2f26e325920ce49168234b3ba64783']`
-- `A-procedural-only` (A_four_types_present): expected `['prov1-73839f1c495d0a332faf0f549e901c537d2f26e325920ce49168234b3ba64783']`, actual `['prov1-73839f1c495d0a332faf0f549e901c537d2f26e325920ce49168234b3ba64783', '8394cf0d-e1ae-4899-ac27-fc214a53600a', 'epv1-b36f162c1e61aae8372a825a529c5fd52d0b4d3d0e5da1ae7a0597c75506dc77']`
-- `C-multi-preference-semantic-procedure` (C_multi_type_required): expected `['8394cf0d-e1ae-4899-ac27-fc214a53600a', 'prov1-73839f1c495d0a332faf0f549e901c537d2f26e325920ce49168234b3ba64783', 'semv1-0f1eba6b3ac3334c213ae515d73351c47800adc6a8d12d537af09387f1502a03']`, actual `['prov1-73839f1c495d0a332faf0f549e901c537d2f26e325920ce49168234b3ba64783', 'semv1-0f1eba6b3ac3334c213ae515d73351c47800adc6a8d12d537af09387f1502a03']`
-- `E-current-procedure-override` (E_current_instruction_override): expected `[]`, actual `['epv1-b36f162c1e61aae8372a825a529c5fd52d0b4d3d0e5da1ae7a0597c75506dc77']`
-- `I-cross-user` (I_cross_user_tenant): expected `[]`, actual `['prov1-73839f1c495d0a332faf0f549e901c537d2f26e325920ce49168234b3ba64783', 'epv1-b36f162c1e61aae8372a825a529c5fd52d0b4d3d0e5da1ae7a0597c75506dc77', 'semv1-2b80ce5adf8a95e228e8faf57ff61af8c1a9eb22fd08c72ac4a7caf3ad3e523f', 'semv1-0f1eba6b3ac3334c213ae515d73351c47800adc6a8d12d537af09387f1502a03', '8394cf0d-e1ae-4899-ac27-fc214a53600a']`
-- `I-cross-tenant` (I_cross_user_tenant): expected `[]`, actual `['prov1-73839f1c495d0a332faf0f549e901c537d2f26e325920ce49168234b3ba64783', '8394cf0d-e1ae-4899-ac27-fc214a53600a']`
+- None
 
 ## Context Budget Evaluation
 
@@ -108,7 +104,7 @@ are a conservative `ceil(chars / 4)` estimate, not a provider tokenizer count;
 the percentage uses the nominal five-record × 1200-character Memory budget.
 
 Per-type selected contribution across the 30 measurements:
-`{'PREFERENCE': 45, 'SEMANTIC': 30, 'EPISODIC': 15, 'PROCEDURAL': 10}`.
+`{'PREFERENCE': 44, 'SEMANTIC': 31, 'EPISODIC': 15, 'PROCEDURAL': 10}`.
 
 ## Lifecycle Correctness
 
@@ -156,8 +152,8 @@ Procedural guidance remained advisory and the current explicit exception won.
 
 ## Failure Diagnosis
 
-FIRST_BAD_STATE: **retrieval selected set**.
-Failure families: **['RETRIEVAL_ISSUE', 'RELEVANCE_GATE_ISSUE']**.
+FIRST_BAD_STATE: **none**.
+Failure families: **['none']**.
 
 Evidence:
 
@@ -190,10 +186,14 @@ in this evaluation-only run.
 
 ## Production Files Changed
 
-**None.** The evaluator changed only evaluation assets. Dirty paths observed by
-the architecture audit:
+The only production paths observed are the explicitly scoped canonical V3
+Retriever/Gate changes:
 
-`['scripts/memory_evaluation_harness.py', 'docs/evaluation/long_term_memory_system_dataset.json', 'docs/evaluation/long_term_memory_system_results.json', 'docs/reports/LONG_TERM_MEMORY_SYSTEM_EVALUATION.md', 'tests/unit/test_long_term_memory_system_evaluation.py']`
+`['packages/agent_core/greenbook_agent_core/memory/relevance.py', 'packages/agent_core/greenbook_agent_core/memory/retriever.py']`
+
+Dirty paths observed by the architecture audit:
+
+`['docs/evaluation/long_term_memory_system_results.json', 'docs/reports/LONG_TERM_MEMORY_SYSTEM_EVALUATION.md', 'packages/agent_core/greenbook_agent_core/memory/relevance.py', 'packages/agent_core/greenbook_agent_core/memory/retriever.py', 'scripts/memory_evaluation_harness.py', 'tests/unit/test_long_term_memory_system_evaluation.py', 'docs/evaluation/long_term_memory_retrieval_v3_diagnosis.json', 'docs/evaluation/long_term_memory_retrieval_v3_results.json', 'docs/reports/LONG_TERM_MEMORY_RETRIEVAL_V3_DIAGNOSIS.md', 'docs/reports/LONG_TERM_MEMORY_RETRIEVAL_V3_REPORT.md', 'tests/unit/test_memory_retrieval_v3.py']`
 
 Out-of-scope paths: `[]`.
 
@@ -206,4 +206,4 @@ full expensive evaluation was included in this report.
 
 ## Next Recommendation
 
-Keep the architecture unchanged and address the diagnosed quality issue only after reviewing the listed cases and FIRST_BAD_STATE.
+Keep the four-type contract unchanged; do not add Memory types, predicates, Episode/Procedure scenarios, or automatic learning in the next step.

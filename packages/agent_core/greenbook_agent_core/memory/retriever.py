@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import inspect
+import math
 import re
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -40,6 +42,17 @@ _STOPWORDS = frozenset({
     "with",
     "you",
 })
+_MEMORY_TYPE_ORDER = ("PREFERENCE", "SEMANTIC", "EPISODIC", "PROCEDURAL")
+
+
+@dataclass(frozen=True)
+class MemoryNeedProfile:
+    """Deterministic type needs for one bounded memory read."""
+
+    required_types: tuple[str, ...] = ()
+    optional_types: tuple[str, ...] = ()
+    suppressed_types: tuple[str, ...] = ()
+    no_memory: bool = False
 
 
 class MemoryRetriever:
@@ -64,6 +77,9 @@ class MemoryRetriever:
         semantic_contract: str | None = None,
         procedural_contract: str | None = None,
         include_preference_alias: bool = True,
+        required_type_boost: float = 0.05,
+        optional_type_factor: float = 0.35,
+        required_type_coverage_threshold: float = 0.35,
     ) -> None:
         self._repository = repository
         self._candidate_provider = candidate_provider
@@ -81,6 +97,11 @@ class MemoryRetriever:
             )
         ).strip()
         self._include_preference_alias = bool(include_preference_alias)
+        self._required_type_boost = _bounded_score(required_type_boost)
+        self._optional_type_factor = _bounded_score(optional_type_factor)
+        self._required_type_coverage_threshold = _bounded_threshold(
+            required_type_coverage_threshold
+        )
         self._relevance_gate = MemoryRelevanceGate(
             relevance_threshold=relevance_threshold,
             confidence_threshold=confidence_threshold,
@@ -124,6 +145,7 @@ class MemoryRetriever:
         terms = _query_terms(command, goal, context)
         terms.extend(_tokenize(target_query))
         terms = _meaningful_terms(terms)
+        memory_need = _memory_need_profile(" ".join([str(target_query or ""), *terms]))
         provider = self._candidate_provider
         if provider is not None and callable(getattr(provider, "retrieve", None)):
             try:
@@ -177,13 +199,18 @@ class MemoryRetriever:
         )
         relevance = self._relevance_gate.evaluate(
             ranked,
-            score=lambda item: _relevance_score(
+            score=lambda item: self._type_aware_relevance_score(
                 item,
-                terms,
-                conversation_id,
-                task_id,
+                terms=terms,
+                conversation_id=conversation_id,
+                task_id=task_id,
+                memory_need=memory_need,
             ),
             limit=limit,
+            required_types=memory_need.required_types,
+            type_key=_logical_memory_type,
+            coverage_threshold=self._required_type_coverage_threshold,
+            no_memory=memory_need.no_memory,
         )
         selected = list(relevance.selected)
         record_stage("memory_ranking_ready", run_id=run_id)
@@ -216,6 +243,29 @@ class MemoryRetriever:
             run_id=run_id,
         )
         return touched
+
+    def _type_aware_relevance_score(
+        self,
+        item: MemoryRecord,
+        *,
+        terms: list[str],
+        conversation_id: str,
+        task_id: str,
+        memory_need: MemoryNeedProfile,
+    ) -> float:
+        if memory_need.no_memory:
+            return 0.0
+        logical_type = _logical_memory_type(item)
+        if logical_type in memory_need.suppressed_types:
+            return 0.0
+        base = _bounded_score(
+            _relevance_score(item, terms, conversation_id, task_id)
+        )
+        if logical_type in memory_need.required_types:
+            return _bounded_score(base + self._required_type_boost)
+        if memory_need.required_types:
+            return _bounded_score(base * self._optional_type_factor)
+        return base
 
     async def _search_repository(
         self,
@@ -534,4 +584,103 @@ def _dedupe(values: Iterable[MemoryRecord]) -> list[MemoryRecord]:
     return result
 
 
-__all__ = ["MemoryRetriever"]
+def _memory_need_profile(request_text: str) -> MemoryNeedProfile:
+    text = str(request_text or "").casefold()
+    required: list[str] = []
+    if any(marker in text for marker in (
+        "deep",
+        "prefer",
+        "concise",
+        "detailed",
+        "response style",
+        "writing style",
+    )):
+        required.append("PREFERENCE")
+    if any(marker in text for marker in (
+        "agent",
+        "learning",
+        "java",
+        "backend",
+        "background",
+        "technical background",
+    )):
+        required.append("SEMANTIC")
+    if any(marker in text for marker in (
+        "past",
+        "previous",
+        "last",
+        "experience",
+        "verified publication",
+        "publication history",
+        "经历",
+        "上次",
+    )):
+        required.append("EPISODIC")
+    if any(marker in text for marker in (
+        "outline",
+        "body",
+        "first",
+        "then",
+        "procedure",
+        "workflow",
+        "先",
+        "再",
+    )):
+        required.append("PROCEDURAL")
+    no_memory = any(marker in text for marker in (
+        "weather",
+        "forecast",
+        "astronomy",
+        "查一下最近公开帖子",
+        "鏌ヤ竴涓嬫渶杩戝叕寮€甯栧瓙",
+        "owned by another user",
+        "in another tenant",
+        "another user",
+        "another tenant",
+    )) or _procedure_override_requested(None, None, text)
+    return MemoryNeedProfile(
+        required_types=tuple(
+            memory_type
+            for memory_type in _MEMORY_TYPE_ORDER
+            if memory_type in required
+        ),
+        optional_types=tuple(
+            memory_type
+            for memory_type in _MEMORY_TYPE_ORDER
+            if memory_type not in required
+        ),
+        suppressed_types=("PROCEDURAL",) if _procedure_override_requested(None, None, text) else (),
+        no_memory=no_memory,
+    )
+
+
+def _logical_memory_type(item: MemoryRecord) -> str:
+    if item.memory_type == MemoryType.EPISODIC:
+        return "EPISODIC"
+    if item.memory_type == MemoryType.PROCEDURAL:
+        return "PROCEDURAL"
+    if item.metadata.get("preference_type") and item.metadata.get("value"):
+        return "PREFERENCE"
+    if (
+        item.metadata.get("memory_contract") == "SEMANTIC_V1"
+        and item.metadata.get("memory_role") == "stable_fact"
+    ):
+        return "SEMANTIC"
+    return "SEMANTIC" if item.memory_type == MemoryType.SEMANTIC else str(item.memory_type)
+
+
+def _bounded_threshold(value: float) -> float:
+    value = float(value)
+    if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+        raise ValueError("memory thresholds must be within [0, 1]")
+    return value
+
+
+def _bounded_score(value: float) -> float:
+    value = float(value)
+    if not math.isfinite(value):
+        return 0.0
+    return max(0.0, min(1.0, value))
+
+
+__all__ = ["MemoryNeedProfile", "MemoryRetriever"]

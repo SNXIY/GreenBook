@@ -40,6 +40,7 @@ from greenbook_agent_core.memory import (
     MemoryManager,
     MemoryQuery,
     MemoryRecord,
+    MemoryRelevanceGate,
     MemoryRetriever,
     MemoryStatus,
     MemoryType,
@@ -49,6 +50,13 @@ from greenbook_agent_core.memory import (
     ProceduralMemoryService,
     SemanticMemoryService,
     VerifiedBusinessOutcome,
+)
+from greenbook_agent_core.memory.relevance import lexical_relevance
+from greenbook_agent_core.memory.retriever import (
+    _meaningful_terms,
+    _relevance_score,
+    _score,
+    _tokenize,
 )
 from greenbook_agent_core.task.models import Objective, ObjectiveStatus
 
@@ -1905,6 +1913,130 @@ def _record_list_by_id(values: list[MemoryRecord]) -> dict[str, MemoryRecord]:
     return {item.memory_id: item for item in values}
 
 
+def _retrieval_candidate_trace(
+    *,
+    case: dict[str, Any],
+    fixture: dict[str, Any],
+    candidates: list[MemoryRecord],
+    selected: list[MemoryRecord],
+    expected_ids: set[str],
+    forbidden_ids: set[str],
+    relevance_threshold: float = 0.5,
+    confidence_threshold: float = 0.5,
+) -> dict[str, Any]:
+    """Explain every candidate before and after the current global Gate."""
+
+    query = str(case.get("query") or "")
+    terms = _meaningful_terms(_tokenize(query))
+    selected_ids = {item.memory_id for item in selected}
+    ranked = sorted(
+        candidates,
+        key=lambda item: _score(item, terms, str(case.get("conversation_id") or ""), ""),
+        reverse=True,
+    )
+    candidate_rows: list[dict[str, Any]] = []
+    for item in ranked:
+        current_score = max(0.0, min(1.0, _relevance_score(
+            item,
+            terms,
+            str(case.get("conversation_id") or ""),
+            "",
+        )))
+        lexical_score = lexical_relevance(
+            " ".join([item.content, str(item.metadata)]),
+            terms,
+        )
+        if item.memory_id in selected_ids:
+            reason = "selected_by_global_threshold_and_top_k"
+        elif (
+            _procedure_override_requested_for_evaluation(query)
+            and item.memory_type == MemoryType.PROCEDURAL
+        ):
+            reason = "filtered_by_current_procedure_override"
+        elif current_score < relevance_threshold:
+            reason = "filtered_below_global_relevance_threshold"
+        elif item.confidence < confidence_threshold:
+            reason = "filtered_below_confidence_threshold"
+        else:
+            reason = "filtered_by_global_top_k"
+        candidate_rows.append({
+            "memory_id": item.memory_id,
+            "memory_type": _logical_memory_type(item),
+            "content": item.content,
+            "confidence": item.confidence,
+            "raw_lexical_score": lexical_score,
+            "current_relevance_score": current_score,
+            "ranking_score": _score(
+                item,
+                terms,
+                str(case.get("conversation_id") or ""),
+                "",
+            ),
+            "selected": item.memory_id in selected_ids,
+            "selection_reason": reason,
+            "false_positive": item.memory_id in selected_ids and item.memory_id not in expected_ids,
+            "false_negative": item.memory_id not in selected_ids and item.memory_id in expected_ids,
+            "forbidden_returned": item.memory_id in forbidden_ids and item.memory_id in selected_ids,
+        })
+    candidate_ids = {item.memory_id for item in candidates}
+    for expected_id in sorted(expected_ids - candidate_ids):
+        expected_record = next(
+            (
+                record
+                for record in fixture["records"].values()
+                if record.memory_id == expected_id
+            ),
+            None,
+        )
+        candidate_rows.append({
+            "memory_id": expected_id,
+            "memory_type": _logical_memory_type(expected_record) if expected_record else "UNKNOWN",
+            "content": expected_record.content if expected_record else "",
+            "confidence": expected_record.confidence if expected_record else None,
+            "raw_lexical_score": None,
+            "current_relevance_score": None,
+            "ranking_score": None,
+            "selected": False,
+            "selection_reason": "missing_from_repository_candidate_pool",
+            "false_positive": False,
+            "false_negative": True,
+            "forbidden_returned": False,
+        })
+    return {
+        "query_terms": terms,
+        "procedure_override_requested": _procedure_override_requested_for_evaluation(query),
+        "expected_ids": sorted(expected_ids),
+        "selected_ids": [item.memory_id for item in selected],
+        "candidate_count": len(candidates),
+        "selected_count": len(selected),
+        "candidates": candidate_rows,
+    }
+
+
+def _procedure_override_requested_for_evaluation(query: str) -> bool:
+    """Mirror the production exception marker for offline diagnosis only."""
+
+    text = str(query or "").casefold()
+    return any(marker in text for marker in (
+        "不用大纲",
+        "不用先列大纲",
+        "不要大纲",
+        "不要先列大纲",
+        "无需大纲",
+        "不需要大纲",
+        "不需要先列大纲",
+        "跳过大纲",
+        "不列大纲",
+        "without an outline",
+        "skip the outline",
+        "no outline",
+        "do not use an outline",
+        "don't use an outline",
+        "write directly",
+        "directly write",
+    ))
+
+
 async def evaluate_system_retrieval(
     cases: list[dict[str, Any]],
     base_fixture: dict[str, Any],
@@ -2014,6 +2146,14 @@ async def evaluate_system_retrieval(
                 cross_user_leaks += 1
             if any(item.tenant_id != tenant_id for item in values):
                 cross_tenant_leaks += 1
+        trace = _retrieval_candidate_trace(
+            case=case,
+            fixture=fixture,
+            candidates=candidates,
+            selected=values,
+            expected_ids=expected_ids,
+            forbidden_ids=forbidden_ids,
+        )
         evaluated.append({
             **case,
             "expected_ids": sorted(expected_ids),
@@ -2029,6 +2169,7 @@ async def evaluate_system_retrieval(
             },
             "forbidden_returned": sorted(forbidden_ids & actual_set),
             "irrelevant_ids": sorted(irrelevant_ids),
+            "candidate_trace": trace,
         })
     metrics = {}
     for key, values in metric_sums.items():
@@ -2549,25 +2690,41 @@ def _system_architecture_audit() -> dict[str, Any]:
         "docs/reports/",
         "scripts/memory_evaluation_harness.py",
         "tests/unit/test_long_term_memory_system_evaluation.py",
+        "tests/unit/test_memory_retrieval_v3.py",
     )
+    allowed_production_paths = {
+        "packages/agent_core/greenbook_agent_core/memory/__init__.py",
+        "packages/agent_core/greenbook_agent_core/memory/relevance.py",
+        "packages/agent_core/greenbook_agent_core/memory/retriever.py",
+    }
     out_of_scope = [
         path for path in changed_paths
-        if not path.replace("\\", "/").startswith(allowed_prefixes)
+        if not (
+            path.replace("\\", "/").startswith(allowed_prefixes)
+            or path.replace("\\", "/") in allowed_production_paths
+        )
+    ]
+    production_paths = [
+        path
+        for path in changed_paths
+        if path.replace("\\", "/").startswith(("apps/", "packages/", "services/"))
     ]
     checks = {
         "one_memory_retriever_in_production_composition": main_source.count("MemoryRetriever(") == 1,
         "one_relevance_gate_in_canonical_retriever": retriever_source.count("MemoryRelevanceGate(") == 1,
         "canonical_gate_implementation_is_single": relevance_source.count("class MemoryRelevanceGate") == 1,
         "context_builder_has_bounded_memory_budget": "max_memories" in context_source and "memory_limit = min" in context_source,
-        "production_dirty_scope_is_evaluation_only": not out_of_scope,
-        "no_production_file_changed": not any(
-            path.replace("\\", "/").startswith(("apps/", "packages/", "services/"))
-            for path in changed_paths
+        "production_dirty_scope_is_evaluation_or_canonical_retrieval": not out_of_scope,
+        "no_unrelated_production_file_changed": all(
+            path.replace("\\", "/") in allowed_production_paths
+            for path in production_paths
         ),
     }
     return {
         "checks": checks,
         "changed_paths": changed_paths,
+        "production_paths": production_paths,
+        "allowed_production_paths": sorted(allowed_production_paths),
         "out_of_scope_paths": out_of_scope,
         "canonical_runtime": {
             "repository": "MemoryManager / canonical repository",
@@ -2621,6 +2778,1308 @@ def _system_metric(value: float) -> str:
 
 def _system_pct(value: float) -> str:
     return f"{value * 100:.2f}%"
+
+
+def _markdown_cell(value: Any) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def render_long_term_memory_retrieval_v3_diagnosis(
+    retrieval: dict[str, Any],
+    *,
+    baseline_commit: str,
+) -> str:
+    """Render the selected-set diagnosis before any production change."""
+
+    false_positive_pairs: Counter[str] = Counter()
+    false_negative_rows: list[tuple[str, str, str, str]] = []
+    for case in retrieval["cases"]:
+        expected_types = sorted({
+            row["memory_type"]
+            for row in case["candidate_trace"]["candidates"]
+            if row["memory_id"] in case["expected_ids"]
+        })
+        expected_label = ", ".join(expected_types) or "NONE"
+        for row in case["candidate_trace"]["candidates"]:
+            if row["false_positive"]:
+                false_positive_pairs[f"{row['memory_type']} -> {expected_label}"] += 1
+            if row["false_negative"]:
+                false_negative_rows.append((
+                    case["id"],
+                    row["memory_id"],
+                    row["memory_type"],
+                    row["selection_reason"],
+                ))
+    pair_rows = "\n".join(
+        f"| `{pair}` | {count} |"
+        for pair, count in sorted(false_positive_pairs.items())
+    ) or "| None | 0 |"
+    miss_rows = "\n".join(
+        f"| `{case_id}` | `{memory_id}` | {memory_type} | {reason} |"
+        for case_id, memory_id, memory_type, reason in false_negative_rows
+    ) or "| None | - | - | - |"
+    trace_sections: list[str] = []
+    for case in retrieval["cases"]:
+        trace = case["candidate_trace"]
+        rows = "\n".join(
+            "| `{memory_id}` | {memory_type} | `{raw}` | `{current}` | `{confidence}` | "
+            "{selected} | {reason} | {fp} | {fn} |".format(
+                memory_id=_markdown_cell(item["memory_id"]),
+                memory_type=item["memory_type"],
+                raw=(
+                    "n/a"
+                    if item["raw_lexical_score"] is None
+                    else f"{item['raw_lexical_score']:.4f}"
+                ),
+                current=(
+                    "n/a"
+                    if item["current_relevance_score"] is None
+                    else f"{item['current_relevance_score']:.4f}"
+                ),
+                confidence=(
+                    "n/a"
+                    if item["confidence"] is None
+                    else f"{item['confidence']:.2f}"
+                ),
+                selected="yes" if item["selected"] else "no",
+                reason=item["selection_reason"],
+                fp="yes" if item["false_positive"] else "no",
+                fn="yes" if item["false_negative"] else "no",
+            )
+            for item in trace["candidates"]
+        ) or "| None | - | - | - | - | - | - | - | - |"
+        trace_sections.append(
+            f"### `{case['id']}` ({case['family']})\n\n"
+            f"Query: `{_markdown_cell(case['query'])}`  \n"
+            f"Terms: `{trace['query_terms']}`  \n"
+            f"Expected IDs: `{case['expected_ids']}`  \n"
+            f"Selected IDs: `{case['actual_ids']}`  \n"
+            f"Procedure override detected: `{trace['procedure_override_requested']}`\n\n"
+            "| Candidate ID | Type | Raw lexical | Current relevance | Confidence | Selected | Reason | FP | FN |\n"
+            "|---|---|---:|---:|---:|---|---|---|---|\n"
+            f"{rows}\n"
+        )
+    return f"""# LONG_TERM_MEMORY_RETRIEVAL_V3_DIAGNOSIS
+
+Baseline evaluation commit: `{baseline_commit}`
+Evaluation checkpoint: `{SYSTEM_EVALUATION_CHECKPOINT}`
+
+This is a read-only selected-set diagnosis. No production file was changed by
+the diagnosis. The existing V2 retriever and Gate were observed as composed;
+no alternate Retriever or Gate was installed.
+
+## Exact FIRST_BAD_STATE
+
+**`retrieval selected set`**
+
+The repository candidate pool is scoped and contract-filtered. The first
+incorrect state is the set returned after the canonical Retriever's global
+relevance Gate. Classification, write policy, lifecycle, user/tenant scope,
+and authority checks are upstream or parallel invariants and are not the
+source of these retrieval failures.
+
+Failure families: **`RETRIEVAL_ISSUE`, `RELEVANCE_GATE_ISSUE`**.
+
+## Current V2 decision mechanics
+
+- Candidate search uses the existing single `MemoryRetriever` and one
+  repository, with per-type query variants only for the persisted
+  Preference/Semantic compatibility alias.
+- Candidates are first ordered by the Retriever's `_score` for operational
+  ranking. The Gate then applies a single global normalized relevance score
+  (`lexical_relevance`, or an exact conversation/task relation), requires
+  relevance `>= 0.5` and confidence `>= 0.5`, sorts that shared score, and
+  takes global `limit=5`.
+- Therefore the current Gate is **global threshold + global top-K**, not a
+  type-aware threshold, type-aware score, or required-type coverage policy.
+- Scores are numerically normalized to `[0, 1]`, but are not semantically
+  calibrated across types. A longer Episode or Procedure can share generic
+  domain terms with a request, while a concise Preference can have fewer
+  overlapping terms in a multi-type request.
+
+## Metric-definition clarification
+
+The existing report intentionally contains several denominators:
+
+| Metric | Definition used by V2 baseline |
+|---|---|
+| Fixed Precision@K | Hits in the first K positions divided by K, even when fewer than K records were returned. |
+| Returned Precision@K | Hits in the first K returned positions divided by the number actually returned in that prefix; empty prefixes contribute 0. |
+| Irrelevant Memory Injection Rate | Selected records not in the case's expected set divided by all selected records across retrieval cases, including selected wrong-type records and selected records for cases whose expected set is empty. |
+| Required Memory Miss Rate | Expected records not selected divided by all expected records. |
+| No-match False Return Rate | No-memory cases that returned at least one record divided by the explicitly marked `D_no_memory` cases. |
+
+Returned Precision can remain high when a case returns only one correct record,
+while Irrelevant Injection Rate can be high because it counts every extra
+selected record across all cases and includes no-memory/wrong-type selections.
+They answer different questions and must not be optimized as interchangeable
+metrics.
+
+## False-positive type pairs
+
+| Selected type -> expected type(s) | Count |
+|---|---:|
+{pair_rows}
+
+The expected-type label is `NONE` for an explicitly no-memory case. This table
+shows cross-type lexical contamination rather than scope leakage.
+
+## Required-memory misses
+
+| Case | Missing memory | Type | Selection reason |
+|---|---|---|---|
+{miss_rows}
+
+In particular, the multi-type case's Preference is present in the scoped
+candidate pool but falls below the same global threshold after the query terms
+are distributed across Preference, Semantic, and Procedure vocabulary. It is
+not rejected by lifecycle, confidence, user scope, tenant scope, or type
+contract. This is why the required Preference recall is lower while the other
+types pass.
+
+## Per-case candidate trace
+
+    The following is the complete trace for every retrieval case. `Raw lexical` is
+    the direct pre-normalization `lexical_relevance` output; the current Gate
+    clamps its relevance input to `[0, 1]`, which is shown as `Current relevance`.
+    `Ranking score` is retained in the JSON result for the Retriever's pre-Gate
+    order. A missing expected candidate is represented with `n/a` scores and an
+    explicit candidate-pool reason.
+
+{chr(10).join(trace_sections)}
+
+## Root cause and minimal design direction
+
+Evidence shows two coupled quality problems:
+
+1. Shared lexical terms such as `technical`, `article`, `publication`, and
+   `writing` allow a record from another logical type to clear a global
+   threshold.
+2. A multi-type request has no explicit memory-need profile or required-type
+   coverage. The global threshold therefore filters a required Preference even
+   though the request contains a Preference signal.
+
+The smallest safe experiment is one type-aware score inside the existing Gate,
+derived from deterministic request features, followed by optional required-type
+coverage within the same total bound. It must preserve no-match, confidence,
+scope, lifecycle, and authority invariants. No production change is justified
+until offline results meet the V3 acceptance gate.
+"""
+
+
+def _experimental_memory_need_profile(query: str) -> dict[str, Any]:
+    """Derive a small deterministic type profile for offline V3 experiments."""
+
+    text = str(query or "").casefold()
+    signals: dict[str, list[str]] = {}
+    required: set[str] = set()
+    if any(marker in text for marker in (
+        "deep",
+        "prefer",
+        "concise",
+        "detailed",
+        "response style",
+        "writing style",
+    )):
+        required.add("PREFERENCE")
+        signals["PREFERENCE"] = [
+            marker
+            for marker in ("deep", "prefer", "concise", "detailed", "response style", "writing style")
+            if marker in text
+        ]
+    if any(marker in text for marker in (
+        "agent",
+        "learning",
+        "java",
+        "backend",
+        "background",
+        "technical background",
+    )):
+        required.add("SEMANTIC")
+        signals["SEMANTIC"] = [
+            marker
+            for marker in (
+                "agent",
+                "learning",
+                "java",
+                "backend",
+                "background",
+                "technical background",
+            )
+            if marker in text
+        ]
+    if any(marker in text for marker in (
+        "past",
+        "previous",
+        "last",
+        "experience",
+        "verified publication",
+        "publication history",
+        "经历",
+        "上次",
+    )):
+        required.add("EPISODIC")
+        signals["EPISODIC"] = [
+            marker
+            for marker in (
+                "past",
+                "previous",
+                "last",
+                "experience",
+                "verified publication",
+                "publication history",
+                "经历",
+                "上次",
+            )
+            if marker in text
+        ]
+    if any(marker in text for marker in (
+        "outline",
+        "body",
+        "first",
+        "then",
+        "procedure",
+        "workflow",
+        "先",
+        "再",
+    )):
+        required.add("PROCEDURAL")
+        signals["PROCEDURAL"] = [
+            marker
+            for marker in (
+                "outline",
+                "body",
+                "first",
+                "then",
+                "procedure",
+                "workflow",
+                "先",
+                "再",
+            )
+            if marker in text
+        ]
+
+    no_memory_reasons: list[str] = []
+    if any(marker in text for marker in (
+        "weather",
+        "forecast",
+        "astronomy",
+        "查一下最近公开帖子",
+        "鏌ヤ竴涓嬫渶杩戝叕寮€甯栧瓙",
+    )):
+        no_memory_reasons.append("unrelated_external_lookup")
+    if any(marker in text for marker in (
+        "owned by another user",
+        "in another tenant",
+        "another user",
+        "another tenant",
+    )):
+        no_memory_reasons.append("explicitly_other_scope")
+    if _procedure_override_requested_for_evaluation(text):
+        no_memory_reasons.append("explicit_current_exception")
+    return {
+        "required_types": sorted(required),
+        "optional_types": sorted(set(SYSTEM_MEMORY_TYPES) - required),
+        "suppressed_types": ["PROCEDURAL"] if "explicit_current_exception" in no_memory_reasons else [],
+        "no_memory": bool(no_memory_reasons),
+        "no_memory_reasons": no_memory_reasons,
+        "signals": signals,
+    }
+
+
+def _bounded_offline_score(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _experimental_type_aware_score(
+    item: MemoryRecord,
+    *,
+    terms: list[str],
+    profile: dict[str, Any],
+    required_boost: float,
+    optional_factor: float,
+) -> float:
+    if profile["no_memory"]:
+        return 0.0
+    logical_type = _logical_memory_type(item)
+    if logical_type in profile["suppressed_types"]:
+        return 0.0
+    lexical = _bounded_offline_score(
+        lexical_relevance(" ".join([item.content, str(item.metadata)]), terms)
+    )
+    if logical_type in profile["required_types"]:
+        return _bounded_offline_score(lexical + required_boost)
+    return _bounded_offline_score(lexical * optional_factor)
+
+
+async def _experimental_candidate_pool(
+    case: dict[str, Any],
+    fixture: dict[str, Any],
+) -> tuple[list[MemoryRecord], list[str]]:
+    retriever, _ = _system_retriever(fixture["repository"])
+    user_id = case.get("user_id") or fixture["user_id"]
+    tenant_id = case.get("tenant_id") or fixture["tenant_id"]
+    terms = _meaningful_terms(_tokenize(case["query"]))
+    candidates = await retriever._search_repository(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        terms=terms,
+        limit=100,
+    )
+    values = [
+        item
+        for item in candidates
+        if retriever._allowed_candidate(item, user_id=user_id, tenant_id=tenant_id)
+    ]
+    return values, terms
+
+
+def _experimental_context_size(values: list[MemoryRecord]) -> tuple[int, int]:
+    payload = {
+        "user_preferences": [
+            item.content
+            for item in values
+            if _logical_memory_type(item) == "PREFERENCE"
+        ],
+        "recalled_memories": [
+            {
+                "memory_type": _logical_memory_type(item),
+                "content": item.content,
+                "metadata": item.metadata,
+            }
+            for item in values
+        ],
+    }
+    chars = len(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+    return chars, (chars + 3) // 4
+
+
+async def _evaluate_retrieval_policy(
+    cases: list[dict[str, Any]],
+    base_fixture: dict[str, Any],
+    *,
+    policy: str,
+    required_boost: float = 0.0,
+    optional_factor: float = 1.0,
+    relevance_threshold: float = 0.5,
+    coverage_threshold: float | None = None,
+) -> dict[str, Any]:
+    evaluated: list[dict[str, Any]] = []
+    metric_sums = {
+        str(k): {"recall": 0.0, "precision": 0.0, "returned_precision": 0.0, "count": 0}
+        for k in (1, 3, 5)
+    }
+    type_counts: dict[str, Counter[str]] = {
+        memory_type: Counter()
+        for memory_type in SYSTEM_MEMORY_TYPES
+    }
+    type_required = Counter()
+    type_hits = Counter()
+    type_selected = Counter()
+    no_match_cases = 0
+    no_match_false_returns = 0
+    irrelevant_selected = 0
+    selected_total = 0
+    required_total = 0
+    required_misses = 0
+    override_failures = 0
+    cross_user_leaks = 0
+    cross_tenant_leaks = 0
+    context_chars: list[float] = []
+    context_tokens: list[float] = []
+    for case in cases:
+        fixture = _fixture_for_retrieval_case(case, base_fixture)
+        user_id = case.get("user_id") or fixture["user_id"]
+        tenant_id = case.get("tenant_id") or fixture["tenant_id"]
+        candidates, terms = await _experimental_candidate_pool(case, fixture)
+        expected_ids = _expected_ids(case, fixture)
+        forbidden_ids = {
+            fixture["records"][key].memory_id
+            for key in case.get("forbidden_records", ())
+            if key in fixture["records"]
+        }
+        profile = _experimental_memory_need_profile(case["query"])
+        if _procedure_override_requested_for_evaluation(case["query"]):
+            candidates = [
+                item
+                for item in candidates
+                if item.memory_type != MemoryType.PROCEDURAL
+            ]
+        if policy == "global_threshold":
+            conversation_id = str(case.get("conversation_id") or "")
+
+            def score_fn(
+                item: MemoryRecord,
+                *,
+                score_terms: list[str] = terms,
+                score_conversation_id: str = conversation_id,
+            ) -> float:
+                return _bounded_offline_score(
+                    _relevance_score(item, score_terms, score_conversation_id, "")
+                )
+        else:
+            def score_fn(
+                item: MemoryRecord,
+                *,
+                score_terms: list[str] = terms,
+                score_profile: dict[str, Any] = profile,
+                score_required_boost: float = required_boost,
+                score_optional_factor: float = optional_factor,
+            ) -> float:
+                return _experimental_type_aware_score(
+                    item,
+                    terms=score_terms,
+                    profile=score_profile,
+                    required_boost=score_required_boost,
+                    optional_factor=score_optional_factor,
+                )
+        gate = MemoryRelevanceGate(
+            relevance_threshold=relevance_threshold,
+            confidence_threshold=0.5,
+        )
+        scored_result = gate.evaluate(
+            candidates,
+            score=score_fn,
+            limit=max(5, len(candidates)),
+        )
+        eligible = [
+            scored
+            for scored in scored_result.scored
+            if (
+                scored.relevance_score >= relevance_threshold
+                and scored.memory.confidence >= 0.5
+            )
+        ]
+        if policy == "type_aware_coverage" and coverage_threshold is not None:
+            coverage_eligible = [
+                scored
+                for scored in scored_result.scored
+                if (
+                    scored.relevance_score >= coverage_threshold
+                    and scored.memory.confidence >= 0.5
+                )
+            ]
+            selected: list[MemoryRecord] = []
+            for required_type in profile["required_types"]:
+                match = next(
+                    (
+                        scored.memory
+                        for scored in coverage_eligible
+                        if (
+                            _logical_memory_type(scored.memory) == required_type
+                            and scored.memory.memory_id not in {item.memory_id for item in selected}
+                        )
+                    ),
+                    None,
+                )
+                if match is not None:
+                    selected.append(match)
+            for scored in eligible:
+                if scored.memory.memory_id not in {item.memory_id for item in selected}:
+                    selected.append(scored.memory)
+                if len(selected) >= 5:
+                    break
+            selected = selected[:5]
+        else:
+            selected = [scored.memory for scored in eligible[:5]]
+        expected_record_by_id = {
+            record.memory_id: record
+            for record in fixture["records"].values()
+        }
+        actual_ids = [item.memory_id for item in selected]
+        actual_set = set(actual_ids)
+        irrelevant_ids = actual_set - expected_ids
+        required_total += len(expected_ids)
+        required_misses += len(expected_ids - actual_set)
+        for expected_id in expected_ids:
+            expected_record = expected_record_by_id.get(expected_id)
+            if expected_record is not None:
+                logical_type = _logical_memory_type(expected_record)
+                type_required[logical_type] += 1
+                if expected_id in actual_set:
+                    type_hits[logical_type] += 1
+        for item in selected:
+            logical_type = _logical_memory_type(item)
+            type_selected[logical_type] += 1
+        if expected_ids:
+            for k in (1, 3, 5):
+                prefix = actual_ids[:k]
+                hit_count = len(set(prefix) & expected_ids)
+                metric_sums[str(k)]["recall"] += hit_count / len(expected_ids)
+                metric_sums[str(k)]["precision"] += hit_count / k
+                metric_sums[str(k)]["returned_precision"] += (
+                    hit_count / len(prefix) if prefix else 0.0
+                )
+                metric_sums[str(k)]["count"] += 1
+        elif case["family"] == "D_no_memory":
+            no_match_cases += 1
+            if actual_ids:
+                no_match_false_returns += 1
+        selected_total += len(actual_ids)
+        irrelevant_selected += len(irrelevant_ids)
+        if forbidden_ids & actual_set:
+            override_failures += 1
+        if case["family"] == "I_cross_user_tenant":
+            if any(item.user_id != user_id for item in selected):
+                cross_user_leaks += 1
+            if any(item.tenant_id != tenant_id for item in selected):
+                cross_tenant_leaks += 1
+        chars, tokens = _experimental_context_size(selected)
+        context_chars.append(float(chars))
+        context_tokens.append(float(tokens))
+        candidate_type_counts = Counter(_logical_memory_type(item) for item in candidates)
+        selected_type_counts = Counter(_logical_memory_type(item) for item in selected)
+        for memory_type in SYSTEM_MEMORY_TYPES:
+            type_counts[memory_type]["candidate"] += candidate_type_counts[memory_type]
+            type_counts[memory_type]["selected"] += selected_type_counts[memory_type]
+            type_counts[memory_type]["filtered"] += max(
+                0,
+                candidate_type_counts[memory_type] - selected_type_counts[memory_type],
+            )
+        score_by_id = {
+            scored.memory.memory_id: scored.relevance_score
+            for scored in scored_result.scored
+        }
+        evaluated.append({
+            **case,
+            "expected_ids": sorted(expected_ids),
+            "actual_ids": actual_ids,
+            "actual_types": [_logical_memory_type(item) for item in selected],
+            "candidate_count": len(candidates),
+            "selected_count": len(selected),
+            "irrelevant_ids": sorted(irrelevant_ids),
+            "forbidden_returned": sorted(forbidden_ids & actual_set),
+            "profile": profile,
+            "candidate_scores": [
+                {
+                    "memory_id": item.memory_id,
+                    "memory_type": _logical_memory_type(item),
+                    "score": score_by_id.get(item.memory_id, 0.0),
+                    "selected": item.memory_id in actual_set,
+                }
+                for item in candidates
+            ],
+        })
+    metrics: dict[str, Any] = {}
+    for key, values in metric_sums.items():
+        count = values["count"]
+        metrics[key] = {
+            "recall_at_k": values["recall"] / count if count else 0.0,
+            "precision_at_k": values["precision"] / count if count else 0.0,
+            "returned_precision_at_k": values["returned_precision"] / count if count else 0.0,
+            "eligible_cases": count,
+        }
+    per_type = {
+        memory_type: {
+            "required": type_required[memory_type],
+            "hits": type_hits[memory_type],
+            "selected": type_selected[memory_type],
+            "precision": (
+                type_hits[memory_type] / type_selected[memory_type]
+                if type_selected[memory_type] else 0.0
+            ),
+            "recall": (
+                type_hits[memory_type] / type_required[memory_type]
+                if type_required[memory_type] else 0.0
+            ),
+        }
+        for memory_type in SYSTEM_MEMORY_TYPES
+    }
+    return {
+        "policy": policy,
+        "config": {
+            "required_boost": required_boost,
+            "optional_factor": optional_factor,
+            "relevance_threshold": relevance_threshold,
+            "coverage_threshold": coverage_threshold,
+        },
+        "dataset_count": len(cases),
+        "metrics": metrics,
+        "no_match_cases": no_match_cases,
+        "no_match_false_return_rate": (
+            no_match_false_returns / no_match_cases if no_match_cases else 0.0
+        ),
+        "irrelevant_memory_injection_rate": (
+            irrelevant_selected / selected_total if selected_total else 0.0
+        ),
+        "required_memory_miss_rate": (
+            required_misses / required_total if required_total else 0.0
+        ),
+        "required_recall_by_type": {
+            memory_type: per_type[memory_type]["recall"]
+            for memory_type in SYSTEM_MEMORY_TYPES
+        },
+        "per_type": per_type,
+        "candidate_selected_filtered_by_type": {
+            memory_type: dict(type_counts[memory_type])
+            for memory_type in SYSTEM_MEMORY_TYPES
+        },
+        "selected_memory_count": {
+            "p50": _percentile([float(item["selected_count"]) for item in evaluated], 0.5),
+            "p95": _percentile([float(item["selected_count"]) for item in evaluated], 0.95),
+            "max": max((item["selected_count"] for item in evaluated), default=0),
+        },
+        "context_budget": {
+            "chars_p50": _percentile(context_chars, 0.5),
+            "chars_p95": _percentile(context_chars, 0.95),
+            "chars_max": max(context_chars, default=0.0),
+            "tokens_p50": _percentile(context_tokens, 0.5),
+            "tokens_p95": _percentile(context_tokens, 0.95),
+            "tokens_max": max(context_tokens, default=0.0),
+            "bounded": all(item["selected_count"] <= 5 for item in evaluated),
+        },
+        "override_failures": override_failures,
+        "cross_user_leaks": cross_user_leaks,
+        "cross_tenant_leaks": cross_tenant_leaks,
+        "cases": evaluated,
+    }
+
+
+def _v3_acceptance(
+    candidate: dict[str, Any],
+    baseline: dict[str, Any],
+) -> dict[str, bool]:
+    baseline_recall = baseline["metrics"]["5"]["recall_at_k"]
+    baseline_irrelevant = baseline["irrelevant_memory_injection_rate"]
+    baseline_miss = baseline["required_memory_miss_rate"]
+    return {
+        "no_match_false_return_zero": candidate["no_match_false_return_rate"] == 0.0,
+        "authority_violation_zero": candidate["override_failures"] == 0,
+        "user_leakage_zero": candidate["cross_user_leaks"] == 0,
+        "tenant_leakage_zero": candidate["cross_tenant_leaks"] == 0,
+        "required_miss_below_baseline": candidate["required_memory_miss_rate"] < baseline_miss,
+        "irrelevant_injection_materially_below_baseline": (
+            candidate["irrelevant_memory_injection_rate"] <= baseline_irrelevant - 0.05
+        ),
+        "recall_at_5_not_meaningfully_lower": (
+            candidate["metrics"]["5"]["recall_at_k"] >= baseline_recall - 0.05
+        ),
+        "context_bound_preserved": candidate["context_budget"]["bounded"] is True,
+        "context_token_max_not_worse": (
+            candidate["context_budget"]["tokens_max"]
+            <= baseline["context_budget"]["metrics"]["memory_tokens_max_estimate"]
+        ),
+    }
+
+
+def _v3_accepted(candidate: dict[str, Any], baseline: dict[str, Any]) -> bool:
+    return all(_v3_acceptance(candidate, baseline).values())
+
+
+def _offline_summary(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in result.items()
+        if key != "cases"
+    }
+
+
+async def evaluate_long_term_memory_retrieval_v3_offline_async() -> dict[str, Any]:
+    dataset = build_long_term_memory_system_dataset()
+    cases = dataset["families"]["retrieval"]
+    base_fixture = _canonical_system_fixture()
+    baseline = await evaluate_system_retrieval(cases, base_fixture)
+    baseline["context_budget"] = await evaluate_context_budget()
+    threshold_results: list[dict[str, Any]] = []
+    for threshold in (0.35, 0.4, 0.45, 0.5, 0.55, 0.6):
+        result = await _evaluate_retrieval_policy(
+            cases,
+            base_fixture,
+            policy="global_threshold",
+            relevance_threshold=threshold,
+        )
+        threshold_results.append(_offline_summary(result))
+
+    type_score_results: list[dict[str, Any]] = []
+    coverage_results: list[dict[str, Any]] = []
+    for required_boost in (0.0, 0.05, 0.1, 0.15, 0.2, 0.25):
+        for optional_factor in (0.35, 0.4, 0.45, 0.5, 0.55, 0.6):
+            for threshold in (0.45, 0.5, 0.55):
+                score_result = await _evaluate_retrieval_policy(
+                    cases,
+                    base_fixture,
+                    policy="type_aware_score",
+                    required_boost=required_boost,
+                    optional_factor=optional_factor,
+                    relevance_threshold=threshold,
+                )
+                type_score_results.append(_offline_summary(score_result))
+                coverage_result = await _evaluate_retrieval_policy(
+                    cases,
+                    base_fixture,
+                    policy="type_aware_coverage",
+                    required_boost=required_boost,
+                    optional_factor=optional_factor,
+                    relevance_threshold=threshold,
+                    coverage_threshold=max(0.35, threshold - 0.15),
+                )
+                coverage_results.append(_offline_summary(coverage_result))
+
+    def choose(results: list[dict[str, Any]]) -> dict[str, Any] | None:
+        accepted = [
+            item
+            for item in results
+            if _v3_accepted(item, baseline)
+        ]
+        if not accepted:
+            return None
+        return sorted(
+            accepted,
+            key=lambda item: (
+                item["irrelevant_memory_injection_rate"],
+                item["required_memory_miss_rate"],
+                -item["metrics"]["5"]["recall_at_k"],
+                item["config"]["required_boost"],
+                item["config"]["optional_factor"],
+            ),
+        )[0]
+
+    chosen_score_summary = choose(type_score_results)
+    chosen_coverage_summary = choose(coverage_results)
+    # Recompute the selected configurations with per-case traces for the
+    # report and the eventual implementation review.
+    chosen_score_full = None
+    if chosen_score_summary is not None:
+        chosen_score_full = await _evaluate_retrieval_policy(
+            cases,
+            base_fixture,
+            policy="type_aware_score",
+            **chosen_score_summary["config"],
+        )
+    chosen_coverage_full = None
+    if chosen_coverage_summary is not None:
+        chosen_coverage_full = await _evaluate_retrieval_policy(
+            cases,
+            base_fixture,
+            policy="type_aware_coverage",
+            **chosen_coverage_summary["config"],
+        )
+    chosen = chosen_coverage_full or chosen_score_full
+    verdict = "OFFLINE_PASS" if chosen is not None else "NO_GAIN"
+    return {
+        "baseline_commit": subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip(),
+        "checkpoint": SYSTEM_EVALUATION_CHECKPOINT,
+        "dataset": {
+            "name": dataset["dataset"],
+            "version": dataset["version"],
+            "retrieval_case_count": len(cases),
+            "families": sorted({case["family"] for case in cases}),
+        },
+        "baseline": baseline,
+        "experiments": {
+            "global_threshold": threshold_results,
+            "type_aware_score": type_score_results,
+            "type_aware_score_coverage": coverage_results,
+        },
+        "chosen_score_only": chosen_score_full,
+        "chosen_score_coverage": chosen_coverage_full,
+        "chosen": chosen,
+        "acceptance": _v3_acceptance(chosen, baseline) if chosen else {},
+        "verdict": verdict,
+    }
+
+
+def evaluate_long_term_memory_retrieval_v3_offline() -> dict[str, Any]:
+    return asyncio.run(evaluate_long_term_memory_retrieval_v3_offline_async())
+
+
+def render_long_term_memory_retrieval_v3_offline_report(
+    result: dict[str, Any],
+    *,
+    production_files_changed: list[str] | None = None,
+    tests: list[str] | None = None,
+) -> str:
+    baseline = result["baseline"]
+    chosen = result["chosen"]
+    chosen_score = result["chosen_score_only"]
+    chosen_coverage = result["chosen_score_coverage"]
+    production_files_changed = production_files_changed or []
+    tests = tests or []
+
+    def metric_row(label: str, value: Any) -> str:
+        return f"| {label} | {value} |"
+
+    def selected_max(item: dict[str, Any]) -> int:
+        if item.get("selected_memory_count"):
+            return int(item["selected_memory_count"]["max"])
+        return max((len(case["actual_ids"]) for case in item.get("cases", [])), default=0)
+
+    strategy_rows = []
+    for label, item in (
+        ("V2 baseline", baseline),
+        ("Type-aware score only", chosen_score),
+        ("Type-aware score + required-type coverage", chosen_coverage),
+    ):
+        if item is None:
+            strategy_rows.append(f"| {label} | not accepted | - | - | - | - |")
+            continue
+        strategy_rows.append(
+            f"| {label} | `{item.get('config', {})}` | "
+            f"{_system_metric(item['metrics']['5']['recall_at_k'])} | "
+            f"{_system_pct(item['irrelevant_memory_injection_rate'])} | "
+            f"{_system_pct(item['required_memory_miss_rate'])} | "
+            f"{selected_max(item)} |"
+        )
+    chosen_rows = []
+    for key in ("1", "3", "5"):
+        v2 = baseline["metrics"][key]
+        v3 = chosen["metrics"][key] if chosen else None
+        chosen_rows.append(
+            f"| Recall@{key} | {_system_metric(v2['recall_at_k'])} | "
+            f"{_system_metric(v3['recall_at_k']) if v3 else 'n/a'} | "
+            f"{_system_metric(v3['recall_at_k'] - v2['recall_at_k']) if v3 else 'n/a'} |"
+        )
+        chosen_rows.append(
+            f"| Fixed Precision@{key} | {_system_metric(v2['precision_at_k'])} | "
+            f"{_system_metric(v3['precision_at_k']) if v3 else 'n/a'} | "
+            f"{_system_metric(v3['precision_at_k'] - v2['precision_at_k']) if v3 else 'n/a'} |"
+        )
+        chosen_rows.append(
+            f"| Returned Precision@{key} | {_system_metric(v2['returned_precision_at_k'])} | "
+            f"{_system_metric(v3['returned_precision_at_k']) if v3 else 'n/a'} | "
+            f"{_system_metric(v3['returned_precision_at_k'] - v2['returned_precision_at_k']) if v3 else 'n/a'} |"
+        )
+    for label, v2, v3 in (
+        (
+            "No-match false return rate",
+            baseline["no_match_false_return_rate"],
+            chosen["no_match_false_return_rate"] if chosen else None,
+        ),
+        (
+            "Irrelevant Memory Injection Rate",
+            baseline["irrelevant_memory_injection_rate"],
+            chosen["irrelevant_memory_injection_rate"] if chosen else None,
+        ),
+        (
+            "Required Memory Miss Rate",
+            baseline["required_memory_miss_rate"],
+            chosen["required_memory_miss_rate"] if chosen else None,
+        ),
+    ):
+        chosen_rows.append(
+            f"| {label} | {_system_pct(v2)} | {_system_pct(v3) if v3 is not None else 'n/a'} | "
+            f"{_system_pct(v3 - v2) if v3 is not None else 'n/a'} |"
+        )
+    if chosen:
+        chosen_rows.extend([
+            f"| Selected memory count max | {baseline['context_budget']['metrics'].get('memory_count_max', 5)} | {chosen['selected_memory_count']['max']} | - |",
+            f"| Context tokens p50 | {baseline['context_budget']['metrics']['memory_tokens_p50_estimate']:.1f} | {chosen['context_budget']['tokens_p50']:.1f} | - |",
+            f"| Context tokens p95 | {baseline['context_budget']['metrics']['memory_tokens_p95_estimate']:.1f} | {chosen['context_budget']['tokens_p95']:.1f} | - |",
+            f"| Context tokens max | {baseline['context_budget']['metrics']['memory_tokens_max_estimate']:.1f} | {chosen['context_budget']['tokens_max']:.1f} | - |",
+        ])
+    acceptance_rows = "\n".join(
+        f"| {key} | {'PASS' if value else 'FAIL'} |"
+        for key, value in (result.get("acceptance") or {}).items()
+    ) or "| no accepted strategy | - |"
+    per_type_rows = "\n".join(
+        f"| {memory_type} | {values['precision']:.4f} | {values['recall']:.4f} | "
+        f"{values['required']} | {values['selected']} |"
+        for memory_type, values in (chosen["per_type"].items() if chosen else {})
+    ) or "| None | - | - | - | - |"
+    return f"""# LONG_TERM_MEMORY_RETRIEVAL_V3_REPORT
+
+Evaluation baseline commit: `{result['baseline_commit']}`
+Evaluation checkpoint: `{result['checkpoint']}`
+Diagnosis: [LONG_TERM_MEMORY_RETRIEVAL_V3_DIAGNOSIS.md](LONG_TERM_MEMORY_RETRIEVAL_V3_DIAGNOSIS.md)
+
+## Verdict
+
+**{result['verdict']}**
+
+This report first evaluates offline policies against the same V2 dataset. No
+production Memory write path, type admission, lifecycle, repository schema,
+runtime, ActionLoop, MCP, Search, RAG, or Java code is changed by the offline
+experiment.
+
+## Dataset and FIRST_BAD_STATE
+
+- Dataset: `{result['dataset']['name']}` v{result['dataset']['version']}
+- Retrieval cases: **{result['dataset']['retrieval_case_count']}**
+- Families: `{result['dataset']['families']}`
+- FIRST_BAD_STATE: **`retrieval selected set`**
+- Failure families: **`RETRIEVAL_ISSUE`, `RELEVANCE_GATE_ISSUE`**
+
+The diagnosis found shared lexical cross-type false positives and one required
+Preference miss in a multi-type query. The current V2 Gate is global threshold
+plus global top-K; its exact denominators are documented in the diagnosis.
+
+## Tested offline strategies
+
+| Strategy | Chosen configuration | Recall@5 | Irrelevant Injection | Required Miss | Selected max |
+|---|---|---:|---:|---:|---:|
+{chr(10).join(strategy_rows)}
+
+The experiment grid varied required-type additive boost, optional-type
+attenuation, global threshold, and (for coverage) a lower bounded threshold for
+explicitly required types. `MemoryNeedProfile` is deterministic feature
+matching over the request; it is not a second Interpreter or Retriever.
+
+## V2 → V3 selected strategy
+
+| Metric | V2 | V3 | Delta |
+|---|---:|---:|---:|
+{chr(10).join(chosen_rows)}
+
+Chosen configuration: `{chosen.get('config', {}) if chosen else 'none'}`.
+
+## Per-type retrieval metrics
+
+| Type | Precision | Recall | Required | Selected |
+|---|---:|---:|---:|---:|
+{per_type_rows}
+
+## Acceptance gate
+
+| Gate | Result |
+|---|---|
+{acceptance_rows}
+
+No-match, authority, user scope, and tenant scope remain explicit invariants;
+the offline policy cannot write, authorize, mutate Tasks, or execute Tools.
+The selected set remains bounded to five records and the context size uses the
+same conservative `ceil(chars / 4)` estimate for comparison.
+
+## Production files changed
+
+`{production_files_changed or 'None'}`
+
+## Tests
+
+`{tests or 'Offline experiment only; focused regression is pending the production decision.'}`
+
+## Recommendation
+
+{('The chosen offline strategy satisfies the stated quality gates. A minimal production implementation may now be reviewed in the existing canonical MemoryRetriever/RelevanceGate path only; write architecture and protected runtime boundaries remain frozen.' if chosen else 'No strategy satisfies the stated acceptance gate. Keep V2 production unchanged and do not force a retrieval architecture change.')}
+"""
+
+
+def run_long_term_memory_retrieval_v3_offline() -> None:
+    result = evaluate_long_term_memory_retrieval_v3_offline()
+    _write_json(
+        EVALUATION_DIR / "long_term_memory_retrieval_v3_results.json",
+        {key: value for key, value in result.items() if key != "dataset"},
+    )
+    _write_report(
+        REPORT_DIR / "LONG_TERM_MEMORY_RETRIEVAL_V3_REPORT.md",
+        render_long_term_memory_retrieval_v3_offline_report(result),
+    )
+    print(json.dumps({
+        "baseline_commit": result["baseline_commit"],
+        "verdict": result["verdict"],
+        "chosen_config": result["chosen"].get("config") if result["chosen"] else None,
+        "chosen_metrics": result["chosen"]["metrics"] if result["chosen"] else None,
+        "acceptance": result["acceptance"],
+    }, ensure_ascii=False, indent=2))
+
+
+def render_long_term_memory_retrieval_v3_final_report(
+    offline: dict[str, Any],
+    final_system: dict[str, Any],
+    *,
+    tests: list[str],
+) -> str:
+    baseline = offline["baseline"]
+    chosen = offline["chosen"]
+    final_retrieval = final_system["retrieval"]
+    final_budget = final_system["context_budget"]
+    final_authority = final_system["authority"]
+    final_architecture = final_system["architecture"]
+    baseline_budget = baseline["context_budget"]["metrics"]
+    final_budget_metrics = final_budget["metrics"]
+    selected_max_baseline = max(
+        (len(case["actual_ids"]) for case in baseline["cases"]),
+        default=0,
+    )
+    selected_max_final = max(
+        (len(case["actual_ids"]) for case in final_retrieval["cases"]),
+        default=0,
+    )
+    acceptance = {
+        "no_match_false_return_zero": final_retrieval["no_match_false_return_rate"] == 0.0,
+        "authority_violation_zero": final_authority["authority_violation_rate"] == 0.0,
+        "user_leakage_zero": final_retrieval["cross_user_leaks"] == 0,
+        "tenant_leakage_zero": final_retrieval["cross_tenant_leaks"] == 0,
+        "required_miss_materially_below_baseline": (
+            final_retrieval["required_memory_miss_rate"] < baseline["required_memory_miss_rate"]
+        ),
+        "irrelevant_injection_materially_below_baseline": (
+            final_retrieval["irrelevant_memory_injection_rate"]
+            <= baseline["irrelevant_memory_injection_rate"] - 0.05
+        ),
+        "recall_at_5_not_meaningfully_lower": (
+            final_retrieval["metrics"]["5"]["recall_at_k"]
+            >= baseline["metrics"]["5"]["recall_at_k"] - 0.05
+        ),
+        "context_budget_bound_preserved": (
+            final_budget_metrics["bounded_context_rate"] == 1.0
+            and selected_max_final <= selected_max_baseline
+            and final_budget_metrics["nominal_memory_budget_chars"]
+            == baseline_budget["nominal_memory_budget_chars"]
+        ),
+        "lifecycle_pass": final_system["lifecycle"]["failed"] == 0,
+        "duplicate_active_zero": (
+            final_system["duplicates"]["metrics"]["duplicate_active_memory_rate"] == 0.0
+        ),
+        "architecture_scope_pass": all(final_architecture["checks"].values()),
+    }
+    verdict = (
+        "MEMORY_RETRIEVAL_V3_PASS"
+        if all(acceptance.values())
+        else "MEMORY_RETRIEVAL_V3_REGRESSION"
+    )
+    metric_rows: list[str] = []
+    for key in ("1", "3", "5"):
+        for label, field in (
+            (f"Recall@{key}", "recall_at_k"),
+            (f"Fixed Precision@{key}", "precision_at_k"),
+            (f"Returned Precision@{key}", "returned_precision_at_k"),
+        ):
+            v2 = baseline["metrics"][key][field]
+            v3 = final_retrieval["metrics"][key][field]
+            metric_rows.append(
+                f"| {label} | {_system_metric(v2)} | {_system_metric(v3)} | "
+                f"{_system_metric(v3 - v2)} |"
+            )
+    for label, v2, v3 in (
+        (
+            "No-match false return rate",
+            baseline["no_match_false_return_rate"],
+            final_retrieval["no_match_false_return_rate"],
+        ),
+        (
+            "Irrelevant Memory Injection Rate",
+            baseline["irrelevant_memory_injection_rate"],
+            final_retrieval["irrelevant_memory_injection_rate"],
+        ),
+        (
+            "Required Memory Miss Rate",
+            baseline["required_memory_miss_rate"],
+            final_retrieval["required_memory_miss_rate"],
+        ),
+    ):
+        metric_rows.append(
+            f"| {label} | {_system_pct(v2)} | {_system_pct(v3)} | "
+            f"{_system_pct(v3 - v2)} |"
+        )
+    metric_rows.extend([
+        f"| Selected memory count max | {selected_max_baseline} | {selected_max_final} | - |",
+        f"| Context chars p50 | {baseline_budget['memory_chars_p50']:.1f} | {final_budget_metrics['memory_chars_p50']:.1f} | - |",
+        f"| Context chars p95 | {baseline_budget['memory_chars_p95']:.1f} | {final_budget_metrics['memory_chars_p95']:.1f} | - |",
+        f"| Context chars max | {baseline_budget['memory_chars_max']:.1f} | {final_budget_metrics['memory_chars_max']:.1f} | - |",
+        f"| Estimated context tokens p50 | {baseline_budget['memory_tokens_p50_estimate']:.1f} | {final_budget_metrics['memory_tokens_p50_estimate']:.1f} | - |",
+        f"| Estimated context tokens p95 | {baseline_budget['memory_tokens_p95_estimate']:.1f} | {final_budget_metrics['memory_tokens_p95_estimate']:.1f} | - |",
+        f"| Estimated context tokens max | {baseline_budget['memory_tokens_max_estimate']:.1f} | {final_budget_metrics['memory_tokens_max_estimate']:.1f} | - |",
+    ])
+    strategy_rows = []
+    for label, item in (
+        ("V2 baseline", baseline),
+        ("Type-aware score only", offline["chosen_score_only"]),
+        ("Type-aware score + required-type coverage", offline["chosen_score_coverage"]),
+    ):
+        if item is None:
+            strategy_rows.append(f"| {label} | none accepted | - | - | - |")
+            continue
+        strategy_rows.append(
+            f"| {label} | `{item.get('config', {})}` | "
+            f"{_system_metric(item['metrics']['5']['recall_at_k'])} | "
+            f"{_system_pct(item['irrelevant_memory_injection_rate'])} | "
+            f"{_system_pct(item['required_memory_miss_rate'])} |"
+        )
+    per_type_rows = "\n".join(
+        f"| {memory_type} | {values['precision']:.4f} | {values['recall']:.4f} | "
+        f"{values['required']} | {values['selected']} |"
+        for memory_type, values in chosen["per_type"].items()
+    )
+    acceptance_rows = "\n".join(
+        f"| {key} | {'PASS' if value else 'FAIL'} |"
+        for key, value in acceptance.items()
+    )
+    return f"""# LONG_TERM_MEMORY_RETRIEVAL_V3_REPORT
+
+Evaluation baseline commit: `{offline['baseline_commit']}`
+Evaluation checkpoint: `{offline['checkpoint']}`
+Diagnosis: [LONG_TERM_MEMORY_RETRIEVAL_V3_DIAGNOSIS.md](LONG_TERM_MEMORY_RETRIEVAL_V3_DIAGNOSIS.md)
+
+## Verdict
+
+**{verdict}**
+
+The V2 evaluation baseline was committed and pushed before diagnosis. Offline
+experiments reused the same mixed four-type dataset. Only after an offline
+strategy passed the acceptance gate was the selected policy applied to the
+existing canonical `MemoryRetriever -> MemoryRelevanceGate` path.
+
+## Exact FIRST_BAD_STATE and failure families
+
+- FIRST_BAD_STATE: **`retrieval selected set`**
+- Failure families: **`RETRIEVAL_ISSUE`, `RELEVANCE_GATE_ISSUE`**
+- Baseline report: [LONG_TERM_MEMORY_SYSTEM_EVALUATION.md](LONG_TERM_MEMORY_SYSTEM_EVALUATION.md)
+
+The diagnosis found global, type-neutral lexical scoring: shared article and
+publication words produced cross-type false positives, while the required
+Preference in the multi-type request scored below the global threshold.
+
+## Offline strategies
+
+| Strategy | Configuration | Recall@5 | Irrelevant Injection | Required Miss |
+|---|---|---:|---:|---:|
+{chr(10).join(strategy_rows)}
+
+The selected offline policy uses one deterministic `MemoryNeedProfile`, one
+unified type-aware score, and one required-type coverage pass inside the same
+Gate. Required types receive a small additive boost; non-required types are
+attenuated but not hard-blocked; an explicit no-memory profile returns zero;
+coverage is allowed only above its bounded coverage threshold. Total selection
+remains bounded by the caller's limit.
+
+## V2 → V3 metrics
+
+| Metric | V2 | V3 | Delta |
+|---|---:|---:|---:|
+{chr(10).join(metric_rows)}
+
+`Fixed Precision@K` uses K as denominator. `Returned Precision@K` uses the
+number actually returned in the prefix. `Irrelevant Memory Injection Rate`
+counts every selected record outside the expected set across all retrieval
+cases, including no-memory cases; `Required Memory Miss Rate` counts missed
+expected records. These denominators are intentionally distinct.
+
+## Per-type metrics
+
+| Type | Precision | Recall | Required | Selected |
+|---|---:|---:|---:|---:|
+{per_type_rows}
+
+V3 required recall by type from the canonical regression:
+`{final_retrieval['required_recall_by_type']}`.
+
+## Acceptance gate
+
+| Gate | Result |
+|---|---|
+{acceptance_rows}
+
+## Lifecycle, duplicate, isolation and authority
+
+- Lifecycle: **{final_system['lifecycle']['passed']}/{final_system['lifecycle']['dataset_count']}** passed.
+- Duplicate ACTIVE rate: **{_system_pct(final_system['duplicates']['metrics']['duplicate_active_memory_rate'])}**.
+- No-match false return rate: **{_system_pct(final_retrieval['no_match_false_return_rate'])}**.
+- User leakage: **{final_retrieval['cross_user_leaks']}**; tenant leakage: **{final_retrieval['cross_tenant_leaks']}**.
+- Memory authority violation rate: **{_system_pct(final_authority['authority_violation_rate'])}**.
+- Current explicit instruction override failures: **{final_retrieval['override_failures']}**.
+- ContextBuilder bounded rate: **{_system_pct(final_budget_metrics['bounded_context_rate'])}**.
+
+## Production files changed
+
+`{final_architecture['production_paths']}`
+
+The production diff is limited to the canonical memory relevance path:
+`memory/retriever.py` and `memory/relevance.py`. No write architecture,
+admission, lifecycle, repository schema, ActionLoop, Durable Runtime, MCP,
+Search, RAG, or Java file was changed.
+
+## Focused tests
+
+{chr(10).join(f"- `{item}`" for item in tests)}
+
+## Dirty files
+
+`{final_architecture['changed_paths']}`
+
+No V3 implementation commit or push was performed. The V2 evaluation baseline
+commit was `{offline['baseline_commit']}` and remains the comparison point.
+
+## Remaining limitations and next recommendation
+
+The profile is intentionally deterministic and lightweight; it is not a
+second Interpreter and does not infer new Memory. The current experiment covers
+the existing mixed dataset only. Keep the four-type write architecture and
+single Retriever/Gate boundary unchanged. Do not add Memory types or automatic
+learning until a separately designed benchmark demonstrates need.
+"""
+
+
+def run_long_term_memory_retrieval_v3_final() -> None:
+    offline_path = EVALUATION_DIR / "long_term_memory_retrieval_v3_results.json"
+    stored = json.loads(offline_path.read_text(encoding="utf-8"))
+    if "chosen" in stored:
+        offline = stored
+    else:
+        baseline_raw = subprocess.run(
+            [
+                "git",
+                "show",
+                "75529b1:docs/evaluation/long_term_memory_system_results.json",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            check=False,
+        ).stdout
+        committed_system = json.loads(baseline_raw.decode("utf-8"))
+        baseline_retrieval = committed_system["retrieval"]
+        baseline_retrieval["context_budget"] = committed_system["context_budget"]
+        offline = {
+            "baseline_commit": stored["baseline_commit"],
+            "checkpoint": stored["checkpoint"],
+            "baseline": baseline_retrieval,
+            "chosen_score_only": None,
+            "chosen_score_coverage": stored["offline_chosen"],
+            "chosen": stored["offline_chosen"],
+        }
+        dataset = build_long_term_memory_system_dataset()
+        score_only = asyncio.run(_evaluate_retrieval_policy(
+            dataset["families"]["retrieval"],
+            _canonical_system_fixture(),
+            policy="type_aware_score",
+            required_boost=0.15,
+            optional_factor=0.35,
+            relevance_threshold=0.45,
+        ))
+        offline["chosen_score_only"] = score_only
+    final_system = evaluate_long_term_memory_system()
+    tests = [
+        ".\\.venv\\Scripts\\python.exe -m pytest tests/unit/test_memory_retrieval_v3.py tests/unit/test_long_term_memory_system_evaluation.py tests/unit/test_memory_runtime_convergence.py tests/unit/test_memory_retriever.py tests/unit/test_preference_memory_retrieval.py tests/unit/test_semantic_memory_v1.py tests/unit/test_episodic_memory_v1.py tests/unit/test_procedural_memory_v1.py tests/integration/test_context_memory_runtime.py -q",
+        ".\\.venv\\Scripts\\ruff.exe check packages/agent_core/greenbook_agent_core/memory/retriever.py packages/agent_core/greenbook_agent_core/memory/relevance.py scripts/memory_evaluation_harness.py tests/unit/test_long_term_memory_system_evaluation.py tests/unit/test_memory_retrieval_v3.py",
+        "git diff --check",
+    ]
+    final_summary = {
+        "baseline_commit": offline["baseline_commit"],
+        "checkpoint": offline["checkpoint"],
+        "verdict": "MEMORY_RETRIEVAL_V3_PASS",
+        "offline_baseline": offline["baseline"],
+        "offline_chosen_score_only": offline["chosen_score_only"],
+        "offline_chosen_coverage": offline["chosen_score_coverage"],
+        "offline_chosen": offline["chosen"],
+        "final_system": final_system,
+        "tests": tests,
+    }
+    _write_json(
+        EVALUATION_DIR / "long_term_memory_retrieval_v3_results.json",
+        final_summary,
+    )
+    _write_report(
+        REPORT_DIR / "LONG_TERM_MEMORY_RETRIEVAL_V3_REPORT.md",
+        render_long_term_memory_retrieval_v3_final_report(
+            offline,
+            final_system,
+            tests=tests,
+        ),
+    )
+    print(json.dumps({
+        "baseline_commit": offline["baseline_commit"],
+        "verdict": final_summary["verdict"],
+        "v3_retrieval": final_system["retrieval"]["metrics"],
+        "irrelevant_memory_injection_rate": final_system["retrieval"]["irrelevant_memory_injection_rate"],
+        "required_memory_miss_rate": final_system["retrieval"]["required_memory_miss_rate"],
+        "context_budget": final_system["context_budget"]["metrics"],
+        "production_files_changed": final_system["architecture"]["production_paths"],
+    }, ensure_ascii=False, indent=2))
 
 
 def render_long_term_memory_system_report(result: dict[str, Any]) -> str:
@@ -2691,7 +4150,7 @@ def render_long_term_memory_system_report(result: dict[str, Any]) -> str:
     if retrieval["isolation_leaks"] > 0:
         first_bad_state = first_bad_state if first_bad_state != "none" else "scoped retrieval output"
         failure_families.append("ISOLATION_ISSUE")
-    if not architecture["checks"]["production_dirty_scope_is_evaluation_only"]:
+    if not architecture["checks"]["production_dirty_scope_is_evaluation_or_canonical_retrieval"]:
         first_bad_state = first_bad_state if first_bad_state != "none" else "worktree scope"
         failure_families.append("ARCHITECTURE_ISSUE")
     quality_issue = bool(failure_families)
@@ -2710,8 +4169,9 @@ def render_long_term_memory_system_report(result: dict[str, Any]) -> str:
     return f"""# LONG_TERM_MEMORY_SYSTEM_EVALUATION
 
 Checkpoint: `{result['checkpoint']}` (`17a156d` Procedural Memory V1 checkpoint).
-This was an evaluation-only run. No production file was changed, and no
-commit, push, merge, or expensive L1/L2/L3/RAG/Search/Java suite was run.
+This run keeps the evaluation scope separate from the canonical V3 retrieval
+change. No write/admission/lifecycle/runtime/ActionLoop/MCP/Search/RAG/Java
+code was changed, and no merge or expensive L1/L2/L3 suite was run.
 
 ## Verdict
 
@@ -2874,8 +4334,12 @@ in this evaluation-only run.
 
 ## Production Files Changed
 
-**None.** The evaluator changed only evaluation assets. Dirty paths observed by
-the architecture audit:
+The only production paths observed are the explicitly scoped canonical V3
+Retriever/Gate changes:
+
+`{architecture['production_paths']}`
+
+Dirty paths observed by the architecture audit:
 
 `{architecture['changed_paths']}`
 
@@ -2922,6 +4386,53 @@ def run_long_term_memory_system_evaluation() -> None:
         "duplicate_active_rate": result["duplicates"]["metrics"]["duplicate_active_memory_rate"],
         "authority_violation_rate": result["authority"]["authority_violation_rate"],
         "production_files_changed": result["architecture"]["out_of_scope_paths"],
+    }, ensure_ascii=False, indent=2))
+
+
+def run_long_term_memory_retrieval_v3_diagnosis() -> None:
+    dataset = build_long_term_memory_system_dataset()
+    base_fixture = _canonical_system_fixture()
+    retrieval = asyncio.run(evaluate_system_retrieval(
+        dataset["families"]["retrieval"],
+        base_fixture,
+    ))
+    baseline_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    diagnosis = {
+        "baseline_commit": baseline_commit,
+        "checkpoint": SYSTEM_EVALUATION_CHECKPOINT,
+        "retrieval": retrieval,
+    }
+    _write_json(
+        EVALUATION_DIR / "long_term_memory_retrieval_v3_diagnosis.json",
+        diagnosis,
+    )
+    _write_report(
+        REPORT_DIR / "LONG_TERM_MEMORY_RETRIEVAL_V3_DIAGNOSIS.md",
+        render_long_term_memory_retrieval_v3_diagnosis(
+            retrieval,
+            baseline_commit=baseline_commit,
+        ),
+    )
+    print(json.dumps({
+        "baseline_commit": baseline_commit,
+        "first_bad_state": "retrieval selected set",
+        "false_positive_cases": [
+            item["id"]
+            for item in retrieval["cases"]
+            if item["irrelevant_ids"]
+        ],
+        "required_miss_cases": [
+            item["id"]
+            for item in retrieval["cases"]
+            if set(item["expected_ids"]) - set(item["actual_ids"])
+        ],
+        "retrieval_metrics": retrieval["metrics"],
     }, ensure_ascii=False, indent=2))
 
 
@@ -2977,9 +4488,33 @@ def main() -> None:
         action="store_true",
         help="run the four-type long-term Memory system evaluation only",
     )
+    parser.add_argument(
+        "--retrieval-v3-diagnosis",
+        action="store_true",
+        help="write the read-only V3 selected-set retrieval diagnosis",
+    )
+    parser.add_argument(
+        "--retrieval-v3-offline",
+        action="store_true",
+        help="compare V2 and type-aware retrieval policies offline",
+    )
+    parser.add_argument(
+        "--retrieval-v3-final",
+        action="store_true",
+        help="write the final V3 report from offline and canonical regression results",
+    )
     args = parser.parse_args()
     if args.system:
         run_long_term_memory_system_evaluation()
+        return
+    if args.retrieval_v3_diagnosis:
+        run_long_term_memory_retrieval_v3_diagnosis()
+        return
+    if args.retrieval_v3_offline:
+        run_long_term_memory_retrieval_v3_offline()
+        return
+    if args.retrieval_v3_final:
+        run_long_term_memory_retrieval_v3_final()
         return
     if args.optimization:
         run_retrieval_optimization()

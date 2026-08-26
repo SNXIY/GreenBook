@@ -59,6 +59,10 @@ class MemoryRelevanceGate:
         *,
         score: Callable[[MemoryRecord], float],
         limit: int,
+        required_types: Iterable[str] = (),
+        type_key: Callable[[MemoryRecord], str] | None = None,
+        coverage_threshold: float | None = None,
+        no_memory: bool = False,
     ) -> MemoryRelevanceResult:
         scored = sorted(
             (
@@ -71,16 +75,58 @@ class MemoryRelevanceGate:
             key=lambda item: item.relevance_score,
             reverse=True,
         )
-        selected = tuple(
-            item.memory
-            for item in scored
-            if (
-                item.relevance_score >= self.relevance_threshold
-                and item.memory.confidence >= self.confidence_threshold
+        selected: list[MemoryRecord] = []
+        if not no_memory:
+            eligible = [
+                item
+                for item in scored
+                if (
+                    item.relevance_score >= self.relevance_threshold
+                    and item.memory.confidence >= self.confidence_threshold
+                )
+            ]
+            selected_ids: set[str] = set()
+            selected_limit = max(0, int(limit))
+            key_fn = type_key or _default_type_key
+            minimum_coverage = (
+                self.relevance_threshold
+                if coverage_threshold is None
+                else _bounded_threshold(coverage_threshold)
             )
-        )[: max(0, int(limit))]
+            coverage_eligible = [
+                item
+                for item in scored
+                if (
+                    item.relevance_score >= minimum_coverage
+                    and item.memory.confidence >= self.confidence_threshold
+                )
+            ]
+            for required_type in required_types:
+                if len(selected) >= selected_limit:
+                    break
+                match = next(
+                    (
+                        item
+                        for item in coverage_eligible
+                        if (
+                            key_fn(item.memory) == str(required_type)
+                            and item.memory.memory_id not in selected_ids
+                        )
+                    ),
+                    None,
+                )
+                if match is not None:
+                    selected.append(match.memory)
+                    selected_ids.add(match.memory.memory_id)
+            for item in eligible:
+                if len(selected) >= selected_limit:
+                    break
+                if item.memory.memory_id in selected_ids:
+                    continue
+                selected.append(item.memory)
+                selected_ids.add(item.memory.memory_id)
         return MemoryRelevanceResult(
-            selected=selected,
+            selected=tuple(selected),
             scored=tuple(scored),
             relevance_threshold=self.relevance_threshold,
             confidence_threshold=self.confidence_threshold,
@@ -140,6 +186,10 @@ def _bounded_score(value: float) -> float:
     if not math.isfinite(value):
         return 0.0
     return max(0.0, min(1.0, value))
+
+
+def _default_type_key(item: MemoryRecord) -> str:
+    return str(item.memory_type)
 
 
 __all__ = [

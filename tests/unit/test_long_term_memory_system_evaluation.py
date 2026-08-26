@@ -61,16 +61,17 @@ def test_duplicate_and_authority_invariants(system_result: dict) -> None:
     assert all(authority["checks"].values())
 
 
-def test_context_is_bounded_and_quality_findings_are_preserved(system_result: dict) -> None:
+def test_context_is_bounded_and_v3_quality_gates_pass(system_result: dict) -> None:
     budget = system_result["context_budget"]
     assert budget["metrics"]["bounded_context_rate"] == 1.0
     assert budget["by_shape"]["1"]["max_selected"] == 1
     assert budget["by_shape"]["4"]["max_selected"] == 4
     assert budget["by_shape"]["12"]["max_selected"] == 5
 
-    # The system evaluation must preserve the current retrieval evidence for
-    # diagnosis.  No production change is implied by these findings.
+    # V3's canonical type-aware Gate should preserve the no-memory contract
+    # while removing the selected-set quality failures diagnosed in the V2
+    # baseline.
     retrieval = system_result["retrieval"]
     assert retrieval["no_match_false_return_rate"] == 0.0
-    assert retrieval["irrelevant_memory_injection_rate"] > 0.0
-    assert retrieval["required_memory_miss_rate"] > 0.0
+    assert retrieval["irrelevant_memory_injection_rate"] == 0.0
+    assert retrieval["required_memory_miss_rate"] == 0.0
