@@ -62,6 +62,7 @@ class MemoryRetriever:
         include_legacy_episodic: bool = True,
         require_tenant_scope: bool = False,
         semantic_contract: str | None = None,
+        procedural_contract: str | None = None,
         include_preference_alias: bool = True,
     ) -> None:
         self._repository = repository
@@ -71,6 +72,14 @@ class MemoryRetriever:
         self._include_legacy_episodic = bool(include_legacy_episodic)
         self._require_tenant_scope = bool(require_tenant_scope)
         self._semantic_contract = str(semantic_contract or "").strip()
+        self._procedural_contract = str(
+            procedural_contract
+            or (
+                "PROCEDURAL_V1"
+                if MemoryType.PROCEDURAL in (self._memory_types or ())
+                else ""
+            )
+        ).strip()
         self._include_preference_alias = bool(include_preference_alias)
         self._relevance_gate = MemoryRelevanceGate(
             relevance_threshold=relevance_threshold,
@@ -155,6 +164,12 @@ class MemoryRetriever:
             for item in values
             if self._allowed_candidate(item, user_id=user_id, tenant_id=tenant_id)
         ]
+        if _procedure_override_requested(command, goal, target_query):
+            values = [
+                item
+                for item in values
+                if item.memory_type != MemoryType.PROCEDURAL
+            ]
         ranked = sorted(
             values,
             key=lambda item: _score(item, terms, conversation_id, task_id),
@@ -290,6 +305,14 @@ class MemoryRetriever:
                         metadata_filters = {
                             "memory_contract": "EPISODIC_V1",
                         }
+                    if (
+                        memory_type == MemoryType.PROCEDURAL
+                        and self._procedural_contract
+                    ):
+                        metadata_filters = {
+                            "memory_contract": self._procedural_contract,
+                            "memory_role": "relevant_procedure",
+                        }
                     queries.append(MemoryQuery(
                         user_id=user_id,
                         tenant_id=query_tenant,
@@ -347,6 +370,15 @@ class MemoryRetriever:
                 allowed = semantic_like
             if not allowed:
                 return False
+        if (
+            self._procedural_contract
+            and item.memory_type == MemoryType.PROCEDURAL
+            and (
+                item.metadata.get("memory_contract") != self._procedural_contract
+                or item.metadata.get("memory_role") != "relevant_procedure"
+            )
+        ):
+            return False
         return not (
             item.memory_type == MemoryType.EPISODIC
             and not self._include_legacy_episodic
@@ -371,6 +403,44 @@ def _query_terms(command: Any, goal: Any, context: Any) -> list[str]:
     for value in values:
         terms.extend(_tokenize(value))
     return _meaningful_terms(terms)
+
+
+def _procedure_override_requested(
+    command: Any,
+    goal: Any,
+    target_query: str,
+) -> bool:
+    """Keep a current explicit exception from inheriting old soft guidance."""
+
+    values: list[str] = [str(target_query or "")]
+    for item in (command, goal):
+        payload = item.model_dump(mode="json") if hasattr(item, "model_dump") else item
+        if isinstance(payload, Mapping):
+            values.extend(
+                str(payload.get(key, ""))
+                for key in ("raw_input", "objective", "description")
+            )
+        elif item:
+            values.append(str(item))
+    text = " ".join(values).casefold()
+    return any(marker in text for marker in (
+        "\u4e0d\u7528\u5927\u7eb2",
+        "\u4e0d\u7528\u5148\u5217\u5927\u7eb2",
+        "\u4e0d\u8981\u5927\u7eb2",
+        "\u4e0d\u8981\u5148\u5217\u5927\u7eb2",
+        "\u65e0\u9700\u5927\u7eb2",
+        "\u4e0d\u9700\u8981\u5927\u7eb2",
+        "\u4e0d\u9700\u8981\u5148\u5217\u5927\u7eb2",
+        "\u8df3\u8fc7\u5927\u7eb2",
+        "\u4e0d\u5217\u5927\u7eb2",
+        "without an outline",
+        "skip the outline",
+        "no outline",
+        "do not use an outline",
+        "don't use an outline",
+        "write directly",
+        "directly write",
+    ))
 
 
 def _meaningful_terms(values: Iterable[str]) -> list[str]:

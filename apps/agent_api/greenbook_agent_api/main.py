@@ -61,6 +61,7 @@ from greenbook_agent_core.memory import (
     MemoryType,
     PostgresMemoryRepository,
     PreferenceMemoryService,
+    ProceduralMemoryService,
     SemanticMemoryService,
 )
 from greenbook_agent_core.memory.manager import MemoryManager
@@ -1022,15 +1023,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         memory_manager,
         enabled=memory_enabled,
     )
+    procedural_memory_service = ProceduralMemoryService(
+        memory_manager,
+        enabled=memory_enabled,
+    )
     memory_retriever = MemoryRetriever(
         durable_memory_repository or memory_manager.store,
-        memory_types=(MemoryType.PREFERENCE, MemoryType.EPISODIC),
+        memory_types=(
+            MemoryType.PREFERENCE,
+            MemoryType.EPISODIC,
+            MemoryType.PROCEDURAL,
+        ),
         status=MemoryStatus.ACTIVE,
         include_legacy_episodic=False,
         require_tenant_scope=True,
         relevance_threshold=0.5,
         confidence_threshold=0.5,
         semantic_contract="SEMANTIC_V1",
+        procedural_contract="PROCEDURAL_V1",
     )
     app.state.memory_store = durable_memory_repository or memory_manager.store
     app.state.memory_retriever = memory_retriever
@@ -1040,6 +1050,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.memory_enabled = memory_enabled
     app.state.preference_memory_service = preference_memory_service
     app.state.semantic_memory_service = semantic_memory_service
+    app.state.procedural_memory_service = procedural_memory_service
     preference_provider = MemoryUserPreferenceProvider(memory_manager)
     task_provider = TaskProvider()
     await task_provider.ensure_storage()

@@ -54,6 +54,14 @@ class MemoryRepository(Protocol):
         predicate: str,
         object_value: str,
     ) -> MemoryRecord | Awaitable[MemoryRecord]: ...
+    def replace_procedural(
+        self,
+        record: MemoryRecord,
+        *,
+        procedure_key: str,
+        trigger: str,
+        guidance: str,
+    ) -> MemoryRecord | Awaitable[MemoryRecord]: ...
 
 
 class InMemoryMemoryRepository:
@@ -145,6 +153,73 @@ class InMemoryMemoryRepository:
         )
         if same is not None:
             metadata = _merge_semantic_metadata(same.metadata, record.metadata)
+            saved = same.model_copy(update={
+                "content": record.content or same.content,
+                "structured_metadata": metadata,
+                "confidence": max(same.confidence, record.confidence),
+                "importance": max(same.importance, record.importance),
+                "updated_at": record.updated_at,
+            })
+            for item in active:
+                if item.memory_id == same.memory_id:
+                    continue
+                self._records[item.memory_id] = item.model_copy(update={
+                    "status": MemoryStatus.SUPERSEDED,
+                    "structured_metadata": {
+                        **item.metadata,
+                        "replacement_memory_id": same.memory_id,
+                    },
+                    "updated_at": record.updated_at,
+                })
+            self._records[same.memory_id] = saved
+            return saved.model_copy(deep=True)
+
+        for item in active:
+            self._records[item.memory_id] = item.model_copy(update={
+                "status": MemoryStatus.SUPERSEDED,
+                "structured_metadata": {
+                    **item.metadata,
+                    "replacement_memory_id": record.memory_id,
+                },
+                "updated_at": record.updated_at,
+            })
+        self._records[record.memory_id] = record.model_copy(deep=True)
+        return record.model_copy(deep=True)
+
+    def replace_procedural(
+        self,
+        record: MemoryRecord,
+        *,
+        procedure_key: str,
+        trigger: str,
+        guidance: str,
+    ) -> MemoryRecord:
+        """Replace one scoped Procedural V1 projection atomically in memory."""
+
+        active = [
+            item
+            for item in self._records.values()
+            if (
+                item.user_id == record.user_id
+                and item.tenant_id == record.tenant_id
+                and item.memory_type == MemoryType.PROCEDURAL
+                and item.status == MemoryStatus.ACTIVE
+                and item.metadata.get("memory_contract") == "PROCEDURAL_V1"
+                and item.metadata.get("memory_role") == "relevant_procedure"
+                and str(item.metadata.get("procedure_key") or "") == str(procedure_key)
+            )
+        ]
+        same = next(
+            (
+                item
+                for item in active
+                if str(item.metadata.get("trigger") or "") == str(trigger)
+                and str(item.metadata.get("guidance") or item.content) == str(guidance)
+            ),
+            None,
+        )
+        if same is not None:
+            metadata = _merge_procedural_metadata(same.metadata, record.metadata)
             saved = same.model_copy(update={
                 "content": record.content or same.content,
                 "structured_metadata": metadata,
@@ -623,6 +698,128 @@ class PostgresMemoryRepository:
             await session.commit()
         return persisted
 
+    async def replace_procedural(
+        self,
+        record: MemoryRecord,
+        *,
+        procedure_key: str,
+        trigger: str,
+        guidance: str,
+    ) -> MemoryRecord:
+        """Replace one scoped Procedural V1 projection in one transaction."""
+
+        identity = json.dumps({
+            "memory_contract": "PROCEDURAL_V1",
+            "memory_role": "relevant_procedure",
+            "procedure_key": procedure_key,
+        }, ensure_ascii=False)
+        lock_key = "|".join((record.tenant_id, record.user_id, procedure_key))
+        async with self._session_factory() as session:
+            await session.execute(
+                sa.text(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"
+                ),
+                {"lock_key": lock_key},
+            )
+            result = await session.execute(
+                sa.text(
+                    "SELECT * FROM agent_memories "
+                    "WHERE user_id = :user_id AND tenant_id = :tenant_id "
+                    "AND memory_type = :memory_type AND status = :status "
+                    "AND structured_metadata @> CAST(:identity AS jsonb) "
+                    "FOR UPDATE"
+                ),
+                {
+                    "user_id": record.user_id,
+                    "tenant_id": record.tenant_id,
+                    "memory_type": MemoryType.PROCEDURAL.value,
+                    "status": MemoryStatus.ACTIVE.value,
+                    "identity": identity,
+                },
+            )
+            active = [
+                _row_record(row)
+                for row in result.mappings().all()
+            ]
+            same = next(
+                (
+                    item
+                    for item in active
+                    if str(item.metadata.get("trigger") or "") == str(trigger)
+                    and str(item.metadata.get("guidance") or item.content) == str(guidance)
+                ),
+                None,
+            )
+            updated_at = datetime.now(UTC).isoformat()
+            if same is not None:
+                persisted = record.model_copy(update={
+                    "memory_id": same.memory_id,
+                    "created_at": same.created_at,
+                    "access_count": same.access_count,
+                    "last_accessed_at": same.last_accessed_at,
+                    "updated_at": updated_at,
+                    "structured_metadata": _merge_procedural_metadata(
+                        same.metadata,
+                        record.metadata,
+                    ),
+                })
+                superseded = [item for item in active if item.memory_id != same.memory_id]
+            else:
+                persisted = record.model_copy(update={"updated_at": updated_at})
+                superseded = active
+
+            for item in superseded:
+                await session.execute(
+                    sa.text(
+                        "UPDATE agent_memories "
+                        "SET status = :status, "
+                        "structured_metadata = structured_metadata "
+                        "|| CAST(:replacement AS jsonb), "
+                        "updated_at = :updated_at "
+                        "WHERE memory_id = :memory_id "
+                        "AND user_id = :user_id AND tenant_id = :tenant_id"
+                    ),
+                    {
+                        "status": MemoryStatus.SUPERSEDED.value,
+                        "replacement": json.dumps(
+                            {"replacement_memory_id": persisted.memory_id}
+                        ),
+                        "updated_at": datetime.now(UTC),
+                        "memory_id": item.memory_id,
+                        "user_id": record.user_id,
+                        "tenant_id": record.tenant_id,
+                    },
+                )
+            await session.execute(sa.text("""
+                INSERT INTO agent_memories
+                    (memory_id, user_id, tenant_id, conversation_id,
+                     source_conversation_id, task_id, memory_type,
+                     content, structured_metadata, importance, confidence,
+                     status,
+                     source_type, source_id, created_at, updated_at,
+                     last_accessed_at, access_count, expires_at)
+                VALUES
+                    (:memory_id, :user_id, :tenant_id, :conversation_id,
+                     :source_conversation_id, :task_id, :memory_type,
+                     :content, CAST(:structured_metadata AS jsonb), :importance,
+                     :confidence, :status, :source_type, :source_id, :created_at,
+                     :updated_at, NULLIF(:last_accessed_at, '')::timestamptz,
+                     :access_count, NULLIF(:expires_at, '')::timestamptz)
+                ON CONFLICT (memory_id) DO UPDATE SET
+                    structured_metadata = EXCLUDED.structured_metadata,
+                    content = EXCLUDED.content,
+                    importance = EXCLUDED.importance,
+                    confidence = EXCLUDED.confidence,
+                    status = EXCLUDED.status,
+                    conversation_id = EXCLUDED.conversation_id,
+                    source_conversation_id = EXCLUDED.source_conversation_id,
+                    updated_at = EXCLUDED.updated_at,
+                    access_count = EXCLUDED.access_count,
+                    last_accessed_at = EXCLUDED.last_accessed_at
+            """), _params(persisted))
+            await session.commit()
+        return persisted
+
 
 def _matches(item: MemoryRecord, query: MemoryQuery) -> bool:
     if query.user_id and item.user_id != query.user_id:
@@ -702,6 +899,51 @@ def _merge_semantic_metadata(
     if source_ids:
         metadata["source_ids"] = source_ids[-20:]
     merged_provenance = dict(provenance or {}) if isinstance(provenance, dict) else {}
+    if isinstance(incoming_provenance, dict):
+        merged_provenance.update(incoming_provenance)
+    metadata["provenance"] = merged_provenance
+    return metadata
+
+
+def _merge_procedural_metadata(
+    existing: dict[str, Any],
+    incoming: dict[str, Any],
+) -> dict[str, Any]:
+    metadata = dict(existing)
+    metadata.update({
+        key: incoming[key]
+        for key in (
+            "memory_contract",
+            "memory_version",
+            "memory_role",
+            "procedure_key",
+            "trigger",
+            "guidance",
+            "advisory_only",
+            "observed_at",
+        )
+        if key in incoming
+    })
+    metadata["evidence_count"] = int(metadata.get("evidence_count", 1) or 1) + 1
+    source_ids = list(metadata.get("source_ids") or [])
+    for provenance in (
+        existing.get("provenance"),
+        incoming.get("provenance"),
+    ):
+        if not isinstance(provenance, dict):
+            continue
+        value = provenance.get("source_id")
+        if value and value not in source_ids:
+            source_ids.append(value)
+    if source_ids:
+        metadata["source_ids"] = source_ids[-20:]
+    existing_provenance = existing.get("provenance")
+    incoming_provenance = incoming.get("provenance")
+    merged_provenance = (
+        dict(existing_provenance)
+        if isinstance(existing_provenance, dict)
+        else {}
+    )
     if isinstance(incoming_provenance, dict):
         merged_provenance.update(incoming_provenance)
     metadata["provenance"] = merged_provenance

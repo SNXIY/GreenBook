@@ -31,6 +31,24 @@ from .manager import MemoryManager
 from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
 from .policy import MemoryWriteDecision, MemoryWritePolicy
 from .preference_retriever import PreferenceRetriever
+from .procedural import (
+    PROCEDURAL_MEMORY_CONTRACT,
+    PROCEDURAL_MEMORY_ROLE,
+    PROCEDURAL_MEMORY_VERSION,
+    PROCEDURAL_SOURCE_TYPE,
+    TECHNICAL_ARTICLE_DIRECT_GUIDANCE,
+    TECHNICAL_ARTICLE_DIRECT_GUIDANCE_EN,
+    TECHNICAL_ARTICLE_GUIDANCE,
+    TECHNICAL_ARTICLE_GUIDANCE_EN,
+    TECHNICAL_ARTICLE_PROCEDURE_KEY,
+    TECHNICAL_ARTICLE_TRIGGER,
+    ProceduralAdmissionDecision,
+    ProceduralAdmissionPolicy,
+    ProceduralAdmissionResult,
+    ProceduralCandidate,
+    ProceduralCandidateBuilder,
+    ProceduralMemoryService,
+)
 from .relevance import (
     MemoryRelevanceGate,
     MemoryRelevanceResult,
@@ -105,4 +123,20 @@ __all__ = [
     "SemanticCandidate",
     "SemanticCandidateBuilder",
     "SemanticMemoryService",
+    "PROCEDURAL_MEMORY_CONTRACT",
+    "PROCEDURAL_MEMORY_ROLE",
+    "PROCEDURAL_MEMORY_VERSION",
+    "PROCEDURAL_SOURCE_TYPE",
+    "TECHNICAL_ARTICLE_GUIDANCE",
+    "TECHNICAL_ARTICLE_GUIDANCE_EN",
+    "TECHNICAL_ARTICLE_DIRECT_GUIDANCE",
+    "TECHNICAL_ARTICLE_DIRECT_GUIDANCE_EN",
+    "TECHNICAL_ARTICLE_PROCEDURE_KEY",
+    "TECHNICAL_ARTICLE_TRIGGER",
+    "ProceduralAdmissionDecision",
+    "ProceduralAdmissionPolicy",
+    "ProceduralAdmissionResult",
+    "ProceduralCandidate",
+    "ProceduralCandidateBuilder",
+    "ProceduralMemoryService",
 ]

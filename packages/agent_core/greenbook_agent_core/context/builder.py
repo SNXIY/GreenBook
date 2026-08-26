@@ -699,6 +699,14 @@ def _compact_memory(value: Mapping[str, Any], limit: int) -> dict[str, Any]:
         result["memory_role"] = "relevant_fact"
     elif memory_type == "EPISODIC":
         result["memory_role"] = "relevant_past_experience"
+    elif (
+        memory_type == "PROCEDURAL"
+        and isinstance(metadata, Mapping)
+        and metadata.get("memory_contract") == "PROCEDURAL_V1"
+        and metadata.get("memory_role") == "relevant_procedure"
+    ):
+        result["memory_role"] = "relevant_procedure"
+        result["advisory_only"] = True
     result["content"] = _bounded_text(value.get("content"), limit)
     if isinstance(metadata, Mapping):
         result["structured_metadata"] = {
