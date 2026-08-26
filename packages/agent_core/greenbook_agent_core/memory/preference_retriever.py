@@ -73,6 +73,15 @@ class PreferenceRetriever:
             for item in (candidates or ())
             if item is not None
         ]
+        # PREFERENCE and SEMANTIC intentionally share the persisted enum
+        # value.  Keep this compatibility projection restricted to records
+        # carrying the Preference metadata contract; otherwise Semantic facts
+        # would be rendered as preferences by this legacy view.
+        values = [
+            item for item in values
+            if item.metadata.get("preference_type")
+            and item.metadata.get("value")
+        ]
         ranked = sorted(
             values,
             key=lambda item: self._score(item, terms),

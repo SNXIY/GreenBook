@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
@@ -21,6 +22,44 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _merge_semantic_metadata(
+    existing: dict[str, Any],
+    incoming: dict[str, Any],
+    source_id: str | None,
+) -> dict[str, Any]:
+    metadata = dict(existing)
+    metadata.update({
+        key: incoming[key]
+        for key in (
+            "memory_contract",
+            "memory_version",
+            "memory_role",
+            "subject",
+            "predicate",
+            "object",
+            "normalized_fact",
+            "observed_at",
+        )
+        if key in incoming
+    })
+    metadata["evidence_count"] = int(metadata.get("evidence_count", 1) or 1) + 1
+    source_ids = list(metadata.get("source_ids") or [])
+    for value in (
+        existing.get("provenance", {}).get("source_id")
+        if isinstance(existing.get("provenance"), dict)
+        else None,
+        source_id,
+    ):
+        if value and value not in source_ids:
+            source_ids.append(value)
+    if source_ids:
+        metadata["source_ids"] = source_ids[-20:]
+    provenance = dict(existing.get("provenance") or {})
+    provenance.update(dict(incoming.get("provenance") or {}))
+    metadata["provenance"] = provenance
+    return metadata
+
+
 class MemoryManager:
     """Write-policy-aware facade over the canonical MemoryRepository."""
 
@@ -34,6 +73,7 @@ class MemoryManager:
         self._repository = repository or InMemoryMemoryRepository()
         self._write_policy = write_policy or MemoryWritePolicy()
         self._durable_repository = durable_repository
+        self._semantic_lock = threading.RLock()
 
     @property
     def store(self) -> Any:
@@ -83,6 +123,164 @@ class MemoryManager:
         saved = self._repository.save(record)
         self._persist(saved)
         return saved
+
+    def remember_semantic(
+        self,
+        record: MemoryRecord,
+        *,
+        subject: str,
+        predicate: str,
+        object_value: str,
+    ) -> MemoryRecord:
+        """Atomically project one Semantic fact through the canonical store.
+
+        Semantic and Preference share the ``SEMANTIC`` storage enum value, so
+        the explicit contract/role metadata is part of this boundary.  A
+        repository that implements ``replace_semantic`` can perform the
+        supersede and upsert in one transaction; the lock plus conservative
+        fallback keeps compatible in-process repositories safe as well.
+        """
+
+        metadata = record.metadata
+        if (
+            record.memory_type != MemoryType.SEMANTIC
+            or metadata.get("memory_contract") != "SEMANTIC_V1"
+            or metadata.get("memory_role") != "stable_fact"
+            or str(metadata.get("subject") or "") != str(subject)
+            or str(metadata.get("predicate") or "") != str(predicate)
+            or str(metadata.get("object") or "") != str(object_value)
+            or record.status != MemoryStatus.ACTIVE
+        ):
+            raise ValueError("SEMANTIC_MEMORY_CONTRACT_REQUIRED")
+        scope_user = str(record.user_id or "").strip()
+        scope_tenant = str(record.tenant_id or "").strip()
+        if not scope_user or not scope_tenant:
+            raise ValueError("SEMANTIC_MEMORY_SCOPE_REQUIRED")
+
+        with self._semantic_lock:
+            replacer = getattr(self._repository, "replace_semantic", None)
+            if callable(replacer):
+                saved = replacer(
+                    record,
+                    subject=subject,
+                    predicate=predicate,
+                    object_value=object_value,
+                )
+                if inspect.isawaitable(saved):
+                    saved = _run(saved)
+            else:
+                saved = self._remember_semantic_fallback(
+                    record,
+                    subject=subject,
+                    predicate=predicate,
+                    object_value=object_value,
+                )
+            self._persist_semantic(
+                saved if isinstance(saved, MemoryRecord) else record,
+                subject=subject,
+                predicate=predicate,
+                object_value=object_value,
+            )
+            return saved
+
+    def _remember_semantic_fallback(
+        self,
+        record: MemoryRecord,
+        *,
+        subject: str,
+        predicate: str,
+        object_value: str,
+    ) -> MemoryRecord:
+        values = self._repository.search(MemoryQuery(
+            user_id=record.user_id,
+            tenant_id=record.tenant_id,
+            type=MemoryType.SEMANTIC,
+            status=MemoryStatus.ACTIVE,
+            metadata_filters={
+                "memory_contract": "SEMANTIC_V1",
+                "memory_role": "stable_fact",
+                "subject": subject,
+                "predicate": predicate,
+            },
+            limit=100,
+            sort_by="created_at",
+        ))
+        if inspect.isawaitable(values):
+            values = _run(values)
+        active = [
+            item if isinstance(item, MemoryRecord) else MemoryRecord.model_validate(item)
+            for item in (values or ())
+        ]
+        same = next(
+            (item for item in active if str(item.metadata.get("object") or "") == object_value),
+            None,
+        )
+        if same is not None:
+            metadata = _merge_semantic_metadata(same.metadata, record.metadata, record.source_id)
+            merged = same.model_copy(update={
+                "content": record.content or same.content,
+                "structured_metadata": metadata,
+                "confidence": max(same.confidence, record.confidence),
+                "importance": max(same.importance, record.importance),
+                "updated_at": _now_iso(),
+            })
+            for item in active:
+                if item.memory_id == same.memory_id:
+                    continue
+                self._repository.save(item.model_copy(update={
+                    "status": MemoryStatus.SUPERSEDED,
+                    "structured_metadata": {
+                        **item.metadata,
+                        "replacement_memory_id": same.memory_id,
+                    },
+                    "updated_at": _now_iso(),
+                }))
+            return self._repository.save(merged)
+
+        for item in active:
+            self._repository.save(item.model_copy(update={
+                "status": MemoryStatus.SUPERSEDED,
+                "structured_metadata": {
+                    **item.metadata,
+                    "replacement_memory_id": record.memory_id,
+                },
+                "updated_at": _now_iso(),
+            }))
+        return self._repository.save(record)
+
+    def _persist_semantic(
+        self,
+        record: MemoryRecord,
+        *,
+        subject: str,
+        predicate: str,
+        object_value: str,
+    ) -> None:
+        if self._durable_repository is None:
+            return
+        replacer = getattr(self._durable_repository, "replace_semantic", None)
+        if callable(replacer):
+            try:
+                value = replacer(
+                    record,
+                    subject=subject,
+                    predicate=predicate,
+                    object_value=object_value,
+                )
+            except Exception:  # noqa: BLE001 - durable shadow must not break the turn
+                logger.warning(
+                    "Durable semantic memory persistence failed memory_id=%s",
+                    record.memory_id,
+                    exc_info=True,
+                )
+                return
+            if inspect.isawaitable(value):
+                self._persist_awaitable(value, record.memory_id)
+            return
+        # Compatibility repositories that predate semantic replacement still
+        # receive the active projection.  Production Postgres implements the
+        # atomic replace operation above.
+        self._persist(record)
 
     def recall(self, query: MemoryQuery) -> list[MemoryRecord]:
         results = self._repository.search(query)

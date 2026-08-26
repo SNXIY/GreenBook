@@ -931,6 +931,43 @@ def _extract_completed_turn_preference(
         )
 
 
+def _extract_completed_turn_semantic(
+    app: Any,
+    *,
+    result: RuntimeResult,
+    conversation_id: str,
+    auth: AuthContext,
+    message_content: str,
+) -> None:
+    """Admit only explicit user facts after a completed turn."""
+
+    if str(result.status or "").upper() != "COMPLETED":
+        return
+    service = getattr(app.state, "semantic_memory_service", None)
+    process = getattr(service, "process_user_statement", None)
+    if not callable(process) or not str(message_content or "").strip():
+        return
+    try:
+        records = process(
+            message_content,
+            user_id=auth.user_id,
+            tenant_id=auth.tenant_id,
+        )
+        if records:
+            logger.info(
+                "semantic_memory_written conversation_id=%s count=%s predicates=%s",
+                conversation_id,
+                len(records),
+                [item.metadata.get("predicate") for item in records],
+            )
+    except Exception:  # noqa: BLE001 - Memory must not break turn convergence
+        logger.warning(
+            "semantic_memory_extraction_failed conversation_id=%s",
+            conversation_id,
+            exc_info=True,
+        )
+
+
 async def _durable_run_record(
     run_id: str,
     request: Request,
@@ -1680,6 +1717,13 @@ async def handle_run_result(
         await _save_session(_app_as_request(app), session)
 
     _extract_completed_turn_preference(
+        app,
+        result=result,
+        conversation_id=conversation_id,
+        auth=auth,
+        message_content=message_content,
+    )
+    _extract_completed_turn_semantic(
         app,
         result=result,
         conversation_id=conversation_id,

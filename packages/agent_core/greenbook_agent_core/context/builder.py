@@ -668,6 +668,12 @@ def _compact_memory(value: Mapping[str, Any], limit: int) -> dict[str, Any]:
         and isinstance(metadata, Mapping)
         and bool(metadata.get("preference_type"))
     )
+    semantic_fact = (
+        memory_type == "SEMANTIC"
+        and isinstance(metadata, Mapping)
+        and metadata.get("memory_contract") == "SEMANTIC_V1"
+        and metadata.get("memory_role") == "stable_fact"
+    )
     result = {
         key: item
         for key, item in value.items()
@@ -689,6 +695,8 @@ def _compact_memory(value: Mapping[str, Any], limit: int) -> dict[str, Any]:
     }
     if preference_like:
         result["memory_role"] = "preference"
+    elif semantic_fact:
+        result["memory_role"] = "relevant_fact"
     elif memory_type == "EPISODIC":
         result["memory_role"] = "relevant_past_experience"
     result["content"] = _bounded_text(value.get("content"), limit)

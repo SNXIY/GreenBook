@@ -5,12 +5,6 @@ Task/Execution/Artifact facts.  The package exposes one repository contract,
 one retriever, and a conservative write policy.
 """
 
-from .extractor import (
-    PreferenceExtraction,
-    PreferenceMemoryExtractor,
-    PreferenceMemoryService,
-    ProceduralMemoryExtractor,
-)
 from .episodic import (
     CONTENT_PUBLICATION_CATEGORY,
     CONTENT_PUBLICATION_OUTCOME,
@@ -26,6 +20,12 @@ from .episodic import (
     WorthRememberingDecision,
     WorthRememberingPolicy,
     WorthRememberingResult,
+)
+from .extractor import (
+    PreferenceExtraction,
+    PreferenceMemoryExtractor,
+    PreferenceMemoryService,
+    ProceduralMemoryExtractor,
 )
 from .manager import MemoryManager
 from .models import MemoryQuery, MemoryRecord, MemoryStatus, MemoryType
@@ -43,6 +43,19 @@ from .repository import (
     PostgresMemoryRepository,
 )
 from .retriever import MemoryRetriever
+from .semantic import (
+    SEMANTIC_MEMORY_CONTRACT,
+    SEMANTIC_MEMORY_ROLE,
+    SEMANTIC_MEMORY_VERSION,
+    SEMANTIC_PREDICATES,
+    SEMANTIC_SOURCE_TYPE,
+    SemanticAdmissionDecision,
+    SemanticAdmissionPolicy,
+    SemanticAdmissionResult,
+    SemanticCandidate,
+    SemanticCandidateBuilder,
+    SemanticMemoryService,
+)
 from .strategy import StrategyRetriever
 
 __all__ = [
@@ -81,4 +94,15 @@ __all__ = [
     "WorthRememberingDecision",
     "WorthRememberingPolicy",
     "WorthRememberingResult",
+    "SEMANTIC_MEMORY_CONTRACT",
+    "SEMANTIC_MEMORY_ROLE",
+    "SEMANTIC_MEMORY_VERSION",
+    "SEMANTIC_PREDICATES",
+    "SEMANTIC_SOURCE_TYPE",
+    "SemanticAdmissionDecision",
+    "SemanticAdmissionPolicy",
+    "SemanticAdmissionResult",
+    "SemanticCandidate",
+    "SemanticCandidateBuilder",
+    "SemanticMemoryService",
 ]

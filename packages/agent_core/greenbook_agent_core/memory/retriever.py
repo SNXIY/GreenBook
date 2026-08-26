@@ -61,6 +61,8 @@ class MemoryRetriever:
         status: MemoryStatus | None = None,
         include_legacy_episodic: bool = True,
         require_tenant_scope: bool = False,
+        semantic_contract: str | None = None,
+        include_preference_alias: bool = True,
     ) -> None:
         self._repository = repository
         self._candidate_provider = candidate_provider
@@ -68,6 +70,8 @@ class MemoryRetriever:
         self._status = status
         self._include_legacy_episodic = bool(include_legacy_episodic)
         self._require_tenant_scope = bool(require_tenant_scope)
+        self._semantic_contract = str(semantic_contract or "").strip()
+        self._include_preference_alias = bool(include_preference_alias)
         self._relevance_gate = MemoryRelevanceGate(
             relevance_threshold=relevance_threshold,
             confidence_threshold=confidence_threshold,
@@ -251,6 +255,33 @@ class MemoryRetriever:
         for query_tenant in tenants:
             if memory_types is not None:
                 for memory_type in memory_types:
+                    if memory_type == MemoryType.SEMANTIC and self._semantic_contract:
+                        # PREFERENCE and SEMANTIC intentionally share the
+                        # persisted enum value. Search both the existing
+                        # Preference projection and the explicit Semantic V1
+                        # contract, then classify them in the one gate path.
+                        metadata_variants = (
+                            ({},) if self._include_preference_alias else ()
+                        ) + ((
+                            {
+                                "memory_contract": self._semantic_contract,
+                                "memory_role": "stable_fact",
+                            },
+                        ))
+                        for metadata_filters in metadata_variants:
+                            queries.append(MemoryQuery(
+                                user_id=user_id,
+                                tenant_id=query_tenant,
+                                type=memory_type,
+                                status=self._status,
+                                metadata_filters=metadata_filters,
+                                conversation_id=None,
+                                task_id=None,
+                                keywords=terms[:12],
+                                limit=limit,
+                                sort_by="created_at",
+                            ))
+                        continue
                     metadata_filters = {}
                     if (
                         memory_type == MemoryType.EPISODIC
@@ -301,6 +332,21 @@ class MemoryRetriever:
             return False
         if self._status is not None and item.status != self._status:
             return False
+        if self._semantic_contract and item.memory_type == MemoryType.SEMANTIC:
+            preference_like = bool(
+                item.metadata.get("preference_type")
+                and item.metadata.get("value")
+            )
+            semantic_like = (
+                item.metadata.get("memory_contract") == self._semantic_contract
+                and item.metadata.get("memory_role") == "stable_fact"
+            )
+            if self._include_preference_alias:
+                allowed = preference_like or semantic_like
+            else:
+                allowed = semantic_like
+            if not allowed:
+                return False
         return not (
             item.memory_type == MemoryType.EPISODIC
             and not self._include_legacy_episodic
