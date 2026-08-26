@@ -1,0 +1,271 @@
+{
+  "dataset": "long_term_memory_system_v1",
+  "version": 1,
+  "checkpoint": "17a156d8464a0f33176781f3717e4d0e80854afa",
+  "families": {
+    "A_four_types_present": "All four logical types are seeded in one scope; queries must select only relevant subsets.",
+    "B_single_type": "A request should select one logical type.",
+    "C_multi_type_required": "A request may require Preference, Semantic, and Procedural, but not Episode without evidence.",
+    "D_no_memory": "Unrelated requests explicitly allow zero long-term memory.",
+    "E_current_instruction_override": "The current explicit exception suppresses stored soft Procedure guidance.",
+    "F_memory_conflict": "Only the newer ACTIVE Semantic truth is eligible.",
+    "G_preference_update": "Only the newer ACTIVE Preference value is eligible.",
+    "H_cross_conversation": "Memory may cross conversations but no current runtime state follows it.",
+    "I_cross_user_tenant": "User and tenant scope must prevent leakage.",
+    "classification": [
+      {
+        "id": "classification-preference-depth",
+        "family": "B_single_type",
+        "text": "I prefer deep technical articles for my writing.",
+        "input_mode": "user_text",
+        "expected_types": [
+          "PREFERENCE"
+        ]
+      },
+      {
+        "id": "classification-preference-concise",
+        "family": "B_single_type",
+        "text": "From now on, prefer concise replies.",
+        "input_mode": "user_text",
+        "expected_types": [
+          "PREFERENCE"
+        ]
+      },
+      {
+        "id": "classification-semantic-background",
+        "family": "B_single_type",
+        "text": "I am a Java backend developer.",
+        "input_mode": "user_text",
+        "expected_types": [
+          "SEMANTIC"
+        ]
+      },
+      {
+        "id": "classification-semantic-learning",
+        "family": "B_single_type",
+        "text": "I am currently learning Agent.",
+        "input_mode": "user_text",
+        "expected_types": [
+          "SEMANTIC"
+        ]
+      },
+      {
+        "id": "classification-episodic-verified",
+        "family": "B_single_type",
+        "text": "Verified publication after a user revision of title and time.",
+        "input_mode": "verified_episode",
+        "expected_types": [
+          "EPISODIC"
+        ]
+      },
+      {
+        "id": "classification-procedural-rule",
+        "family": "B_single_type",
+        "text": "From now on, when writing a technical article, first generate an outline, then write the body from that outline.",
+        "input_mode": "user_text",
+        "expected_types": [
+          "PROCEDURAL"
+        ]
+      },
+      {
+        "id": "classification-procedural-chinese",
+        "family": "B_single_type",
+        "text": "以后写技术文章时，先给我生成大纲，再根据大纲写正文。",
+        "input_mode": "user_text",
+        "expected_types": [
+          "PROCEDURAL"
+        ]
+      },
+      {
+        "id": "classification-preference-not-procedure",
+        "family": "type_boundary",
+        "text": "I prefer deep technical articles.",
+        "input_mode": "user_text",
+        "expected_types": [
+          "PREFERENCE"
+        ]
+      },
+      {
+        "id": "classification-history-not-procedure",
+        "family": "type_boundary",
+        "text": "Last time I wrote an article, I first made an outline.",
+        "input_mode": "user_text",
+        "expected_types": []
+      },
+      {
+        "id": "classification-current-state-not-semantic",
+        "family": "type_boundary",
+        "text": "I am currently publishing a Java article.",
+        "input_mode": "user_text",
+        "expected_types": []
+      },
+      {
+        "id": "classification-runtime-invariant-not-procedure",
+        "family": "type_boundary",
+        "text": "From now on, before updating a schedule, check its version and reconcile unknown results.",
+        "input_mode": "user_text",
+        "expected_types": []
+      },
+      {
+        "id": "classification-unsupported-inference",
+        "family": "robustness",
+        "text": "I wrote a Java article, so I am probably a Java backend developer.",
+        "input_mode": "user_text",
+        "expected_types": []
+      },
+      {
+        "id": "classification-current-exception",
+        "family": "E_current_instruction_override",
+        "text": "This time write the technical article directly without an outline.",
+        "input_mode": "user_text",
+        "expected_types": []
+      }
+    ],
+    "retrieval": [
+      {
+        "id": "A-preference-only",
+        "family": "A_four_types_present",
+        "query": "deep technical articles",
+        "expected_records": [
+          "preference_depth"
+        ]
+      },
+      {
+        "id": "A-semantic-only",
+        "family": "A_four_types_present",
+        "query": "Agent learning",
+        "expected_records": [
+          "semantic_learning"
+        ]
+      },
+      {
+        "id": "A-episodic-only",
+        "family": "A_four_types_present",
+        "query": "verified publication revised title publication time",
+        "expected_records": [
+          "episode_publication"
+        ]
+      },
+      {
+        "id": "A-procedural-only",
+        "family": "A_four_types_present",
+        "query": "outline body technical article",
+        "expected_records": [
+          "procedure_article"
+        ]
+      },
+      {
+        "id": "B-preference-only",
+        "family": "B_single_type",
+        "query": "prefer deep articles",
+        "expected_records": [
+          "preference_depth"
+        ]
+      },
+      {
+        "id": "B-semantic-only",
+        "family": "B_single_type",
+        "query": "Java backend",
+        "expected_records": [
+          "semantic_occupation"
+        ]
+      },
+      {
+        "id": "B-episodic-only",
+        "family": "B_single_type",
+        "query": "past publication experience",
+        "expected_records": [
+          "episode_publication"
+        ]
+      },
+      {
+        "id": "B-procedural-only",
+        "family": "B_single_type",
+        "query": "outline then body",
+        "expected_records": [
+          "procedure_article"
+        ]
+      },
+      {
+        "id": "C-multi-preference-semantic-procedure",
+        "family": "C_multi_type_required",
+        "query": "deep technical Agent learning outline body",
+        "expected_records": [
+          "preference_depth",
+          "semantic_learning",
+          "procedure_article"
+        ]
+      },
+      {
+        "id": "D-no-memory-public-posts",
+        "family": "D_no_memory",
+        "query": "查一下最近公开帖子",
+        "expected_records": []
+      },
+      {
+        "id": "D-no-memory-weather",
+        "family": "D_no_memory",
+        "query": "weather forecast and astronomy",
+        "expected_records": []
+      },
+      {
+        "id": "E-current-procedure-override",
+        "family": "E_current_instruction_override",
+        "query": "This time write the technical article directly without an outline.",
+        "expected_records": [],
+        "forbidden_records": [
+          "procedure_article"
+        ]
+      },
+      {
+        "id": "F-semantic-new-truth",
+        "family": "F_memory_conflict",
+        "query": "Agent",
+        "fixture": "semantic_conflict",
+        "expected_records": [
+          "semantic_agent_new"
+        ],
+        "forbidden_records": [
+          "semantic_java_old"
+        ]
+      },
+      {
+        "id": "G-preference-new-truth",
+        "family": "G_preference_update",
+        "query": "concise replies",
+        "fixture": "preference_update",
+        "expected_records": [
+          "preference_concise_new"
+        ],
+        "forbidden_records": [
+          "preference_detailed_old"
+        ]
+      },
+      {
+        "id": "H-cross-conversation",
+        "family": "H_cross_conversation",
+        "query": "Agent",
+        "conversation_id": "joint-conversation-b",
+        "expected_records": [
+          "semantic_learning"
+        ]
+      },
+      {
+        "id": "I-cross-user",
+        "family": "I_cross_user_tenant",
+        "query": "deep technical articles owned by another user",
+        "expected_records": [],
+        "user_id": "joint-user",
+        "tenant_id": "joint-tenant"
+      },
+      {
+        "id": "I-cross-tenant",
+        "family": "I_cross_user_tenant",
+        "query": "deep technical articles in another tenant",
+        "expected_records": [],
+        "user_id": "joint-user",
+        "tenant_id": "joint-tenant"
+      }
+    ]
+  }
+}

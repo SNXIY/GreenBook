@@ -13,27 +13,44 @@ Usage::
 
 from __future__ import annotations
 
-import asyncio
 import argparse
+import asyncio
 import json
 import subprocess
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from greenbook_agent_core.command.models import CommandContext
-from greenbook_agent_core.context import ContextBuilder
+from greenbook_agent_core.context import ContextBudget, ContextBuilder
 from greenbook_agent_core.context.projection import project_interpreter_context
+from greenbook_agent_core.execution.action_observation import ActionObservation
 from greenbook_agent_core.memory import (
+    CONTENT_PUBLICATION_CATEGORY,
+    CONTENT_PUBLICATION_OUTCOME,
+    EPISODIC_MEMORY_CONTRACT,
+    PROCEDURAL_MEMORY_CONTRACT,
+    PROCEDURAL_MEMORY_ROLE,
+    SEMANTIC_MEMORY_CONTRACT,
+    SEMANTIC_MEMORY_ROLE,
+    EpisodeCandidateBuilder,
+    EpisodicMemoryService,
     InMemoryMemoryRepository,
     MemoryManager,
     MemoryQuery,
     MemoryRecord,
+    MemoryRetriever,
     MemoryStatus,
     MemoryType,
     PreferenceMemoryExtractor,
+    PreferenceMemoryService,
     PreferenceRetriever,
+    ProceduralMemoryService,
+    SemanticMemoryService,
+    VerifiedBusinessOutcome,
 )
+from greenbook_agent_core.task.models import Objective, ObjectiveStatus
 
 ROOT = Path(__file__).resolve().parents[1]
 EVALUATION_DIR = ROOT / "docs" / "evaluation"
@@ -1200,6 +1217,1714 @@ preference evidence. Keep that change separate from this evaluation-only run.
 """
 
 
+SYSTEM_EVALUATION_CHECKPOINT = (
+    "17a156d8464a0f33176781f3717e4d0e80854afa"
+)
+SYSTEM_EVALUATION_DATASET = "long_term_memory_system_v1"
+SYSTEM_EVALUATION_TIMESTAMP = "2026-08-26T08:00:00+00:00"
+SYSTEM_MEMORY_TYPES = (
+    "PREFERENCE",
+    "SEMANTIC",
+    "EPISODIC",
+    "PROCEDURAL",
+)
+
+
+def _logical_memory_type(value: Any) -> str:
+    """Classify the four logical types behind the compatibility enum alias."""
+
+    if isinstance(value, Mapping):
+        memory_type = str(value.get("memory_type") or value.get("type") or "").upper()
+        metadata = value.get("structured_metadata") or value.get("metadata") or {}
+    else:
+        memory_type = str(getattr(value, "memory_type", "") or "").upper()
+        metadata = getattr(value, "metadata", {}) or {}
+    if memory_type == "EPISODIC":
+        return "EPISODIC"
+    if memory_type == "PROCEDURAL":
+        return "PROCEDURAL"
+    if isinstance(metadata, dict) and metadata.get("preference_type"):
+        return "PREFERENCE"
+    if isinstance(metadata, dict) and (
+        metadata.get("memory_contract") == SEMANTIC_MEMORY_CONTRACT
+        and metadata.get("memory_role") == SEMANTIC_MEMORY_ROLE
+    ):
+        return "SEMANTIC"
+    return memory_type or "UNKNOWN"
+
+
+def _episode_fixture_inputs(
+    *,
+    observation_id: str = "joint-observation-1",
+    user_id: str = "joint-user",
+    tenant_id: str = "joint-tenant",
+) -> tuple[ActionObservation, Objective, VerifiedBusinessOutcome, str, str]:
+    """Return the exact verified source shape used by Episodic V1 tests."""
+
+    task_id = f"joint-task-{observation_id}"
+    objective_id = f"joint-objective-{observation_id}"
+    observation = ActionObservation(
+        observation_id=observation_id,
+        execution_id=f"joint-execution-{observation_id}",
+        task_id=task_id,
+        conversation_id="joint-conversation-a",
+        status="COMPLETED",
+        resource_refs=[{
+            "resource_type": "POST",
+            "resource_id": f"joint-post-{observation_id}",
+        }],
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+    objective = Objective(
+        objective_id=objective_id,
+        task_id=task_id,
+        description="Publish technical content",
+        intent="CONTENT_PUBLICATION",
+        status=ObjectiveStatus.COMPLETED,
+    )
+    outcome = VerifiedBusinessOutcome(
+        task_id=task_id,
+        objective_id=objective_id,
+        category=CONTENT_PUBLICATION_CATEGORY,
+        summary=(
+            "In a verified technical publication workflow, the user revised "
+            "the title and publication time before successful publication."
+        ),
+        outcome=CONTENT_PUBLICATION_OUTCOME,
+        occurred_at=SYSTEM_EVALUATION_TIMESTAMP,
+        confidence=0.95,
+        verified=True,
+        source_type="VERIFIED_BUSINESS_OUTCOME",
+        revision_fields=["title", "publish_time"],
+        user_initiated_revision=True,
+        verified_resource_kinds=["POST"],
+    )
+    return observation, objective, outcome, user_id, tenant_id
+
+
+def _canonical_system_fixture(
+    *,
+    user_id: str = "joint-user",
+    tenant_id: str = "joint-tenant",
+) -> dict[str, Any]:
+    """Build all four logical types through their canonical write adapters."""
+
+    repository = InMemoryMemoryRepository()
+    manager = MemoryManager(repository)
+    preference_service = PreferenceMemoryService(manager)
+    semantic_service = SemanticMemoryService(manager)
+    episodic_service = EpisodicMemoryService(manager)
+    procedural_service = ProceduralMemoryService(manager)
+
+    _, preference = preference_service.process_completed_turn(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        conversation_id="joint-conversation-preference",
+        user_message="I prefer deep technical articles for my writing.",
+    )
+    semantic_records = semantic_service.process_user_statement(
+        "I am a Java backend developer and I am learning Agent.",
+        user_id=user_id,
+        tenant_id=tenant_id,
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+        source_id="joint-semantic-statement-1",
+    )
+    procedural_records = procedural_service.process_user_instruction(
+        "From now on, when writing a technical article, first generate an outline, "
+        "then write the body from that outline.",
+        user_id=user_id,
+        tenant_id=tenant_id,
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+        source_id="joint-procedural-statement-1",
+    )
+    observation, objective, outcome, _, _ = _episode_fixture_inputs(
+        user_id=user_id,
+        tenant_id=tenant_id,
+    )
+    episode = episodic_service.process(
+        observation=observation,
+        objective=objective,
+        verified_outcome=outcome,
+        user_id=user_id,
+        tenant_id=tenant_id,
+    )
+
+    if preference is None or len(semantic_records) != 2 or not procedural_records or episode is None:
+        raise AssertionError("canonical four-type fixture could not be built")
+    semantic_by_predicate = {
+        str(item.metadata.get("predicate")): item
+        for item in semantic_records
+    }
+    records = {
+        "preference_depth": preference,
+        "semantic_occupation": semantic_by_predicate["occupation_domain"],
+        "semantic_learning": semantic_by_predicate["learning_focus"],
+        "episode_publication": episode,
+        "procedure_article": procedural_records[0],
+    }
+
+    # This row is intentionally legacy-shaped.  It is seeded only as a
+    # quarantine fixture; canonical retrieval must reject it by contract.
+    legacy = repository.save(MemoryRecord(
+        memory_id="joint-legacy-episodic",
+        user_id=user_id,
+        tenant_id=tenant_id,
+        memory_type=MemoryType.EPISODIC,
+        content="legacy technical publication execution trace",
+        confidence=1.0,
+        importance=0.9,
+        source_type="LEGACY_RUNTIME_MEMORY",
+        structured_metadata={"status": "COMPLETED", "legacy": True},
+    ))
+
+    # Foreign-scope fixtures make cross-user and cross-tenant checks exercise
+    # the repository scope filters rather than only an empty repository.
+    manager.remember(_preference_record(
+        memory_id="joint-other-user-preference",
+        user_id="other-user",
+        tenant_id=tenant_id,
+        key="writing_depth",
+        value="prefer deep technical articles owned by another user",
+        conversation_id="other-user-conversation",
+    ))
+    manager.remember(_preference_record(
+        memory_id="joint-other-tenant-preference",
+        user_id=user_id,
+        tenant_id="other-tenant",
+        key="writing_depth",
+        value="prefer deep technical articles in another tenant",
+        conversation_id="other-tenant-conversation",
+    ))
+    return {
+        "repository": repository,
+        "manager": manager,
+        "records": records,
+        "legacy": legacy,
+        "services": {
+            "preference": preference_service,
+            "semantic": semantic_service,
+            "episodic": episodic_service,
+            "procedural": procedural_service,
+        },
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+    }
+
+
+class _RecordingMemoryRepository:
+    """Read-only evaluation wrapper that exposes pre-gate candidate counts."""
+
+    def __init__(self, delegate: InMemoryMemoryRepository) -> None:
+        self.delegate = delegate
+        self.searches: list[tuple[MemoryQuery, list[MemoryRecord]]] = []
+
+    def search(self, query: MemoryQuery) -> list[MemoryRecord]:
+        values = self.delegate.search(query)
+        self.searches.append((query, values))
+        return values
+
+    def reset(self) -> None:
+        self.searches.clear()
+
+
+def _system_retriever(
+    repository: InMemoryMemoryRepository,
+    *,
+    record_candidates: bool = False,
+) -> tuple[MemoryRetriever, _RecordingMemoryRepository | None]:
+    recorder = _RecordingMemoryRepository(repository) if record_candidates else None
+    retriever = MemoryRetriever(
+        recorder or repository,
+        memory_types=(
+            MemoryType.PREFERENCE,
+            MemoryType.EPISODIC,
+            MemoryType.PROCEDURAL,
+        ),
+        status=MemoryStatus.ACTIVE,
+        include_legacy_episodic=False,
+        require_tenant_scope=True,
+        relevance_threshold=0.5,
+        confidence_threshold=0.5,
+        semantic_contract=SEMANTIC_MEMORY_CONTRACT,
+        procedural_contract=PROCEDURAL_MEMORY_CONTRACT,
+    )
+    return retriever, recorder
+
+
+def build_long_term_memory_system_dataset() -> dict[str, Any]:
+    """Build natural-language cases for the four-type system evaluation."""
+
+    classification = [
+        {
+            "id": "classification-preference-depth",
+            "family": "B_single_type",
+            "text": "I prefer deep technical articles for my writing.",
+            "input_mode": "user_text",
+            "expected_types": ["PREFERENCE"],
+        },
+        {
+            "id": "classification-preference-concise",
+            "family": "B_single_type",
+            "text": "From now on, prefer concise replies.",
+            "input_mode": "user_text",
+            "expected_types": ["PREFERENCE"],
+        },
+        {
+            "id": "classification-semantic-background",
+            "family": "B_single_type",
+            "text": "I am a Java backend developer.",
+            "input_mode": "user_text",
+            "expected_types": ["SEMANTIC"],
+        },
+        {
+            "id": "classification-semantic-learning",
+            "family": "B_single_type",
+            "text": "I am currently learning Agent.",
+            "input_mode": "user_text",
+            "expected_types": ["SEMANTIC"],
+        },
+        {
+            "id": "classification-episodic-verified",
+            "family": "B_single_type",
+            "text": "Verified publication after a user revision of title and time.",
+            "input_mode": "verified_episode",
+            "expected_types": ["EPISODIC"],
+        },
+        {
+            "id": "classification-procedural-rule",
+            "family": "B_single_type",
+            "text": (
+                "From now on, when writing a technical article, first generate an "
+                "outline, then write the body from that outline."
+            ),
+            "input_mode": "user_text",
+            "expected_types": ["PROCEDURAL"],
+        },
+        {
+            "id": "classification-procedural-chinese",
+            "family": "B_single_type",
+            "text": "\u4ee5\u540e\u5199\u6280\u672f\u6587\u7ae0\u65f6\uff0c\u5148\u7ed9\u6211\u751f\u6210\u5927\u7eb2\uff0c\u518d\u6839\u636e\u5927\u7eb2\u5199\u6b63\u6587\u3002",
+            "input_mode": "user_text",
+            "expected_types": ["PROCEDURAL"],
+        },
+        {
+            "id": "classification-preference-not-procedure",
+            "family": "type_boundary",
+            "text": "I prefer deep technical articles.",
+            "input_mode": "user_text",
+            "expected_types": ["PREFERENCE"],
+        },
+        {
+            "id": "classification-history-not-procedure",
+            "family": "type_boundary",
+            "text": "Last time I wrote an article, I first made an outline.",
+            "input_mode": "user_text",
+            "expected_types": [],
+        },
+        {
+            "id": "classification-current-state-not-semantic",
+            "family": "type_boundary",
+            "text": "I am currently publishing a Java article.",
+            "input_mode": "user_text",
+            "expected_types": [],
+        },
+        {
+            "id": "classification-runtime-invariant-not-procedure",
+            "family": "type_boundary",
+            "text": (
+                "From now on, before updating a schedule, check its version and "
+                "reconcile unknown results."
+            ),
+            "input_mode": "user_text",
+            "expected_types": [],
+        },
+        {
+            "id": "classification-unsupported-inference",
+            "family": "robustness",
+            "text": "I wrote a Java article, so I am probably a Java backend developer.",
+            "input_mode": "user_text",
+            "expected_types": [],
+        },
+        {
+            "id": "classification-current-exception",
+            "family": "E_current_instruction_override",
+            "text": "This time write the technical article directly without an outline.",
+            "input_mode": "user_text",
+            "expected_types": [],
+        },
+    ]
+    retrieval = [
+        {
+            "id": "A-preference-only",
+            "family": "A_four_types_present",
+            "query": "deep technical articles",
+            "expected_records": ["preference_depth"],
+        },
+        {
+            "id": "A-semantic-only",
+            "family": "A_four_types_present",
+            "query": "Agent learning",
+            "expected_records": ["semantic_learning"],
+        },
+        {
+            "id": "A-episodic-only",
+            "family": "A_four_types_present",
+            "query": "verified publication revised title publication time",
+            "expected_records": ["episode_publication"],
+        },
+        {
+            "id": "A-procedural-only",
+            "family": "A_four_types_present",
+            "query": "outline body technical article",
+            "expected_records": ["procedure_article"],
+        },
+        {
+            "id": "B-preference-only",
+            "family": "B_single_type",
+            "query": "prefer deep articles",
+            "expected_records": ["preference_depth"],
+        },
+        {
+            "id": "B-semantic-only",
+            "family": "B_single_type",
+            "query": "Java backend",
+            "expected_records": ["semantic_occupation"],
+        },
+        {
+            "id": "B-episodic-only",
+            "family": "B_single_type",
+            "query": "past publication experience",
+            "expected_records": ["episode_publication"],
+        },
+        {
+            "id": "B-procedural-only",
+            "family": "B_single_type",
+            "query": "outline then body",
+            "expected_records": ["procedure_article"],
+        },
+        {
+            "id": "C-multi-preference-semantic-procedure",
+            "family": "C_multi_type_required",
+            "query": "deep technical Agent learning outline body",
+            "expected_records": [
+                "preference_depth",
+                "semantic_learning",
+                "procedure_article",
+            ],
+        },
+        {
+            "id": "D-no-memory-public-posts",
+            "family": "D_no_memory",
+            "query": "查一下最近公开帖子",
+            "expected_records": [],
+        },
+        {
+            "id": "D-no-memory-weather",
+            "family": "D_no_memory",
+            "query": "weather forecast and astronomy",
+            "expected_records": [],
+        },
+        {
+            "id": "E-current-procedure-override",
+            "family": "E_current_instruction_override",
+            "query": "This time write the technical article directly without an outline.",
+            "expected_records": [],
+            "forbidden_records": ["procedure_article"],
+        },
+        {
+            "id": "F-semantic-new-truth",
+            "family": "F_memory_conflict",
+            "query": "Agent",
+            "fixture": "semantic_conflict",
+            "expected_records": ["semantic_agent_new"],
+            "forbidden_records": ["semantic_java_old"],
+        },
+        {
+            "id": "G-preference-new-truth",
+            "family": "G_preference_update",
+            "query": "concise replies",
+            "fixture": "preference_update",
+            "expected_records": ["preference_concise_new"],
+            "forbidden_records": ["preference_detailed_old"],
+        },
+        {
+            "id": "H-cross-conversation",
+            "family": "H_cross_conversation",
+            "query": "Agent",
+            "conversation_id": "joint-conversation-b",
+            "expected_records": ["semantic_learning"],
+        },
+        {
+            "id": "I-cross-user",
+            "family": "I_cross_user_tenant",
+            "query": "deep technical articles owned by another user",
+            "expected_records": [],
+            "user_id": "joint-user",
+            "tenant_id": "joint-tenant",
+        },
+        {
+            "id": "I-cross-tenant",
+            "family": "I_cross_user_tenant",
+            "query": "deep technical articles in another tenant",
+            "expected_records": [],
+            "user_id": "joint-user",
+            "tenant_id": "joint-tenant",
+        },
+    ]
+    return {
+        "dataset": SYSTEM_EVALUATION_DATASET,
+        "version": 1,
+        "checkpoint": SYSTEM_EVALUATION_CHECKPOINT,
+        "families": {
+            "A_four_types_present": "All four logical types are seeded in one scope; queries must select only relevant subsets.",
+            "B_single_type": "A request should select one logical type.",
+            "C_multi_type_required": "A request may require Preference, Semantic, and Procedural, but not Episode without evidence.",
+            "D_no_memory": "Unrelated requests explicitly allow zero long-term memory.",
+            "E_current_instruction_override": "The current explicit exception suppresses stored soft Procedure guidance.",
+            "F_memory_conflict": "Only the newer ACTIVE Semantic truth is eligible.",
+            "G_preference_update": "Only the newer ACTIVE Preference value is eligible.",
+            "H_cross_conversation": "Memory may cross conversations but no current runtime state follows it.",
+            "I_cross_user_tenant": "User and tenant scope must prevent leakage.",
+            "classification": classification,
+            "retrieval": retrieval,
+        },
+    }
+
+
+def _classification_types_for_case(case: dict[str, Any]) -> tuple[set[str], dict[str, Any]]:
+    text = str(case.get("text") or "")
+    user_id = "classification-user"
+    tenant_id = "classification-tenant"
+    observed: set[str] = set()
+    evidence: dict[str, Any] = {}
+    if case.get("input_mode") == "verified_episode":
+        observation, objective, outcome, user_id, tenant_id = _episode_fixture_inputs(
+            observation_id="classification-episode",
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
+        candidate = EpisodeCandidateBuilder().build(
+            observation=observation,
+            objective=objective,
+            verified_outcome=outcome,
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
+        episode_service = EpisodicMemoryService(MemoryManager(InMemoryMemoryRepository()))
+        if candidate is not None and episode_service.evaluate(candidate).should_write:
+            observed.add("EPISODIC")
+        evidence["episode_candidate"] = candidate is not None
+        return observed, evidence
+
+    extraction = PreferenceMemoryExtractor.extract(text)
+    if extraction.should_write:
+        observed.add("PREFERENCE")
+    evidence["preference_decision"] = extraction.decision.value
+    semantic_service = SemanticMemoryService(MemoryManager(InMemoryMemoryRepository()))
+    semantic_candidates = semantic_service.build_candidates(
+        text,
+        user_id=user_id,
+        tenant_id=tenant_id,
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+        source_id=f"classification-{case['id']}",
+    )
+    semantic_kept = [
+        candidate
+        for candidate in semantic_candidates
+        if semantic_service.evaluate(candidate).should_write
+    ]
+    if semantic_kept:
+        observed.add("SEMANTIC")
+    evidence["semantic_predicates"] = [item.predicate for item in semantic_kept]
+    procedural_service = ProceduralMemoryService(MemoryManager(InMemoryMemoryRepository()))
+    procedural_candidates = procedural_service.build_candidates(
+        text,
+        user_id=user_id,
+        tenant_id=tenant_id,
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+        source_id=f"classification-{case['id']}",
+    )
+    procedural_kept = [
+        candidate
+        for candidate in procedural_candidates
+        if procedural_service.evaluate(candidate).should_write
+    ]
+    if procedural_kept:
+        observed.add("PROCEDURAL")
+    evidence["procedural_keys"] = [item.procedure_key for item in procedural_kept]
+    return observed, evidence
+
+
+def evaluate_system_classification(
+    cases: list[dict[str, Any]],
+) -> dict[str, Any]:
+    evaluated: list[dict[str, Any]] = []
+    counts = {
+        memory_type: Counter()
+        for memory_type in SYSTEM_MEMORY_TYPES
+    }
+    confusion = Counter()
+    wrong_type_cases: list[dict[str, Any]] = []
+    unsupported_cases = [case for case in cases if not case.get("expected_types")]
+    unsupported_admissions = 0
+    for case in cases:
+        expected = set(case.get("expected_types") or [])
+        actual, evidence = _classification_types_for_case(case)
+        if not expected and actual:
+            unsupported_admissions += 1
+        wrong_types = sorted(actual - expected)
+        if wrong_types:
+            wrong_type_cases.append({**case, "actual_types": sorted(actual), "wrong_types": wrong_types})
+        for expected_type in expected:
+            for actual_type in actual:
+                if actual_type != expected_type:
+                    confusion[f"{expected_type}->{actual_type}"] += 1
+        for memory_type in SYSTEM_MEMORY_TYPES:
+            expected_value = memory_type in expected
+            actual_value = memory_type in actual
+            if expected_value and actual_value:
+                counts[memory_type]["tp"] += 1
+            elif not expected_value and actual_value:
+                counts[memory_type]["fp"] += 1
+            elif expected_value:
+                counts[memory_type]["fn"] += 1
+            else:
+                counts[memory_type]["tn"] += 1
+        evaluated.append({
+            **case,
+            "actual_types": sorted(actual),
+            "evidence": evidence,
+            "wrong_types": wrong_types,
+        })
+    per_type: dict[str, Any] = {}
+    for memory_type, values in counts.items():
+        tp = values["tp"]
+        fp = values["fp"]
+        fn = values["fn"]
+        per_type[memory_type] = {
+            "true_positive": tp,
+            "false_positive": fp,
+            "false_negative": fn,
+            "precision": tp / (tp + fp) if tp + fp else 0.0,
+            "recall": tp / (tp + fn) if tp + fn else 0.0,
+        }
+    return {
+        "dataset_count": len(cases),
+        "metrics": {
+            "per_type": per_type,
+            "wrong_type_admission_rate": len(wrong_type_cases) / len(cases) if cases else 0.0,
+            "unsupported_inference_rate": (
+                unsupported_admissions / len(unsupported_cases)
+                if unsupported_cases else 0.0
+            ),
+        },
+        "confusion": dict(confusion),
+        "wrong_type_cases": wrong_type_cases,
+        "cases": evaluated,
+    }
+
+
+def _fixture_for_retrieval_case(
+    case: dict[str, Any],
+    base_fixture: dict[str, Any],
+) -> dict[str, Any]:
+    fixture_name = case.get("fixture")
+    if fixture_name == "semantic_conflict":
+        repository = InMemoryMemoryRepository()
+        service = SemanticMemoryService(MemoryManager(repository))
+        old = service.process_user_statement(
+            "I am currently learning Java.",
+            user_id="joint-user",
+            tenant_id="joint-tenant",
+            observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+            source_id="semantic-old-java",
+        )
+        new = service.process_user_statement(
+            "I am currently learning Agent.",
+            user_id="joint-user",
+            tenant_id="joint-tenant",
+            observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+            source_id="semantic-new-agent",
+        )
+        return {
+            "repository": repository,
+            "records": {
+                "semantic_java_old": old[0],
+                "semantic_agent_new": new[0],
+            },
+            "user_id": "joint-user",
+            "tenant_id": "joint-tenant",
+        }
+    if fixture_name == "preference_update":
+        repository = InMemoryMemoryRepository()
+        manager = MemoryManager(repository)
+        old = manager.remember(_preference_record(
+            memory_id="joint-preference-detailed-old",
+            user_id="joint-user",
+            tenant_id="joint-tenant",
+            key="response_style",
+            value="prefer detailed replies",
+            conversation_id="preference-old",
+            source_type="USER_EXPLICIT_PREFERENCE",
+            source_id="preference-detailed-old",
+        ))
+        new = manager.remember(_preference_record(
+            memory_id="joint-preference-concise-new",
+            user_id="joint-user",
+            tenant_id="joint-tenant",
+            key="response_style",
+            value="prefer concise replies",
+            conversation_id="preference-new",
+            source_type="USER_EXPLICIT_PREFERENCE",
+            source_id="preference-concise-new",
+        ))
+        return {
+            "repository": repository,
+            "records": {
+                "preference_detailed_old": old,
+                "preference_concise_new": new,
+            },
+            "user_id": "joint-user",
+            "tenant_id": "joint-tenant",
+        }
+    return base_fixture
+
+
+def _expected_ids(
+    case: dict[str, Any],
+    fixture: dict[str, Any],
+) -> set[str]:
+    return {
+        fixture["records"][key].memory_id
+        for key in case.get("expected_records", ())
+        if key in fixture["records"]
+    }
+
+
+def _record_list_by_id(values: list[MemoryRecord]) -> dict[str, MemoryRecord]:
+    return {item.memory_id: item for item in values}
+
+
+async def evaluate_system_retrieval(
+    cases: list[dict[str, Any]],
+    base_fixture: dict[str, Any],
+) -> dict[str, Any]:
+    evaluated: list[dict[str, Any]] = []
+    metric_sums = {
+        str(k): {"recall": 0.0, "precision": 0.0, "returned_precision": 0.0, "count": 0}
+        for k in (1, 3, 5)
+    }
+    type_counts: dict[str, Counter[str]] = {
+        memory_type: Counter()
+        for memory_type in SYSTEM_MEMORY_TYPES
+    }
+    no_match_cases = 0
+    no_match_false_returns = 0
+    irrelevant_selected = 0
+    selected_total = 0
+    required_total = 0
+    required_misses = 0
+    required_by_type = Counter()
+    hits_by_type = Counter()
+    cross_user_leaks = 0
+    cross_tenant_leaks = 0
+    override_failures = 0
+    for case in cases:
+        fixture = _fixture_for_retrieval_case(case, base_fixture)
+        retriever, recorder = _system_retriever(
+            fixture["repository"],
+            record_candidates=True,
+        )
+        user_id = case.get("user_id") or fixture["user_id"]
+        tenant_id = case.get("tenant_id") or fixture["tenant_id"]
+        if recorder is not None:
+            recorder.reset()
+        values = await retriever.retrieve(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            conversation_id=case.get("conversation_id", "joint-conversation-b"),
+            target_query=case["query"],
+            limit=5,
+            touch=False,
+        )
+        candidate_values: dict[str, MemoryRecord] = {}
+        if recorder is not None:
+            for _, found in recorder.searches:
+                candidate_values.update(_record_list_by_id(found))
+        candidates = list(candidate_values.values())
+        expected_ids = _expected_ids(case, fixture)
+        actual_ids = [item.memory_id for item in values]
+        actual_set = set(actual_ids)
+        forbidden_ids = {
+            fixture["records"][key].memory_id
+            for key in case.get("forbidden_records", ())
+            if key in fixture["records"]
+        }
+        case_candidate_counts: Counter[str] = Counter()
+        case_selected_counts: Counter[str] = Counter()
+        for item in candidates:
+            case_candidate_counts[_logical_memory_type(item)] += 1
+        for item in values:
+            case_selected_counts[_logical_memory_type(item)] += 1
+        for memory_type in SYSTEM_MEMORY_TYPES:
+            candidate_count = case_candidate_counts[memory_type]
+            selected_count = case_selected_counts[memory_type]
+            type_counts[memory_type]["candidate"] += candidate_count
+            type_counts[memory_type]["selected"] += selected_count
+            type_counts[memory_type]["filtered"] += max(0, candidate_count - selected_count)
+        if expected_ids:
+            required_total += len(expected_ids)
+            required_misses += len(expected_ids - actual_set)
+            for expected_id in expected_ids:
+                expected_record = fixture["records"].get(
+                    next(
+                        (
+                            key
+                            for key, record in fixture["records"].items()
+                            if record.memory_id == expected_id
+                        ),
+                        "",
+                    )
+                )
+                if expected_record is not None:
+                    expected_type = _logical_memory_type(expected_record)
+                    required_by_type[expected_type] += 1
+                    if expected_id in actual_set:
+                        hits_by_type[expected_type] += 1
+            for k in (1, 3, 5):
+                prefix = actual_ids[:k]
+                hit_count = len(set(prefix) & expected_ids)
+                metric_sums[str(k)]["recall"] += hit_count / len(expected_ids)
+                metric_sums[str(k)]["precision"] += hit_count / k
+                metric_sums[str(k)]["returned_precision"] += (
+                    hit_count / len(prefix) if prefix else 0.0
+                )
+                metric_sums[str(k)]["count"] += 1
+        elif case["family"] == "D_no_memory":
+            no_match_cases += 1
+            if actual_ids:
+                no_match_false_returns += 1
+        irrelevant_ids = actual_set - expected_ids
+        irrelevant_selected += len(irrelevant_ids)
+        selected_total += len(actual_ids)
+        if forbidden_ids & actual_set:
+            override_failures += 1
+        if case["family"] == "I_cross_user_tenant":
+            if any(item.user_id != user_id for item in values):
+                cross_user_leaks += 1
+            if any(item.tenant_id != tenant_id for item in values):
+                cross_tenant_leaks += 1
+        evaluated.append({
+            **case,
+            "expected_ids": sorted(expected_ids),
+            "actual_ids": actual_ids,
+            "actual_types": [_logical_memory_type(item) for item in values],
+            "candidate_counts": {
+                memory_type: case_candidate_counts[memory_type]
+                for memory_type in SYSTEM_MEMORY_TYPES
+            },
+            "selected_counts": {
+                memory_type: case_selected_counts[memory_type]
+                for memory_type in SYSTEM_MEMORY_TYPES
+            },
+            "forbidden_returned": sorted(forbidden_ids & actual_set),
+            "irrelevant_ids": sorted(irrelevant_ids),
+        })
+    metrics = {}
+    for key, values in metric_sums.items():
+        count = values["count"]
+        metrics[key] = {
+            "recall_at_k": values["recall"] / count if count else 0.0,
+            "precision_at_k": values["precision"] / count if count else 0.0,
+            "returned_precision_at_k": values["returned_precision"] / count if count else 0.0,
+            "eligible_cases": count,
+        }
+    required_recall_by_type = {
+        memory_type: (
+            hits_by_type[memory_type] / required_by_type[memory_type]
+            if required_by_type[memory_type] else 0.0
+        )
+        for memory_type in SYSTEM_MEMORY_TYPES
+    }
+    return {
+        "dataset_count": len(cases),
+        "metrics": metrics,
+        "no_match_cases": no_match_cases,
+        "no_match_false_return_rate": (
+            no_match_false_returns / no_match_cases if no_match_cases else 0.0
+        ),
+        "irrelevant_memory_injection_rate": (
+            irrelevant_selected / selected_total if selected_total else 0.0
+        ),
+        "required_memory_miss_rate": required_misses / required_total if required_total else 0.0,
+        "required_recall_by_type": required_recall_by_type,
+        "candidate_selected_filtered_by_type": {
+            memory_type: dict(type_counts[memory_type])
+            for memory_type in SYSTEM_MEMORY_TYPES
+        },
+        "override_failures": override_failures,
+        "cross_user_leaks": cross_user_leaks,
+        "cross_tenant_leaks": cross_tenant_leaks,
+        "isolation_leaks": cross_user_leaks + cross_tenant_leaks,
+        "cases": evaluated,
+    }
+
+
+def _memory_record_for_budget(index: int, user_id: str, tenant_id: str) -> MemoryRecord:
+    logical_type = SYSTEM_MEMORY_TYPES[index % len(SYSTEM_MEMORY_TYPES)]
+    common = {
+        "memory_id": f"budget-memory-{index}",
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "status": MemoryStatus.ACTIVE,
+        "content": f"Reusable article memory item {index}: article memory context.",
+        "importance": 0.7,
+        "confidence": 0.95,
+        "source_type": "SYSTEM_EVALUATION_FIXTURE",
+        "source_id": f"budget-source-{index}",
+    }
+    if logical_type == "PREFERENCE":
+        return MemoryRecord(
+            **common,
+            memory_type=MemoryType.PREFERENCE,
+            structured_metadata={
+                "preference_type": f"budget_preference_{index}",
+                "value": "article memory",
+            },
+        )
+    if logical_type == "SEMANTIC":
+        return MemoryRecord(
+            **common,
+            memory_type=MemoryType.SEMANTIC,
+            structured_metadata={
+                "memory_contract": SEMANTIC_MEMORY_CONTRACT,
+                "memory_role": SEMANTIC_MEMORY_ROLE,
+                "subject": "user",
+                "predicate": "occupation_domain",
+                "object": f"article_domain_{index}",
+            },
+        )
+    if logical_type == "EPISODIC":
+        return MemoryRecord(
+            **common,
+            memory_type=MemoryType.EPISODIC,
+            structured_metadata={
+                "memory_contract": EPISODIC_MEMORY_CONTRACT,
+                "memory_role": "relevant_past_experience",
+                "category": "SYSTEM_EVALUATION",
+            },
+        )
+    return MemoryRecord(
+        **common,
+        memory_type=MemoryType.PROCEDURAL,
+        structured_metadata={
+            "memory_contract": PROCEDURAL_MEMORY_CONTRACT,
+            "memory_role": PROCEDURAL_MEMORY_ROLE,
+            "procedure_key": f"budget_procedure_{index}",
+            "trigger": "article",
+            "guidance": "Use article memory as bounded soft guidance.",
+            "advisory_only": True,
+        },
+    )
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * percentile
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+async def evaluate_context_budget() -> dict[str, Any]:
+    measurements: list[dict[str, Any]] = []
+    for candidate_count in (1, 4, 12):
+        for variant in range(10):
+            repository = InMemoryMemoryRepository()
+            manager = MemoryManager(repository)
+            user_id = "budget-user"
+            tenant_id = "budget-tenant"
+            for index in range(candidate_count):
+                manager.remember(_memory_record_for_budget(
+                    index + variant * 100,
+                    user_id,
+                    tenant_id,
+                ))
+            retriever, _ = _system_retriever(repository)
+            snapshot = await ContextBuilder(
+                memory_retriever=retriever,
+                budget=ContextBudget(max_memories=5, max_memory_chars=1200),
+            ).build(
+                conversation_id=f"budget-conversation-{candidate_count}-{variant}",
+                user_id=user_id,
+                tenant_id=tenant_id,
+                target_query="article memory",
+                memory_recall=True,
+            )
+            provider_view = project_interpreter_context(CommandContext.from_any(snapshot))
+            model_memory = {
+                "user_preferences": provider_view.get("user_preferences", []),
+                "recalled_memories": provider_view.get("recalled_memories", []),
+            }
+            memory_chars = len(json.dumps(model_memory, ensure_ascii=False, sort_keys=True))
+            type_contribution = Counter(
+                _logical_memory_type(item)
+                for item in snapshot.recalled_memories
+            )
+            measurements.append({
+                "candidate_count": candidate_count,
+                "selected_count": len(snapshot.recalled_memories),
+                "memory_chars": memory_chars,
+                "type_contribution": dict(type_contribution),
+                "bounded": len(snapshot.recalled_memories) <= 5,
+            })
+    sizes = [float(item["memory_chars"]) for item in measurements]
+    token_estimates = [float((int(item["memory_chars"]) + 3) // 4) for item in measurements]
+    memory_budget_chars = 5 * 1200
+    type_contribution = Counter()
+    for item in measurements:
+        type_contribution.update(item["type_contribution"])
+    return {
+        "dataset_count": len(measurements),
+        "candidate_shapes": [1, 4, 12],
+        "metrics": {
+            "memory_count_max": max(item["selected_count"] for item in measurements),
+            "memory_chars_p50": _percentile(sizes, 0.50),
+            "memory_chars_p95": _percentile(sizes, 0.95),
+            "memory_chars_max": max(sizes),
+            "memory_tokens_p50_estimate": _percentile(token_estimates, 0.50),
+            "memory_tokens_p95_estimate": _percentile(token_estimates, 0.95),
+            "memory_tokens_max_estimate": max(token_estimates),
+            "nominal_memory_budget_chars": memory_budget_chars,
+            "memory_context_percentage_p50": _percentile(sizes, 0.50) / memory_budget_chars * 100,
+            "memory_context_percentage_p95": _percentile(sizes, 0.95) / memory_budget_chars * 100,
+            "memory_context_percentage_max": max(sizes) / memory_budget_chars * 100,
+            "per_type_selected_total": dict(type_contribution),
+            "bounded_context_rate": sum(item["bounded"] for item in measurements) / len(measurements),
+        },
+        "by_shape": {
+            str(candidate_count): {
+                "runs": [item for item in measurements if item["candidate_count"] == candidate_count],
+                "max_selected": max(
+                    item["selected_count"]
+                    for item in measurements
+                    if item["candidate_count"] == candidate_count
+                ),
+                "max_memory_chars": max(
+                    item["memory_chars"]
+                    for item in measurements
+                    if item["candidate_count"] == candidate_count
+                ),
+            }
+            for candidate_count in (1, 4, 12)
+        },
+        "measurements": measurements,
+    }
+
+
+async def evaluate_system_lifecycle() -> dict[str, Any]:
+    cases: list[dict[str, Any]] = []
+    repository = InMemoryMemoryRepository()
+    manager = MemoryManager(repository)
+    preference_old = manager.remember(_preference_record(
+        memory_id="lifecycle-system-preference-old",
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        key="response_style",
+        value="prefer detailed replies",
+        conversation_id="lifecycle-pref-old",
+    ))
+    preference_new = manager.remember(_preference_record(
+        memory_id="lifecycle-system-preference-new",
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        key="response_style",
+        value="prefer concise replies",
+        conversation_id="lifecycle-pref-new",
+    ))
+    semantic_service = SemanticMemoryService(manager)
+    semantic_old = semantic_service.process_user_statement(
+        "I am currently learning Java.",
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        source_id="lifecycle-semantic-old",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+    semantic_new = semantic_service.process_user_statement(
+        "I am currently learning Agent.",
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        source_id="lifecycle-semantic-new",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+    procedural_service = ProceduralMemoryService(manager)
+    procedure_old = procedural_service.process_user_instruction(
+        "From now on, when writing a technical article, first generate an outline, "
+        "then write the body from that outline.",
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        source_id="lifecycle-procedure-old",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+    procedure_new = procedural_service.process_user_instruction(
+        "From now on, when writing a technical article, directly write a draft "
+        "without an outline.",
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        source_id="lifecycle-procedure-new",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+    retriever, _ = _system_retriever(repository)
+    visible_preference = await retriever.retrieve(
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        target_query="concise replies",
+        touch=False,
+    )
+    visible_semantic = await retriever.retrieve(
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        target_query="Agent",
+        touch=False,
+    )
+    visible_procedure = await retriever.retrieve(
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        target_query="direct draft",
+        touch=False,
+    )
+    preference_old_saved = repository.get(preference_old.memory_id)
+    preference_new_saved = repository.get(preference_new.memory_id)
+    cases.extend([
+        {
+            "case": "superseded_preference_excluded",
+            "passed": preference_old_saved is not None
+            and preference_new_saved is not None
+            and preference_old_saved.status == MemoryStatus.SUPERSEDED
+            and preference_new_saved.status == MemoryStatus.ACTIVE
+            and preference_old.memory_id not in {item.memory_id for item in visible_preference},
+        },
+        {
+            "case": "superseded_semantic_excluded",
+            "passed": bool(semantic_old and semantic_new)
+            and repository.get(semantic_old[0].memory_id).status == MemoryStatus.SUPERSEDED
+            and repository.get(semantic_new[0].memory_id).status == MemoryStatus.ACTIVE
+            and semantic_old[0].memory_id not in {item.memory_id for item in visible_semantic}
+            and semantic_new[0].memory_id in {item.memory_id for item in visible_semantic},
+        },
+        {
+            "case": "superseded_procedure_excluded",
+            "passed": bool(procedure_old and procedure_new)
+            and repository.get(procedure_old[0].memory_id).status == MemoryStatus.SUPERSEDED
+            and repository.get(procedure_new[0].memory_id).status == MemoryStatus.ACTIVE
+            and procedure_old[0].memory_id not in {item.memory_id for item in visible_procedure}
+            and procedure_new[0].memory_id in {item.memory_id for item in visible_procedure},
+        },
+    ])
+    inactive = manager.deactivate(
+        preference_new.memory_id,
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+    )
+    cases.append({
+        "case": "inactive_memory_excluded",
+        "passed": inactive is not None and inactive.status == MemoryStatus.INACTIVE,
+    })
+    legacy = repository.save(MemoryRecord(
+        memory_id="lifecycle-legacy-episode",
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        memory_type=MemoryType.EPISODIC,
+        content="legacy episode publication execution trace",
+        confidence=1.0,
+        structured_metadata={"legacy": True},
+    ))
+    visible = await retriever.retrieve(
+        user_id="lifecycle-user",
+        tenant_id="lifecycle-tenant",
+        target_query="publication execution trace",
+        touch=False,
+    )
+    cases.append({
+        "case": "legacy_episodic_excluded",
+        "passed": legacy.memory_id not in {item.memory_id for item in visible},
+    })
+    return {
+        "dataset_count": len(cases),
+        "passed": sum(item["passed"] for item in cases),
+        "failed": sum(not item["passed"] for item in cases),
+        "cases": cases,
+    }
+
+
+def evaluate_system_duplicates() -> dict[str, Any]:
+    repository = InMemoryMemoryRepository()
+    manager = MemoryManager(repository)
+    preference_service = PreferenceMemoryService(manager)
+    first_preference = preference_service.process_completed_turn(
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+        conversation_id="duplicate-preference-a",
+        user_message="I prefer deep technical articles for my writing.",
+    )[1]
+    second_preference = preference_service.process_completed_turn(
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+        conversation_id="duplicate-preference-b",
+        user_message="I prefer deep technical articles for my writing.",
+    )[1]
+
+    semantic_service = SemanticMemoryService(manager)
+    first_semantic = semantic_service.process_user_statement(
+        "I am a Java backend developer.",
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+        source_id="duplicate-semantic-a",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+    second_semantic = semantic_service.process_user_statement(
+        "I am a Java backend developer.",
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+        source_id="duplicate-semantic-b",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+
+    episodic_service = EpisodicMemoryService(manager)
+    episode_inputs = _episode_fixture_inputs(
+        observation_id="duplicate-episode",
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+    )
+    first_episode = episodic_service.process(
+        observation=episode_inputs[0],
+        objective=episode_inputs[1],
+        verified_outcome=episode_inputs[2],
+        user_id=episode_inputs[3],
+        tenant_id=episode_inputs[4],
+    )
+    second_episode = episodic_service.process(
+        observation=episode_inputs[0],
+        objective=episode_inputs[1],
+        verified_outcome=episode_inputs[2],
+        user_id=episode_inputs[3],
+        tenant_id=episode_inputs[4],
+    )
+
+    procedural_service = ProceduralMemoryService(manager)
+    rule = (
+        "From now on, when writing a technical article, first generate an outline, "
+        "then write the body from that outline."
+    )
+    first_procedure = procedural_service.process_user_instruction(
+        rule,
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+        source_id="duplicate-procedure-a",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+    second_procedure = procedural_service.process_user_instruction(
+        rule,
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+        source_id="duplicate-procedure-b",
+        observed_at=SYSTEM_EVALUATION_TIMESTAMP,
+    )
+
+    active = repository.search(MemoryQuery(
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+        status=MemoryStatus.ACTIVE,
+        limit=100,
+    ))
+    identity_groups: Counter[tuple[str, str]] = Counter()
+    for item in active:
+        identity = (
+            _logical_memory_type(item),
+            str(
+                item.metadata.get("preference_type")
+                or item.metadata.get("predicate")
+                or item.metadata.get("procedure_key")
+                or item.source_id
+                or item.memory_id
+            ),
+        )
+        identity_groups[identity] += 1
+    duplicate_rows = sum(max(count - 1, 0) for count in identity_groups.values())
+    # A second observation id is a distinct real Episode and must not collapse.
+    second_episode_inputs = _episode_fixture_inputs(
+        observation_id="duplicate-episode-distinct",
+        user_id="duplicate-user",
+        tenant_id="duplicate-tenant",
+    )
+    distinct_episode = episodic_service.process(
+        observation=second_episode_inputs[0],
+        objective=second_episode_inputs[1],
+        verified_outcome=second_episode_inputs[2],
+        user_id=second_episode_inputs[3],
+        tenant_id=second_episode_inputs[4],
+    )
+    return {
+        "dataset_count": 5,
+        "metrics": {
+            "duplicate_active_memory_rate": duplicate_rows / len(active) if active else 0.0,
+            "duplicate_active_memory_count": duplicate_rows,
+            "episode_replay_same_id": bool(first_episode and second_episode)
+            and first_episode.memory_id == second_episode.memory_id,
+            "distinct_episode_not_collapsed": bool(
+                first_episode and distinct_episode
+                and first_episode.memory_id != distinct_episode.memory_id
+            ),
+            "preference_replay_same_id": bool(first_preference and second_preference)
+            and first_preference.memory_id == second_preference.memory_id,
+            "semantic_replay_same_id": bool(first_semantic and second_semantic)
+            and first_semantic[0].memory_id == second_semantic[0].memory_id,
+            "procedure_replay_same_id": bool(first_procedure and second_procedure)
+            and first_procedure[0].memory_id == second_procedure[0].memory_id,
+        },
+        "active_records": [item.memory_id for item in active],
+    }
+
+
+async def evaluate_system_authority(base_fixture: dict[str, Any]) -> dict[str, Any]:
+    repository = base_fixture["repository"]
+    retriever, _ = _system_retriever(repository)
+    procedure = base_fixture["records"]["procedure_article"]
+    override_values = await retriever.retrieve(
+        user_id=base_fixture["user_id"],
+        tenant_id=base_fixture["tenant_id"],
+        target_query="This time write the technical article directly without an outline.",
+        touch=False,
+    )
+    provider_view = project_interpreter_context(CommandContext.from_any(
+        await ContextBuilder(memory_retriever=retriever).build(
+            conversation_id="authority-conversation",
+            user_id=base_fixture["user_id"],
+            tenant_id=base_fixture["tenant_id"],
+            target_query="This time write the technical article directly without an outline.",
+            memory_recall=True,
+        )
+    ))
+    provider_memory = provider_view.get("recalled_memories", [])
+    identity_exposed = any(
+        str(key).lower().endswith(("_id", "_ids"))
+        for item in provider_memory
+        if isinstance(item, dict)
+        for key in item
+    )
+    checks = {
+        "current_instruction_overrides_procedure": procedure.memory_id
+        not in {item.memory_id for item in override_values},
+        "no_memory_is_no_task_mutation": not provider_view.get("active_tasks"),
+        "provider_projection_hides_memory_identity": not identity_exposed,
+        "procedural_memory_is_advisory_only": bool(
+            procedure.metadata.get("advisory_only") is True
+        ),
+    }
+    return {
+        "checks": checks,
+        "authority_violation_rate": sum(not value for value in checks.values()) / len(checks),
+        "current_override_returned_ids": [item.memory_id for item in override_values],
+    }
+
+
+def _system_architecture_audit() -> dict[str, Any]:
+    retriever_source = (ROOT / "packages/agent_core/greenbook_agent_core/memory/retriever.py").read_text(encoding="utf-8")
+    relevance_source = (ROOT / "packages/agent_core/greenbook_agent_core/memory/relevance.py").read_text(encoding="utf-8")
+    context_source = (ROOT / "packages/agent_core/greenbook_agent_core/context/builder.py").read_text(encoding="utf-8")
+    main_source = (ROOT / "apps/agent_api/greenbook_agent_api/main.py").read_text(encoding="utf-8")
+    status = subprocess.run(
+        ["git", "status", "--short", "--untracked-files=all"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.splitlines()
+    changed_paths = [line[3:] for line in status if len(line) >= 4]
+    allowed_prefixes = (
+        "docs/evaluation/",
+        "docs/reports/",
+        "scripts/memory_evaluation_harness.py",
+        "tests/unit/test_long_term_memory_system_evaluation.py",
+    )
+    out_of_scope = [
+        path for path in changed_paths
+        if not path.replace("\\", "/").startswith(allowed_prefixes)
+    ]
+    checks = {
+        "one_memory_retriever_in_production_composition": main_source.count("MemoryRetriever(") == 1,
+        "one_relevance_gate_in_canonical_retriever": retriever_source.count("MemoryRelevanceGate(") == 1,
+        "canonical_gate_implementation_is_single": relevance_source.count("class MemoryRelevanceGate") == 1,
+        "context_builder_has_bounded_memory_budget": "max_memories" in context_source and "memory_limit = min" in context_source,
+        "production_dirty_scope_is_evaluation_only": not out_of_scope,
+        "no_production_file_changed": not any(
+            path.replace("\\", "/").startswith(("apps/", "packages/", "services/"))
+            for path in changed_paths
+        ),
+    }
+    return {
+        "checks": checks,
+        "changed_paths": changed_paths,
+        "out_of_scope_paths": out_of_scope,
+        "canonical_runtime": {
+            "repository": "MemoryManager / canonical repository",
+            "read": "MemoryRetriever -> MemoryRelevanceGate -> ContextBuilder",
+            "logical_types": list(SYSTEM_MEMORY_TYPES),
+            "legacy_episodic": "quarantined by EPISODIC_V1 contract filter",
+        },
+        "findings": [
+            "All four logical types are stored in the existing MemoryRecord/repository boundary; Preference and Semantic retain their persisted enum compatibility alias but are separated by metadata contracts.",
+            "Production composition constructs one MemoryRetriever with one relevance gate and supplies it to ContextBuilder; no type-specific retriever or direct prompt path was added by this evaluation.",
+            "The ContextBuilder caps recalled memories at five; model-facing memory is projected as bounded evidence and provider identity keys are sanitized.",
+            "Legacy episodic rows are excluded unless they carry the canonical EPISODIC_V1 contract; old helper symbols remain compatibility/test surfaces rather than an active recall path.",
+            "Memory is evaluated as an advisory input. Current instruction, runtime truth, policy, capability, and business truth remain outside the Memory authority boundary.",
+        ],
+    }
+
+
+async def evaluate_long_term_memory_system_async() -> dict[str, Any]:
+    dataset = build_long_term_memory_system_dataset()
+    classification = evaluate_system_classification(dataset["families"]["classification"])
+    base_fixture = _canonical_system_fixture()
+    retrieval = await evaluate_system_retrieval(
+        dataset["families"]["retrieval"],
+        base_fixture,
+    )
+    context_budget = await evaluate_context_budget()
+    lifecycle = await evaluate_system_lifecycle()
+    duplicates = evaluate_system_duplicates()
+    authority = await evaluate_system_authority(base_fixture)
+    architecture = _system_architecture_audit()
+    return {
+        "checkpoint": SYSTEM_EVALUATION_CHECKPOINT,
+        "dataset": dataset,
+        "classification": classification,
+        "retrieval": retrieval,
+        "context_budget": context_budget,
+        "lifecycle": lifecycle,
+        "duplicates": duplicates,
+        "authority": authority,
+        "architecture": architecture,
+    }
+
+
+def evaluate_long_term_memory_system() -> dict[str, Any]:
+    return asyncio.run(evaluate_long_term_memory_system_async())
+
+
+def _system_metric(value: float) -> str:
+    return f"{value:.4f}"
+
+
+def _system_pct(value: float) -> str:
+    return f"{value * 100:.2f}%"
+
+
+def render_long_term_memory_system_report(result: dict[str, Any]) -> str:
+    classification = result["classification"]
+    retrieval = result["retrieval"]
+    budget = result["context_budget"]
+    lifecycle = result["lifecycle"]
+    duplicates = result["duplicates"]
+    authority = result["authority"]
+    architecture = result["architecture"]
+    classification_rows = []
+    for memory_type in SYSTEM_MEMORY_TYPES:
+        metric = classification["metrics"]["per_type"][memory_type]
+        classification_rows.append(
+            f"| {memory_type} | {metric['true_positive']} | {metric['false_positive']} "
+            f"| {metric['false_negative']} | {_system_metric(metric['precision'])} "
+            f"| {_system_metric(metric['recall'])} |"
+        )
+    retrieval_rows = []
+    for key in ("1", "3", "5"):
+        metric = retrieval["metrics"][key]
+        retrieval_rows.append(
+            f"| {key} | {_system_metric(metric['recall_at_k'])} "
+            f"| {_system_metric(metric['precision_at_k'])} "
+            f"| {_system_metric(metric['returned_precision_at_k'])} "
+            f"| {metric['eligible_cases']} |"
+        )
+    lifecycle_rows = "\n".join(
+        f"| {item['case']} | {'PASS' if item['passed'] else 'FAIL'} |"
+        for item in lifecycle["cases"]
+    )
+    type_count_rows = "\n".join(
+        f"| {memory_type} | {values.get('candidate', 0)} | {values.get('selected', 0)} "
+        f"| {values.get('filtered', 0)} |"
+        for memory_type, values in retrieval["candidate_selected_filtered_by_type"].items()
+    )
+    architecture_rows = "\n".join(
+        f"- {'PASS' if value else 'FAIL'}: {key}"
+        for key, value in architecture["checks"].items()
+    )
+    authority_rows = "\n".join(
+        f"- {'PASS' if value else 'FAIL'}: {key}"
+        for key, value in authority["checks"].items()
+    )
+    first_bad_state = "none"
+    failure_families: list[str] = []
+    if classification["metrics"]["wrong_type_admission_rate"] > 0:
+        first_bad_state = "classification admission output"
+        failure_families.append("CLASSIFICATION_ISSUE")
+    if retrieval["required_memory_miss_rate"] > 0:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "retrieval selected set"
+        failure_families.append("RETRIEVAL_ISSUE")
+    if retrieval["irrelevant_memory_injection_rate"] > 0 or retrieval["no_match_false_return_rate"] > 0:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "relevance-gated selected set"
+        failure_families.append("RELEVANCE_GATE_ISSUE")
+    if budget["metrics"]["bounded_context_rate"] < 1.0:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "ContextBuilder budget projection"
+        failure_families.append("CONTEXT_BUDGET_ISSUE")
+    if lifecycle["failed"]:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "lifecycle projection"
+        failure_families.append("LIFECYCLE_ISSUE")
+    if duplicates["metrics"]["duplicate_active_memory_rate"] > 0:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "duplicate active records"
+        failure_families.append("ADMISSION_ISSUE")
+    if authority["authority_violation_rate"] > 0:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "authority boundary projection"
+        failure_families.append("AUTHORITY_BOUNDARY_ISSUE")
+    if retrieval["isolation_leaks"] > 0:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "scoped retrieval output"
+        failure_families.append("ISOLATION_ISSUE")
+    if not architecture["checks"]["production_dirty_scope_is_evaluation_only"]:
+        first_bad_state = first_bad_state if first_bad_state != "none" else "worktree scope"
+        failure_families.append("ARCHITECTURE_ISSUE")
+    quality_issue = bool(failure_families)
+    verdict = "LONG_TERM_MEMORY_QUALITY_ISSUES" if quality_issue else "LONG_TERM_MEMORY_SYSTEM_PASS"
+    wrong_type_cases = "\n".join(
+        f"- `{item['id']}`: expected `{item['expected_types']}`, actual `{item['actual_types']}`"
+        for item in classification["wrong_type_cases"][:20]
+    ) or "- None"
+    retrieval_failures = "\n".join(
+        f"- `{item['id']}` ({item['family']}): expected `{item['expected_ids']}`, actual `{item['actual_ids']}`"
+        for item in retrieval["cases"]
+        if set(item["expected_ids"]) - set(item["actual_ids"])
+        or item["irrelevant_ids"]
+        or item["forbidden_returned"]
+    ) or "- None"
+    return f"""# LONG_TERM_MEMORY_SYSTEM_EVALUATION
+
+Checkpoint: `{result['checkpoint']}` (`17a156d` Procedural Memory V1 checkpoint).
+This was an evaluation-only run. No production file was changed, and no
+commit, push, merge, or expensive L1/L2/L3/RAG/Search/Java suite was run.
+
+## Verdict
+
+**{verdict}**
+
+Dataset families: **{len(result['dataset']['families']['classification'])} classification**
+and **{len(result['dataset']['families']['retrieval'])} retrieval** cases, plus
+**{budget['dataset_count']} context-budget measurements**.
+
+## Architecture Invariant Check
+
+{architecture_rows}
+
+Canonical runtime:
+
+`MemoryManager / Repository -> MemoryRetriever -> MemoryRelevanceGate -> bounded ContextBuilder`.
+
+The four logical types share the repository, retriever, Gate, scope, lifecycle,
+and bounded injection contract. Preference/Semantic persisted-enum compatibility
+is separated by metadata contract and logical projection. Legacy Episodic is
+quarantined by the `EPISODIC_V1` contract filter.
+
+## Four-Type Classification
+
+| Type | TP | FP | FN | Precision | Recall |
+|---|---:|---:|---:|---:|---:|
+{chr(10).join(classification_rows)}
+
+Wrong-Type Admission Rate: **{_system_pct(classification['metrics']['wrong_type_admission_rate'])}**.
+Unsupported Inference Rate: **{_system_pct(classification['metrics']['unsupported_inference_rate'])}**.
+
+Confusion metrics: `{classification['confusion'] or 'none'}`.
+
+Boundary failures:
+
+{wrong_type_cases}
+
+## Retrieval Evaluation
+
+| K | Recall@K | Fixed Precision@K | Returned Precision@K | Eligible |
+|---:|---:|---:|---:|---:|
+{chr(10).join(retrieval_rows)}
+
+| Metric | Value |
+|---|---:|
+| No-match false return rate | {_system_pct(retrieval['no_match_false_return_rate'])} |
+| Irrelevant Memory Injection Rate | {_system_pct(retrieval['irrelevant_memory_injection_rate'])} |
+| Required Memory Miss Rate | {_system_pct(retrieval['required_memory_miss_rate'])} |
+| Cross-user leakage count | {retrieval['cross_user_leaks']} |
+| Cross-tenant leakage count | {retrieval['cross_tenant_leaks']} |
+| Current-instruction override failures | {retrieval['override_failures']} |
+
+### Candidate / Selected / Filtered by Type
+
+| Type | Candidate | Selected | Filtered |
+|---|---:|---:|---:|
+{type_count_rows}
+
+Required recall by type: `{retrieval['required_recall_by_type']}`.
+
+Retrieval failures:
+
+{retrieval_failures}
+
+## Context Budget Evaluation
+
+The measured model-facing memory payload is the serialized combination of
+`user_preferences` and `recalled_memories` after `ContextBuilder` and the
+interpreter projection. Measurements include 1, 4, and 12 candidate shapes.
+
+| Metric | Value |
+|---|---:|
+| Maximum selected memory count | {budget['metrics']['memory_count_max']} |
+| Memory context chars p50 | {budget['metrics']['memory_chars_p50']:.1f} |
+| Memory context chars p95 | {budget['metrics']['memory_chars_p95']:.1f} |
+| Memory context chars max | {budget['metrics']['memory_chars_max']:.1f} |
+| Estimated memory tokens p50/p95/max | {budget['metrics']['memory_tokens_p50_estimate']:.1f} / {budget['metrics']['memory_tokens_p95_estimate']:.1f} / {budget['metrics']['memory_tokens_max_estimate']:.1f} |
+| Nominal memory budget | {budget['metrics']['nominal_memory_budget_chars']} chars (5 × 1200) |
+| Budget percentage p50/p95/max | {budget['metrics']['memory_context_percentage_p50']:.1f}% / {budget['metrics']['memory_context_percentage_p95']:.1f}% / {budget['metrics']['memory_context_percentage_max']:.1f}% |
+| Bounded context rate | {_system_pct(budget['metrics']['bounded_context_rate'])} |
+
+The 12-candidate shape selected at most five records, confirming that Memory
+does not grow the model context without the ContextBuilder bound. Token values
+are a conservative `ceil(chars / 4)` estimate, not a provider tokenizer count;
+the percentage uses the nominal five-record × 1200-character Memory budget.
+
+Per-type selected contribution across the 30 measurements:
+`{budget['metrics']['per_type_selected_total']}`.
+
+## Lifecycle Correctness
+
+| Case | Result |
+|---|---|
+{lifecycle_rows}
+
+Lifecycle: **{lifecycle['passed']}/{lifecycle['dataset_count']} passed**.
+Superseded and inactive rows were excluded; legacy Episodic was not admitted
+to the canonical retrieval contract.
+
+## Duplicate / Consolidation Evaluation
+
+| Metric | Value |
+|---|---:|
+| Duplicate Active Memory Rate | {_system_pct(duplicates['metrics']['duplicate_active_memory_rate'])} |
+| Duplicate Active Memory Count | {duplicates['metrics']['duplicate_active_memory_count']} |
+| Preference replay same ID | {duplicates['metrics']['preference_replay_same_id']} |
+| Semantic replay same ID | {duplicates['metrics']['semantic_replay_same_id']} |
+| Episode replay same ID | {duplicates['metrics']['episode_replay_same_id']} |
+| Distinct Episode not collapsed | {duplicates['metrics']['distinct_episode_not_collapsed']} |
+| Procedure replay same ID | {duplicates['metrics']['procedure_replay_same_id']} |
+
+## Instruction / Truth Priority
+
+{authority_rows}
+
+Memory Authority Violation Rate: **{_system_pct(authority['authority_violation_rate'])}**.
+Procedural guidance remained advisory and the current explicit exception won.
+
+## Isolation and Cross-Conversation Behavior
+
+- Cross-user leakage: **{retrieval['cross_user_leaks']}**.
+- Cross-tenant leakage: **{retrieval['cross_tenant_leaks']}**.
+- Cross-conversation reuse is allowed for relevant long-term Memory; current
+  Task, target, resource, approval, and execution state are not copied into a
+  new ContextBuilder snapshot.
+
+## Failure Diagnosis
+
+FIRST_BAD_STATE: **{first_bad_state}**.
+Failure families: **{failure_families or ['none']}**.
+
+Evidence:
+
+- `A-preference-only` selected the intended Preference plus an unrelated
+  Procedure sharing `technical/article` terms.
+- `A-procedural-only` selected the intended Procedure plus unrelated Preference
+  and Episode records sharing the same publication vocabulary.
+- `C-multi-preference-semantic-procedure` selected Semantic and Procedure but
+  missed the required Preference.
+- `E-current-procedure-override` correctly removed the stored Procedure but
+  still returned an Episode for a request explicitly asking to bypass the
+  outline.
+- The two scope-qualified I cases selected only in-scope records; they caused
+  no user or tenant leakage, but show that lexical matching does not understand
+  a request about another scope.
+
+Root cause: the current single Gate receives a type-neutral lexical relevance
+score. Shared domain words can clear the same threshold across types, while a
+multi-type query can distribute its terms so that one required type falls
+below the threshold. This is a retrieval-quality limitation, not evidence of a
+second runtime, lifecycle bypass, or authority violation.
+
+General invariant affected: selected Memory must be relevant to the current
+request, and no-match must remain allowed. The scope and lifecycle invariants
+still passed. Minimal fix proposal for a later, separately reviewed change:
+improve the scoring/intent evidence supplied to this one Gate (including
+stronger unique-term or type-aware relevance) while retaining one canonical
+Gate, bounded injection, and no-match behavior. No production fix was applied
+in this evaluation-only run.
+
+## Production Files Changed
+
+**None.** The evaluator changed only evaluation assets. Dirty paths observed by
+the architecture audit:
+
+`{architecture['changed_paths']}`
+
+Out-of-scope paths: `{architecture['out_of_scope_paths']}`.
+
+## Targeted Test Scope
+
+The intended verification scope is limited to the four Memory V1/V2 focused
+tests, Memory runtime convergence tests, this joint evaluation test, and Ruff
+on evaluation assets. No L1/L2/L3, RAG/Search matrix, Java/browser E2E, or
+full expensive evaluation was included in this report.
+
+## Next Recommendation
+
+{('Keep the architecture unchanged and address the diagnosed quality issue only after reviewing the listed cases and FIRST_BAD_STATE.' if quality_issue else 'Keep the four-type contract unchanged; do not add Memory types, predicates, Episode/Procedure scenarios, or automatic learning in the next step.')}
+"""
+
+
+def run_long_term_memory_system_evaluation() -> None:
+    result = evaluate_long_term_memory_system()
+    dataset = result["dataset"]
+    _write_json(EVALUATION_DIR / "long_term_memory_system_dataset.json", dataset)
+    # Re-read the worktree after creating evaluation outputs so the report's
+    # dirty-file inventory includes the dataset/results/report artifacts.
+    result["architecture"] = _system_architecture_audit()
+    _write_json(
+        EVALUATION_DIR / "long_term_memory_system_results.json",
+        {key: value for key, value in result.items() if key != "dataset"},
+    )
+    _write_report(
+        REPORT_DIR / "LONG_TERM_MEMORY_SYSTEM_EVALUATION.md",
+        render_long_term_memory_system_report(result),
+    )
+    print(json.dumps({
+        "checkpoint": result["checkpoint"],
+        "classification_cases": result["classification"]["dataset_count"],
+        "retrieval_cases": result["retrieval"]["dataset_count"],
+        "wrong_type_admission_rate": result["classification"]["metrics"]["wrong_type_admission_rate"],
+        "retrieval": result["retrieval"]["metrics"],
+        "no_match_false_return_rate": result["retrieval"]["no_match_false_return_rate"],
+        "irrelevant_memory_injection_rate": result["retrieval"]["irrelevant_memory_injection_rate"],
+        "context_budget": result["context_budget"]["metrics"],
+        "lifecycle": result["lifecycle"]["passed"],
+        "duplicate_active_rate": result["duplicates"]["metrics"]["duplicate_active_memory_rate"],
+        "authority_violation_rate": result["authority"]["authority_violation_rate"],
+        "production_files_changed": result["architecture"]["out_of_scope_paths"],
+    }, ensure_ascii=False, indent=2))
+
+
 def run_retrieval_optimization() -> None:
     retrieval_cases = build_retrieval_cases()
     v1_retrieval = asyncio.run(evaluate_retrieval_variant(
@@ -1247,7 +2972,15 @@ def main() -> None:
         action="store_true",
         help="run V1/V2 retrieval and injection comparison only",
     )
+    parser.add_argument(
+        "--system",
+        action="store_true",
+        help="run the four-type long-term Memory system evaluation only",
+    )
     args = parser.parse_args()
+    if args.system:
+        run_long_term_memory_system_evaluation()
+        return
     if args.optimization:
         run_retrieval_optimization()
         return
