@@ -677,8 +677,10 @@ class RuntimeAgentService:
             )
         task_id = task_context.task_id
 
-        # Phase 6.6: Recall agent memory
-        self._recall_memories(ctx)
+        # Long-term Memory is assembled before Runtime by ContextBuilder and
+        # passed to the semantic consumers as a bounded projection.  Runtime
+        # owns execution state only; it must not perform a second recall path
+        # or inject a private memory_context.
 
         # ── 1. Capabilities ─────────────────────────────────
         gc = str(
@@ -1907,23 +1909,9 @@ class RuntimeAgentService:
             None,
         )
 
-        # Phase 6.6: record episodic + procedural memory
-        self._record_episodic(
-            ctx=ctx, task_id=task_id,
-            status="COMPLETED" if not execution_failed else "FAILED",
-            draft_id=draft_id, schedule_id=schedule_id,
-        )
-        self._record_procedural(
-            ctx=ctx,
-            status="COMPLETED" if not execution_failed else "FAILED",
-            plan_source=plan_source,
-            step_count=len(final.steps) if final else 0,
-            tool_count=sum(1 for s in (final.steps if final else [])
-                           if s.status in (StepStatus.COMPLETED, StepStatus.FAILED,
-                                            StepStatus.FAILED_RETRYABLE)
-                           and s.capability not in ("ANALYZE_CONTENT_PATTERNS",
-                                                     "VALIDATE_QUALITY")),
-        )
+        # Terminal Task/Execution/Resource facts remain owned by the durable
+        # Runtime, Task, Observation and Resource projections.  Do not turn a
+        # Runtime completion into a second legacy Episodic/Procedural write.
 
         if self._metrics is not None:
             metrics_context = TraceContext(

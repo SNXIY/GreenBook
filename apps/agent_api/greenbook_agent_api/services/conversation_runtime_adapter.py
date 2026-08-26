@@ -65,7 +65,7 @@ from greenbook_agent_core.goal.satisfaction import (
     goal_states,
     select_unsatisfied_goal_id,
 )
-from greenbook_agent_core.memory import MemoryRetriever
+from greenbook_agent_core.memory import PreferenceRetriever
 from greenbook_agent_core.planning.contracts import PlanStep, TaskPlan
 from greenbook_agent_core.runtime.container import RuntimeContainer
 from greenbook_agent_core.task.manager import (
@@ -230,7 +230,7 @@ class ConversationRuntimeAdapter:
         preference_provider: Any | None = None,
         conversation_service: Any | None = None,
         context_builder: ContextBuilder | None = None,
-        memory_retriever: MemoryRetriever | None = None,
+        memory_retriever: PreferenceRetriever | None = None,
         memory_enabled: bool = True,
         max_concurrent_work_per_conversation: int = 3,
         max_concurrent_direct_tools: int = 6,
@@ -291,7 +291,11 @@ class ConversationRuntimeAdapter:
         if memory_retriever is None and memory_manager is not None:
             store = getattr(memory_manager, "store", None)
             if store is not None:
-                memory_retriever = MemoryRetriever(store)
+                # The fallback is only for compatibility/test composition,
+                # but it must still use the canonical Preference gate.  A
+                # RuntimeService must never silently widen the model-facing
+                # path to all Memory types.
+                memory_retriever = PreferenceRetriever(store)
         self._context_builder = context_builder or ContextBuilder(
             conversation_source=conversation_service,
             task_provider=self._task_provider,
@@ -553,7 +557,7 @@ class ConversationRuntimeAdapter:
                     )
                 self._require_resolved_target(command)
 
-            # Rebuild once with the structured Command so MemoryRetriever can
+            # Rebuild once with the structured Command so PreferenceRetriever can
             # use the actual objective while preserving the same fact sources.
             context = await self._build_context_snapshot(
                 request_session,

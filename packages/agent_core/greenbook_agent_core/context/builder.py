@@ -209,7 +209,11 @@ class ContextBuilder:
             tracked("context_preferences_ready", self._load_preferences(
                 user_id,
                 tenant_id=tenant_id,
-                enabled=recall_enabled,
+                # A canonical retriever owns the model-facing preference
+                # view.  Do not perform a second unfiltered provider read
+                # that will be discarded below; it would duplicate recall
+                # semantics and needlessly touch another storage path.
+                enabled=recall_enabled and self._memory_retriever is None,
             )),
             tracked("context_memory_ready", self._recall(
                 user_id=user_id,
