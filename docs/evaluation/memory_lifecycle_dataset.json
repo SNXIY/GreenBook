@@ -1,0 +1,49 @@
+{
+  "dataset": "memory_preference_lifecycle_v1",
+  "case_count": 5,
+  "cases": [
+    {
+      "case": "same_value_update",
+      "passed": true,
+      "details": {
+        "first_id": "lifecycle-update-first",
+        "merged_id": "lifecycle-update-first",
+        "confidence": 0.95
+      }
+    },
+    {
+      "case": "conflict_supersedes_without_delete",
+      "passed": true,
+      "details": {
+        "old_status": "superseded",
+        "new_status": "active"
+      }
+    },
+    {
+      "case": "inactive_excluded_from_retrieval",
+      "passed": true,
+      "details": {
+        "status": "inactive",
+        "visible_ids": [
+          "lifecycle-java"
+        ]
+      }
+    },
+    {
+      "case": "wrong_scope_cannot_mutate",
+      "passed": true,
+      "details": {
+        "result": null,
+        "status": "active"
+      }
+    },
+    {
+      "case": "superseded_retry_does_not_resurrect",
+      "passed": true,
+      "details": {
+        "retry_status": "superseded",
+        "active_status": "active"
+      }
+    }
+  ]
+}

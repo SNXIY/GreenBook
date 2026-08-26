@@ -1,0 +1,234 @@
+{
+  "dataset": "memory_preference_injection_v1",
+  "case_count": 30,
+  "cases": [
+    {
+      "id": "injection-001",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about Agent architecture",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-002",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about MCP boundaries",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-003",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about PostgreSQL reliability",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-004",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about workflow design",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-005",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about RAG evaluation",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-006",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about Agent architecture",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-007",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about MCP boundaries",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-008",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about PostgreSQL reliability",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-009",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about workflow design",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-010",
+      "category": "positive_depth",
+      "query": "Write a technical deep article about RAG evaluation",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "injection-011",
+      "category": "positive_java",
+      "query": "Use Java technology stack for Agent architecture",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-012",
+      "category": "positive_java",
+      "query": "Use Java technology stack for MCP boundaries",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-013",
+      "category": "positive_java",
+      "query": "Use Java technology stack for PostgreSQL reliability",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-014",
+      "category": "positive_java",
+      "query": "Use Java technology stack for workflow design",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-015",
+      "category": "positive_java",
+      "query": "Use Java technology stack for RAG evaluation",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-016",
+      "category": "positive_java",
+      "query": "Use Java technology stack for Agent architecture",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-017",
+      "category": "positive_java",
+      "query": "Use Java technology stack for MCP boundaries",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-018",
+      "category": "positive_java",
+      "query": "Use Java technology stack for PostgreSQL reliability",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "injection-019",
+      "category": "positive_concise",
+      "query": "Give concise replies about Agent architecture",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "injection-020",
+      "category": "positive_concise",
+      "query": "Give concise replies about MCP boundaries",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "injection-021",
+      "category": "positive_concise",
+      "query": "Give concise replies about PostgreSQL reliability",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "injection-022",
+      "category": "positive_concise",
+      "query": "Give concise replies about workflow design",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "injection-023",
+      "category": "positive_concise",
+      "query": "Give concise replies about RAG evaluation",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "injection-024",
+      "category": "positive_concise",
+      "query": "Give concise replies about Agent architecture",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "injection-025",
+      "category": "harmful_candidate",
+      "query": "Schedule a post tomorrow about Agent architecture",
+      "expected_keys": []
+    },
+    {
+      "id": "injection-026",
+      "category": "harmful_candidate",
+      "query": "Schedule a post tomorrow about MCP boundaries",
+      "expected_keys": []
+    },
+    {
+      "id": "injection-027",
+      "category": "harmful_candidate",
+      "query": "Schedule a post tomorrow about PostgreSQL reliability",
+      "expected_keys": []
+    },
+    {
+      "id": "injection-028",
+      "category": "harmful_candidate",
+      "query": "Schedule a post tomorrow about workflow design",
+      "expected_keys": []
+    },
+    {
+      "id": "injection-029",
+      "category": "harmful_candidate",
+      "query": "Schedule a post tomorrow about RAG evaluation",
+      "expected_keys": []
+    },
+    {
+      "id": "injection-030",
+      "category": "harmful_candidate",
+      "query": "Schedule a post tomorrow about Agent architecture",
+      "expected_keys": []
+    }
+  ]
+}

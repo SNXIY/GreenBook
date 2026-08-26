@@ -1,0 +1,1406 @@
+{
+  "dataset": "memory_preference_isolation_v1",
+  "case_count": 100,
+  "cases": [
+    {
+      "id": "isolation-001",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-0",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-002",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-1",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-003",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-2",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-004",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-3",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-005",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-4",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-006",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-5",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-007",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-6",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-008",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-7",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-009",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-8",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-010",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-9",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-011",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-10",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-012",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-11",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-013",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-12",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-014",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-13",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-015",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-14",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-016",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-15",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-017",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-16",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-018",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-17",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-019",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-18",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-020",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-19",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-021",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-20",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-022",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-21",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-023",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-22",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-024",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-23",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-025",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-24",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-026",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-25",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-027",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-26",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-028",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-27",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-029",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-28",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-030",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-29",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-031",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-30",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-032",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-31",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-033",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-32",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-034",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-33",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-035",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-34",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-036",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-35",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-037",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-36",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-038",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-37",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-039",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-38",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-040",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-39",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-041",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-40",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-042",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-41",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-043",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-42",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-044",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-43",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-045",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-44",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-046",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-45",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-047",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-46",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-048",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-47",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-049",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-48",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-050",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-49",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-051",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-50",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-052",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-51",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-053",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-52",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-054",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-53",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-055",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-54",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-056",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-55",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-057",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-56",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-058",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-57",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-059",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-58",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-060",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-59",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-061",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-60",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-062",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-61",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-063",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-62",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-064",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-63",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-065",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-64",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-066",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-65",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-067",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-66",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-068",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-67",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-069",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-68",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-070",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-69",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-071",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-70",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-072",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-71",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-073",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-72",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-074",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-73",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-075",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-74",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-076",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-75",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-077",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-76",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-078",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-77",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-079",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-78",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-080",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-79",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-081",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-80",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-082",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-81",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-083",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-82",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-084",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-83",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-085",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-84",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-086",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-85",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-087",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-86",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-088",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-87",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-089",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-88",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-090",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-89",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-091",
+      "category": "user_a_same_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-90",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": [
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-092",
+      "category": "user_b_same_tenant",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-91",
+      "query": "Python",
+      "expected_ids": [
+        "isolation-b-python"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-093",
+      "category": "user_b_java_query",
+      "user_id": "user-b",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-92",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-094",
+      "category": "same_user_other_tenant",
+      "user_id": "user-a",
+      "tenant_id": "tenant-b",
+      "conversation_id": "new-conversation-93",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-tenant-b-java"
+      ],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python"
+      ]
+    },
+    {
+      "id": "isolation-095",
+      "category": "cross_conversation_reuse",
+      "user_id": "user-a",
+      "tenant_id": "tenant-a",
+      "conversation_id": "new-conversation-94",
+      "query": "Java",
+      "expected_ids": [
+        "isolation-a-java"
+      ],
+      "forbidden_ids": []
+    },
+    {
+      "id": "isolation-096",
+      "category": "missing_tenant_fail_closed",
+      "user_id": "user-a",
+      "tenant_id": "",
+      "conversation_id": "missing-tenant-0",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-097",
+      "category": "missing_tenant_fail_closed",
+      "user_id": "user-a",
+      "tenant_id": "",
+      "conversation_id": "missing-tenant-1",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-098",
+      "category": "missing_tenant_fail_closed",
+      "user_id": "user-a",
+      "tenant_id": "",
+      "conversation_id": "missing-tenant-2",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-099",
+      "category": "missing_tenant_fail_closed",
+      "user_id": "user-a",
+      "tenant_id": "",
+      "conversation_id": "missing-tenant-3",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    },
+    {
+      "id": "isolation-100",
+      "category": "missing_tenant_fail_closed",
+      "user_id": "user-a",
+      "tenant_id": "",
+      "conversation_id": "missing-tenant-4",
+      "query": "Java",
+      "expected_ids": [],
+      "forbidden_ids": [
+        "isolation-a-java",
+        "isolation-b-python",
+        "isolation-a-tenant-b-java"
+      ]
+    }
+  ]
+}

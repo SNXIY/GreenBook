@@ -1,0 +1,986 @@
+{
+  "dataset": "memory_preference_retrieval_v1",
+  "case_count": 100,
+  "cases": [
+    {
+      "id": "retrieve-001",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-002",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-003",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-004",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-005",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-006",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-007",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-008",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-009",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-010",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-011",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-012",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-013",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-014",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-015",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-016",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-017",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-018",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-019",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-020",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-021",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-022",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-023",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-024",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-025",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-026",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-027",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-028",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-029",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-030",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-031",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-032",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-033",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-034",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-035",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-036",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-037",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-038",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-039",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-040",
+      "category": "technical_depth",
+      "query": "Write a technical deep article about API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "writing_depth"
+      ]
+    },
+    {
+      "id": "retrieve-041",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-042",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-043",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-044",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-045",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-046",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-047",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-048",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-049",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-050",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-051",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-052",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-053",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-054",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-055",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-056",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-057",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-058",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-059",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-060",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-061",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-062",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-063",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-064",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-065",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-066",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-067",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-068",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-069",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-070",
+      "category": "technology_stack",
+      "query": "Use Java technology stack for API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "technology_stack"
+      ]
+    },
+    {
+      "id": "retrieve-071",
+      "category": "response_style",
+      "query": "Give concise replies about Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-072",
+      "category": "response_style",
+      "query": "Give concise replies about distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-073",
+      "category": "response_style",
+      "query": "Give concise replies about PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-074",
+      "category": "response_style",
+      "query": "Give concise replies about MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-075",
+      "category": "response_style",
+      "query": "Give concise replies about reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-076",
+      "category": "response_style",
+      "query": "Give concise replies about Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-077",
+      "category": "response_style",
+      "query": "Give concise replies about Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-078",
+      "category": "response_style",
+      "query": "Give concise replies about RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-079",
+      "category": "response_style",
+      "query": "Give concise replies about workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-080",
+      "category": "response_style",
+      "query": "Give concise replies about API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-081",
+      "category": "response_style",
+      "query": "Give concise replies about Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-082",
+      "category": "response_style",
+      "query": "Give concise replies about distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-083",
+      "category": "response_style",
+      "query": "Give concise replies about PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-084",
+      "category": "response_style",
+      "query": "Give concise replies about MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-085",
+      "category": "response_style",
+      "query": "Give concise replies about reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-086",
+      "category": "response_style",
+      "query": "Give concise replies about Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-087",
+      "category": "response_style",
+      "query": "Give concise replies about Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-088",
+      "category": "response_style",
+      "query": "Give concise replies about RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-089",
+      "category": "response_style",
+      "query": "Give concise replies about workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-090",
+      "category": "response_style",
+      "query": "Give concise replies about API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": [
+        "response_style"
+      ]
+    },
+    {
+      "id": "retrieve-091",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about Agent architecture",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-092",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about distributed systems",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-093",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about PostgreSQL",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-094",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about MCP",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-095",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about reliability",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-096",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about Python services",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-097",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about Java runtime",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-098",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about RAG evaluation",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-099",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about workflow design",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    },
+    {
+      "id": "retrieve-100",
+      "category": "irrelevant_request",
+      "query": "Schedule a post tomorrow about API contracts",
+      "user_id": "u1",
+      "tenant_id": "tenant-a",
+      "expected_keys": []
+    }
+  ]
+}
