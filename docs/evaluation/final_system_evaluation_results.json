@@ -1,0 +1,127 @@
+{
+  "schema_version": "greenbook_final_system_evaluation_results_v1",
+  "generated_on": "2026-08-27",
+  "baseline": {
+    "branch": "feature/hybrid-search-rag",
+    "commit": "310604a23f0878a21191dac7d4421e32c173cec3",
+    "tag": "greenbook-clean-baseline-20260827"
+  },
+  "manifest": "docs/evaluation/final_system/final_system_evaluation_manifest.json",
+  "dataset_case_count": 64,
+  "functional": {
+    "full_unit_retained": {"status":"PASS","passed":1602,"failed":0,"rerun":false},
+    "final_focused": {"status":"PASS","passed":143,"failed":0,"warning":"pytest cache permission warning"},
+    "semantic": {"status":"PASS_FOCUSED","exact_accuracy":"55/78 retained semantic benchmark","core_intent_accuracy":"68/78 retained semantic benchmark"},
+    "objective_decomposition": {"status":"PASS","mo_cases":"12/12 focused/affected-family evidence","duplicate_objective_count":0},
+    "dependency_accuracy": {"status":"PASS_FOCUSED","wrong_dependency_count":0},
+    "target_accuracy": {"status":"PASS_FOCUSED","wrong_resource_count":0},
+    "business_truth_mismatch_count": 0,
+    "duplicate_physical_mutation_count": 0
+  },
+  "parallel": {
+    "status":"PASS_BOUNDED_SCOPE",
+    "max_parallel_objectives":2,
+    "eligible_shape":"independent CREATE_DRAFT only",
+    "two_objective_browser_before_ms":73859,
+    "two_objective_browser_after_ms":55672,
+    "runtime_before_ms":65793,
+    "runtime_after_ms":48071,
+    "observed_overlap_ms":6730.941,
+    "wrong_resource_count":0,
+    "duplicate_write_count":0,
+    "failure_isolation":"PASS_FOCUSED"
+  },
+  "reliability": {
+    "status":"PASS_FOCUSED",
+    "retry_resume":"PASS",
+    "result_unknown":"PASS",
+    "reconcile":"PASS",
+    "duplicate_callback_idempotency":"PASS",
+    "hitl_approve_reject":"PASS",
+    "refresh_during_run":"PASS",
+    "conversation_switch_during_run":"PASS",
+    "unknown_recovery_success":"UNAVAILABLE_AS_EXACT_RATE",
+    "hitl_safety":"PASS; zero destructive write before approval"
+  },
+  "rag": {
+    "canonical_route":"community.answer_from_knowledge",
+    "canonical_admission":"PASS",
+    "regression_cases":"3/3 route-admitted retained Browser evidence",
+    "grounding_citation":"RAG_CURRENT_LIMIT_ACCEPTED_PARTIAL",
+    "no_answer_behavior":"FAIL_CLOSED observed",
+    "new_tuning":"NONE"
+  },
+  "memory": {
+    "status":"PASS_SEMANTICS_PRESERVED",
+    "preference":"PASS",
+    "semantic":"PASS",
+    "episodic":"PASS_FOCUSED",
+    "procedural":"PASS_FOCUSED",
+    "conversation_tenant_leakage_count":0,
+    "current_state_authority":"NOT_GRANTED",
+    "duplicate_active_count":0
+  },
+  "browser": {
+    "status":"PASS_WITH_LIMITATIONS",
+    "manifest_browser_cases":16,
+    "accepted_cases":16,
+    "strict_rag_limitation":true,
+    "three_objective":"PASS_FOCUSED_RETAINED_EVIDENCE",
+    "final_ux_smoke":"PASS",
+    "rapid_send_new_run_count":1,
+    "rapid_send_terminal":"COMPLETED",
+    "stale_ui_marker_leak":false,
+    "frontend_backend_java_truth_mismatch_count":0,
+    "tuf": {
+      "status":"UNAVAILABLE",
+      "definition":"accepted request to first meaningful rendered progress/activity/status text",
+      "sample_count":2,
+      "source":"rendered DOM observer; no fake timers or states",
+      "reason":"No dedicated meaningful progress node was observed within the controlled 60-second window"
+    }
+  },
+  "performance": {
+    "status":"STRICT_ACCEPTANCE_INCONCLUSIVE",
+    "before_source":"docs/evaluation/agent_performance_baseline_v2_results.json; n=3 per admitted scenario",
+    "after_samples": {
+      "simple_read": {"n":3,"completed":2,"failed":1,"success_only_p50_ms":152789.0085,"success_only_max_ms":194269.788,"failure":"Request timed out","verdict":"INCONCLUSIVE"},
+      "simple_write": {"n":3,"completed":2,"failed":1,"success_only_p50_ms":65704.0825,"success_only_max_ms":69288.649,"failure":"Request timed out","verdict":"INCONCLUSIVE"},
+      "sequential_dependent": {"n":3,"completed":3,"failed":0,"success_only_p50_ms":105043.284,"success_only_max_ms":119239.656,"before_p50_ms":55823.778,"verdict":"REGRESSED_OR_ENVIRONMENT_VARIANCE; DIAGNOSE BEFORE CHANGE"},
+      "search_creation": {"n":3,"completed":1,"failed":2,"success_only_p50_ms":214150.516,"success_only_max_ms":214150.516,"before_p50_ms":61792.437,"verdict":"INCONCLUSIVE"},
+      "independent_multi_objective": {"n":3,"completed":2,"failed":1,"success_only_p50_ms":99552.7555,"success_only_max_ms":110036.233,"before":"No valid equivalent V2 success baseline; Browser serial baseline retained","verdict":"INCONCLUSIVE"}
+    },
+    "p95":"DESCRIPTIVE_ONLY_OR_UNAVAILABLE",
+    "ttft":"UNAVAILABLE_PROVIDER_TOKEN_TIMESTAMP",
+    "tuf":"UNAVAILABLE",
+    "java":"not critical path; observed approximately 54-278ms in completed AFTER samples",
+    "accepted_change":"No new performance optimization introduced in this evaluation"
+  },
+  "architecture": {
+    "planner_count":1,
+    "runtime_count":1,
+    "memory_runtime_count":1,
+    "tool_registry_count":1,
+    "scheduler_decision":"deterministic ready/conflict/budget",
+    "parallel_preserves_durable_runtime":true,
+    "new_mq":0,
+    "new_multi_agent":0,
+    "new_rag_or_memory_semantics":false
+  },
+  "regression": {
+    "frontend_lint":"PASS",
+    "frontend_tests":"PASS",
+    "frontend_build":"PASS",
+    "compose":"PASS",
+    "services":"PASS",
+    "browser_smoke":"PASS",
+    "full_unit":"PASS_RETAINED_NOT_RERUN"
+  },
+  "known_limitations": [
+    "RAG retrieval grounding/citation remains RAG_CURRENT_LIMIT_ACCEPTED_PARTIAL",
+    "Provider token-level TTFT is unavailable",
+    "Formal TUF observer is present but no meaningful DOM progress event was observed in the controlled samples",
+    "Strict equivalent performance acceptance is inconclusive because AFTER had request timeouts and queue/LLM latency variance",
+    "P5 RAG, P7 three-objective, P8 HITL, P9 relevant Memory, and P10 irrelevant Memory lack equivalent three-sample latency corpora"
+  ],
+  "verdict": "GREENBOOK_SYSTEM_ACCEPTANCE_PASS_WITH_LIMITATIONS"
+}

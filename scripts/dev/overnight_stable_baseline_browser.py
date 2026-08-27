@@ -70,6 +70,7 @@ class Browser:
         self.ws_url = ws_url
         self.ws: websockets.ClientConnection | None = None
         self._message_id = 0
+        self._command_lock = asyncio.Lock()
 
     async def connect(self) -> None:
         self.ws = await websockets.connect(self.ws_url, max_size=16_000_000)
@@ -80,18 +81,19 @@ class Browser:
             self.ws = None
 
     async def command(self, method: str, params: dict[str, Any] | None = None) -> Any:
-        if self.ws is None:
-            raise RuntimeError("CDP is not connected")
-        self._message_id += 1
-        message_id = self._message_id
-        await self.ws.send(json.dumps({"id": message_id, "method": method, "params": params or {}}))
-        while True:
-            raw = await self.ws.recv()
-            message = json.loads(raw)
-            if message.get("id") == message_id:
-                if "error" in message:
-                    raise RuntimeError(f"CDP {method}: {message['error']}")
-                return message.get("result")
+        async with self._command_lock:
+            if self.ws is None:
+                raise RuntimeError("CDP is not connected")
+            self._message_id += 1
+            message_id = self._message_id
+            await self.ws.send(json.dumps({"id": message_id, "method": method, "params": params or {}}))
+            while True:
+                raw = await self.ws.recv()
+                message = json.loads(raw)
+                if message.get("id") == message_id:
+                    if "error" in message:
+                        raise RuntimeError(f"CDP {method}: {message['error']}")
+                    return message.get("result")
 
     async def evaluate(self, expression: str, *, await_promise: bool = True) -> Any:
         params = {

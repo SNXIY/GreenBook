@@ -18,6 +18,13 @@ from scripts.dev.round1_final_closure_v2 import JavaTruth, restore_browser_auth
 
 
 TERMINAL = {"COMPLETED", "PARTIAL_SUCCESS", "FAILED", "CANCELLED"}
+GENERIC_PROGRESS_TEXT = {
+    "loading",
+    "加载中",
+    "已接受",
+    "请求已接受",
+    "处理中",
+}
 
 
 async def selected(browser: Browser) -> str:
@@ -101,21 +108,41 @@ async def wait_terminal(browser: Browser, run_id: str, timeout: float = 150) -> 
     return last
 
 
-async def progress_probe(browser: Browser, click_at: float, timeout: float = 20) -> dict[str, Any]:
+async def progress_probe(browser: Browser, click_at: float, timeout: float = 60) -> dict[str, Any]:
+    """Measure TUF from the real rendered DOM, without creating progress."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         state = await browser.evaluate(
             """(()=>{
               const panel=document.querySelector('[role="dialog"]');
-              const nodes=[...(panel?.querySelectorAll('[aria-live], [role="status"], [class*="activity"], [class*="thinking"], [class*="progress"]')||[])];
+              const nodes=[...(panel?.querySelectorAll('[role="status"], [class*="activity"], [class*="thinking"], [class*="progress"]')||[])];
               const texts=nodes.map(x=>(x.innerText||'').trim()).filter(Boolean);
               return {visible:Boolean(texts.length),texts:texts.slice(-8)};
             })()"""
         )
-        if isinstance(state, dict) and state.get("visible"):
-            return {"available": True, "latency_ms": round((time.monotonic() - click_at) * 1000, 1), "texts": state.get("texts", [])}
+        texts = [
+            str(value).strip()
+            for value in (state.get("texts", []) if isinstance(state, dict) else [])
+            if str(value).strip() and str(value).strip().lower() not in GENERIC_PROGRESS_TEXT
+        ]
+        if texts:
+            return {
+                "metric": "TUF",
+                "available": True,
+                "latency_ms": round((time.monotonic() - click_at) * 1000, 1),
+                "source": "rendered_dom_user_facing_progress",
+                "first_meaningful_text": texts[0],
+                "texts": texts[-8:],
+            }
         await asyncio.sleep(0.25)
-    return {"available": False, "latency_ms": None, "texts": []}
+    return {
+        "metric": "TUF",
+        "available": False,
+        "latency_ms": None,
+        "source": "rendered_dom_user_facing_progress",
+        "first_meaningful_text": None,
+        "texts": [],
+    }
 
 
 async def visible_thread_text(browser: Browser) -> str:
@@ -139,8 +166,9 @@ async def main() -> None:
         rapid_before = {str(item.get("run_id") or "") for item in await browser.list_runs(rapid_conversation)}
         await fill_composer(browser, "搜索 UX rapid send 20260827")
         rapid_click = await click_send(browser, twice=True)
+        rapid_progress_task = asyncio.create_task(progress_probe(browser, rapid_click))
         rapid_run = await new_run(browser, rapid_conversation, rapid_before)
-        rapid_progress = await progress_probe(browser, rapid_click)
+        rapid_progress = await rapid_progress_task
         rapid_terminal = await wait_terminal(browser, str(rapid_run.get("run_id")))
         rapid_runs = [
             item for item in await browser.list_runs(rapid_conversation)
@@ -165,9 +193,11 @@ async def main() -> None:
         stale_before = {str(item.get("run_id") or "") for item in await browser.list_runs(conversation_a)}
         await fill_composer(browser, stale_marker)
         stale_click = await click_send(browser)
+        stale_progress_task = asyncio.create_task(progress_probe(browser, stale_click))
         await switch_to(browser, conversation_b)
         stale_run = await new_run(browser, conversation_a, stale_before)
         stale_terminal = await wait_terminal(browser, str(stale_run.get("run_id")))
+        stale_progress = await stale_progress_task
         b_messages = await browser.messages(conversation_b)
         b_thread_text = await visible_thread_text(browser)
         await switch_to(browser, conversation_a)
@@ -184,7 +214,7 @@ async def main() -> None:
             "b_message_count": len(b_messages),
             "b_thread_text_contains_marker": stale_marker in b_thread_text,
             "b_ui_marker_leak": leaked,
-            "progress_probe": await progress_probe(browser, stale_click, timeout=2),
+            "progress_probe": stale_progress,
         }
         if leaked or not evidence["stale_response"]["a_contains_marker"]:
             evidence["status"] = "FAIL"
