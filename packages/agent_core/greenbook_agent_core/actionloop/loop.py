@@ -32,6 +32,7 @@ from ..command.models import Command
 from ..execution.temporal_resolver import TemporalResolver
 from ..planning.contracts import PlanStep, TaskPlan
 from ..task.objective_compat import resolve_objectives
+from ..task.models import ArtifactRef
 from ..task.objective_reducer import (
     ObjectiveStateReducer,
     all_objectives_satisfied,
@@ -62,6 +63,7 @@ logger = logging.getLogger(__name__)
 
 _SEMANTIC_CAPABILITY: dict[str, str] = {
     "SEARCH_POSTS": "SEARCH_COMMUNITY",
+    "ANSWER_FROM_KNOWLEDGE": "ANSWER_FROM_KNOWLEDGE",
     "GET_POST": "GET_POST_DETAIL",
     "LIST_OWN_POSTS": "LIST_OWN_POSTS",
     "CREATE_DRAFT": "GENERATE_CONTENT",
@@ -79,6 +81,7 @@ _SEMANTIC_CAPABILITY: dict[str, str] = {
 
 _SEMANTIC_TOOL: dict[str, str] = {
     "SEARCH_POSTS": "community.search_public_posts",
+    "ANSWER_FROM_KNOWLEDGE": "community.answer_from_knowledge",
     "GET_POST": "community.get_post",
     "LIST_OWN_POSTS": "community.list_own_posts",
     "CREATE_DRAFT": "content.create_draft",
@@ -137,6 +140,7 @@ _READ_NO_PROGRESS_THRESHOLD = 2
 
 _PLAN_CAPABILITY_ACTION = {
     "SEARCH_COMMUNITY": "SEARCH_POSTS",
+    "ANSWER_FROM_KNOWLEDGE": "ANSWER_FROM_KNOWLEDGE",
     "GET_POST_DETAIL": "GET_POST",
     "GENERATE_CONTENT": "CREATE_DRAFT",
     "SCHEDULE_PUBLISH": "CREATE_SCHEDULE",
@@ -203,6 +207,7 @@ class ActionLoop:
         max_replans: int = 4,
         max_failures: int = 6,
         max_compose_attempts: int = 3,
+        max_parallel_objectives: int = 2,
     ) -> None:
         self._decision_maker = decision_maker
         self._resolver = semantic_resolver or _default_resolver
@@ -228,6 +233,10 @@ class ActionLoop:
         self._max_tool_calls = max(1, max_tool_calls)
         self._max_replans = max(0, max_replans)
         self._max_failures = max(1, max_failures)
+        # Objective-level concurrency is deliberately bounded.  The scheduler
+        # below only admits a proven-safe subset; all other shapes retain the
+        # serial ActionLoop path.
+        self._max_parallel_objectives = max(1, max_parallel_objectives)
         # Deterministic mutation plan tracking: (task_id, resource_id) already
         # submitted by a mutation command, so each desired mutation (UPDATE_DRAFT,
         # UPDATE_SCHEDULE, ...) runs exactly once even across continuations.
@@ -341,6 +350,11 @@ class ActionLoop:
             result.content = "该任务有正在执行或结果未知的操作，等待其完成。"
             return result
 
+        if await self._try_parallel_independent_creates(
+            task, command, request, boundary, store, result,
+        ):
+            return result
+
         for i in range(1, iterations + 1):
             context = await self._observe(task, command, assembled_context)
             self._refresh_plan_status(task, plan)
@@ -412,10 +426,17 @@ class ActionLoop:
             # read next.
             self._hydrate_candidate_state(task, candidate_state)
             evd_decision = await self._evidence_acquisition_decision(task, candidate_state)
+            canonical_answer = self._structured_answer_decision(task, command)
             decision_source = "DETERMINISTIC"
             pending_mutation = self._next_pending_mutation(task, command)
             if evd_decision is not None:
                 decision = evd_decision
+            elif canonical_answer is not None:
+                # ANSWER_FROM_KNOWLEDGE is already a resolved semantic fact.
+                # Keep it on the existing ActionLoop path, but do not ask the
+                # per-iteration model to turn that fact into a different read
+                # action (or to invent its required question argument).
+                decision = canonical_answer
             else:
                 # Deterministic completion: once a synthesis Objective's evidence
                 # is ready, compose + finish NOW instead of waiting for the model
@@ -455,15 +476,29 @@ class ActionLoop:
                         ):
                             if objective_constraints.get(key) not in (None, ""):
                                 deterministic_arguments[key] = objective_constraints[key]
+                        if det_next in {"CREATE_SCHEDULE", "PUBLISH_NOW"}:
+                            # A dependent Objective may consume one verified
+                            # Draft owned by its explicit predecessor.  Carry
+                            # that typed artifact identity into the durable
+                            # boundary; do not copy the resource into the
+                            # dependent Objective's ownership list.
+                            dependency_drafts = _dependency_draft_ids(task, current)
+                            if len(dependency_drafts) == 1:
+                                deterministic_arguments["draft_id"] = dependency_drafts[0]
                     decision = ActionDecision(
                         decision=ActionDecisionType.CALL_TOOL,
                         semantic_action=det_next,
                         arguments=deterministic_arguments,
                     )
-                elif pending_mutation:
+                elif pending_mutation and self._mutation_matches_current_objective(
+                    current_objective,
+                    pending_mutation,
+                ):
                     # Deterministic mutation plan: an explicit command mutation
                     # (UPDATE_DRAFT / UPDATE_SCHEDULE ...) must run even when the
                     # Objective is already satisfied.  Each mutation runs once.
+                    # It must not preempt an independent read/synthesis Objective
+                    # that is currently ready in the same Task.
                     decision = self._mutation_decision(task, command)
                 else:
                     ready = self._next_ready_plan_step(
@@ -679,6 +714,15 @@ class ActionLoop:
                 mutation_plan_selected=mutation_is_allowed,
             )
             result.observations.append(observation)
+            if action == "ANSWER_FROM_KNOWLEDGE" and observation.outcome == "SUCCESS" and observation.ok:
+                self._record_direct_result_artifact(task, observation)
+                answer_text = _direct_answer_text(observation)
+                if answer_text:
+                    # The canonical tool has already performed grounded
+                    # generation. Preserve that exact result for the final
+                    # Runtime envelope; a generic completion sentence would
+                    # discard the user's answer.
+                    result.content = answer_text
             # Progress is recorded only after the write boundary accepted or
             # verified this exact mutation.  Marking it while constructing the
             # decision would make the final mutation look non-mutation to the
@@ -733,6 +777,19 @@ class ActionLoop:
                 return _budget_failure(result, "ACTION_LOOP_TOOL_BUDGET", "工具调用次数超限。")
             if observation.outcome == "FAILED":
                 failures += 1
+                # ToolRuntime already classifies whether a failed read is
+                # safe to retry. A concrete non-retryable provider failure
+                # must terminate this Objective after the first attempt;
+                # replaying the same request only adds latency and can turn a
+                # clear dependency outage into an opaque failure budget.
+                if (observation.detail or {}).get("retryable") is False:
+                    result.status = "FAILED"
+                    result.success = False
+                    result.iterations = i
+                    result.error_code = observation.error_code or "READ_FAILED"
+                    result.error_message = observation.message or "The read operation failed and is not retryable."
+                    result.content = observation.message or result.error_message
+                    return result
                 if failures > self._max_failures:
                     return _budget_failure(result, "ACTION_LOOP_FAILURE_BUDGET", "失败次数超限，需要澄清。")
 
@@ -857,6 +914,8 @@ class ActionLoop:
                         )
                     )
                     await _maybe_await(self._bind_observation(task, detail_observation, store))
+            if observation.artifact_id:
+                await _maybe_await(self._bind_observation(task, observation, store))
             self._mark_plan_step(plan, action, observation)
             result.task_plan = plan
             await _maybe_await(store._record(task, "act", observation.action))
@@ -1046,6 +1105,83 @@ class ActionLoop:
             arguments=arguments,
             reason="__PLAN__",
         )
+
+    def _structured_answer_decision(
+        self,
+        task: Any,
+        command: Command | None,
+    ) -> ActionDecision | None:
+        """Admit the resolved grounded-answer capability deterministically.
+
+        ANSWER_FROM_KNOWLEDGE is a final read result, while SEARCH_COMMUNITY
+        is only a supporting capability of that result. Once the semantic
+        boundary has supplied the capability, the ActionLoop must preserve it
+        instead of handing read selection back to its LLM.
+
+        Arguments are copied only from structured command/objective facts. If
+        no question fact survived interpretation, fail closed with
+        clarification rather than forwarding an empty MCP request or using raw
+        user text.
+        """
+        objective = self._current_objective(task)
+        if objective is None or not _objective_requires_answer(objective, command):
+            return None
+        arguments = _structured_answer_arguments(command, objective)
+        objective_id = str(getattr(objective, "objective_id", "") or "")
+        if not arguments.get("question"):
+            return ActionDecision(
+                decision=ActionDecisionType.CLARIFY,
+                reason="The community knowledge question is incomplete.",
+            )
+        arguments["objective_id"] = objective_id
+        return ActionDecision(
+            decision=ActionDecisionType.CALL_TOOL,
+            semantic_action="ANSWER_FROM_KNOWLEDGE",
+            capability="ANSWER_FROM_KNOWLEDGE",
+            tool_name="community.answer_from_knowledge",
+            arguments=arguments,
+            reason="__STRUCTURED_ANSWER__",
+        )
+
+    @staticmethod
+    def _record_direct_result_artifact(task: Any, observation: ActionObservation) -> None:
+        """Bind a successful direct answer without inventing a business resource.
+
+        The answer payload is a real read artifact, not a Draft/Post/Schedule.
+        Its id is derived from the observed structured payload so a replay of
+        the same verified result remains idempotent and objective ownership is
+        still explicit.
+        """
+        detail = dict(getattr(observation, "detail", None) or {})
+        structured = detail.get("structured_data")
+        answer = _direct_answer_text(observation)
+        facts = dict(getattr(observation, "verified_facts", None) or {})
+        fingerprint = str(
+            facts.get("data_fingerprint")
+            or _payload_fingerprint(structured)
+            or ""
+        )
+        if not answer or not fingerprint:
+            return
+        artifact_id = f"knowledge-answer:{fingerprint}"
+        try:
+            observation.artifact_id = artifact_id
+        except Exception:  # pragma: no cover - defensive for injected observations
+            return
+        artifacts = getattr(task, "artifacts", None)
+        if not isinstance(artifacts, list):
+            return
+        if any(
+            str(getattr(item, "artifact_id", "") or "") == artifact_id
+            for item in artifacts
+        ):
+            return
+        artifacts.append(ArtifactRef(
+            artifact_id=artifact_id,
+            task_id=str(getattr(task, "task_id", "") or ""),
+            artifact_type="KNOWLEDGE_ANSWER",
+            summary=answer[:2000],
+        ))
 
     async def _default_decision_maker(self, context: Mapping[str, Any]) -> ActionDecision:
         raise ActionLoopError(
@@ -1270,7 +1406,7 @@ class ActionLoop:
                 action=action,
                 tool_name=tool_name,
                 task_id=str(getattr(task, "task_id", "") or ""),
-                query=str(args.get("query") or ""),
+                query=str(args.get("query") or args.get("question") or ""),
                 input_fingerprint=_input_fingerprint(args),
                 outcome="FAILED",
                 error_code="INTERNAL_ERROR",
@@ -1296,7 +1432,7 @@ class ActionLoop:
                 action=action,
                 tool_name=tool_name,
                 task_id=str(getattr(task, "task_id", "") or ""),
-                query=str(args.get("query") or ""),
+                query=str(args.get("query") or args.get("question") or ""),
                 input_fingerprint=_input_fingerprint(args),
                 outcome="FAILED",
                 error_code="INTERNAL_ERROR",
@@ -1336,7 +1472,7 @@ class ActionLoop:
                 return ActionObservation(
                     iteration=0, action=action, tool_name=tool_name,
                     task_id=str(getattr(task, "task_id", "") or ""),
-                    query=str(args.get("query") or ""),
+                    query=str(args.get("query") or args.get("question") or ""),
                     input_fingerprint=_input_fingerprint(args),
                     outcome="FAILED", ok=False,
                     error_code="VALIDATION_ERROR",
@@ -1348,7 +1484,7 @@ class ActionLoop:
             action=action,
             tool_name=tool_name,
             task_id=str(getattr(task, "task_id", "") or ""),
-            query=str(args.get("query") or ""),
+            query=str(args.get("query") or args.get("question") or ""),
             input_fingerprint=_input_fingerprint(args),
             outcome="SUCCESS" if ok else "FAILED",
             ok=ok,
@@ -1458,6 +1594,180 @@ class ActionLoop:
             arguments={"post_id": pending, "objective_id": objective_id},
             reason="deterministic evidence acquisition",
         )
+
+    async def _try_parallel_independent_creates(
+        self,
+        task: Any,
+        command: Command | None,
+        request: Any,
+        boundary: Any,
+        store: Any,
+        result: ActionLoopResult,
+    ) -> bool:
+        """Submit a bounded batch of provably independent draft objectives.
+
+        This is a deterministic scheduler decision, not an LLM choice.  The
+        initial safe slice is intentionally narrow: one CREATE_DRAFT action per
+        objective, no dependencies, no existing artifacts/resources, and no
+        pending mutation plan.  Every write still crosses ``_act`` and the
+        injected durable submitter; this method never invokes a tool directly.
+        """
+        if self._max_parallel_objectives < 2:
+            return False
+        if self._has_nonterminal_execution(task):
+            return False
+        if command is not None and getattr(command, "task_changes", None):
+            return False
+        if self._next_pending_mutation(task, command):
+            return False
+
+        candidates: list[Any] = []
+        for objective in getattr(task, "objectives", ()) or ():
+            status = str(
+                getattr(getattr(objective, "status", None), "value", None)
+                or getattr(objective, "status", "")
+                or ""
+            ).upper()
+            if status in {"COMPLETED", "FAILED", "CANCELLED", "SUPERSEDED"}:
+                continue
+            if getattr(objective, "dependencies", None):
+                continue
+            if getattr(objective, "related_resource_ids", None):
+                continue
+            if getattr(objective, "related_artifact_ids", None):
+                continue
+            if getattr(objective, "related_operations", None):
+                continue
+            capabilities = {
+                str(value).upper()
+                for value in (getattr(objective, "required_capabilities", ()) or ())
+            }
+            if capabilities not in ({"GENERATE_CONTENT"}, {"CREATE_DRAFT"}):
+                continue
+            if not str(getattr(objective, "objective_id", "") or ""):
+                continue
+            candidates.append(objective)
+            if len(candidates) >= self._max_parallel_objectives:
+                break
+        if len(candidates) < 2:
+            return False
+
+        async def submit(objective: Any) -> ActionObservation:
+            objective_id = str(getattr(objective, "objective_id", "") or "")
+            decision = ActionDecision(
+                decision=ActionDecisionType.CALL_TOOL,
+                semantic_action="CREATE_DRAFT",
+                arguments={"objective_id": objective_id},
+                reason="deterministic independent-objective scheduler",
+            )
+            try:
+                observation = await self._act(
+                    "CREATE_DRAFT",
+                    decision,
+                    task,
+                    command,
+                    request,
+                    boundary,
+                    task_store=store,
+                )
+            except Exception as exc:  # noqa: BLE001 - isolate sibling failure
+                observation = ActionObservation(
+                    iteration=1,
+                    action="CREATE_DRAFT",
+                    objective_id=objective_id,
+                    outcome="FAILED",
+                    ok=False,
+                    error_code="PARALLEL_OBJECTIVE_EXCEPTION",
+                    message="parallel objective submission failed",
+                    detail={"error_type": type(exc).__name__},
+                )
+            observation.iteration = 1
+            observation.objective_id = objective_id
+            return observation
+
+        observations = list(await asyncio.gather(*(submit(item) for item in candidates)))
+        result.iterations = 1
+        result.decisions.extend(
+            f"1:PARALLEL:{getattr(observation, 'objective_id', '')}:CREATE_DRAFT"
+            for observation in observations
+        )
+        result.observations.extend(observations)
+
+        execution_ids: list[str] = []
+        parallel_results: list[dict[str, Any]] = []
+        for observation in observations:
+            execution_id = str(getattr(observation, "execution_id", "") or "")
+            if execution_id and execution_id not in execution_ids:
+                execution_ids.append(execution_id)
+            parallel_results.append({
+                "objective_id": str(getattr(observation, "objective_id", "") or ""),
+                "action": "CREATE_DRAFT",
+                "outcome": str(getattr(observation, "outcome", "") or ""),
+                "status": (
+                    "SUBMITTED"
+                    if str(getattr(observation, "outcome", "") or "").upper()
+                    in {"SUBMITTED", "RESULT_UNKNOWN"}
+                    else str(getattr(observation, "outcome", "") or "")
+                ),
+                "execution_id": execution_id,
+                "resource_id": str(getattr(observation, "resource_id", "") or ""),
+                "error_code": str(getattr(observation, "error_code", "") or ""),
+            })
+            if observation.outcome == "SUCCESS" and observation.resource_id:
+                await _maybe_await(store._record_resource(
+                    task,
+                    str(observation.resource_id),
+                    str(observation.resource_kind or "DRAFT"),
+                    objective_id=str(observation.objective_id or ""),
+                ))
+                await _maybe_await(self._bind_observation(task, observation, store))
+            self._mark_plan_step(result.task_plan, "CREATE_DRAFT", observation)
+
+        result.partial_results["parallel_results"] = parallel_results
+        result.partial_results["parallel_objectives"] = {
+            "mode": "BOUNDED_OBJECTIVE_EXECUTOR",
+            "max_parallel_objectives": self._max_parallel_objectives,
+            "eligible_objective_ids": [
+                str(getattr(item, "objective_id", "") or "") for item in candidates
+            ],
+        }
+        result.partial_results["execution_ids"] = execution_ids
+        result.task_ids = [str(getattr(task, "task_id", "") or "")]
+
+        if execution_ids:
+            boundary.record_result_unknown()
+            await _maybe_await(self._suspend(task, store))
+            result.status = "WAITING_EXTERNAL"
+            result.success = True
+            result.execution_id = execution_ids[0]
+            result.content = "Independent objectives were submitted and are awaiting verification."
+            return True
+        if any(str(getattr(item, "outcome", "") or "").upper() == "WAITING_APPROVAL"
+               for item in observations):
+            await _maybe_await(self._suspend(task, store))
+            result.status = "WAITING_APPROVAL"
+            result.success = True
+            result.execution_id = next(
+                (str(getattr(item, "execution_id", "") or "") for item in observations),
+                "",
+            )
+            result.approval_id = next(
+                (str(getattr(item, "approval_id", "") or "") for item in observations),
+                "",
+            ) or None
+            return True
+        if any(str(getattr(item, "outcome", "") or "").upper() == "FAILED"
+               for item in observations):
+            result.status = "FAILED"
+            result.success = False
+            result.error_code = "PARALLEL_OBJECTIVE_FAILED"
+            result.error_message = "One or more independent objectives failed."
+            result.content = result.error_message
+            return True
+        ObjectiveStateReducer().reduce(task)
+        if self._verify_finish(task):
+            await self._finished(result, task, store)
+        return True
 
     async def _synthesis_evidence_ready(self, task: Any, objective: Any) -> bool:
         intent = str(getattr(objective, "intent", "") or getattr(objective, "description", "") or "")
@@ -1607,6 +1917,34 @@ class ActionLoop:
         return None
 
     @staticmethod
+    def _mutation_matches_current_objective(
+        objective: Any,
+        mutation_action: str,
+    ) -> bool:
+        """Allow a pending explicit mutation only for its active Objective.
+
+        A Task may carry an independent read Objective next to a destructive
+        mutation.  The mutation list is retained for deterministic durable
+        execution, but it cannot bypass the current read Objective and trigger
+        approval/side effects first.  When no active Objective exists, keep the
+        legacy recovery behavior and let the pending mutation be selected.
+        """
+
+        if objective is None:
+            return True
+        requested = str(mutation_action or "").upper()
+        if not requested:
+            return False
+        objective_actions = {
+            _PLAN_CAPABILITY_ACTION.get(
+                str(capability or "").upper(),
+            )
+            or str(capability or "").upper()
+            for capability in (getattr(objective, "required_capabilities", ()) or ())
+        }
+        return requested in objective_actions
+
+    @staticmethod
     def _objective_execution_refs(task: Any, objective: Any) -> list[Any]:
         """Return execution refs owned by an Objective, failing closed for legacy refs."""
         objective_id = str(getattr(objective, "objective_id", "") or "")
@@ -1685,6 +2023,27 @@ class ActionLoop:
         """
         if objective is None:
             return None
+        dependency_resolution = dict(
+            (getattr(objective, "constraints", {}) or {}).get(
+                "dependency_resolution", {}
+            ) or {}
+        )
+        if str(dependency_resolution.get("status") or "").upper() == "UNRESOLVED":
+            # The structured boundary reported a prerequisite relation but it
+            # could not bind that reference to one materialized Objective.
+            # Fail closed before any dependent tool side effect; independent
+            # sibling Objectives remain selectable by _current_objective.
+            return {
+                "kind": "FAILED",
+                "dependency_ids": [],
+                "details": {
+                    "status": "UNRESOLVED",
+                    "references": [
+                        str(value)
+                        for value in (dependency_resolution.get("references") or [])
+                    ],
+                },
+            }
         dependency_ids = [
             str(value)
             for value in (getattr(objective, "dependencies", ()) or ())
@@ -1877,7 +2236,19 @@ class ActionLoop:
             return ""
         kind_by_id = _resource_kind_by_id(task)
         owned = set(getattr(objective, "related_resource_ids", ()) or ())
-        has_draft = any("DRAFT" in kind_by_id.get(str(rid), set()) for rid in owned)
+        owned_drafts = tuple(
+            str(rid)
+            for rid in owned
+            if "DRAFT" in kind_by_id.get(str(rid), set())
+        )
+        dependency_drafts = _dependency_draft_ids(task, objective)
+        # A CREATE_SCHEDULE normally consumes the current Objective's Draft.
+        # An explicit artifact dependency is the only exception: a dependent
+        # Objective may consume exactly one verified predecessor Draft without
+        # claiming it as its own resource.
+        has_draft = len(owned_drafts) == 1 or (
+            not owned_drafts and len(dependency_drafts) == 1
+        )
         has_schedule = any("SCHEDULE" in kind_by_id.get(str(rid), set()) for rid in owned)
         if has_draft and not has_schedule:
             return "CREATE_SCHEDULE"
@@ -2158,7 +2529,7 @@ class ActionLoop:
 
     async def _bind_observation(self, task: Any, observation: Any, store: Any) -> None:
         """Deterministically bind a verified result to its matching Objective."""
-        if not observation.resource_kind:
+        if not observation.resource_kind and not getattr(observation, "artifact_id", None):
             return
         objective_id = str(getattr(observation, "objective_id", "") or "")
         objective = next(
@@ -2177,7 +2548,8 @@ class ActionLoop:
                 for item in (getattr(task, "objectives", ()) or ())
             )
             if not is_new_business:
-                objective = objective_for_resource(task, observation.resource_kind)
+                if observation.resource_kind:
+                    objective = objective_for_resource(task, observation.resource_kind)
         if objective is None:
             return
         bind_related(
@@ -2203,6 +2575,7 @@ class ActionLoop:
         }
         expected_kind = {
             "SEARCH_COMMUNITY": "SEARCH_RESULT",
+            "ANSWER_FROM_KNOWLEDGE": "KNOWLEDGE_ANSWER",
             "GET_POST_DETAIL": "POST",
             "GENERATE_CONTENT": "DRAFT",
             "SCHEDULE_PUBLISH": "SCHEDULE",
@@ -2217,6 +2590,13 @@ class ActionLoop:
                 continue
             objective = objectives.get(str(step.goal_id or ""))
             owned = set(getattr(objective, "related_resource_ids", ()) or ()) if objective else set()
+            if (
+                str(step.capability or "").upper() == "ANSWER_FROM_KNOWLEDGE"
+                and objective is not None
+                and getattr(objective, "related_artifact_ids", None)
+            ):
+                step.status = "COMPLETED"
+                continue
             kind = expected_kind.get(str(step.capability or "").upper())
             if kind and any(resources.get(rid) == kind for rid in owned):
                 step.status = "COMPLETED"
@@ -2892,6 +3272,53 @@ def _input_fingerprint(arguments: dict[str, Any]) -> str:
     ).hexdigest()[:16]
 
 
+def _objective_requires_answer(objective: Any, command: Command | None) -> bool:
+    capabilities = {
+        str(value or "").strip().upper().replace("-", "_")
+        for value in (getattr(objective, "required_capabilities", ()) or ())
+    }
+    if "ANSWER_FROM_KNOWLEDGE" in capabilities:
+        return True
+    if str(getattr(objective, "expected_resource_kind", "") or "").upper() == "KNOWLEDGE_ANSWER":
+        return True
+    return str(getattr(command, "semantic_operation", "") or "").upper() == "ANSWER_FROM_KNOWLEDGE"
+
+
+def _structured_answer_arguments(
+    command: Command | None,
+    objective: Any | None,
+) -> dict[str, Any]:
+    """Read the answer question from the bounded semantic fact containers."""
+    containers: list[Any] = [
+        {"question": getattr(command, "question", "")} if command is not None else None,
+        getattr(command, "parameters", None),
+        getattr(command, "entities", None),
+        getattr(command, "constraints", None),
+        {"question": getattr(getattr(command, "resolved_semantics", None), "question", "")}
+        if command is not None else None,
+        getattr(getattr(command, "resolved_semantics", None), "constraints", None),
+        getattr(objective, "constraints", None),
+    ]
+    for container in containers:
+        if not isinstance(container, Mapping):
+            continue
+        for key in ("question", "query", "search_query", "topic", "subject"):
+            value = container.get(key)
+            if isinstance(value, (str, int, float)) and str(value).strip():
+                return {"question": str(value).strip()}
+    return {}
+
+
+def _direct_answer_text(observation: Any) -> str:
+    detail = dict(getattr(observation, "detail", None) or {})
+    structured = detail.get("structured_data")
+    if isinstance(structured, Mapping):
+        value = structured.get("answer") or structured.get("content")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 def _read_observation_signature(
     action: str,
     observation: ActionObservation,
@@ -2941,6 +3368,51 @@ def _resource_kind_by_id(task: Any) -> dict[str, set[str]]:
     return result
 
 
+def _dependency_draft_ids(task: Any, objective: Any) -> tuple[str, ...]:
+    """Return verified Drafts from explicit Objective prerequisites only.
+
+    A dependent schedule/publish action may consume an upstream Draft as an
+    artifact, but it must never discover one from task recency or a sibling's
+    active session binding.  The result is intentionally empty for missing,
+    failed, ambiguous, or multi-artifact prerequisites so the durable boundary
+    can reject the action closed.
+    """
+    dependency_ids = [
+        str(value)
+        for value in (getattr(objective, "dependencies", ()) or ())
+        if str(value)
+    ]
+    if not dependency_ids:
+        return ()
+    objectives = {
+        str(getattr(item, "objective_id", "") or ""): item
+        for item in (getattr(task, "objectives", ()) or ())
+    }
+    kind_by_id = _resource_kind_by_id(task)
+    result: list[str] = []
+    for dependency_id in dependency_ids:
+        predecessor = objectives.get(dependency_id)
+        if predecessor is None:
+            return ()
+        predecessor_status = str(
+            getattr(getattr(predecessor, "status", None), "value", None)
+            or getattr(predecessor, "status", "")
+            or ""
+        ).upper()
+        if predecessor_status in {"FAILED", "ERROR", "CANCELLED", "SUPERSEDED"}:
+            return ()
+        predecessor_drafts = [
+            str(resource_id)
+            for resource_id in (getattr(predecessor, "related_resource_ids", ()) or ())
+            if "DRAFT" in kind_by_id.get(str(resource_id), set())
+        ]
+        if len(predecessor_drafts) != 1:
+            return ()
+        result.extend(predecessor_drafts)
+    unique = tuple(dict.fromkeys(result))
+    return unique if len(unique) == 1 else ()
+
+
 def _normalize_arguments(
     action: str,
     args: dict[str, Any],
@@ -2975,6 +3447,22 @@ def _normalize_arguments(
         # Keep the semantic alias boundary closed: the MCP search contract
         # intentionally exposes only these four fields.
         return {key: value for key, value in result.items() if key in {"query", "sort", "page", "size"}}
+    if normalized == "ANSWER_FROM_KNOWLEDGE":
+        result = dict(args)
+        question = (
+            result.get("question")
+            or result.get("query")
+            or result.get("search_query")
+            or result.get("topic")
+        )
+        if question not in (None, ""):
+            result["question"] = question
+        return {
+            key: value
+            for key, value in result.items()
+            if key in {"question", "top_posts", "top_chunks"}
+            and value not in (None, "")
+        }
     if normalized in {"CREATE_DRAFT", "GENERATE_CONTENT"}:
         result = dict(args)
         if not result.get("title") and result.get("topic"):
@@ -3004,6 +3492,21 @@ def _normalize_arguments(
             result["title"] = str(getattr(command, "requested_goal", "") or "")
         if not result.get("instruction") and command is not None:
             result["instruction"] = str(getattr(command, "requested_goal", "") or "")
+        return result
+    if normalized == "UPDATE_DRAFT":
+        # The semantic mutation model may call the replacement body ``body``
+        # (or ``body_markdown``), while the capability contract crossing the
+        # durable/MCP boundary is ``content``.  Normalize aliases here and
+        # remove them before schema binding so a multi-target update cannot
+        # fail only for the item that edits the body.
+        result = dict(args)
+        if not result.get("content"):
+            for alias in ("body", "body_markdown"):
+                if result.get(alias):
+                    result["content"] = result[alias]
+                    break
+        result.pop("body", None)
+        result.pop("body_markdown", None)
         return result
     if normalized in {"CREATE_SCHEDULE", "SCHEDULE_PUBLISH", "UPDATE_SCHEDULE"}:
         result = dict(args)

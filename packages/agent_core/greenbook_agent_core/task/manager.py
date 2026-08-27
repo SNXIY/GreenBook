@@ -884,29 +884,42 @@ class TaskManager:
         goal_id: str | None = None,
         status: str = "SUBMITTED",
     ) -> Task:
-        task = await self.get_required(task_id)
-        # Monotonic execution-state projection: a terminal execution is a latch
-        # and is never rebound as active work.  A late QUEUED/RUNNING update for
-        # an already-terminal execution must not regress it.
-        effective = merge_execution_status(
-            existing_execution_status(task.execution_refs, execution_id),
-            status,
-        )
-        task.execution_refs = project_execution_ref(
-            task.execution_refs,
-            execution_id=execution_id,
-            task_id=task.task_id,
-            goal_id=goal_id,
-            status=status,
-        )
-        if is_terminal_execution_status(effective):
-            if task.active_execution_id == execution_id:
-                task.active_execution_id = None
-        else:
-            task.active_execution_id = execution_id
-            task.status = self._transition_value(task.status, TaskStatus.RUNNING)
-            task.last_action = "BIND_EXECUTION"
-        return await self._persist(task)
+        # Independent Objective executors may bind their durable execution
+        # references at the same time.  Re-read and merge after a CAS conflict
+        # so one sibling's reference cannot be lost merely because another
+        # sibling persisted first.  Execution remains the side-effect authority;
+        # this is only a bounded projection retry.
+        last_error: TaskVersionConflictError | None = None
+        for _attempt in range(3):
+            task = await self.get_required(task_id)
+            # Monotonic execution-state projection: a terminal execution is a
+            # latch and is never rebound as active work.  A late QUEUED/RUNNING
+            # update for an already-terminal execution must not regress it.
+            effective = merge_execution_status(
+                existing_execution_status(task.execution_refs, execution_id),
+                status,
+            )
+            task.execution_refs = project_execution_ref(
+                task.execution_refs,
+                execution_id=execution_id,
+                task_id=task.task_id,
+                goal_id=goal_id,
+                status=status,
+            )
+            if is_terminal_execution_status(effective):
+                if task.active_execution_id == execution_id:
+                    task.active_execution_id = None
+            else:
+                task.active_execution_id = execution_id
+                task.status = self._transition_value(task.status, TaskStatus.RUNNING)
+                task.last_action = "BIND_EXECUTION"
+            try:
+                return await self._persist(task)
+            except TaskVersionConflictError as exc:
+                last_error = exc
+        if last_error is not None:
+            raise last_error
+        raise TaskManagerError("Task execution binding failed.")
 
     async def add_resource(
         self,
