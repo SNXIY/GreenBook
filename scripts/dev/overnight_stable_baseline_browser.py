@@ -247,6 +247,30 @@ class Browser:
         await asyncio.sleep(0.25)
 
     async def new_conversation(self, title: str) -> str:
+        # The current AgentPanel exposes a real New Conversation control.
+        # Prefer that browser path so the returned id is the conversation the
+        # UI actually selected.  The older API-create/order-wrapper fallback
+        # is retained for older builds that do not expose the control.
+        if await self.evaluate(
+            "Boolean(document.querySelector('[data-testid=\"new-conversation\"]'))"
+        ):
+            before = str(await self.evaluate(
+                "document.querySelector('[data-conversation-id][aria-pressed=\"true\"]')?.dataset.conversationId || ''"
+            ) or "")
+            await self.evaluate(
+                "document.querySelector('[data-testid=\"new-conversation\"]')?.click(); true"
+            )
+            deadline = time.monotonic() + COMPOSER_HYDRATION_GRACE_SECONDS
+            while time.monotonic() < deadline:
+                current = str(await self.evaluate(
+                    "document.querySelector('[data-conversation-id][aria-pressed=\"true\"]')?.dataset.conversationId || ''"
+                ) or "")
+                if current and current != before:
+                    await self.open_panel()
+                    return current
+                await asyncio.sleep(0.25)
+            raise TimeoutError("Frontend New Conversation did not select a new conversation")
+
         response = await self.api("POST", "/api/v1/agent/conversations", {"title": title, "surface": "HOME"})
         if response.get("status") != 200:
             raise RuntimeError(f"conversation create failed: {response}")

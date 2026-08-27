@@ -259,6 +259,79 @@ async def test_explicit_items_are_not_collapsed_by_span_grouping() -> None:
 
 
 @pytest.mark.asyncio
+async def test_mixed_read_and_mutation_does_not_span_group_create_items() -> None:
+    """Existing mutations must not duplicate the independent read item."""
+    goal = "delete post 350238090952052736 after approval; also search recent Java posts"
+    llm = _FakeLLM([
+        {
+            "command": "CREATE",
+            "goal": goal,
+            "objective": goal,
+            "request_complexity": "COMPLEX",
+            "task_changes": [{
+                "operation": "UPDATE_GOAL",
+                "change_id": "delete_post",
+                "target_reference": {
+                    "kind": "POST",
+                    "id": "350238090952052736",
+                    "reference_type": "IDENTIFIER",
+                },
+                "desired_changes": {
+                    "semantic_action": "DELETE_POST",
+                    "requires_approval": True,
+                },
+                "needs_target_resolution": False,
+            }],
+            "required_capabilities": ["DELETE_POST", "SEARCH_COMMUNITY"],
+            "semantic_operation": "DELETE_AND_SEARCH",
+            "items": [{
+                "item_key": "search_java",
+                "topic": "Java",
+                "requirements": ["search recent Java posts"],
+                "operation": "CREATE",
+                "capabilities": ["SEARCH_COMMUNITY"],
+            }],
+        },
+        {
+            "deliverables": [{
+                "entity_type": "search",
+                "item_key": "search_java",
+                "topic": "Java",
+                "requirements": ["search recent Java posts"],
+                "operation_hint": "CREATE",
+            }],
+        },
+        {
+            "deliverables": [{
+                "entity_type": "search",
+                "item_key": "search_java",
+                "topic": "Java",
+                "requirements": ["search recent Java posts"],
+                "operation_hint": "CREATE",
+            }],
+        },
+    ])
+
+    command = await CommandInterpreter(llm=llm, model="test").interpret(goal)
+
+    assert len(command.items) == 1
+    assert command.items[0].item_key == "search_java"
+    assert command.items[0].capabilities == ["SEARCH_COMMUNITY"]
+    assert len(command.task_changes) == 1
+    assert command.task_changes[0].operation == TaskDeltaOperation.UPDATE_GOAL
+    assert command.task_changes[0].desired_changes["semantic_action"] == "DELETE_POST"
+    schema_names = [
+        call["response_format"]["json_schema"]["name"]
+        for call in llm.completions.calls
+    ]
+    assert schema_names == [
+        "greenbook_command",
+        "greenbook_deliverable_segmentation",
+        "greenbook_deliverable_segmentation_repair",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_immediate_publish_span_marker_is_not_temporal_evidence() -> None:
     text = "write a Java post and publish now. marker E2E-20260821-123456."
     spans = _input_spans(text)
@@ -513,6 +586,81 @@ async def test_complex_connected_workflow_remains_one_deliverable() -> None:
 
     assert len(command.items) == 1
     assert len(llm.completions.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_typed_draft_and_schedule_segments_remain_one_connected_deliverable() -> None:
+    """A schedule is a dependent lifecycle step, not a second CREATE target."""
+    llm = _FakeLLM([
+        {
+            "command": "CREATE",
+            "request_complexity": "COMPLEX",
+            "required_capabilities": ["GENERATE_CONTENT", "SCHEDULE_PUBLISH"],
+            "constraints": {"publication_intent": "SCHEDULED_PUBLISH"},
+            "items": [{
+                "title": "Java reliability",
+                "topic": "Java reliability",
+                "capabilities": ["GENERATE_CONTENT", "SCHEDULE_PUBLISH"],
+                "temporal_text": "tomorrow 10:00",
+                "constraints": {"publication_intent": "SCHEDULED_PUBLISH"},
+            }],
+        },
+        {
+            "deliverables": [
+                {
+                    "entity_type": "draft",
+                    "title": "Java reliability",
+                    "topic": "Java reliability",
+                    "requirements": ["create the draft"],
+                },
+                {
+                    "entity_type": "schedule",
+                    "title": "Java reliability",
+                    "topic": "Java reliability",
+                    "requirements": ["schedule the same draft"],
+                    "temporal_text": "tomorrow 10:00",
+                },
+            ],
+        },
+    ])
+
+    command = await CommandInterpreter(llm=llm, model="test").interpret(
+        "create a Java reliability draft and schedule the same draft tomorrow 10:00",
+    )
+
+    assert len(command.items) == 1
+    item = command.items[0]
+    assert item.title == "Java reliability"
+    assert item.temporal_text == "tomorrow 10:00"
+    assert item.capabilities == ["GENERATE_CONTENT", "SCHEDULE_PUBLISH"]
+    assert item.requirements == ["create the draft", "schedule the same draft"]
+    assert len(llm.completions.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_typed_draft_and_schedule_segments_with_different_identity_stay_separate() -> None:
+    """Matching types alone must not collapse independent business targets."""
+    llm = _FakeLLM([
+        {
+            "command": "CREATE",
+            "request_complexity": "COMPLEX",
+            "required_capabilities": ["GENERATE_CONTENT", "SCHEDULE_PUBLISH"],
+            "constraints": {"publication_intent": "SCHEDULED_PUBLISH"},
+            "items": [{"capabilities": ["GENERATE_CONTENT", "SCHEDULE_PUBLISH"]}],
+        },
+        {
+            "deliverables": [
+                {"entity_type": "draft", "title": "Java", "topic": "Java"},
+                {"entity_type": "schedule", "title": "Agent", "topic": "Agent", "temporal_text": "tomorrow 10:00"},
+            ],
+        },
+    ])
+
+    command = await CommandInterpreter(llm=llm, model="test").interpret(
+        "create Java and schedule Agent tomorrow 10:00",
+    )
+
+    assert len(command.items) == 2
 
 
 @pytest.mark.asyncio

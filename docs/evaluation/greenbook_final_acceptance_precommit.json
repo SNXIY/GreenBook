@@ -1,0 +1,27 @@
+{
+  "schema_version": "greenbook_final_acceptance_precommit.v1",
+  "generated_at": "2026-08-27T14:35:00+08:00",
+  "branch": "feature/hybrid-search-rag",
+  "head": "2b593fa4d521bca30a5a913eed2a0df6db308450",
+  "git_policy": {"commit": false, "push": false},
+  "verdict": "GREENBOOK_FINAL_ACCEPTANCE_PARTIAL",
+  "recovery": {
+    "status": "PASS",
+    "branch_head_match": true,
+    "shutdown_patch_applied": false,
+    "services": {"frontend": "UP", "agent_api": "UP", "mcp": "UP", "java": "UP", "postgresql": "HEALTHY", "redis": "HEALTHY", "kafka": "HEALTHY", "elasticsearch": "HEALTHY", "qdrant": "HEALTHY", "mysql": "HEALTHY"},
+    "runtime_tokens": "PRESENT_MATCH_NO_SECRET_VALUES_RECORDED"
+  },
+  "unit": {"status": "PASS", "passed": 1602, "failed": 0, "warnings": 1},
+  "mo08": {"status": "PASS", "first_bad_state": "OBJECTIVE_DECOMPOSITION", "root_cause": "OBJECTIVE_EXPANSION_DUPLICATE_MIXED_CREATE_SPAN_GROUPING", "frozen_objective_count": 2, "search_duplicate_count": 0, "delete_waiting_approval": true, "destructive_write_before_approval": 0},
+  "multi_objective": {"status": "PASS_FOCUSED_CORPUS", "mo_cases": "MO-01..MO-12_RETAINED_NO_FULL_RERUN", "independent_2": "PASS", "independent_3_semantics": "PASS_EXISTING_MO-02_MO-06", "dependency_shapes": "PASS", "identity_and_resource_isolation": "PASS"},
+  "parallel": {"status": "PASS_BOUNDED_SCOPE", "max_parallel_objectives": 2, "eligible_shape": "independent_CREATE_DRAFT_only", "browser_before_ms": 73859, "browser_after_ms": 55672, "runtime_before_ms": 65793, "runtime_after_ms": 48071, "observed_overlap_ms": 6730.941, "distinct_resources": true, "durable_runtime_preserved": true, "failure_isolation_tests": "PASS_FOCUSED"},
+  "browser": {"core": "PASS_EXISTING_FOCUSED", "conversation_lifecycle": "PASS", "ux_final": "PASS", "rapid_send_new_run_count": 1, "rapid_send_status": "COMPLETED", "stale_response_b_ui_marker_leak": false, "progress_visible": true, "first_useful_feedback": "NOT_INSTRUMENTED"},
+  "performance_after": {"status": "PASS_FOCUSED_PARTIAL_SCOPE", "artifact": ".runtime/agent_performance_final_after_focus.json", "completed_samples": 5, "scenarios": {"simple_read": 47274.407, "simple_write": 45965.15, "sequential_dependent": 80585.106, "search_creation": 77628.589, "independent_multi_objective": 48645.971}, "rag_grounded_query": "NOT_RERUN_BY_EXPLICIT_SCOPE", "three_independent_objectives": "NOT_EXPANDED_BEYOND_MAX_2_SCOPE", "ttft": "UNAVAILABLE_PROVIDER_TOKEN_TIMESTAMP"},
+  "memory": {"status": "SEMANTICS_PRESERVED_IO_ONLY", "focused_repository_search_ms": 6400},
+  "rag": {"canonical_admission": "PASS", "grounding_citations": "RAG_CURRENT_LIMIT_ACCEPTED_PARTIAL", "rerun": false},
+  "architecture": {"new_mq": false, "multi_agent": false, "second_planner": false, "direct_write_bypass": false, "durable_permission_relaxed": false, "java_critical_path_optimized": false, "claim_interval_changed": false},
+  "dirty_audit": {"tracked_modified": 43, "untracked_top_level": 14, "cleanup_performed": false, "candidate_files_to_review_before_future_commit": ["checkpoints/", "docs/evaluation/", "docs/reports/", "docs/worklogs/", "tests/e2e/browser_ux_final_smoke.py", "tests/unit/test_action_loop_parallel_objectives.py"]},
+  "remaining_blockers": ["RAG grounding/citation remains accepted partial limit", "formal first-useful-feedback metric is not instrumented", "strict multi-sample equivalent P1-P7 performance corpus is incomplete"],
+  "evidence": {"matrix": "docs/worklogs/overnight-20260826-27/TEST_MATRIX.json", "failures": "docs/worklogs/overnight-20260826-27/FAILURES.json", "performance": "docs/worklogs/overnight-20260826-27/PERFORMANCE_BEFORE_AFTER.json", "ux": "docs/worklogs/overnight-20260826-27/UX_FINDINGS.md", "architecture": "docs/worklogs/overnight-20260826-27/ARCHITECTURE_FINDINGS.md", "browser_ux_script": "tests/e2e/browser_ux_final_smoke.py"}
+}

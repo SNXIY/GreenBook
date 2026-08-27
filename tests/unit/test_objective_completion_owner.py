@@ -301,7 +301,10 @@ async def test_strict_objectives_do_not_share_resources_or_satisfaction() -> Non
     assert not objective_b.related_resource_ids
     assert is_objective_satisfied(task, objective_a)
     assert not is_objective_satisfied(task, objective_b)
-    assert task.status == TaskStatus.RUNNING
+    # A's execution is terminal and B has no live execution yet.  Task READY
+    # means the next Objective may be scheduled; RUNNING is reserved for a
+    # Task backed by a non-terminal Execution reference.
+    assert task.status == TaskStatus.READY
     reloaded = registry.get_task("t1")
     assert reloaded is not None
     refs = {item.resource_id: item.objective_id for item in reloaded.resource_index}
@@ -326,9 +329,42 @@ async def test_task_completes_only_after_each_strict_objective_owns_outputs() ->
         )
         assert task is not None
         if objective_id == "A":
-            assert task.status == TaskStatus.RUNNING
+            # Both A executions are terminal; B is still unsatisfied but has
+            # not started an execution, so the aggregate Task is READY.
+            assert task.status == TaskStatus.READY
     assert task.status == TaskStatus.COMPLETED
     assert all(objective.status == "COMPLETED" for objective in task.objectives)
+
+
+@pytest.mark.asyncio
+async def test_task_remains_running_when_sibling_execution_is_live() -> None:
+    registry = _MemoryTaskRegistry()
+    task = _strict_two_objective_task()
+    task.active_execution_id = "e-b-running"
+    task.execution_refs = [
+        TaskExecutionRef(
+            execution_id="e-b-running",
+            task_id="t1",
+            objective_id="B",
+            status="RUNNING",
+        )
+    ]
+    registry._tasks["t1"] = task
+    provider = _provider(registry)
+
+    projected = await provider.persist_completion_projection(
+        _scope(),
+        task_id="t1",
+        execution_id="e-a-draft",
+        status="COMPLETED",
+        artifacts=[_draft_artifact("draft-A")],
+        objective_id="A",
+    )
+
+    assert projected is not None
+    assert projected.status == TaskStatus.RUNNING
+    assert projected.active_execution_id == "e-b-running"
+    assert next(ref for ref in projected.execution_refs if ref.execution_id == "e-b-running").status == "RUNNING"
 
 
 @pytest.mark.asyncio

@@ -133,7 +133,7 @@ def _call_payload(
 
 def test_active_registry_is_scoped_and_protocol_catalog_is_deterministic() -> None:
     names = [tool.name for tool in list_tools()]
-    assert len(names) == 14
+    assert len(names) == 15
     assert names == list(dict.fromkeys(names))
     assert not {
         "interaction.list_comments",
@@ -204,7 +204,7 @@ async def test_http_tools_list_and_tools_call_contract() -> None:
         )
         assert listed.status_code == 200
         assert listed.json()["result"]["resultType"] == "complete"
-        assert len(listed.json()["result"]["tools"]) == 14
+        assert len(listed.json()["result"]["tools"]) == 15
 
         called = await client.post(
             "/mcp",

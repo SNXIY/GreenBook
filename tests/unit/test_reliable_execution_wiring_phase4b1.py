@@ -213,6 +213,58 @@ def test_terminal_run_does_not_redeliver_orphaned_queue_message() -> None:
     assert published[0].execution_id == "orphaned-execution"
 
 
+def test_cancelled_execution_does_not_reopen_retryable_queue_delivery() -> None:
+    from greenbook_agent_core.execution.execution_queue import ExecutionQueueMessage
+    from greenbook_agent_core.execution.queue_execution_handler import RuntimeExecutionQueueHandler
+
+    class StubService:
+        calls = 0
+
+        def __init__(self) -> None:
+            self._execution_repository = SimpleNamespace(
+                find_by_id=lambda execution_id: SimpleNamespace(
+                    execution_id=execution_id,
+                    task_id="task-1",
+                    status="CANCELLED",
+                )
+            )
+
+        async def execute_queued(self, message, **kwargs):
+            self.calls += 1
+            return RuntimeResult(success=True, status="COMPLETED")
+
+    published: list[RuntimeResult] = []
+
+    async def publish(message, result, auth):
+        published.append(result)
+
+    service = StubService()
+    handler = RuntimeExecutionQueueHandler(
+        mcp=None,
+        service=service,
+        worker_access_token="t",
+        completion_publisher=publish,
+        run_store={"r1": SimpleNamespace(status="RUNNING")},
+    )
+    message = ExecutionQueueMessage(
+        execution_id="cancelled-execution",
+        payload={
+            "conversation_id": "c1",
+            "run_id": "r1",
+            "task_id": "task-1",
+            "auth_context": {"user_id": "u1", "tenant_id": "tenant-1"},
+        },
+    )
+
+    import asyncio
+
+    asyncio.run(handler(message))
+    assert service.calls == 0
+    assert len(published) == 1
+    assert published[0].status == "CANCELLED"
+    assert published[0].execution_id == "cancelled-execution"
+
+
 @pytest.mark.parametrize("resource_type", ["DRAFT", "SCHEDULE"])
 def test_worker_completion_persists_canonical_resource_evidence(resource_type: str) -> None:
     from greenbook_agent_core.execution.execution_queue import ExecutionQueueMessage

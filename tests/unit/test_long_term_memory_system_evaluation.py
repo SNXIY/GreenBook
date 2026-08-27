@@ -32,6 +32,10 @@ def test_canonical_architecture_lifecycle_and_isolation(system_result: dict) -> 
     architecture = system_result["architecture"]
     assert all(architecture["checks"].values())
     assert architecture["out_of_scope_paths"] == []
+    # The repository intentionally contains other dirty feature work.  The
+    # Memory audit must report those paths without treating them as a Memory
+    # semantic-scope violation.
+    assert "coexisting_dirty_production_paths" in architecture
 
     lifecycle = system_result["lifecycle"]
     assert lifecycle["failed"] == 0

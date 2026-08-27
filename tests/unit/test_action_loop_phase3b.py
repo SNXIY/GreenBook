@@ -73,6 +73,19 @@ def _decision(dtype: ActionDecisionType, **kw: Any) -> ActionDecision:
     return ActionDecision(decision=dtype, **kw)
 
 
+def test_pending_mutation_does_not_preempt_independent_read_objective() -> None:
+    search = type("ObjectiveStub", (), {
+        "required_capabilities": ["SEARCH_COMMUNITY"],
+    })()
+    delete = type("ObjectiveStub", (), {
+        "required_capabilities": ["DELETE_POST"],
+    })()
+
+    assert not ActionLoop._mutation_matches_current_objective(search, "DELETE_POST")
+    assert ActionLoop._mutation_matches_current_objective(delete, "DELETE_POST")
+    assert ActionLoop._mutation_matches_current_objective(None, "DELETE_POST")
+
+
 def _loop(
     *,
     decisions: list[ActionDecision],
@@ -376,6 +389,114 @@ async def test_action_loop_no_duplicate_tool_selection_llm() -> None:
 
 
 @pytest.mark.asyncio
+async def test_structured_grounded_answer_uses_canonical_action_and_direct_artifact() -> None:
+    """A resolved knowledge answer must not fall through to generic read routing."""
+    from greenbook_agent_core.task.objective_compat import objectives_for_capabilities
+
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def read(tool_name=None, arguments=None, **kwargs):
+        calls.append((str(tool_name), dict(arguments or {})))
+        return {
+            "ok": True,
+            "data": {
+                "answer": "Grounded community answer",
+                "sources": [
+                    {"postId": "post-1", "title": "Memory", "chunkId": "chunk-1"},
+                ],
+            },
+            "resource_refs": [
+                {
+                    "ref": "post:post-1:chunk:chunk-1",
+                    "kind": "POST_CHUNK",
+                    "resource_id": "chunk-1",
+                    "title": "Memory",
+                },
+            ],
+        }
+
+    async def unexpected_model_call(context):
+        raise AssertionError("resolved ANSWER_FROM_KNOWLEDGE must be deterministic")
+
+    command = Command(
+        type=CommandType.QUERY,
+        goal="community memory question",
+        semantic_operation="SEARCH_AND_SUMMARIZE",
+        required_capabilities=["SEARCH_COMMUNITY", "ANSWER_FROM_KNOWLEDGE"],
+        parameters={"question": "What does the community discuss about Agent Memory?"},
+    )
+    task = Task(
+        task_id="task-rag",
+        conversation_id="c1",
+        user_id="u1",
+        tenant_id="t1",
+        goal="community memory question",
+        status=TaskStatus.RUNNING,
+        objectives=objectives_for_capabilities(
+            command.required_capabilities,
+            "task-rag",
+        ),
+        resource_index=[],
+        execution_refs=[],
+        artifacts=[],
+        goals=[],
+    )
+    result = await ActionLoop(
+        decision_maker=unexpected_model_call,
+        read_handler=read,
+        task_store=RecordingStore(),
+        max_iterations=4,
+    ).run(task, command, request=_request())
+
+    assert result.status == "COMPLETED"
+    assert result.success is True
+    assert calls == [
+        (
+            "community.answer_from_knowledge",
+            {"question": "What does the community discuss about Agent Memory?"},
+        )
+    ]
+    assert result.decisions == ["1:CALL_TOOL"]
+    assert result.content == "Grounded community answer"
+    assert len(task.artifacts) == 1
+    assert task.artifacts[0].artifact_type == "KNOWLEDGE_ANSWER"
+    assert task.objectives[0].status == "COMPLETED"
+    assert task.objectives[0].related_artifact_ids == [task.artifacts[0].artifact_id]
+
+
+def test_grounded_answer_without_structured_question_fails_closed() -> None:
+    from greenbook_agent_core.task.objective_compat import objectives_for_capabilities
+
+    command = Command(
+        type=CommandType.QUERY,
+        goal="community memory question",
+        semantic_operation="SEARCH_AND_SUMMARIZE",
+        required_capabilities=["SEARCH_COMMUNITY", "ANSWER_FROM_KNOWLEDGE"],
+    )
+    task = Task(
+        task_id="task-rag-clarify",
+        conversation_id="c1",
+        user_id="u1",
+        tenant_id="t1",
+        goal="community memory question",
+        status=TaskStatus.RUNNING,
+        objectives=objectives_for_capabilities(
+            command.required_capabilities,
+            "task-rag-clarify",
+        ),
+        resource_index=[],
+        execution_refs=[],
+        artifacts=[],
+        goals=[],
+    )
+
+    decision = ActionLoop()._structured_answer_decision(task, command)
+
+    assert decision is not None
+    assert decision.decision == ActionDecisionType.CLARIFY
+
+
+@pytest.mark.asyncio
 async def test_action_loop_completed_task_reopen() -> None:
     store = RecordingStore()
     task = _task(goals=[])
@@ -558,6 +679,18 @@ def test_objective_without_run_at_keeps_model_proposal() -> None:
     args = _normalize_arguments("UPDATE_DRAFT", {"draft_id": "d1", "title": "新标题"},
                                 command=None, objective=obj)
     assert "run_at" not in args
+
+
+def test_update_draft_normalizes_body_alias_to_content() -> None:
+    from greenbook_agent_core.actionloop.loop import _normalize_arguments
+
+    args = _normalize_arguments(
+        "UPDATE_DRAFT",
+        {"draft_id": "d1", "body": "完整替换正文", "body_markdown": "旧别名"},
+        command=None,
+    )
+
+    assert args == {"draft_id": "d1", "content": "完整替换正文"}
 
 
 # ── helpers ──────────────────────────────────────────────────────────────

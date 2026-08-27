@@ -64,6 +64,60 @@ def _detail(
     return result
 
 
+def _knowledge_answer(
+    answer: str,
+    sources: list[dict[str, str]],
+    *,
+    candidate_count: int = 8,
+) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "tool_name": "community.answer_from_knowledge",
+        "capability": "ANSWER_FROM_KNOWLEDGE",
+        "state": {"candidate_post_count": candidate_count, "evidence_count": 8},
+        "data": {"answer": answer, "sources": sources},
+    }
+
+
+@pytest.mark.asyncio
+async def test_canonical_knowledge_answer_projects_answer_and_validated_citations() -> None:
+    interaction, message = await build_retrieval_interaction(
+        request="根据社区资料总结 Agent Memory，并给出依据。",
+        tool_results=[_knowledge_answer(
+            "社区资料显示，可靠记忆与状态管理是 Agent 工程中的重点。",
+            [{
+                "postId": "post-memory",
+                "title": "Agent 工程实践",
+                "chunkId": "chunk-memory",
+            }],
+        )],
+        synthesis_requested=True,
+    )
+
+    assert interaction is not None
+    assert interaction["kind"] == "SYNTHESIS_RESULT"
+    assert interaction["synthesis"]["conclusion"].startswith("社区资料显示")
+    assert interaction["synthesis"]["sources"][0]["resource_id"] == "post-memory"
+    assert interaction["synthesis"]["sources"][0]["source_refs"] == ["source-1"]
+    assert message.startswith("社区资料显示")
+
+
+@pytest.mark.asyncio
+async def test_canonical_knowledge_answer_projects_fail_closed_no_answer() -> None:
+    interaction, message = await build_retrieval_interaction(
+        request="社区里有没有足够资料？",
+        tool_results=[_knowledge_answer("当前社区资料不足", [])],
+        synthesis_requested=True,
+    )
+
+    assert interaction is not None
+    assert interaction["kind"] == "SYNTHESIS_RESULT"
+    assert interaction["synthesis"]["sources"] == []
+    assert interaction["synthesis"]["conclusion"] == ""
+    assert interaction["synthesis"]["evidence_note"] == "当前社区资料不足"
+    assert message == "当前社区资料不足"
+
+
 @pytest.mark.asyncio
 async def test_pure_search_stays_query_result() -> None:
     interaction, message = await build_retrieval_interaction(

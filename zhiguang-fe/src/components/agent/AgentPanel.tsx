@@ -249,6 +249,10 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
   const panelRef = useRef<HTMLElement>(null);
   const runControllerRef = useRef<AbortController | null>(null);
   const runControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // Prevent two DOM events in the same submit window from creating duplicate
+  // durable Runs.  This is intentionally released once the first request is
+  // durably accepted so an explicit mid-turn follow-up remains supported.
+  const sendInFlightRef = useRef(false);
   const hydrationControllerRef = useRef<AbortController | null>(null);
   const conversationGenerationRef = useRef(0);
   const activeConversationIdRef = useRef<string | null>(null);
@@ -296,6 +300,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
     setContent("");
     setLoading(false);
     setComposerState("READY");
+    sendInFlightRef.current = false;
     activityCursorRef.current = 0;
     semanticActionKeysRef.current.clear();
     semanticModifySupersededKeysRef.current.clear();
@@ -942,7 +947,9 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
   ) => {
     const prompt = (suggestion ?? content).trim();
     if (!token || !conversation) return;
+    if (sendInFlightRef.current) return;
     if (!canSubmitNaturalLanguage(prompt, composerState, true)) return;
+    sendInFlightRef.current = true;
     const conversationId = conversation.conversation_id;
     const conversationGeneration = conversationGenerationRef.current;
     const isLiveConversation = () => isCurrentConversation(conversationId, conversationGeneration);
@@ -1001,6 +1008,10 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         commandOverride,
         controller.signal
       );
+      // The server has accepted this Run durably.  Unlock only the request
+      // gate here; composer state is managed below so deliberate follow-ups
+      // can still be queued while the accepted Run is executing.
+      sendInFlightRef.current = false;
       if (!isLiveConversation()) return;
       // Show the first decided semantic action as an immediate business
       // activity while the execution snapshot is still on its way.
@@ -1217,6 +1228,7 @@ const AgentPanel = ({ open, onClose, contextPostId, surface = "HOME" }: Props) =
         setError(friendlyClientError(caught));
       }
     } finally {
+      sendInFlightRef.current = false;
       if (runControllerRef.current === controller) runControllerRef.current = null;
       if (isLiveConversation()) {
         setLoading(false);

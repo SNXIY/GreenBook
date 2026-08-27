@@ -294,3 +294,49 @@ def test_objectives_from_items_partial_temporal_no_inherit() -> None:
     objs = objectives_from_items(items, "t1", timezone="Asia/Shanghai", now=now)
     assert objs[0].constraints.get("run_at") == "2026-08-17T02:00:00Z"
     assert "run_at" not in objs[1].constraints, "item without temporal must not inherit"
+
+
+def test_objectives_from_items_resolve_explicit_item_dependencies() -> None:
+    from greenbook_agent_core.command.models import CommandItem
+    from greenbook_agent_core.task.objective_compat import objectives_from_items
+
+    items = [
+        CommandItem(
+            item_key="A",
+            title="检索结果",
+            capabilities=["SEARCH_COMMUNITY"],
+        ),
+        CommandItem(
+            item_key="B",
+            title="依赖检索的草稿",
+            capabilities=["GENERATE_CONTENT"],
+            dependencies=["A"],
+        ),
+    ]
+
+    objectives = objectives_from_items(items, "task-dependency")
+
+    assert len(objectives) == 2
+    assert objectives[1].dependencies == [objectives[0].objective_id]
+    assert objectives[1].constraints["dependency_resolution"]["status"] == "RESOLVED"
+
+
+def test_objectives_from_items_fail_closed_for_unresolved_dependency_reference() -> None:
+    from greenbook_agent_core.command.models import CommandItem
+    from greenbook_agent_core.task.objective_compat import objectives_from_items
+
+    objectives = objectives_from_items([
+        CommandItem(item_key="A", title="检索", capabilities=["SEARCH_COMMUNITY"]),
+        CommandItem(
+            item_key="B",
+            title="草稿",
+            capabilities=["GENERATE_CONTENT"],
+            dependencies=["missing-item"],
+        ),
+    ], "task-unresolved-dependency")
+
+    assert objectives[1].dependencies == []
+    assert objectives[1].constraints["dependency_resolution"] == {
+        "status": "UNRESOLVED",
+        "references": ["missing-item"],
+    }

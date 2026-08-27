@@ -117,3 +117,62 @@ def test_title_only_mutation_does_not_inherit_schedule_hint() -> None:
     assert state.items[0].publication_intent == ""
     assert state.temporal_kind == "NONE"
     assert state.publication_intent == ""
+
+
+def test_identifier_mutation_is_not_projected_twice_when_action_is_unique() -> None:
+    command = Command(
+        type=CommandType.MODIFY,
+        items=[CommandItem(
+            item_key="delete_post",
+            operation="DELETE",
+            capabilities=["DELETE_POST"],
+            requirements=["删除帖子 123"],
+        )],
+        task_changes=[TaskDelta(
+            operation=TaskDeltaOperation.UPDATE_GOAL,
+            change_id="delete_post_123",
+            target_reference={"kind": "POST", "id": "123"},
+            desired_changes={"semantic_action": "DELETE_POST"},
+        )],
+    )
+
+    state = _coordinator()._resolve_semantic_state(  # noqa: SLF001
+        command,
+        target_resolution=None,
+        timezone="Asia/Shanghai",
+    )
+
+    assert len(state.items) == 1
+    assert state.items[0].capabilities == ["DELETE_POST"]
+
+
+def test_same_action_siblings_are_not_collapsed_without_structured_pairing() -> None:
+    command = Command(
+        type=CommandType.MODIFY,
+        items=[
+            CommandItem(item_key="delete_a", operation="DELETE", capabilities=["DELETE_POST"]),
+            CommandItem(item_key="delete_b", operation="DELETE", capabilities=["DELETE_POST"]),
+        ],
+        task_changes=[
+            TaskDelta(
+                operation=TaskDeltaOperation.UPDATE_GOAL,
+                change_id="mutation_a",
+                target_reference={"kind": "POST", "id": "a"},
+                desired_changes={"semantic_action": "DELETE_POST"},
+            ),
+            TaskDelta(
+                operation=TaskDeltaOperation.UPDATE_GOAL,
+                change_id="mutation_b",
+                target_reference={"kind": "POST", "id": "b"},
+                desired_changes={"semantic_action": "DELETE_POST"},
+            ),
+        ],
+    )
+
+    state = _coordinator()._resolve_semantic_state(  # noqa: SLF001
+        command,
+        target_resolution=None,
+        timezone="Asia/Shanghai",
+    )
+
+    assert len(state.items) == 4

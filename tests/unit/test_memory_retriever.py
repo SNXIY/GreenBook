@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from greenbook_agent_core.memory import (
     InMemoryMemoryRepository,
@@ -85,3 +87,47 @@ async def test_retriever_can_skip_touch_for_context_reads() -> None:
 
     assert values[0].memory_id == record.memory_id
     assert repository.get(record.memory_id).access_count == 0
+
+
+@pytest.mark.asyncio
+async def test_repository_type_queries_are_concurrent_but_results_are_deduped() -> None:
+    records = [
+        MemoryRecord(
+            user_id="u-io",
+            tenant_id="tenant-io",
+            memory_type=MemoryType.EPISODIC,
+            content="Java draft fact",
+        ),
+        MemoryRecord(
+            user_id="u-io",
+            tenant_id="tenant-io",
+            memory_type=MemoryType.PROCEDURAL,
+            content="Java draft procedure",
+        ),
+    ]
+    active = 0
+    maximum = 0
+
+    class Repository:
+        async def search(self, query):
+            nonlocal active, maximum
+            active += 1
+            maximum = max(maximum, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            return [item for item in records if item.memory_type == query.type]
+
+    values = await MemoryRetriever(
+        Repository(),
+        memory_types=[MemoryType.EPISODIC, MemoryType.PROCEDURAL],
+        require_tenant_scope=True,
+    ).retrieve(
+        user_id="u-io",
+        tenant_id="tenant-io",
+        target_query="Java draft",
+        touch=False,
+    )
+
+    assert maximum == 2
+    assert values
+    assert len({item.memory_id for item in values}) == len(values)

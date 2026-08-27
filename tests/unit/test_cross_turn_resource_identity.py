@@ -11,13 +11,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from greenbook_agent_api.services.action_loop_executor import ActionLoopExecutor
+from greenbook_agent_api.services.action_loop_executor import (
+    ActionLoopExecutor,
+    _command_task_id,
+)
 from greenbook_agent_api.services.conversation_runtime_adapter import (
     ConversationRuntimeAdapter,
 )
 from greenbook_agent_core.actionloop.loop import ActionLoop
 from greenbook_agent_core.command.models import (
     Command,
+    CommandItem,
     CommandType,
     TaskDelta,
     TaskDeltaOperation,
@@ -128,6 +132,103 @@ async def _compile_mutations(manager: TaskManager, task, changes):
     )
     refreshed = await executor._ensure_mutation_objectives(task, command)
     return command, refreshed
+
+
+@pytest.mark.asyncio
+async def test_existing_task_admits_independent_read_sibling_before_mutation() -> None:
+    """A materialized resource Task must retain a sibling QUERY Objective."""
+
+    manager = TaskManager(InMemoryTaskRepository())
+    original = Objective(
+        task_id="",
+        objective_id="objective-post",
+        description="Existing community post",
+        intent="Existing community post",
+        status=ObjectiveStatus.COMPLETED,
+        expected_resource_kind="POST",
+        required_capabilities=["GET_POST_DETAIL"],
+        result_requirement="DIRECT_RESULT",
+        related_resource_ids=["post-A"],
+    )
+    task = await _task(
+        manager,
+        [original],
+        [_resource("post-A", "POST", original.objective_id, title="Existing community post")],
+    )
+    original.task_id = task.task_id
+    task = await _persist(manager, task)
+
+    command = Command(
+        type=CommandType.MODIFY,
+        goal="删除帖子并另外搜索 Java 并发资料",
+        items=[CommandItem(
+            item_key="search_java",
+            title="Java 并发资料",
+            topic="Java 并发",
+            operation="QUERY",
+            capabilities=["SEARCH_COMMUNITY"],
+        )],
+        task_changes=[TaskDelta(
+            operation=TaskDeltaOperation.UPDATE_GOAL,
+            target_reference={
+                "kind": "POST",
+                "resource_id": "post-A",
+                "objective_id": original.objective_id,
+            },
+            desired_changes={"semantic_action": "DELETE_POST"},
+        )],
+    )
+    command.resolved_semantics = SimpleNamespace(items=[
+        SimpleNamespace(
+            item_key="search_java",
+            operation="SEARCH_POSTS",
+            capabilities=["SEARCH_COMMUNITY"],
+            target_reference={},
+        ),
+        SimpleNamespace(
+            operation="DELETE_POST",
+            target_reference={"resource_id": "post-A", "objective_id": original.objective_id},
+        ),
+    ])
+
+    executor = ActionLoopExecutor(
+        adapter=SimpleNamespace(),
+        task_manager=manager,
+        llm=None,
+    )
+    updated = await executor._ensure_mutation_objectives(task, command)
+    repeated = await executor._ensure_mutation_objectives(updated, command)
+
+    search = [
+        item for item in repeated.objectives
+        if "SEARCH_COMMUNITY" in item.required_capabilities
+    ]
+    mutations = [
+        item for item in repeated.objectives
+        if (getattr(item, "constraints", {}) or {}).get("mutation_identity")
+    ]
+    assert len(search) == 1
+    assert len(mutations) == 1
+    assert repeated.objectives.index(search[0]) < repeated.objectives.index(mutations[0])
+    assert search[0].constraints["item_key"] == "search_java"
+
+
+def test_explicit_materialized_task_wins_over_create_type() -> None:
+    command = Command(
+        type=CommandType.CREATE,
+        resolved_target={"task_id": "materialized-task"},
+        parameters={
+            "__external_explicit_resource_admission": [{
+                "resource_id": "post-A",
+                "resource_kind": "POST",
+            }],
+        },
+    )
+
+    assert _command_task_id(
+        command,
+        SimpleNamespace(active_task_id="historical-task"),
+    ) == "materialized-task"
 
 
 @pytest.mark.asyncio

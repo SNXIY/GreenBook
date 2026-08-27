@@ -16,6 +16,7 @@ from greenbook_agent_core.command.models import (
     CommandItem,
     CommandTarget,
     CommandType,
+    ResolvedSemanticState,
     TargetKind,
     TaskDelta,
     TaskDeltaOperation,
@@ -27,6 +28,7 @@ from greenbook_agent_core.turn import FastPathGate, TurnRoute
 from greenbook_agent_core.turn.models import AssembledTurnContext
 from greenbook_agent_core.execution.runtime_result import RuntimeResult
 from greenbook_agent_core.task.objective_compat import objectives_from_items
+from greenbook_agent_core.command.interpreter import _normalize_draft_only
 
 
 def _target() -> Resolved:
@@ -107,6 +109,46 @@ def test_structured_semantic_matrix(name, command, resolution, expected_route):
         semantic_state=state,
     )
     assert decision.route == expected_route, name
+
+
+def test_grounded_answer_capability_admits_canonical_rag_action() -> None:
+    command = _command(
+        CommandType.QUERY,
+        action="SEARCH_AND_SUMMARIZE",
+        caps=["SEARCH_COMMUNITY", "ANSWER_FROM_KNOWLEDGE"],
+    )
+    semantic_state = ResolvedSemanticState(
+        operation="QUERY",
+        semantic_operation="SEARCH_AND_SUMMARIZE",
+        capabilities=["SEARCH_COMMUNITY", "ANSWER_FROM_KNOWLEDGE"],
+    )
+
+    decision = FastPathGate().decide(command, semantic_state=semantic_state)
+
+    assert decision.route == TurnRoute.COMPLEX
+    assert decision.semantic_actions == ["ANSWER_FROM_KNOWLEDGE"]
+
+
+def test_draft_only_normalization_preserves_read_item_action_ownership() -> None:
+    command = _command(
+        CommandType.CREATE,
+        caps=["SEARCH_COMMUNITY", "GENERATE_CONTENT"],
+        constraints={"publication_intent": "DRAFT_ONLY"},
+        items=[
+            CommandItem(topic="RAG 评测", capabilities=["SEARCH_COMMUNITY"]),
+            CommandItem(
+                title="Java 线程池实践",
+                topic="Java 线程池",
+                capabilities=["GENERATE_CONTENT"],
+                constraints={"publication_intent": "DRAFT_ONLY"},
+            ),
+        ],
+    )
+
+    _normalize_draft_only(command, "分别搜索并创建一篇草稿")
+
+    assert command.items[0].capabilities == ["SEARCH_COMMUNITY"]
+    assert command.items[1].capabilities == ["GENERATE_CONTENT"]
 
 
 def test_canonical_temporal_is_resolved_once_for_objective_projection() -> None:
@@ -230,6 +272,53 @@ def test_multi_objective_temporal_resolution_is_per_item() -> None:
         "2026-08-21T01:00:00Z",
         "2026-08-21T06:00:00Z",
     ]
+
+
+def test_item_publication_ownership_does_not_broadcast_schedule_to_sibling() -> None:
+    coordinator = TurnCoordinator(
+        temporal_resolver=TemporalResolver(
+            now=datetime(2026, 8, 20, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai")),
+        ),
+    )
+    command = _command(
+        CommandType.CREATE,
+        caps=["SEARCH_COMMUNITY", "GENERATE_CONTENT", "SCHEDULE_PUBLISH"],
+        constraints={"publication_intent": "SCHEDULED_PUBLISH"},
+        items=[
+            CommandItem(
+                item_key="A",
+                topic="RAG 评测",
+                capabilities=["SEARCH_COMMUNITY"],
+            ),
+            CommandItem(
+                item_key="B",
+                title="Agent 可观测性实践",
+                capabilities=["GENERATE_CONTENT"],
+                constraints={"publication_intent": "DRAFT_ONLY"},
+            ),
+            CommandItem(
+                item_key="C",
+                title="Agent 可观测性实践",
+                capabilities=["SCHEDULE_PUBLISH"],
+                temporal_text="明天 10:00",
+                dependencies=["B"],
+                constraints={"publication_intent": "SCHEDULED_PUBLISH"},
+            ),
+        ],
+    )
+
+    state = coordinator._resolve_semantic_state(
+        command,
+        target_resolution=None,
+        timezone="Asia/Shanghai",
+    )
+
+    assert state.clarification_required is False
+    assert [item.publication_intent for item in state.items] == [
+        "", "DRAFT_ONLY", "SCHEDULED_PUBLISH",
+    ]
+    assert state.items[2].run_at == "2026-08-21T02:00:00Z"
+    assert state.items[2].dependencies == ["B"]
 
 
 def test_unresolved_future_never_routes_to_publish_now() -> None:

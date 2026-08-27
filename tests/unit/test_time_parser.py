@@ -86,6 +86,19 @@ def test_chinese_relative_schedule_supports_leading_waiting_verbs() -> None:
     assert parse_natural_schedule_time("等五分钟再发", now=now) == "2026-08-20T02:05:00Z"
 
 
+def test_chinese_relative_schedule_supports_event_anchor_before_delay() -> None:
+    now = datetime(2026, 8, 20, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+    assert parse_natural_schedule_time(
+        "创建成功后五分钟发布",
+        now=now,
+    ) == "2026-08-20T02:05:00Z"
+    assert parse_natural_schedule_time(
+        "处理完成后两小时发布",
+        now=now,
+    ) == "2026-08-20T04:00:00Z"
+
+
 def test_v1_chinese_absolute_schedule_contract() -> None:
     now = datetime(2026, 8, 20, 10, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
 

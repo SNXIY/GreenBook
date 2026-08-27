@@ -168,6 +168,43 @@ async def test_t4i_b_schedule_rejects_when_no_owned_draft(
 
 
 @pytest.mark.asyncio
+async def test_explicit_dependent_schedule_consumes_predecessor_draft(
+    registry: CapabilityRegistry,
+) -> None:
+    """A dependent schedule may consume exactly one verified predecessor Draft."""
+    captured: dict[str, Any] = {}
+    executor = CapabilityExecutor(
+        registry,
+        _capture_handler(captured),
+        objective_id="C",
+        objective_draft_ids=[],
+        objective_dependency_draft_ids=["draft-B"],
+    )
+    result = await executor.execute_step(_schedule_step())
+    assert result.ok is True
+    assert captured["args"]["draft_id"] == "draft-B"
+
+
+@pytest.mark.asyncio
+async def test_dependent_schedule_rejects_ambiguous_predecessor_drafts(
+    registry: CapabilityRegistry,
+) -> None:
+    """More than one dependency Draft remains a controlled no-side-effect reject."""
+    captured: dict[str, Any] = {}
+    executor = CapabilityExecutor(
+        registry,
+        _capture_handler(captured),
+        objective_id="C",
+        objective_draft_ids=[],
+        objective_dependency_draft_ids=["draft-A", "draft-B"],
+    )
+    result = await executor.execute_step(_schedule_step())
+    assert result.ok is False
+    assert result.error_code == "INVALID_RESOURCE_BINDING"
+    assert "args" not in captured
+
+
+@pytest.mark.asyncio
 async def test_t4_no_task_global_draft_fallback_for_business_objective(
     registry: CapabilityRegistry,
 ) -> None:
