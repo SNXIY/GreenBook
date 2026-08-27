@@ -149,6 +149,10 @@ class CommandItem(BaseModel):
 
     title: str = Field(default="", description="Title of this one final business deliverable")
     topic: str = Field(default="", description="Topic owned by this deliverable")
+    # Stable semantic label supplied by the structured interpreter (for
+    # example A/B/C). It is not a runtime/objective id; it only lets a later
+    # item name an explicit predecessor without inferring from raw text.
+    item_key: str = Field(default="", description="Structured label for this deliverable, if supplied")
     requirements: list[str] = Field(
         default_factory=list,
         description="Requirements for this deliverable; do not split execution steps into items",
@@ -156,6 +160,9 @@ class CommandItem(BaseModel):
     operation: str = "CREATE"
     capabilities: list[str] = Field(default_factory=list)
     temporal_text: str = Field(default="", description="This item's natural-language publication time")
+    # References to other structured items, not tool steps. Resolution to
+    # persisted Objective ids happens after all items are materialized.
+    dependencies: list[str] = Field(default_factory=list)
     constraints: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -166,6 +173,7 @@ class ResolvedSemanticItem(BaseModel):
 
     title: str = ""
     topic: str = ""
+    item_key: str = ""
     requirements: list[str] = Field(default_factory=list)
     # The model may provide an operation/capability hint for compatibility;
     # the semantic compilation boundary derives the canonical values.
@@ -179,6 +187,7 @@ class ResolvedSemanticItem(BaseModel):
     temporal_kind: str = "NONE"
     run_at: str | None = None
     temporal_resolved: bool = False
+    dependencies: list[str] = Field(default_factory=list)
     constraints: dict[str, Any] = Field(default_factory=dict)
     target_reference: dict[str, Any] = Field(default_factory=dict)
 
@@ -203,6 +212,11 @@ class ResolvedSemanticState(BaseModel):
     # Preserve the resolver's bounded candidate set for ambiguity/clarification
     # consumers.  This is evidence, not an alternate target selection path.
     target_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    # A bounded knowledge/query fact preserved from structured interpretation.
+    # It is intentionally separate from Command.goal, which may be a
+    # compatibility display string and must never be used as an implicit raw
+    # user-text fallback by an execution adapter.
+    question: str = Field(default="", max_length=1000)
     temporal_kind: str = "NONE"
     run_at: str | None = None
     temporal_resolved: bool = False
@@ -222,6 +236,7 @@ class DeliverableSegment(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     text: str = Field(default="", description="Self-contained deliverable text")
+    item_key: str = ""
     operation_hint: str = Field(
         default="CREATE",
         description="High-level operation hint: CREATE, MODIFY, QUERY, or CANCEL",
@@ -231,6 +246,7 @@ class DeliverableSegment(BaseModel):
     title: str = ""
     requirements: list[str] = Field(default_factory=list)
     temporal_text: str = ""
+    dependencies: list[str] = Field(default_factory=list)
     # Per-deliverable semantic evidence.  This is intentionally the same
     # bounded constraint container used by CommandItem; segmentation may carry
     # publication intent without inventing a concrete timestamp.
@@ -324,6 +340,9 @@ class StructuredCommandOutput(BaseModel):
     )
     task_changes: list[TaskDelta] = Field(default_factory=list)
     target: CommandTarget | None = None
+    # Query text for a knowledge/read outcome. This is semantic evidence, not
+    # an execution plan or a copy of the unstructured request envelope.
+    question: str = Field(default="", max_length=1000)
     parameters: dict[str, Any] = Field(default_factory=dict)
     entities: dict[str, Any] = Field(default_factory=dict)
     constraints: dict[str, Any] = Field(default_factory=dict)
@@ -361,6 +380,8 @@ class Command(BaseModel):
     request_complexity: str = "SIMPLE"
     task_changes: list[TaskDelta] = Field(default_factory=list)
     target: CommandTarget | None = None
+    # Bounded structured query fact used by canonical read capabilities.
+    question: str = Field(default="", max_length=1000)
     parameters: dict[str, Any] = Field(default_factory=dict)
     entities: dict[str, Any] = Field(default_factory=dict)
     constraints: dict[str, Any] = Field(default_factory=dict)

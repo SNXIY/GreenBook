@@ -1019,6 +1019,10 @@ class RuntimeAgentService:
         objective_draft_ids, objective_schedule_ids = (
             await self._objective_owned_resource_ids(task_id, ctx.objective_id)
         )
+        objective_dependency_draft_ids = await self._objective_dependency_draft_ids(
+            task_id,
+            ctx.objective_id,
+        )
         executor = CapabilityExecutor(
             self._registry, invoke_fn=invoke_fn,
             task_id=task_id, execution_id="",
@@ -1032,6 +1036,7 @@ class RuntimeAgentService:
             objective_id=ctx.objective_id,
             objective_draft_ids=objective_draft_ids,
             objective_schedule_ids=objective_schedule_ids,
+            objective_dependency_draft_ids=objective_dependency_draft_ids,
         )
 
         # ── 7. Worker (with trace) ──────────────────────────
@@ -2190,6 +2195,77 @@ class RuntimeAgentService:
         """Return the DRAFT resource ids owned by ``objective_id`` (see above)."""
         drafts, _ = await self._objective_owned_resource_ids(task_id, objective_id)
         return drafts
+
+    async def _objective_dependency_draft_ids(
+        self,
+        task_id: str,
+        objective_id: str | None,
+    ) -> tuple[str, ...]:
+        """Return one verified Draft from an explicit Objective prerequisite.
+
+        This is an artifact hand-off, not ownership transfer.  The prerequisite
+        Objective remains the ResourceBinding owner; the dependent execution is
+        allowed to consume that exact Draft only when the Task's structured
+        dependency edge names the predecessor and the resource is unambiguous.
+        """
+        if not objective_id or self._task_manager is None:
+            return ()
+        getter = getattr(self._task_manager, "get_task", None)
+        if not callable(getter):
+            return ()
+        try:
+            task = getter(task_id)
+            if inspect.isawaitable(task):
+                task = await task
+        except Exception:
+            logger.warning(
+                "Could not load Task for dependency Draft lookup task_id=%s",
+                task_id,
+                exc_info=True,
+            )
+            return ()
+        if task is None:
+            return ()
+        objectives = {
+            str(getattr(item, "objective_id", "") or ""): item
+            for item in (getattr(task, "objectives", ()) or ())
+        }
+        current = objectives.get(str(objective_id))
+        dependency_ids = [
+            str(value)
+            for value in (getattr(current, "dependencies", ()) or ())
+            if str(value)
+        ] if current is not None else []
+        if not dependency_ids:
+            return ()
+        kind_by_id = {
+            str(getattr(resource, "resource_id", "") or ""): str(
+                getattr(resource, "resource_kind", "") or ""
+            ).upper()
+            for resource in (getattr(task, "resource_index", ()) or ())
+        }
+        result: list[str] = []
+        for dependency_id in dependency_ids:
+            predecessor = objectives.get(dependency_id)
+            if predecessor is None:
+                return ()
+            status = str(
+                getattr(getattr(predecessor, "status", None), "value", None)
+                or getattr(predecessor, "status", "")
+                or ""
+            ).upper()
+            if status in {"FAILED", "ERROR", "CANCELLED", "SUPERSEDED"}:
+                return ()
+            drafts = [
+                str(resource_id)
+                for resource_id in (getattr(predecessor, "related_resource_ids", ()) or ())
+                if kind_by_id.get(str(resource_id)) == "DRAFT"
+            ]
+            if len(drafts) != 1:
+                return ()
+            result.extend(drafts)
+        unique = tuple(dict.fromkeys(result))
+        return unique if len(unique) == 1 else ()
 
     def _record_episodic(
         self, *, ctx: RuntimeContext, task_id: str, status: str,

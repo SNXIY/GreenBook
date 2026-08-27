@@ -8,7 +8,7 @@ from typing import Any
 
 from greenbook_agent_core.capability.registry import CapabilityRegistry
 from greenbook_agent_core.context import SessionContext
-from greenbook_agent_core.observability.run_metrics import run_scope
+from greenbook_agent_core.observability.run_metrics import run_scope, snapshot
 from greenbook_contracts.identity import AuthContext
 from greenbook_java_client.client import JavaClient, agent_run_scope
 from pydantic import ValidationError
@@ -18,6 +18,37 @@ from .context import ToolContext
 from .tool_schemas import openai_parameters
 
 logger = logging.getLogger(__name__)
+_MCP_OBSERVABILITY_KEY = "_greenbook_mcp_observability"
+
+
+def _java_counter_snapshot(agent_run_id: str | None) -> tuple[int, int]:
+    if not agent_run_id:
+        return 0, 0
+    try:
+        value = snapshot(agent_run_id)
+        return (
+            int(value.get("java_calls") or 0),
+            int(value.get("java_latency_ms") or 0),
+        )
+    except Exception:
+        return 0, 0
+
+
+def _attach_java_observation(
+    result: dict[str, Any],
+    before: tuple[int, int],
+    after: tuple[int, int],
+) -> dict[str, Any]:
+    calls = max(0, after[0] - before[0])
+    latency_ms = max(0, after[1] - before[1])
+    if calls <= 0:
+        return result
+    enriched = dict(result)
+    enriched[_MCP_OBSERVABILITY_KEY] = {
+        "java_calls": calls,
+        "java_latency_ms": latency_ms,
+    }
+    return enriched
 
 
 class GreenBookMCPServer:
@@ -189,8 +220,11 @@ class GreenBookMCPServer:
         ctx = tool_context
 
         try:
+            java_before = _java_counter_snapshot(agent_run_id)
             with agent_run_scope(agent_run_id), run_scope(agent_run_id):
                 result = await definition.handler(ctx, **normalized_kwargs)
+            java_after = _java_counter_snapshot(agent_run_id)
+            java_observation = (java_before, java_after)
             raw_result = result.model_dump(mode="python") if hasattr(result, "model_dump") else result
             try:
                 validated_result = definition.output_schema.model_validate(raw_result)
@@ -286,7 +320,10 @@ class GreenBookMCPServer:
                         ],
                         "operation_receipt": receipt_payload,
                     }
-            return validated_result.model_dump(mode="json")
+            return _attach_java_observation(
+                validated_result.model_dump(mode="json"),
+                *java_observation,
+            )
         except Exception:
             logger.exception("Tool '%s' execution failed", tool_name)
             has_side_effect = definition.policy.side_effect.has_side_effect

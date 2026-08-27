@@ -31,6 +31,7 @@ from .models import (
     TargetKind,
     TargetReferenceType,
     TaskDelta,
+    TaskDeltaOperation,
 )
 from .normalization import normalize_task_deltas
 from .reference_extractor import ReferenceExtractor
@@ -39,6 +40,12 @@ from .semantic_validator import validate_semantic_candidate
 from .target import TargetResolutionStatus, TargetResolver
 
 logger = logging.getLogger(__name__)
+
+_NON_MUTATING_TASK_DELTA_OPERATIONS = frozenset({
+    TaskDeltaOperation.CREATE_TASK,
+    TaskDeltaOperation.NO_CHANGE,
+    TaskDeltaOperation.ASK_USER,
+})
 
 
 class CommandInterpretationError(ValueError):
@@ -189,6 +196,7 @@ class CommandInterpreter:
             request_complexity=structured.request_complexity,
             task_changes=list(structured.task_changes or []),
             target=structured.target,
+            question=_structured_question(structured),
             parameters=structured.parameters,
             entities=structured.entities,
             constraints=structured.constraints,
@@ -267,11 +275,16 @@ class CommandInterpreter:
 
         Span grouping is a bounded fallback for the one-item shape.  Once the
         semantic extraction boundary has already returned multiple explicit
-        deliverables, regrouping raw spans can erase their per-item outcome
-        ownership (for example, immediate versus scheduled publication).
-        Preserve that structured cardinality and its constraints.
+        deliverables, or the same response contains an explicit task mutation,
+        regrouping raw spans can erase per-item outcome ownership or duplicate
+        the independent CREATE item.  Preserve that structured cardinality and
+        its constraints.
         """
-        if structured.command != CommandType.CREATE or len(structured.items) != 1:
+        if (
+            structured.command != CommandType.CREATE
+            or len(structured.items) != 1
+            or _has_non_create_task_mutation(structured)
+        ):
             return structured
         spans = _input_spans(user_input)
         if len(spans) <= 1:
@@ -462,11 +475,13 @@ class CommandInterpreter:
                 fallback = structured.items[0].model_dump(mode="python")
                 item = {
                     **fallback,
+                    "item_key": str(getattr(segment, "item_key", "") or ""),
                     "operation": segment.operation_hint or fallback.get("operation", "CREATE"),
                     "topic": segment.topic or fallback.get("topic", ""),
                     "title": segment.title or segment.topic or fallback.get("title", ""),
                     "requirements": list(segment.requirements or fallback.get("requirements") or ()),
                     "temporal_text": segment.temporal_text or fallback.get("temporal_text", ""),
+                    "dependencies": list(getattr(segment, "dependencies", ()) or ()),
                     "constraints": {
                         **dict(fallback.get("constraints") or {}),
                         **dict(segment.constraints or {}),
@@ -492,6 +507,11 @@ class CommandInterpreter:
                 if not item["topic"]:
                     item["topic"] = item["title"]
                 extracted.append(item)
+            extracted = _merge_connected_create_schedule_items(
+                extracted,
+                segments,
+                structured,
+            )
             merged = structured.model_dump(mode="python")
             merged["items"] = extracted
             return StructuredCommandOutput.model_validate(merged)
@@ -950,7 +970,28 @@ def _normalize_draft_only(command: Command, user_input: str) -> None:
             if str(capability).upper() not in publication_capabilities
             and str(capability).upper() not in {"CREATE_DRAFT", "GENERATE_CONTENT"}
         ]
-        item_capabilities = list(dict.fromkeys([*item_capabilities, "GENERATE_CONTENT"]))
+        explicit_capabilities = {
+            str(capability).upper()
+            for capability in (getattr(item, "capabilities", ()) or ())
+        }
+        item_intent = _publication_intent_from_constraints(
+            getattr(item, "constraints", {})
+        )
+        # Request-level DRAFT_ONLY is an outcome for the content-bearing
+        # deliverable, not permission to append GENERATE_CONTENT to every
+        # sibling item.  A read-only SEARCH item must retain its own action
+        # ownership; only an explicitly content-bearing/draft-only item (or a
+        # single legacy item with no per-item capabilities) gets generation.
+        content_bearing = bool(
+            explicit_capabilities.intersection(
+                {"GENERATE_CONTENT", "CREATE_DRAFT", "PUBLISH_NOW", "SCHEDULE_PUBLISH"}
+            )
+        )
+        if content_bearing or item_intent == "DRAFT_ONLY" or (
+            not explicit_capabilities and len(command.items or ()) == 1
+        ):
+            item_capabilities.append("GENERATE_CONTENT")
+        item_capabilities = list(dict.fromkeys(item_capabilities))
         if hasattr(item, "capabilities"):
             item.capabilities = item_capabilities
         elif isinstance(item, Mapping):
@@ -990,8 +1031,8 @@ revised, or published.  One independently createable Draft/Post/article is
 one deliverable.  A connected search -> summarize -> write -> schedule
 pipeline is one deliverable.  Two independent articles with separate titles
 or publication times are two deliverables.  For each deliverable fill its own
-operation_hint, entity_type, topic, title, requirements, temporal_text,
-constraints, and target_reference.  Preserve per-deliverable
+item_key, operation_hint, entity_type, topic, title, requirements, temporal_text,
+dependencies, constraints, and target_reference.  Preserve per-deliverable
 publication_intent such as SCHEDULED_PUBLISH or DRAFT_ONLY when publication
 outcomes differ.  A future publication requirement without a concrete time
 keeps publication_intent=SCHEDULED_PUBLISH with an empty temporal_text; do not
@@ -1002,7 +1043,9 @@ the user has not supplied each entity's topic or title; an entity_type and an
 empty detail field are valid.  Do not collapse such entities into one vague
 aggregate.  Count independently satisfiable outcomes, not verbs, tools, or
 prerequisite steps.
-Do not emit tools, capabilities, plans, dependencies, or execution steps.
+Do not emit tools, capabilities, plans, or execution steps.  A dependency is
+allowed only as an explicit semantic relation between returned deliverables;
+when present, use the referenced item's item_key, title, or ordinal.
 Return deliverables=[] only for a pure query or conversational message.
 """
 
@@ -1063,6 +1106,22 @@ def _validate_span_grouping(
     return result if set(result) == expected else None
 
 
+def _has_non_create_task_mutation(structured: StructuredCommandOutput) -> bool:
+    """Keep explicit task mutations outside raw CREATE span grouping.
+
+    ``CREATE_TASK`` is the compatibility representation for new work and can
+    still participate in the existing CREATE cardinality repair.  The other
+    stateful TaskDelta operations already identify a separate mutation; input
+    spans must not be reinterpreted as additional CREATE items.  ``NO_CHANGE``
+    and ``ASK_USER`` carry no mutation and therefore do not close the grouping
+    boundary.
+    """
+    return any(
+        delta.operation not in _NON_MUTATING_TASK_DELTA_OPERATIONS
+        for delta in (structured.task_changes or ())
+    )
+
+
 _COMMAND_SYSTEM_PROMPT = """You are the GreenBook Command Runtime.
 
 Return exactly one JSON object matching the supplied greenbook_command schema.
@@ -1080,10 +1139,23 @@ as the user's message (Chinese user input → Chinese goal and descriptions).
 
 Describe the open semantic evidence needed by the runtime: action family,
 publication requirement, target/reference, temporal expression, deliverable
-ownership, content constraints, and dependencies.  The runtime derives the
+ownership, content constraints, and dependencies.  For multiple items, give
+each item a short stable ``item_key`` when the user labels it (A/B/C or an
+equivalent explicit label).  Put an explicit predecessor reference in that
+item's ``dependencies`` list when the user states that it waits for another
+item.  These are semantic item relations, not execution steps; do not invent
+one when the relationship is not explicit.  The runtime derives the
 canonical capabilities and first action from those facts.  It also derives
 SIMPLE/COMPLEX after deliverable segmentation; the complexity value here is
 only a bootstrap hint for that existing boundary.
+
+For a QUERY whose semantic outcome is a community knowledge answer, preserve
+the bounded question in the top-level ``question`` field.  If a provider uses
+the compatibility containers instead, put the same fact in
+``parameters.question`` (or ``parameters.query``).  A topic is acceptable in
+``entities.topic`` when it is the actual knowledge question.  This is the
+structured query fact consumed by the canonical answer capability; never
+make an execution adapter recover it from raw input or the display goal.
 
 When the user is modifying or steering existing work in this conversation
 ("Redis 那个不用了", "总结完再写一篇", "改成明天下午3点", "顺便查一下 RAG"),
@@ -1268,8 +1340,9 @@ saving as a draft or explicitly not publishing is never an immediate
 publication request.
 
 Each independent user-mentioned outcome owns exactly one item or one
-TaskDelta. Keep that item's target, action, publication intent, temporal
-expression, and constraints together; do not copy a sibling's value, and do
+TaskDelta. Keep that item's item_key, target, action, publication intent,
+temporal expression, explicit dependency references, and constraints together;
+do not copy a sibling's value, and do
 not emit mutations for other active tasks that the user did not mention.
 For a user-triggered retry, preserve the FAILED semantic reference and create
 new-work evidence; if the old outcome is RESULT_UNKNOWN, emit reconciliation
@@ -1290,8 +1363,9 @@ items is the authoritative business projection. One independent final entity
 that can be created, revised, or published (one Draft/Post/article) is exactly
 one item. For every new CREATE request, populate items with one object per
 independent deliverable; do not merge items merely because they occur in one
-user message. Each item preserves its own topic, title, requirements (plain
-language requirements for the deliverable), and temporal_text/run_at.
+ user message. Each item preserves its own item_key, topic, title, requirements
+ (plain language requirements for the deliverable), temporal_text/run_at, and
+ explicit dependencies when the user states a prerequisite.
 SEARCH, ANALYZE, summarization, and GENERATE are requirements within that item,
 not separate items. A connected pipeline is one item; two independent articles
 with two titles or publish times are two items. The top-level command describes
@@ -1354,6 +1428,31 @@ def _publication_intent_from_constraints(value: Any) -> str:
         return "SCHEDULED_PUBLISH"
     if value.get("publish") is False or value.get("schedule") is False:
         return "DRAFT_ONLY"
+    return ""
+
+
+def _structured_question(structured: StructuredCommandOutput) -> str:
+    """Project a bounded query fact from the structured interpretation only.
+
+    The query is deliberately not recovered from ``goal`` or ``raw_input``.
+    Those fields are compatibility/display envelopes and may contain the whole
+    request rather than the question that the canonical read tool accepts.
+    """
+
+    direct = str(getattr(structured, "question", "") or "").strip()
+    if direct:
+        return direct[:1000]
+    for container in (
+        getattr(structured, "parameters", None),
+        getattr(structured, "entities", None),
+        getattr(structured, "constraints", None),
+    ):
+        if not isinstance(container, Mapping):
+            continue
+        for key in ("question", "query", "search_query", "topic", "subject"):
+            value = container.get(key)
+            if isinstance(value, (str, int, float)) and str(value).strip():
+                return str(value).strip()[:1000]
     return ""
 
 
@@ -1482,9 +1581,11 @@ def _normalize_multi_objective_items(
             repaired.append({
                 "title": str(desired.get("title") or desired.get("topic") or desired.get("description") or ""),
                 "topic": str(desired.get("topic") or desired.get("title") or ""),
+                "item_key": str(desired.get("item_key") or ""),
                 "requirements": list(desired.get("requirements") or ()),
                 "operation": "CREATE",
                 "capabilities": list(desired.get("required_capabilities") or desired.get("capabilities") or ()),
+                "dependencies": [str(value) for value in (desired.get("dependencies") or ()) if str(value).strip()],
                 "temporal_text": str(
                     desired.get("temporal_text") or constraints.get("temporal_text")
                     or desired.get("publish_at") or desired.get("run_at")
@@ -1530,7 +1631,11 @@ def _normalize_multi_objective_items(
                     if isinstance(value, Mapping):
                         child.update({
                             key: value[key]
-                            for key in ("title", "topic", "requirements", "temporal_text", "constraints", "capabilities")
+                            for key in (
+                                "item_key", "title", "topic", "requirements",
+                                "temporal_text", "dependencies", "constraints",
+                                "capabilities",
+                            )
                             if key in value
                         })
                 split_items.append(child)
@@ -1539,6 +1644,120 @@ def _normalize_multi_objective_items(
         payload["items"] = items
         return StructuredCommandOutput.model_validate(payload)
     return structured
+
+
+_DRAFT_DELIVERABLE_ENTITY_TYPES = frozenset({
+    "article",
+    "content",
+    "draft",
+    "post",
+})
+_SCHEDULE_DELIVERABLE_ENTITY_TYPES = frozenset({
+    "publication",
+    "publish_schedule",
+    "schedule",
+    "scheduled",
+})
+
+
+def _normalized_entity_type(value: Any) -> str:
+    return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _same_deliverable_identity(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    for key in ("title", "topic"):
+        left_value = str(left.get(key) or "").strip().casefold()
+        right_value = str(right.get(key) or "").strip().casefold()
+        if left_value and right_value and left_value == right_value:
+            return True
+    return False
+
+
+def _merge_connected_create_schedule_items(
+    extracted: list[dict[str, Any]],
+    segments: Sequence[Any],
+    structured: StructuredCommandOutput,
+) -> list[dict[str, Any]]:
+    """Keep one final item for a typed Draft -> Schedule pipeline.
+
+    The WHAT-only boundary can distinguish the draft entity from its schedule
+    entity even when the user described one connected resource lifecycle.  A
+    single initial structured item carrying both mutation capabilities is the
+    evidence that this is one deliverable, not two independent articles.  The
+    merge is deliberately narrow: it requires exactly one draft segment, one
+    schedule segment, and matching structured identity; otherwise the explicit
+    segmentation cardinality remains untouched.
+    """
+    if len(extracted) < 2 or len(extracted) != len(segments):
+        return extracted
+    initial_capabilities = {
+        str(value).upper().replace("-", "_")
+        for value in (
+            list(structured.required_capabilities or ())
+            + list(structured.items[0].capabilities if structured.items else ())
+        )
+    }
+    if not {"GENERATE_CONTENT", "SCHEDULE_PUBLISH"}.issubset(initial_capabilities):
+        return extracted
+
+    draft_indexes = [
+        index for index, segment in enumerate(segments)
+        if _normalized_entity_type(getattr(segment, "entity_type", ""))
+        in _DRAFT_DELIVERABLE_ENTITY_TYPES
+    ]
+    schedule_indexes = [
+        index for index, segment in enumerate(segments)
+        if _normalized_entity_type(getattr(segment, "entity_type", ""))
+        in _SCHEDULE_DELIVERABLE_ENTITY_TYPES
+    ]
+    if len(draft_indexes) != 1 or len(schedule_indexes) != 1:
+        return extracted
+    draft_index = draft_indexes[0]
+    schedule_index = schedule_indexes[0]
+    draft_item = extracted[draft_index]
+    schedule_item = extracted[schedule_index]
+    if not _same_deliverable_identity(draft_item, schedule_item):
+        return extracted
+
+    merged = dict(draft_item)
+    merged["title"] = str(merged.get("title") or schedule_item.get("title") or "")
+    merged["topic"] = str(merged.get("topic") or schedule_item.get("topic") or merged["title"])
+    requirements: list[str] = []
+    for item in (draft_item, schedule_item):
+        for requirement in item.get("requirements") or ():
+            value = str(requirement).strip()
+            if value and value not in requirements:
+                requirements.append(value)
+    merged["requirements"] = requirements
+    merged["operation"] = "CREATE"
+    merged["temporal_text"] = str(
+        schedule_item.get("temporal_text")
+        or draft_item.get("temporal_text")
+        or ""
+    )
+    merged["constraints"] = {
+        **dict(draft_item.get("constraints") or {}),
+        **dict(schedule_item.get("constraints") or {}),
+    }
+    capabilities: list[str] = []
+    for item in (draft_item, schedule_item):
+        for capability in item.get("capabilities") or ():
+            value = str(capability).upper().replace("-", "_")
+            if value and value not in capabilities:
+                capabilities.append(value)
+    for capability in ("GENERATE_CONTENT", "SCHEDULE_PUBLISH"):
+        if capability not in capabilities:
+            capabilities.append(capability)
+    merged["capabilities"] = capabilities
+    schedule_target = dict(schedule_item.get("constraints") or {}).get("target_reference")
+    if schedule_target and not merged["constraints"].get("target_reference"):
+        merged["constraints"]["target_reference"] = schedule_target
+
+    return [
+        merged if index == draft_index else item
+        for index, item in enumerate(extracted)
+        if index != schedule_index
+    ]
 
 
 def _ensure_create_item(structured: StructuredCommandOutput) -> StructuredCommandOutput:

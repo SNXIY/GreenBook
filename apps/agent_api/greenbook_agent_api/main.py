@@ -70,7 +70,7 @@ from greenbook_agent_core.runtime.container import RuntimeContainer
 from greenbook_agent_core.task.manager import TaskManager
 from greenbook_agent_core.task.provider import TaskProvider, TaskScope
 from greenbook_contracts.events import EVENT_ACTION_COMPLETED, EVENT_PARTIAL_RESULT
-from greenbook_java_client.client import JavaClient
+from greenbook_java_client.client import JavaClient, configure_observability
 from greenbook_mcp_server import tool_registry as mcp_tool_registry
 from greenbook_mcp_server.client import GreenBookMCPClient
 from greenbook_mcp_server.server import GreenBookMCPServer
@@ -79,6 +79,10 @@ from greenbook_security.jwt import JwtValidationError, validate_access_token
 from greenbook_security.policy import SecurityPolicy
 from openai import AsyncOpenAI
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from greenbook_agent_core.observability.run_metrics import record_java, record_stage
+
+configure_observability(record_stage=record_stage, record_java=record_java)
 
 from .api.routes import router
 from .api.runtime_routes import router as runtime_router

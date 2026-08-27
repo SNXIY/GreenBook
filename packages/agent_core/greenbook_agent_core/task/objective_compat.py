@@ -8,6 +8,7 @@ capability — it only converts existing data.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .models import Objective, ObjectiveStatus
@@ -91,6 +92,7 @@ def resolve_objectives(task: Any) -> list[Objective]:
 
 
 _CAPABILITY_OBJECTIVE: dict[str, tuple[str, str]] = {
+    "ANSWER_FROM_KNOWLEDGE": ("KNOWLEDGE_ANSWER", "Community knowledge answer"),
     "SEARCH_COMMUNITY": ("SEARCH_RESULT", "检索相关内容"),
     "GET_POST_DETAIL": ("POST", "获取内容详情"),
     "LIST_OWN_POSTS": ("POST", "查看自己的帖子"),
@@ -121,6 +123,18 @@ def _item_result_requirement(caps: list[str]) -> str:
     return "DIRECT_RESULT"
 
 
+def _canonical_objective_capabilities(values: Any) -> list[str]:
+    """Collapse supporting search into the resolved knowledge-answer outcome."""
+    names: list[str] = []
+    for value in (values or ()):
+        name = str(getattr(value, "name", "") or value or "").upper()
+        if name and name not in names:
+            names.append(name)
+    if "ANSWER_FROM_KNOWLEDGE" in names:
+        names = [name for name in names if name != "SEARCH_COMMUNITY"]
+    return names
+
+
 def objectives_for_capabilities(
     capabilities: Any,
     task_id: str,
@@ -128,20 +142,24 @@ def objectives_for_capabilities(
     fallback_intent: str = "",
 ) -> list[Objective]:
     """Deterministically create one Objective per required capability."""
+    names = _canonical_objective_capabilities(capabilities)
     seen: set[str] = set()
     objectives: list[Objective] = []
-    for capability in (capabilities or ()):
-        name = str(getattr(capability, "name", "") or capability or "").upper()
+    for name in names:
         if not name or name in seen:
             continue
         seen.add(name)
         kind, label = _CAPABILITY_OBJECTIVE.get(name, ("", ""))
-        objectives.append(Objective(
+        objective = Objective(
             task_id=task_id,
             description=label or name,
             intent=label or name,
             expected_resource_kind=kind,
-        ))
+        )
+        if name == "ANSWER_FROM_KNOWLEDGE":
+            objective.required_capabilities = [name]
+            objective.result_requirement = "DIRECT_RESULT"
+        objectives.append(objective)
     if not objectives and fallback_intent:
         objectives.append(Objective(
             task_id=task_id,
@@ -178,13 +196,16 @@ def objectives_from_items(
         from greenbook_agent_core.execution.temporal_resolver import TemporalResolver
         now = now if now is not None else datetime.now(UTC)
         resolver = TemporalResolver()
+    source_items = [item for item in (items or ()) if item is not None]
     objectives: list[Objective] = []
-    for item in (items or ()):
+    for item_index, item in enumerate(source_items):
         if item is None:
             continue
         title = str(getattr(item, "title", "") or getattr(item, "topic", "") or "")
         intent = title or str(getattr(item, "operation", "") or "TASK")
-        caps = list(getattr(item, "capabilities", ()) or ())
+        caps = _canonical_objective_capabilities(
+            getattr(item, "capabilities", ()) or ()
+        )
         kind = ""
         for cap in caps:
             k, _label = _CAPABILITY_OBJECTIVE.get(str(cap).upper(), ("", ""))
@@ -203,8 +224,8 @@ def objectives_from_items(
             # Preserve ALL required capabilities so the Objective is only
             # COMPLETED when every one has a verified resource (DRAFT AND
             # SCHEDULE), not just the first.
-            objective.required_capabilities = [str(c).upper() for c in caps]
-        resolved_item = state_items[len(objectives)] if len(state_items) > len(objectives) else None
+            objective.required_capabilities = list(caps)
+        resolved_item = state_items[item_index] if len(state_items) > item_index else None
         if resolved_item is not None:
             canonical_constraints = dict(getattr(resolved_item, "constraints", {}) or {})
             objective.constraints.update(canonical_constraints)
@@ -222,8 +243,101 @@ def objectives_from_items(
                 if resolved:
                     objective.constraints["run_at"] = str(resolved)
                     objective.constraints["timezone"] = timezone
+        item_key = str(
+            getattr(item, "item_key", "")
+            or getattr(resolved_item, "item_key", "")
+            or ""
+        ).strip()
+        if item_key:
+            objective.constraints["item_key"] = item_key
         objectives.append(objective)
+
+    # Dependencies are semantic references between already materialized
+    # deliverables. Resolve them only against structured item evidence (key,
+    # title/topic, or an explicit ordinal); never search the raw request text.
+    for item_index, (item, objective) in enumerate(zip(source_items, objectives)):
+        resolved_item = state_items[item_index] if len(state_items) > item_index else None
+        references = _item_dependency_references(item, resolved_item)
+        if not references:
+            continue
+        resolved_ids, unresolved = _resolve_item_dependencies(
+            references,
+            item_index=item_index,
+            items=source_items,
+            objectives=objectives,
+        )
+        objective.dependencies = resolved_ids
+        if unresolved:
+            objective.constraints["dependency_resolution"] = {
+                "status": "UNRESOLVED",
+                "references": unresolved,
+            }
+        else:
+            objective.constraints["dependency_resolution"] = {
+                "status": "RESOLVED",
+                "references": references,
+            }
     return objectives
+
+
+def _item_dependency_references(item: Any, resolved_item: Any | None) -> list[str]:
+    values = list(getattr(item, "dependencies", ()) or ())
+    if not values and resolved_item is not None:
+        values = list(getattr(resolved_item, "dependencies", ()) or ())
+    return [str(value).strip() for value in values if str(value).strip()]
+
+
+def _resolve_item_dependencies(
+    references: list[str],
+    *,
+    item_index: int,
+    items: list[Any],
+    objectives: list[Objective],
+) -> tuple[list[str], list[str]]:
+    by_key: dict[str, list[int]] = {}
+    by_identity: dict[str, list[int]] = {}
+    for index, item in enumerate(items):
+        for field in ("item_key", "title", "topic"):
+            value = getattr(item, field, "")
+            normalized = _dependency_identity(value)
+            if not normalized:
+                continue
+            target = by_key if field == "item_key" else by_identity
+            target.setdefault(normalized, []).append(index)
+
+    resolved: list[str] = []
+    unresolved: list[str] = []
+    for reference in references:
+        normalized = _dependency_identity(reference)
+        candidates = list(by_key.get(normalized, ()))
+        if not candidates:
+            candidates = list(by_identity.get(normalized, ()))
+        if not candidates:
+            ordinal = _dependency_ordinal(reference)
+            if ordinal is not None and 0 < ordinal <= len(items):
+                candidates = [ordinal - 1]
+        candidates = [candidate for candidate in candidates if candidate != item_index]
+        if len(candidates) == 1:
+            objective_id = str(objectives[candidates[0]].objective_id)
+            if objective_id not in resolved:
+                resolved.append(objective_id)
+        else:
+            unresolved.append(reference)
+    return resolved, unresolved
+
+
+def _dependency_identity(value: Any) -> str:
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def _dependency_ordinal(value: Any) -> int | None:
+    match = re.fullmatch(
+        r"(?:item|objective|deliverable|goal)[\s_-]*(\d+)|#?(\d+)",
+        str(value or "").strip().casefold(),
+    )
+    if not match:
+        return None
+    return int(next(group for group in match.groups() if group))
 
 
 def _objective_status(value: Any) -> ObjectiveStatus:

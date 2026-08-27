@@ -46,6 +46,7 @@ from ..runner import (
     RUN_RUNNING,
     RUN_WORKING,
     AgentRun,
+    performance_projection,
 )
 from ..runner import (
     RUN_TERMINAL as _RUN_TERMINAL,
@@ -725,6 +726,38 @@ def _run_record_from_projection(
     }
 
 
+def _finish_final_response_observation(run_id: str, started_at: float) -> None:
+    """Close the existing final-response timing boundary best-effort."""
+
+    try:
+        from greenbook_agent_core.observability.run_metrics import (
+            record_final_response_once,
+            snapshot,
+        )
+
+        performance = snapshot(run_id)
+        start_timestamp = (performance.get("stage_timestamps") or {}).get(
+            "final_response_start"
+        )
+        elapsed_ms: int
+        if start_timestamp:
+            try:
+                started = datetime.fromisoformat(
+                    str(start_timestamp).replace("Z", "+00:00")
+                )
+                elapsed_ms = round(
+                    (datetime.now(UTC) - started).total_seconds() * 1000
+                )
+            except (TypeError, ValueError):
+                elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+        else:
+            elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+        record_final_response_once(elapsed_ms, run_id=run_id)
+    except Exception:
+        # Observability must never change the user-facing response.
+        pass
+
+
 async def _final_response_projection(
     record: dict[str, Any],
     projections: list[Any],
@@ -739,13 +772,15 @@ async def _final_response_projection(
     completed child cannot overwrite the result of its siblings.
     """
     started_at = time.perf_counter()
+    run_id = str(record.get("run_id") or "")
     try:
-        from greenbook_agent_core.observability.run_metrics import record_stage
-        record_stage("final_response_start", run_id=str(record.get("run_id") or ""))
+        from greenbook_agent_core.observability.run_metrics import record_stage_once
+        record_stage_once("final_response_start", run_id=run_id)
     except Exception:
         pass
     status = str(record.get("status") or "").upper()
     if status not in _RUN_TERMINAL:
+        _finish_final_response_observation(run_id, started_at)
         return str(record.get("content") or "")
     task_id = str(
         record.get("task_id")
@@ -754,6 +789,7 @@ async def _final_response_projection(
     )
     provider = getattr(request.app.state, "task_provider", None)
     if not task_id or provider is None:
+        _finish_final_response_observation(run_id, started_at)
         return str(record.get("content") or "")
     conversation_id = str(record.get("conversation_id") or getattr(projections[0], "conversation_id", ""))
     try:
@@ -766,9 +802,11 @@ async def _final_response_projection(
             task_id,
         )
     except Exception:
+        _finish_final_response_observation(run_id, started_at)
         return str(record.get("content") or "")
     objectives = list(getattr(task, "objectives", ()) or ()) if task is not None else []
     if not objectives:
+        _finish_final_response_observation(run_id, started_at)
         return str(record.get("content") or "")
     touched_ids = {
         str(getattr(item, "objective_id", "") or "")
@@ -780,6 +818,7 @@ async def _final_response_projection(
     if not touched_ids and len(objectives) == 1:
         touched_ids = {str(getattr(objectives[0], "objective_id", "") or "")}
     if not touched_ids:
+        _finish_final_response_observation(run_id, started_at)
         return str(record.get("content") or "")
     from greenbook_agent_core.task.objective_reducer import mutation_objective_is_superseded
 
@@ -814,15 +853,7 @@ async def _final_response_projection(
         changed_resources = [task_resources[rid] for rid in changed_ids if rid in task_resources]
         lines.append(_render_objective_terminal_line(objective, owned_resources, changed_resources))
     content = "\n".join(line for line in lines if line) or str(record.get("content") or "")
-    try:
-        from greenbook_agent_core.observability.run_metrics import (
-            record_final_response,
-            record_stage,
-        )
-        record_final_response(round((time.perf_counter() - started_at) * 1000), run_id=str(record.get("run_id") or ""))
-        record_stage("final_response_finished", run_id=str(record.get("run_id") or ""))
-    except Exception:
-        pass
+    _finish_final_response_observation(run_id, started_at)
     return content
 
 
@@ -2434,6 +2465,32 @@ async def get_run(run_id: str, request: Request) -> RunResponse:
                 request=request,
                 auth=auth,
             )
+            # Final-response timing is recorded while the read projection is
+            # being assembled, after the durable Run performance snapshot was
+            # originally persisted. Refresh only the returned read model so the
+            # existing observability projection includes the terminal
+            # presentation stage without changing business state. Preserve the
+            # terminal total from the durable snapshot: recalculating it from
+            # the current GET would make a later poll look slower than the Run.
+            try:
+                previous_performance = dict(record.get("performance") or {})
+                refreshed_performance = performance_projection(
+                    SimpleNamespace(
+                        run_id=str(record.get("run_id") or ""),
+                        created_at=record.get("created_at", ""),
+                    ),
+                    RuntimeResult(
+                        run_id=str(record.get("run_id") or ""),
+                        partial_results={},
+                    ),
+                )
+                if previous_performance.get("total_latency_ms") is not None:
+                    refreshed_performance["total_latency_ms"] = previous_performance[
+                        "total_latency_ms"
+                    ]
+                record["performance"] = refreshed_performance
+            except Exception:
+                logger.debug("final_response_performance_refresh_failed", exc_info=True)
             request.app.state.run_store[run_id] = record
     events = record.get("events", [])
     steps: list[dict[str, object]] = list(record.get("steps", []))

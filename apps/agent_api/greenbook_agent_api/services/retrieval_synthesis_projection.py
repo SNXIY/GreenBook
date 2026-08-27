@@ -26,8 +26,11 @@ logger = logging.getLogger(__name__)
 
 _SEARCH_CAPABILITIES = {"SEARCH_COMMUNITY", "LIST_OWN_POSTS"}
 _DETAIL_CAPABILITIES = {"GET_POST_DETAIL"}
+_ANSWER_CAPABILITIES = {"ANSWER_FROM_KNOWLEDGE"}
 _SEARCH_TOOL_MARKERS = ("SEARCH_PUBLIC_POSTS", "LIST_OWN_POSTS")
 _DETAIL_TOOL_MARKERS = ("GET_POST",)
+_ANSWER_TOOL_MARKERS = ("ANSWER_FROM_KNOWLEDGE",)
+_INSUFFICIENT_KNOWLEDGE_ANSWER = "当前社区资料不足"
 _MAX_SOURCES = 5
 _MAX_SEARCH_ITEMS = 5
 _MAX_EVIDENCE_CHARS = 6000
@@ -104,7 +107,7 @@ def _mapping(value: Any) -> dict[str, Any]:
 
 
 def _payload(tool_result: Mapping[str, Any]) -> dict[str, Any]:
-    for key in ("data", "payload", "result"):
+    for key in ("data", "payload", "result", "structured_data"):
         value = tool_result.get(key)
         if isinstance(value, Mapping):
             return dict(value)
@@ -143,6 +146,14 @@ def _is_detail(item: Mapping[str, Any]) -> bool:
     capability = _text(item.get("capability")).upper()
     tool = _text(item.get("tool_name") or item.get("tool")).upper().replace(".", "_")
     return capability in _DETAIL_CAPABILITIES or any(marker in tool for marker in _DETAIL_TOOL_MARKERS)
+
+
+def _is_knowledge_answer(item: Mapping[str, Any]) -> bool:
+    capability = _text(item.get("capability")).upper()
+    tool = _text(item.get("tool_name") or item.get("tool")).upper().replace(".", "_")
+    return capability in _ANSWER_CAPABILITIES or any(
+        marker in tool for marker in _ANSWER_TOOL_MARKERS
+    )
 
 
 def _resource_id(record: Mapping[str, Any]) -> str:
@@ -266,6 +277,113 @@ def _detail_sources(tool_results: Sequence[Mapping[str, Any]]) -> tuple[list[dic
             if len(sources) >= _MAX_SOURCES:
                 return sources, failed, selected
     return sources, failed, selected
+
+
+def _knowledge_sources(item: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Project only the source identity returned by the canonical RAG tool.
+
+    The tool has already validated every cited chunk against the retrieved
+    evidence.  The presentation layer must preserve those references without
+    inventing a post or exposing the raw chunk id as user-facing prose.
+    """
+    payload = _payload(item)
+    raw_sources = payload.get("sources")
+    if not isinstance(raw_sources, list):
+        return []
+    sources: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for raw in raw_sources:
+        if not isinstance(raw, Mapping):
+            continue
+        post_id = _text(raw.get("postId") or raw.get("post_id"))
+        chunk_id = _text(raw.get("chunkId") or raw.get("chunk_id"))
+        title = _compact(raw.get("title") or raw.get("name"), 180)
+        if not post_id and not chunk_id:
+            continue
+        key = (post_id, chunk_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        sources.append({
+            "ref": f"source-{len(sources) + 1}",
+            "resource_id": post_id or chunk_id,
+            "title": title or "社区资料",
+            "summary": _clean_excerpt(
+                raw.get("excerpt") or raw.get("summary") or raw.get("content"),
+                260,
+            ),
+            "body": "",
+            "read_status": "FULL",
+            # Keep the exact validated chunk identity for structured citation
+            # lineage.  It is never interpolated into user-facing prose.
+            "evidence_ref": chunk_id or post_id,
+        })
+        if len(sources) >= _MAX_SOURCES:
+            break
+    return sources
+
+
+def _knowledge_answer_interaction(
+    *,
+    request: str,
+    item: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, str]:
+    """Adapt canonical `{answer, sources}` into the existing synthesis wire shape."""
+    if not _is_success(item):
+        return None, ""
+    payload = _payload(item)
+    answer = _text(payload.get("answer") or payload.get("content"))
+    sources = _knowledge_sources(item)
+    copy = _language_copy(request)
+    state = _mapping(item.get("state"))
+    candidate_count = state.get("candidate_post_count")
+    evidence_count = state.get("evidence_count")
+    total = candidate_count if isinstance(candidate_count, (int, float)) else evidence_count
+    total = int(total) if isinstance(total, (int, float)) else None
+    no_answer = not answer or answer == _INSUFFICIENT_KNOWLEDGE_ANSWER
+    safe_answer = _safe_conclusion(answer) if not no_answer else ""
+    if not no_answer and not safe_answer:
+        no_answer = True
+    if no_answer:
+        if total:
+            intro = (
+                f"{copy['found']} {total} {copy['related']}，但当前资料不足以给出可核验的结论。"
+                if _language_is_chinese(request)
+                else f"{copy['found']} {total} {copy['related']}, but the evidence is insufficient for a verifiable answer."
+            )
+        else:
+            intro = copy["no_results"]
+        evidence_note = _INSUFFICIENT_KNOWLEDGE_ANSWER if _language_is_chinese(request) else (
+            "There is not enough community evidence for a verifiable answer."
+        )
+        message = evidence_note
+    else:
+        intro = (
+            f"基于 {len(sources)} 条社区资料整理。"
+            if _language_is_chinese(request)
+            else f"Answer grounded in {len(sources)} community sources."
+        )
+        evidence_note = None
+        message = safe_answer
+    interaction = {
+        "kind": "SYNTHESIS_RESULT",
+        "status": "SUCCESS",
+        "synthesis": {
+            "title": "社区知识回答" if _language_is_chinese(request) else "Community knowledge answer",
+            "language": "zh" if _language_is_chinese(request) else "en",
+            "intro": intro,
+            "total_matched": total,
+            "selected_count": len(sources) or None,
+            "read_count": len(sources),
+            "failed_count": 0,
+            "sources": _source_items(sources),
+            "common_patterns": [],
+            "differences": [],
+            "conclusion": safe_answer,
+            "evidence_note": evidence_note,
+        },
+    }
+    return interaction, message
 
 
 def _ordered_search_items(records: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -500,6 +618,12 @@ async def build_retrieval_interaction(
     """
 
     normalized_results = [dict(item) for item in tool_results if isinstance(item, Mapping)]
+    knowledge_answer = next(
+        (item for item in normalized_results if _is_knowledge_answer(item)),
+        None,
+    )
+    if knowledge_answer is not None:
+        return _knowledge_answer_interaction(request=request, item=knowledge_answer)
     search_records, total_matched, search_summary = _search_snapshot(normalized_results)
     sources, failed_count, selected_count = _detail_sources(normalized_results)
     readable_sources = [

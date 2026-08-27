@@ -24,8 +24,12 @@ from greenbook_agent_core.observability.metrics import MemoryMetricsCollector
 from greenbook_agent_core.runtime.container import RuntimeContainer
 from greenbook_contracts.identity import AuthContext
 from greenbook_java_client import JavaClient
+from greenbook_java_client.client import configure_observability
+from greenbook_agent_core.observability.run_metrics import record_java, record_stage
 
 logger = logging.getLogger(__name__)
+
+configure_observability(record_stage=record_stage, record_java=record_java)
 
 _ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 

@@ -61,6 +61,7 @@ class CapabilityExecutor:
         objective_id: str | None = None,
         objective_draft_ids: Sequence[str] | None = None,
         objective_schedule_ids: Sequence[str] | None = None,
+        objective_dependency_draft_ids: Sequence[str] | None = None,
     ) -> None:
         self._registry = registry
         self._tool_handler = tool_handler
@@ -80,6 +81,9 @@ class CapabilityExecutor:
         )
         self._objective_schedule_ids = tuple(
             str(rid) for rid in (objective_schedule_ids or ()) if rid
+        )
+        self._objective_dependency_draft_ids = tuple(
+            str(rid) for rid in (objective_dependency_draft_ids or ()) if rid
         )
         self._tool_registry = tool_registry
 
@@ -323,15 +327,16 @@ class CapabilityExecutor:
             getattr(getattr(capability, "inputs", None), "optional", ()) or ()
         )
 
-        # Objective-owned resource authority: a CREATE_SCHEDULE under a Business
-        # Objective must schedule that Objective's OWN Draft.  The authority is
-        # Objective.related_resource_ids (persisted), never the task-global
-        # latest/first Draft and never a cross-Objective draft_id supplied by
-        # the model.  A missing or ambiguous owned Draft is a controlled reject,
-        # so Schedule(DraftA) can never execute.
+        # Objective-owned resource authority: a CREATE_SCHEDULE/PUBLISH_NOW
+        # under a Business Objective normally consumes that Objective's OWN
+        # Draft.  The only explicit dependency exception is one verified Draft
+        # produced by a declared predecessor Objective.  It remains owned by
+        # the predecessor; this boundary merely passes the typed artifact into
+        # the dependent action.  Task-global latest/first resources and model
+        # guesses remain invalid.
         if (
             self._objective_id
-            and capability.name == "SCHEDULE_PUBLISH"
+            and capability.name in {"SCHEDULE_PUBLISH", "PUBLISH_NOW"}
             and "draft_id" in declared_fields
         ):
             owned = list(self._objective_draft_ids)
@@ -341,10 +346,18 @@ class CapabilityExecutor:
             supplied = str(arguments.get("draft_id") or "")
             if supplied and supplied in owned:
                 return arguments
+            dependency_owned = list(self._objective_dependency_draft_ids)
+            if not owned and len(dependency_owned) == 1:
+                arguments["draft_id"] = dependency_owned[0]
+                return arguments
+            if not owned and supplied and supplied in dependency_owned and len(dependency_owned) == 1:
+                arguments["draft_id"] = supplied
+                return arguments
             raise ResourceBindingError(
                 "INVALID_RESOURCE_BINDING: Objective "
-                f"{self._objective_id} owns {len(owned)} draft(s); a "
-                "CREATE_SCHEDULE requires exactly one Objective-owned Draft."
+                f"{self._objective_id} owns {len(owned)} draft(s) and its "
+                f"explicit dependencies provide {len(dependency_owned)}; "
+                f"{capability.name} requires exactly one verified Draft."
             )
 
         # Immediate publication has the same Draft ownership invariant as

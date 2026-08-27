@@ -88,6 +88,26 @@ def _resolve_semantic_action(action: str) -> tuple[str, str] | None:
         return "ANSWER_FROM_KNOWLEDGE", "community.answer_from_knowledge"
     return _core_default_resolver(action)
 
+
+# These are the capability spellings that represent a business mutation.  A
+# current Command can contain read/synthesis items alongside task_changes for a
+# cross-turn mutation; those read items must still become sibling Objectives.
+# Keep this as a capability contract, not a raw-text or route heuristic.
+_MUTATION_ITEM_CAPABILITIES = frozenset({
+    "GENERATE_CONTENT",
+    "CREATE_DRAFT",
+    "MANAGE_DRAFT",
+    "UPDATE_DRAFT",
+    "DELETE_DRAFT",
+    "DELETE_POST",
+    "SCHEDULE_PUBLISH",
+    "CREATE_SCHEDULE",
+    "MANAGE_SCHEDULE",
+    "UPDATE_SCHEDULE",
+    "CANCEL_SCHEDULE",
+    "PUBLISH_NOW",
+})
+
 _UPDATE_CONTENT_PROMPT = """You rewrite a GreenBook draft body per a user edit.
 
 Return exactly one JSON object {"content": "..."}. The content is the FULL
@@ -376,6 +396,7 @@ class ActionLoopExecutor:
         max_iterations: int = 8,
         action_loop: ActionLoop | Any | None = None,
         decision_event_store: Any | None = None,
+        max_parallel_objectives: int = 2,
     ) -> None:
         self._adapter = adapter
         self._context_assembler = context_assembler
@@ -397,6 +418,7 @@ class ActionLoopExecutor:
             llm=self._llm,
             model=self._model,
             max_iterations=self._max_iterations,
+            max_parallel_objectives=max_parallel_objectives,
         )
 
     @staticmethod
@@ -628,7 +650,12 @@ class ActionLoopExecutor:
             run_id=run_id,
             turn_id=trace_id,
         )
-        task = await self._ensure_mutation_objectives(task, command)
+        task = await self._ensure_mutation_objectives(
+            task,
+            command,
+            run_id=run_id,
+            turn_id=trace_id,
+        )
         task = await self._admit_task_if_needed(task)
         if _semantic_confirmation_blocks_task(task):
             return _semantic_confirmation_waiting_result(
@@ -684,7 +711,12 @@ class ActionLoopExecutor:
             run_id=run_id,
             turn_id=turn_id,
         )
-        task = await self._ensure_mutation_objectives(task, command)
+        task = await self._ensure_mutation_objectives(
+            task,
+            command,
+            run_id=run_id,
+            turn_id=turn_id,
+        )
         if getattr(command, "task_changes", None):
             store = _ActionLoopTaskStore(
                 self._task_manager,
@@ -708,7 +740,182 @@ class ActionLoopExecutor:
                 task = latest
         return task
 
-    async def _ensure_mutation_objectives(self, task: Any, command: Any) -> Any:
+    async def _persist_task_projection(self, task: Any) -> Any:
+        """Persist an Objective projection through the existing Task repository."""
+
+        manager = self._task_manager
+        repository = getattr(manager, "repository", None)
+        repository = repository() if callable(repository) else getattr(manager, "_repository", None)
+        update = getattr(repository, "update", None)
+        if not callable(update):
+            return task
+        persisted = update(task, expected_version=getattr(task, "version", None))
+        return await persisted if inspect.isawaitable(persisted) else persisted
+
+    @staticmethod
+    def _command_source_id(command: Any) -> str:
+        return str(
+            getattr(command, "command_id", "")
+            or getattr(getattr(command, "resolved_semantics", None), "source_command_id", "")
+            or ""
+        ).strip()
+
+    @staticmethod
+    def _item_is_mutation(item: Any) -> bool:
+        capabilities = {
+            str(value).upper()
+            for value in (getattr(item, "capabilities", None) or ())
+            if str(value).strip()
+        }
+        return bool(capabilities & _MUTATION_ITEM_CAPABILITIES)
+
+    def _append_current_non_mutation_objectives(
+        self,
+        task: Any,
+        command: Any,
+        *,
+        run_id: str = "",
+        turn_id: str = "",
+    ) -> bool:
+        """Admit current read/synthesis items to an already materialized Task.
+
+        Explicit-resource mutations can materialize a Task before the ordinary
+        ``Command.items`` Objective seeding path runs.  In that case the task
+        already has a resource projection, but its independent read sibling is
+        otherwise invisible to ActionLoop.  This helper only projects the
+        existing structured item contract; it does not select actions or call
+        tools.  The source command/index markers make retries idempotent.
+        """
+
+        items = list(getattr(command, "items", None) or ())
+        if not items:
+            return False
+        candidates = [
+            (index, item)
+            for index, item in enumerate(items)
+            if not self._item_is_mutation(item)
+        ]
+        if not candidates:
+            return False
+
+        from greenbook_agent_core.task.objective_compat import objectives_from_items
+
+        source_id = self._command_source_id(command)
+        resolved_state = getattr(command, "resolved_semantics", None)
+        resolved_items = list(getattr(resolved_state, "items", None) or ())
+        resolved_subset = None
+        if resolved_state is not None and resolved_items and all(
+            index < len(resolved_items) for index, _item in candidates
+        ):
+            try:
+                resolved_subset = resolved_state.model_copy(update={
+                    "items": [resolved_items[index] for index, _item in candidates],
+                })
+            except Exception:  # noqa: BLE001 - compatibility state may be a stub
+                resolved_subset = None
+        source_items = [item for _index, item in candidates]
+        objectives = objectives_from_items(
+            source_items,
+            str(getattr(task, "task_id", "") or ""),
+            timezone="Asia/Shanghai",
+            resolved_state=resolved_subset,
+        )
+        if not objectives:
+            return False
+
+        task_objectives = getattr(task, "objectives", None)
+        if task_objectives is None:
+            task.objectives = []
+            task_objectives = task.objectives
+        added: list[Any] = []
+        for (source_index, item), objective in zip(candidates, objectives):
+            constraints = dict(getattr(objective, "constraints", {}) or {})
+            item_key = str(
+                constraints.get("item_key")
+                or getattr(item, "item_key", "")
+                or ""
+            ).strip()
+            if source_id:
+                constraints["source_command_id"] = source_id
+            constraints["source_item_index"] = source_index
+            objective.constraints = constraints
+
+            existing = None
+            for current in task_objectives:
+                current_constraints = dict(
+                    getattr(current, "constraints", {}) or {}
+                )
+                source_index_value = current_constraints.get(
+                    "source_item_index", -1
+                )
+                try:
+                    source_index_matches = int(source_index_value) == source_index
+                except (TypeError, ValueError):
+                    source_index_matches = False
+                if (
+                    source_id
+                    and str(current_constraints.get("source_command_id", ""))
+                    == source_id
+                    and source_index_matches
+                ) or (
+                    not current_constraints.get("source_command_id")
+                    and item_key
+                    and str(current_constraints.get("item_key", "")).strip()
+                    == item_key
+                    and not current_constraints.get("mutation_identity")
+                ):
+                    existing = current
+                    break
+            if existing is not None:
+                continue
+            task_objectives.append(objective)
+            added.append(objective)
+
+        if not added:
+            return False
+        try:
+            from greenbook_agent_core.command.interpreter import _debug_structured_stage
+
+            _debug_structured_stage(
+                "objective_attach",
+                {
+                    "mode": "existing_task_current_items",
+                    "objective_count": len(task_objectives),
+                    "added_objectives": [
+                        {
+                            "objective_id": str(getattr(item, "objective_id", "")),
+                            "item_key": str(
+                                (getattr(item, "constraints", {}) or {}).get(
+                                    "item_key", ""
+                                )
+                            ),
+                            "required_capabilities": [
+                                str(value)
+                                for value in (getattr(item, "required_capabilities", ()) or ())
+                            ],
+                            "dependencies": [
+                                str(value)
+                                for value in (getattr(item, "dependencies", ()) or ())
+                            ],
+                        }
+                        for item in added
+                    ],
+                },
+                run_id=run_id,
+                turn_id=turn_id,
+            )
+        except Exception:  # noqa: BLE001 - diagnostics must never affect admission
+            pass
+        return True
+
+    async def _ensure_mutation_objectives(
+        self,
+        task: Any,
+        command: Any,
+        *,
+        run_id: str = "",
+        turn_id: str = "",
+    ) -> Any:
         """Create one new Objective for each new cross-turn mutation.
 
         Target resolution first identifies the historical Objective/resource.
@@ -721,6 +928,12 @@ class ActionLoopExecutor:
         manager = self._task_manager
         if manager is None or task is None:
             return task
+        current_items_added = self._append_current_non_mutation_objectives(
+            task,
+            command,
+            run_id=run_id,
+            turn_id=turn_id,
+        )
         changes = list(getattr(command, "task_changes", None) or ())
         pending: list[Any] = []
         for index, change in enumerate(changes):
@@ -741,7 +954,7 @@ class ActionLoopExecutor:
                 continue
             pending.append((index, change, semantic_action))
         if not pending:
-            return task
+            return await self._persist_task_projection(task) if current_items_added else task
 
         # The command has already crossed the canonical resolver boundary in
         # TurnCoordinator.  Bind each delta against its resolved historical
@@ -984,16 +1197,11 @@ class ActionLoopExecutor:
             updated_changes[index] = bound.model_copy(update={"desired_changes": desired})
             changed = True
 
-        if not changed:
+        if not changed and not current_items_added:
             return task
-        command.task_changes = updated_changes
-        repository = getattr(manager, "repository", None)
-        repository = repository() if callable(repository) else getattr(manager, "_repository", None)
-        update = getattr(repository, "update", None)
-        if not callable(update):
-            return task
-        persisted = update(task, expected_version=getattr(task, "version", None))
-        return await persisted if inspect.isawaitable(persisted) else persisted
+        if changed:
+            command.task_changes = updated_changes
+        return await self._persist_task_projection(task)
 
     async def resume_task(
         self,
@@ -1280,6 +1488,13 @@ class ActionLoopExecutor:
             )
         if not objectives:
             return
+        source_id = self._command_source_id(command)
+        for index, objective in enumerate(objectives):
+            constraints = dict(getattr(objective, "constraints", {}) or {})
+            if source_id:
+                constraints.setdefault("source_command_id", source_id)
+            constraints.setdefault("source_item_index", index)
+            objective.constraints = constraints
         try:
             from greenbook_agent_core.command.interpreter import _debug_structured_stage
             _debug_structured_stage(
@@ -1287,6 +1502,10 @@ class ActionLoopExecutor:
                 {"objective_count": len(objectives),
                  "objectives": [
                      {"objective_id": str(getattr(item, "objective_id", "")),
+                      "item_key": str((getattr(item, "constraints", {}) or {}).get("item_key", "")),
+                      "dependencies": [
+                          str(value) for value in (getattr(item, "dependencies", ()) or ())
+                      ],
                       "description": str(getattr(item, "description", "")),
                       "constraints": dict(getattr(item, "constraints", {}) or {})}
                      for item in objectives
@@ -1441,7 +1660,29 @@ class ActionLoopExecutor:
         )
         result = await result if inspect.isawaitable(result) else result
         from greenbook_agent_core.observability.run_metrics import record_tool
-        record_tool(round((time.perf_counter() - started_at) * 1000), run_id=getattr(request, "run_id", ""))
+        latency_ms = round((time.perf_counter() - started_at) * 1000)
+        record_tool(latency_ms, run_id=getattr(request, "run_id", ""))
+        try:
+            from greenbook_agent_core.observability.bus import observability
+
+            if isinstance(result, Mapping):
+                result_status = result.get("status") or result.get("code") or "COMPLETED"
+                result_error = result.get("error_code") or result.get("code") or ""
+            else:
+                result_status = getattr(result, "status", None) or "COMPLETED"
+                result_error = getattr(result, "error_code", None) or ""
+            observability().record_trace(
+                "mcp_call",
+                trace_id=str(getattr(request, "trace_id", "") or ""),
+                conversation_id=str(getattr(request, "conversation_id", "") or ""),
+                semantic_action=tool_name,
+                status=str(result_status),
+                latency_ms=latency_ms,
+                error_code=str(result_error),
+            )
+        except Exception:
+            # Trace enrichment must never change the read result.
+            pass
         # Forward the structured ToolResult payload so the ActionLoop can record
         # real resource_refs/evidence instead of guessing business state from a
         # stringified content.  The Fast Path read keeps the full tool result in
@@ -1559,9 +1800,21 @@ def _command_task_id(command: Any, session: Any) -> str:
     # would make the ActionLoop observe an already-satisfied Objective and
     # finish without creating the requested Draft/Schedule.
     command_type = str(getattr(command, "type", "") or getattr(command, "command", "")).upper()
+    target = getattr(command, "resolved_target", None)
+    # Explicit cross-Conversation resource admission first materializes a fresh
+    # current-Conversation Task and puts its id on the canonical command.  The
+    # provider may still label the mixed request CREATE; in this narrow case
+    # reusing that materialized Task is required to preserve its ResourceBinding
+    # and is not reuse of the session's historical active task.
+    parameters = dict(getattr(command, "parameters", None) or {})
+    if (
+        isinstance(target, dict)
+        and target.get("task_id")
+        and parameters.get("__external_explicit_resource_admission")
+    ):
+        return str(target["task_id"])
     if command_type in {"CREATE", "QUERY"}:
         return ""
-    target = getattr(command, "resolved_target", None)
     if isinstance(target, dict) and target.get("task_id"):
         return str(target["task_id"])
     for field in ("active_task_id", "active_draft_id", "active_schedule_id"):
@@ -1613,7 +1866,12 @@ def _to_runtime_result(result: Any) -> Any:
     # execution_ids the Agent runner sees no accepted work and flips the Run to
     # COMPLETED while the side effect is still in flight.
     if execution_id:
-        partial_results["execution_ids"] = [str(execution_id)]
+        execution_ids = [
+            str(item) for item in (partial_results.get("execution_ids") or []) if item
+        ]
+        if str(execution_id) not in execution_ids:
+            execution_ids.append(str(execution_id))
+        partial_results["execution_ids"] = execution_ids
 
     return RuntimeResult(
         success=bool(getattr(result, "success", False)),

@@ -111,12 +111,19 @@ class GreenBookMCPProtocolAdapter:
     def tool_result(result: dict[str, Any]) -> dict[str, Any]:
         """Project the existing typed result into MCP CallToolResult."""
 
-        return {
+        payload = dict(result)
+        observability = payload.pop("_greenbook_mcp_observability", None)
+        projected = {
             "resultType": "complete",
-            "content": [{"type": "text", "text": _json_text(result)}],
-            "structuredContent": result,
-            "isError": not bool(result.get("ok")),
+            "content": [{"type": "text", "text": _json_text(payload)}],
+            "structuredContent": payload,
+            "isError": not bool(payload.get("ok")),
         }
+        if isinstance(observability, dict):
+            projected["_meta"] = {
+                "greenbook.performance": observability,
+            }
+        return projected
 
 
 __all__ = [

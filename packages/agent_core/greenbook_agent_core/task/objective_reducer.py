@@ -456,6 +456,11 @@ def _capability_resource_present(
     yet (single-objective compatibility).
     """
     cap = str(capability).upper()
+    if cap == "ANSWER_FROM_KNOWLEDGE":
+        # This capability produces a read artifact, not a business resource.
+        # The artifact is attached only after a successful canonical tool
+        # response and is scoped to the owning Objective.
+        return bool(getattr(objective, "related_artifact_ids", None) or [])
     if cap in _MUTATION_CAPABILITIES:
         # Completion is a verified postcondition (operation/resource binding on
         # the Objective), not "a resource of this kind already exists".

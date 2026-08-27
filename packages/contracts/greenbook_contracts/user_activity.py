@@ -141,6 +141,13 @@ class UserActivityEvent(BaseModel):
 # existing ToolContract catalog, which gives new tools one backend-owned
 # activity mapping without teaching the frontend about the tool.
 _MAPPINGS: dict[str, UserActivityMapping] = {
+    "ANSWER_FROM_KNOWLEDGE": UserActivityMapping(
+        semantic_action="ANSWER_FROM_KNOWLEDGE",
+        started_type=UserActivityType.SEARCH_STARTED,
+        completed_type=UserActivityType.SEARCH_COMPLETED,
+        started_display_key="activity.search.started",
+        completed_display_key="activity.search.completed",
+    ),
     "SEARCH_POSTS": UserActivityMapping(
         semantic_action="SEARCH_POSTS",
         started_type=UserActivityType.SEARCH_STARTED,

@@ -223,6 +223,29 @@ def parse_natural_schedule_time(
             target = base_local + timedelta(days=amount)
         return _as_utc_iso(target)
 
+    # Event-anchored Chinese variants put the anchor before the delay, for
+    # example "创建成功后五分钟" or "处理完成后两小时".  The semantic
+    # layer resolves this relative fact at the execution boundary; keep the
+    # parser general instead of teaching individual workflows about wording.
+    event_delay = re.search(
+        rf"(?:成功|完成|结束|创建|生成|保存|提交|执行|处理)\s*后\s*"
+        rf"(?P<amount>{_NUMBER_RE})\s*"
+        rf"(?P<unit>分钟|分|小时|个小时|天)",
+        text,
+    )
+    if event_delay:
+        amount = _parse_number(event_delay.group("amount"))
+        if amount is None:
+            return None
+        unit = event_delay.group("unit")
+        if unit in {"分钟", "分"}:
+            target = base_local + timedelta(minutes=amount)
+        elif unit in {"小时", "个小时"}:
+            target = base_local + timedelta(hours=amount)
+        else:
+            target = base_local + timedelta(days=amount)
+        return _as_utc_iso(target)
+
     # Natural Chinese variants such as "过五分钟再发" and "等五分钟发出" use
     # a leading waiting verb instead of the canonical "五分钟后" suffix.
     # They still describe a relative delay from the current time.

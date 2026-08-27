@@ -168,11 +168,24 @@ def _task_delta_semantic_item(delta: Any) -> tuple[CommandItem, dict[str, Any]] 
 
 
 def _command_item_covers_delta(item: Any, delta: Any) -> bool:
-    """Avoid counting one provider item and its same-target mutation twice."""
+    """Avoid counting one provider item and its same-target mutation twice.
+
+    Provider responses may identify the same mutation in both ``items`` and
+    ``task_changes``.  Prefer structured identity evidence; a natural-language
+    label is only the compatibility fallback for older provider payloads.
+    """
 
     reference = getattr(delta, "target_reference", None) or {}
     if not isinstance(reference, Mapping):
         return False
+    item_key = str(getattr(item, "item_key", "") or "").strip().casefold()
+    change_id = str(getattr(delta, "change_id", "") or "").strip().casefold()
+    if item_key and change_id and (
+        item_key == change_id
+        or item_key.startswith(f"{change_id}_")
+        or change_id.startswith(f"{item_key}_")
+    ):
+        return True
     label = str(
         reference.get("label")
         or reference.get("reference")
@@ -185,6 +198,28 @@ def _command_item_covers_delta(item: Any, delta: Any) -> bool:
         for key in ("title", "topic", "requirements")
     ).casefold()
     return label in haystack
+
+
+def _command_item_action_matches_delta(item: Any, delta: Any) -> bool:
+    """Return whether an item has the delta's canonical action capability."""
+
+    desired = getattr(delta, "desired_changes", None) or {}
+    if not isinstance(desired, Mapping):
+        return False
+    action = str(desired.get("semantic_action") or "").strip().upper()
+    action = action.replace("-", "_").replace(" ", "_")
+    if action == "SCHEDULE_PUBLISH":
+        action = SemanticAction.CREATE_SCHEDULE.value
+    capability = _SEMANTIC_ACTION_CAPABILITIES.get(action, "")
+    item_capabilities = _normalized_capabilities(
+        getattr(item, "capabilities", None) or ()
+    )
+    item_operation = str(getattr(item, "operation", "") or "").strip().upper()
+    item_operation = item_operation.replace("-", "_").replace(" ", "_")
+    return bool(
+        (capability and capability in item_capabilities)
+        or (action and action == item_operation)
+    )
 
 
 # Capabilities proven to complete through the new ActionLoop (real E2E or
@@ -480,6 +515,21 @@ class TurnCoordinator:
             record_stage("semantic_resolved", run_id=request.run_id)
         except Exception:
             pass
+        try:
+            from greenbook_agent_core.observability.bus import observability
+
+            observability().record_trace(
+                "semantic_state",
+                trace_id=request.trace_id,
+                conversation_id=request.conversation_id,
+                semantic_action=str(semantic_state.semantic_operation or ""),
+                status="CAPABILITIES=" + ",".join(
+                    str(value) for value in (semantic_state.capabilities or ())
+                ),
+            )
+        except Exception:
+            # Semantic trace enrichment must never affect routing.
+            pass
         run_at = semantic_state.run_at
         decision = self._gate.decide(
             command,
@@ -561,6 +611,13 @@ class TurnCoordinator:
                 "route_" + route.lower(),
                 trace_id=str(getattr(request, "trace_id", "") or getattr(request, "run_id", "") or ""),
                 conversation_id=str(getattr(request, "conversation_id", "") or ""),
+                semantic_action=", ".join(
+                    sorted(
+                        str(value)
+                        for value in (getattr(decision, "semantic_actions", ()) or ())
+                        if value
+                    )
+                ),
                 status=route,
             )
         except Exception:  # noqa: BLE001
@@ -1188,10 +1245,22 @@ class TurnCoordinator:
         for delta in command.task_changes or ():
             projected = _task_delta_semantic_item(delta)
             if projected is not None:
-                if any(
+                command_items = list(command.items or ())
+                covered_by_identity = any(
                     _command_item_covers_delta(item, delta)
-                    for item in command.items or ()
-                ):
+                    for item in command_items
+                )
+                action_matches = [
+                    item for item in command_items
+                    if _command_item_action_matches_delta(item, delta)
+                ]
+                # A structured provider item with the same canonical action
+                # can represent this TaskDelta even when the target is an
+                # opaque identifier and therefore has no label to match.  Do
+                # this only for a unique action match: two same-action sibling
+                # mutations must remain separate unless their structured keys
+                # identify the pairing above.
+                if covered_by_identity or len(action_matches) == 1:
                     continue
                 item, item_target = projected
                 semantic_item_inputs.append((item, item_target, True))
@@ -1203,6 +1272,7 @@ class TurnCoordinator:
             for item, _item_target, _is_delta in semantic_item_inputs
             if (intent := self._publication_intent(dict(getattr(item, "constraints", {}) or {})))
         }
+        has_item_publication_ownership = bool(item_intents)
         if not command.items and semantic_item_inputs and not item_intents:
             # A request-wide provider hint such as SCHEDULED_PUBLISH must not
             # turn a title-only/update-draft delta into a publication goal.
@@ -1250,7 +1320,7 @@ class TurnCoordinator:
                 ).strip()
             temporal_input = temporal_text or explicit_time
             item_intent = self._publication_intent(constraints)
-            if not item_intent and not is_delta:
+            if not item_intent and not is_delta and not has_item_publication_ownership:
                 # Only a request-level fact may be inherited by an item.  A
                 # sibling's item-level fact is never a default for this item.
                 item_intent = request_intent
@@ -1311,6 +1381,7 @@ class TurnCoordinator:
             resolved_items.append(ResolvedSemanticItem(
                 title=str(getattr(item, "title", "") or ""),
                 topic=str(getattr(item, "topic", "") or ""),
+                item_key=str(getattr(item, "item_key", "") or ""),
                 requirements=list(getattr(item, "requirements", ()) or ()),
                 operation=str(getattr(item, "operation", "CREATE") or "CREATE"),
                 capabilities=[str(value).upper() for value in (getattr(item, "capabilities", ()) or ())],
@@ -1319,6 +1390,7 @@ class TurnCoordinator:
                 temporal_kind=item_temporal.temporal_kind,
                 run_at=str(item_run_at) if item_run_at else None,
                 temporal_resolved=bool(item_temporal.resolved),
+                dependencies=[str(value) for value in (getattr(item, "dependencies", ()) or ()) if str(value).strip()],
                 constraints=constraints,
                 target_reference=dict(item_target_reference),
             ))
@@ -1419,6 +1491,7 @@ class TurnCoordinator:
             target_reference=target_reference,
             resolved_target=resolved_target,
             target_candidates=target_candidates,
+            question=str(getattr(command, "question", "") or "")[:1000],
             temporal_kind=temporal_kind,
             run_at=run_at,
             temporal_resolved=temporal_resolved,
@@ -1634,6 +1707,26 @@ class TurnCoordinator:
             from greenbook_agent_core.observability.run_metrics import record_tool
             record_tool(round((time.perf_counter() - started_at) * 1000), run_id=request.run_id)
         except Exception:
+            pass
+        try:
+            from greenbook_agent_core.observability.bus import observability
+
+            result_status = (
+                getattr(result, "status", None)
+                or result.get("code")
+                if isinstance(result, Mapping)
+                else getattr(result, "status", None)
+            )
+            observability().record_trace(
+                "mcp_call",
+                trace_id=request.trace_id,
+                conversation_id=request.conversation_id,
+                semantic_action=tool_name,
+                status=str(result_status or "COMPLETED"),
+                latency_ms=round((time.perf_counter() - started_at) * 1000),
+            )
+        except Exception:
+            # Trace enrichment must never change the read result.
             pass
         return result
 

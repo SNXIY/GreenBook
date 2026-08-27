@@ -12,7 +12,9 @@ import contextvars
 import logging
 import os
 import re
+import time
 from contextlib import suppress
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -45,6 +47,31 @@ _active_agent_run_id: contextvars.ContextVar[str] = contextvars.ContextVar(
 )
 
 
+def _noop_observer(*args: Any, **kwargs: Any) -> None:
+    return None
+
+
+_record_stage: Callable[..., None] = _noop_observer
+_record_java: Callable[..., None] = _noop_observer
+
+
+def configure_observability(
+    *,
+    record_stage: Callable[..., None] | None = None,
+    record_java: Callable[..., None] | None = None,
+) -> None:
+    """Install optional host-owned timing observers without importing the host.
+
+    The Java facade remains an external client package.  Runtime applications
+    may inject their own observability callbacks at composition time; the
+    client response and business contract never depend on those callbacks.
+    """
+
+    global _record_stage, _record_java
+    _record_stage = record_stage or _noop_observer
+    _record_java = record_java or _noop_observer
+
+
 @contextlib.contextmanager
 def agent_run_scope(run_id: str | None):
     token = _active_agent_run_id.set(str(run_id or ""))
@@ -61,6 +88,29 @@ _SENSITIVE_RE = re.compile(
 
 def _sanitize(value: str) -> str:
     return _SENSITIVE_RE.sub(r"\1=[REDACTED]", value)
+
+
+@contextlib.contextmanager
+def _java_call_scope(run_id: str) -> Any:
+    """Record one Java HTTP boundary without changing client behavior."""
+
+    started_at = time.perf_counter()
+    try:
+        _record_stage("java_start", run_id=run_id)
+    except Exception:
+        pass
+    try:
+        yield
+    finally:
+        try:
+            _record_java(
+                round((time.perf_counter() - started_at) * 1000),
+                run_id=run_id,
+            )
+            _record_stage("java_end", run_id=run_id)
+        except Exception:
+            # Observability must never change the Java client result.
+            pass
 
 
 def _env_first(*names: str, default: str) -> str:
@@ -333,11 +383,15 @@ class JavaClient:
         trace_id = self._trace_id(req_headers)
 
         is_write = method in ("POST", "PUT", "DELETE", "PATCH")
+        run_id = str(
+            req_headers.get("X-Agent-Run-Id") or _active_agent_run_id.get() or ""
+        )
 
         try:
-            resp = await self.http.request(
-                method, path, json=body, params=params, headers=req_headers
-            )
+            with _java_call_scope(run_id):
+                resp = await self.http.request(
+                    method, path, json=body, params=params, headers=req_headers
+                )
         except httpx.ConnectError:
             logger.warning("Java connect failed path=%s", path)
             return ToolResult.java_backend_unavailable(

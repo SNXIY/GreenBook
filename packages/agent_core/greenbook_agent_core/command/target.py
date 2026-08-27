@@ -211,7 +211,7 @@ class TargetResolver:
             # incorrectly counted twice.
             grounding_values = values
             if goal_operation:
-                objective_values = [item for item in values if item.get("goal_id")]
+                objective_values = [item for item in values if _is_objective_candidate(item)]
                 if resource_kind:
                     typed_objectives = [
                         item
@@ -223,7 +223,7 @@ class TargetResolver:
                 if objective_values:
                     grounding_values = objective_values
             else:
-                task_values = [item for item in values if not item.get("goal_id")]
+                task_values = [item for item in values if not _is_objective_candidate(item)]
                 if task_values:
                     grounding_values = task_values
             grounded = _reference_grounding_candidates(
@@ -256,7 +256,7 @@ class TargetResolver:
             # considering labels, focus, or recency.  Use Task candidates
             # rather than every Goal in the Task so one resource shared by a
             # Task's GoalTree does not manufacture an ambiguity.
-            task_values = [item for item in values if not item.get("goal_id")]
+            task_values = [item for item in values if not _is_objective_candidate(item)]
             matches = _resource_owner_matches(
                 task_values,
                 resource_id=resource_id,
@@ -280,11 +280,14 @@ class TargetResolver:
                 or reference_type in {"ACTIVE", "RECENT", "LATEST"}
                 or _is_recent_label(label)
             )
-            values = [item for item in values if item.get("goal_id")]
+            values = [item for item in values if _is_objective_candidate(item)]
             if task_id:
                 values = [item for item in values if str(item.get("task_id")) == task_id]
             if goal_id:
-                matches = [item for item in values if str(item.get("goal_id")) == goal_id]
+                matches = [
+                    item for item in values
+                    if str(item.get("objective_id") or item.get("goal_id")) == goal_id
+                ]
             elif not has_reference:
                 # Conversation focus is only weak evidence.  It must not
                 # turn an unqualified multi-Goal mutation into a selection;
@@ -339,7 +342,7 @@ class TargetResolver:
                 task_values = [
                     dict(item)
                     for item in candidates
-                    if isinstance(item, Mapping) and not item.get("goal_id")
+                    if isinstance(item, Mapping) and not _is_objective_candidate(item)
                 ]
                 if resource_kind:
                     # Task-level fallback must obey the same typed ownership
@@ -387,7 +390,7 @@ class TargetResolver:
         # Task-level mutations may use an explicit task id, a unique task
         # label, the active Task, or deterministic references: ordinal
         # ("第三篇"), most-recent ("刚刚那篇") and run-time ("下午那篇").
-        task_values = [item for item in values if not item.get("goal_id")]
+        task_values = [item for item in values if not _is_objective_candidate(item)]
         if task_id:
             matches = [item for item in task_values if str(item.get("task_id")) == task_id]
         else:
@@ -1130,6 +1133,12 @@ def _resource_owner_matches(
     return matches
 
 
+def _is_objective_candidate(value: Mapping[str, Any]) -> bool:
+    """Recognize both legacy Goal and canonical Objective projections."""
+
+    return bool(value.get("goal_id") or value.get("objective_id"))
+
+
 def _owner_refs(value: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     refs: list[Mapping[str, Any]] = []
     for source in (
@@ -1603,38 +1612,34 @@ def _resource_label_matches(
         # the bounded user-intent evidence.  Use only those semantic fields
         # to find the owner; the concrete resource identity remains sourced
         # from the owner's resource index below.
-        if resource_display_values:
-            # A real resource title is stronger than a multi-objective Task
-            # label.  Do not re-introduce sibling-topic tokens from the Task
-            # description when the typed resource already has display
-            # evidence of its own.
-            evidence_tokens_by_value.append(
-                _reference_evidence_tokens(" ".join(resource_display_values))
-            )
-        else:
-            evidence: list[str] = []
-            for key in ("label", "task_label", "semantic_label", "title", "goal", "description", "intent"):
-                candidate = value.get(key)
+        # Resource display text is primary, while the Objective's structured
+        # constraints remain bounded semantic evidence when a provider title
+        # is generated and no longer contains the user's topic.  Keep both
+        # sources; frequency/discriminator checks below still enforce the
+        # existing 0/1/N ambiguity boundary.
+        evidence: list[str] = list(resource_display_values)
+        for key in ("label", "task_label", "semantic_label", "title", "goal", "description", "intent"):
+            candidate = value.get(key)
+            if candidate:
+                evidence.append(str(candidate))
+        constraints = value.get("constraints")
+        if isinstance(constraints, Mapping):
+            requirements = constraints.get("requirements")
+            if isinstance(requirements, Sequence) and not isinstance(requirements, (str, bytes)):
+                evidence.extend(str(item) for item in requirements if item)
+            elif requirements:
+                evidence.append(str(requirements))
+            for key in ("title", "topic", "subject", "intent"):
+                candidate = constraints.get(key)
                 if candidate:
                     evidence.append(str(candidate))
-            constraints = value.get("constraints")
-            if isinstance(constraints, Mapping):
-                requirements = constraints.get("requirements")
-                if isinstance(requirements, Sequence) and not isinstance(requirements, (str, bytes)):
-                    evidence.extend(str(item) for item in requirements if item)
-                elif requirements:
-                    evidence.append(str(requirements))
-                for key in ("title", "topic", "subject", "intent"):
-                    candidate = constraints.get(key)
-                    if candidate:
-                        evidence.append(str(candidate))
-            metadata = value.get("metadata")
-            if isinstance(metadata, Mapping):
-                for key in ("label", "task_label", "semantic_label", "title", "goal", "description", "intent"):
-                    candidate = metadata.get(key)
-                    if candidate:
-                        evidence.append(str(candidate))
-            evidence_tokens_by_value.append(_reference_evidence_tokens(" ".join(evidence)))
+        metadata = value.get("metadata")
+        if isinstance(metadata, Mapping):
+            for key in ("label", "task_label", "semantic_label", "title", "goal", "description", "intent"):
+                candidate = metadata.get(key)
+                if candidate:
+                    evidence.append(str(candidate))
+        evidence_tokens_by_value.append(_reference_evidence_tokens(" ".join(evidence)))
         evidence_values.append(value)
         owner_keys_by_value.append(owner_keys)
     token_frequency: dict[str, int] = {}

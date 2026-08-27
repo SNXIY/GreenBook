@@ -49,6 +49,11 @@ _CAPABILITY_TO_ACTION: dict[str, str] = {
     # specific semantic_operation marker; otherwise the gate falls through to
     # no_action_chat and never admits the read.
     "SEARCH_COMMUNITY": "SEARCH_POSTS",
+    # Grounded community answers are a canonical read action in their own
+    # right.  Do not collapse this capability into the SEARCH -> GET_POST
+    # synthesis loop: the MCP RAG tool owns evidence retrieval, generation,
+    # citation validation, and fail-closed behavior.
+    "ANSWER_FROM_KNOWLEDGE": "ANSWER_FROM_KNOWLEDGE",
     "MANAGE_DRAFT": "UPDATE_DRAFT",
     "DELETE_DRAFT": "DELETE_DRAFT",
     "DELETE_POST": "DELETE_POST",

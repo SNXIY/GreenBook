@@ -414,6 +414,7 @@ class GreenBookMCPClient:
                 detail="MCP tools/call response did not contain a result",
                 response_lost=is_write,
             )
+        self._record_remote_observability(result, agent_run_id)
         structured = result.get("structuredContent")
         if isinstance(structured, Mapping):
             return dict(structured)
@@ -431,6 +432,40 @@ class GreenBookMCPClient:
             detail="MCP CallToolResult had no structured result",
             response_lost=is_write,
         )
+
+    @staticmethod
+    def _record_remote_observability(
+        result: Mapping[str, Any],
+        agent_run_id: str | None,
+    ) -> None:
+        """Bridge provider-side Java timing into the owning Agent Run.
+
+        The Business MCP process owns the Java HTTP client, while the Agent
+        process owns the Run metrics bucket.  MCP ``result._meta`` carries
+        only this non-business observation; the public ToolResult remains
+        unchanged.
+        """
+
+        if not agent_run_id:
+            return
+        metadata = result.get("_meta")
+        performance = metadata.get("greenbook.performance") if isinstance(metadata, Mapping) else None
+        if not isinstance(performance, Mapping):
+            return
+        try:
+            calls = int(performance.get("java_calls") or 0)
+            latency_ms = int(performance.get("java_latency_ms") or 0)
+        except (TypeError, ValueError):
+            return
+        if calls <= 0:
+            return
+        try:
+            from greenbook_agent_core.observability.run_metrics import record_java
+
+            record_java(latency_ms, run_id=agent_run_id)
+        except Exception:
+            # Measurement must never change the MCP result or retry behavior.
+            return
 
     @staticmethod
     def _protocol_failure(message: str, *, protocol_code: Any = None) -> dict[str, Any]:

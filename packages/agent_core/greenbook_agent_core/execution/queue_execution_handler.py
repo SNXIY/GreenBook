@@ -223,6 +223,23 @@ class RuntimeExecutionQueueHandler:
             )
             return
 
+        # Cancellation is an Execution-level terminal state too.  The Agent
+        # Run may still be RUNNING while a user cancels the durable execution;
+        # allowing that queue message into RuntimeAgentService then reopens a
+        # retryable step and can create an unbounded claim/retry loop.  Replay
+        # the terminal execution result and let the queue worker ACK the
+        # message without invoking MCP or Java.
+        terminal_execution = self._terminal_execution_result(message)
+        if terminal_execution is not None:
+            if terminal_execution.status in {"FAILED", "CANCELLED"}:
+                self._fail_orphaned_operation(message)
+            await self._publish_result(
+                message,
+                terminal_execution,
+                self._service_auth(message),
+            )
+            return
+
         auth = (
             self._credential_resolver(message)
             if self._credential_resolver is not None
@@ -456,6 +473,54 @@ class RuntimeExecutionQueueHandler:
             error_code="STALE_QUEUE_MESSAGE",
             error_message="Queued work belongs to a terminal Run and was not submitted.",
             retryable=False,
+        )
+
+    def _terminal_execution_result(
+        self,
+        message: ExecutionQueueMessage,
+    ) -> RuntimeResult | None:
+        """Return a replay result when the durable Execution is terminal.
+
+        Agent Run and Runtime Execution state are persisted independently. A
+        control request can therefore close the Execution while its parent
+        Run is still RUNNING. Queue delivery must honor the more specific
+        Execution terminal state before calling the Runtime again.
+        """
+
+        repository = getattr(self._service, "_execution_repository", None)
+        finder = getattr(repository, "find_by_id", None)
+        if not callable(finder):
+            return None
+        execution = finder(message.execution_id)
+        if execution is None:
+            return None
+        status = str(
+            getattr(
+                getattr(execution, "status", ""),
+                "value",
+                getattr(execution, "status", ""),
+            )
+            or ""
+        ).upper()
+        if status not in {"COMPLETED", "FAILED", "CANCELLED"}:
+            return None
+        return RuntimeResult(
+            success=status == "COMPLETED",
+            status=status,
+            run_id=str((message.payload or {}).get("run_id") or ""),
+            task_id=str((message.payload or {}).get("task_id") or getattr(execution, "task_id", "") or ""),
+            execution_id=message.execution_id,
+            trace_id=str((message.payload or {}).get("trace_id") or message.trace_id),
+            error_code=("EXECUTION_ALREADY_TERMINAL" if status != "COMPLETED" else ""),
+            error_message=(
+                "Execution was cancelled before queue delivery."
+                if status == "CANCELLED"
+                else "Execution is already terminal."
+                if status == "FAILED"
+                else ""
+            ),
+            retryable=False,
+            started_execution=True,
         )
 
     async def _publish_result(
