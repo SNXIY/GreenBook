@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import math
 import re
@@ -290,13 +291,20 @@ class MemoryRetriever:
             terms=terms,
             limit=limit,
         )
-        values: list[MemoryRecord] = []
-        for query in queries:
+        async def search_one(query: MemoryQuery) -> list[Any]:
             found = self._repository.search(query)
             found = await found if inspect.isawaitable(found) else found
+            return list(found or ())
+
+        # Each typed/contract-scoped repository query is an independent read.
+        # Run only this I/O fan-out concurrently; ordering, dedupe, relevance,
+        # and the later touch phase remain unchanged.
+        batches = await asyncio.gather(*(search_one(query) for query in queries))
+        values: list[MemoryRecord] = []
+        for found in batches:
             values.extend(
                 item if isinstance(item, MemoryRecord) else MemoryRecord.model_validate(item)
-                for item in (found or ())
+                for item in found
             )
         return _dedupe(values)
 

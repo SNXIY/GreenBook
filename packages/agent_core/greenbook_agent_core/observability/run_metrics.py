@@ -196,6 +196,28 @@ def record_final_response(latency_ms: int, *, run_id: str | None = None) -> None
             bucket["final_response_latency_ms"] += max(0, int(latency_ms))
 
 
+def record_final_response_once(latency_ms: int, *, run_id: str | None = None) -> bool:
+    """Record the terminal presentation boundary once per Run.
+
+    Run reads can be polled concurrently.  The terminal response is a single
+    presentation boundary, so repeated reads must not accumulate read-time
+    latency into the Run metric.
+    """
+
+    bucket = _bucket(_run_id(run_id))
+    if bucket is None:
+        return False
+    from datetime import UTC, datetime
+
+    with _lock:
+        timestamps = bucket.setdefault("stage_timestamps", {})
+        if "final_response_finished" in timestamps:
+            return False
+        bucket["final_response_latency_ms"] += max(0, int(latency_ms))
+        timestamps["final_response_finished"] = datetime.now(UTC).isoformat()
+        return True
+
+
 def record_stage(stage: str, *, run_id: str | None = None) -> None:
     bucket = _bucket(_run_id(run_id))
     if bucket is None or not stage:
@@ -246,7 +268,7 @@ def snapshot(run_id: str) -> dict[str, Any]:
 
 
 __all__ = [
-    "llm_category_scope", "record_actionloop", "record_actionloop_llm", "record_final_response", "record_java", "record_llm",
+    "llm_category_scope", "record_actionloop", "record_actionloop_llm", "record_final_response", "record_final_response_once", "record_java", "record_llm",
     "record_memory_retrieval", "record_tool", "run_scope", "snapshot",
     "record_stage", "record_stage_once",
 ]
