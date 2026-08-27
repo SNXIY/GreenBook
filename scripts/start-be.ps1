@@ -12,8 +12,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $jwtSecret = Get-GreenBookEnvValue -Name "JWT_SECRET" -DefaultValue ""
 $agentSecret = Get-GreenBookEnvValue -Name "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" -DefaultValue ""
-Assert-GreenBookSecret -Name "JWT_SECRET" -Value $jwtSecret -ForbiddenValues @("change-me-to-a-long-random-string")
-Assert-GreenBookSecret -Name "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" -Value $agentSecret -ForbiddenValues @("change-me-agent-service")
+Assert-GreenBookSecret -Name "JWT_SECRET" -Value $jwtSecret -ForbiddenValues @("change-me-to-a-long-random-string", "replace-with-a-long-random-local-secret")
+Assert-GreenBookSecret -Name "GREENBOOK_AGENT_SERVICE_SHARED_SECRET" -Value $agentSecret -ForbiddenValues @("change-me-agent-service", "replace-with-a-local-agent-secret")
 
 $env:SPRING_PROFILES_ACTIVE = ""
 $env:MYSQL_HOST = "127.0.0.1"

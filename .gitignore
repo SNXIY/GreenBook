@@ -49,6 +49,9 @@ data/
 var/
 backups/
 refrence/
+checkpoints/
+docs/worklogs/overnight-*/
+docs/archive/recovery/
 
 # Local scratch / diagnostic artifacts
 **/.pytest-temp*/

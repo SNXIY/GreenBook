@@ -1,7 +1,7 @@
 # GreenBook Current Architecture
 
 This document describes the active production wiring observed in the source
-tree on 2026-08-21. Historical phase reports remain useful evidence, but they
+tree on 2026-08-27. Historical phase reports remain useful evidence, but they
 do not override the composition root in `apps/agent_api/greenbook_agent_api/main.py`.
 
 ## Active product surface
@@ -70,6 +70,10 @@ worker.
   short path. It is not a second intent taxonomy.
 - `ActionLoop` selects one typed semantic action at a time. It does not compile
   a static DAG and does not own durable delivery.
+- The Objective scheduler may run at most two independent `CREATE_DRAFT`
+  leaves concurrently when dependencies, artifacts, resource conflicts,
+  mutation ordering, and shared HITL gates are absent. Unsafe or dependent
+  shapes remain serial.
 - `Objective`/`Task` are the current persisted work-item envelope. Their
   reducer owns deterministic satisfaction until a Commitment migration is
   justified.
@@ -79,6 +83,12 @@ worker.
   `packages/agent_core/greenbook_agent_core/turn/commitment_poc.py` models a
   minimal Commitment/WorkItem projection, but is not production-wired or
   persisted.
+
+The active RAG surface is conditional evidence-grounded retrieval with
+fail-closed/no-answer behavior when evidence is insufficient. Its current
+grounding/citation limitation is recorded as `RAG_CURRENT_LIMIT_ACCEPTED`.
+Memory is a separate read-oriented context source and is not Task state or
+Java business truth.
 
 ## Durable and business owners
 

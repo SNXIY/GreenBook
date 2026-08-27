@@ -100,7 +100,7 @@ Production/runtime groups include `apps/agent_api/**`, `apps/agent_worker/**`, `
 
 Untracked evidence/harness entries include `apps/backend/scripts/run_overnight_multi_objective_matrix.py`, `checkpoints/`, `docs/evaluation/`, `docs/reports/`, `docs/worklogs/`, safe inspection scripts, `tests/e2e/browser_ux_final_smoke.py`, and `tests/unit/test_action_loop_parallel_objectives.py`.
 
-Files to remove before a future commit: **none automatically**. Review `checkpoints/`, runtime/evaluation artifacts, and test-only harnesses deliberately before staging; they were preserved for this handoff. No cleanup, reset, or commit was performed.
+Files to remove before a future cleanup commit: **none automatically**. The original checkpoint/worklog material was preserved under `docs/archive/recovery/`; runtime/evaluation artifacts and test-only harnesses remain subject to deliberate review. The pre-cleanup baseline has now been committed and tagged separately.
 
 ## 11. Verdict and next three priorities
 
@@ -112,6 +112,6 @@ Next priorities:
 
 1. Add formal first-useful-feedback instrumentation and repeat the performance scenarios with equivalent samples if a strict performance PASS is required.
 2. Revisit RAG grounding/citation only under a separately approved RAG change.
-3. Before commit, review the dirty audit and checkpoint/evaluation artifacts, then stage selectively; keep this branch uncommitted until that review.
+3. Before any future cleanup change, review the dirty audit and archived checkpoint/evaluation artifacts, then stage selectively.
 
-Evidence index: `docs/worklogs/overnight-20260826-27/STATE.md`, `NEXT_CURSOR.md`, `TEST_MATRIX.json`, `FAILURES.json`, `PERFORMANCE_BEFORE_AFTER.json`, `UX_FINDINGS.md`, `ARCHITECTURE_FINDINGS.md`, and the latest incremental checkpoint.
+Evidence index: `docs/archive/recovery/overnight-20260826-27/STATE.md`, `NEXT_CURSOR.md`, `TEST_MATRIX.json`, `FAILURES.json`, `PERFORMANCE_BEFORE_AFTER.json`, `UX_FINDINGS.md`, `ARCHITECTURE_FINDINGS.md`, and the latest incremental checkpoint.

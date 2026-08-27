@@ -259,7 +259,7 @@ Provider residual:
 
 ## G. Semantic Evaluation
 
-Source layer: DETERMINISTIC semantic benchmark with 60 primary cases and 78 utterance variants. Artifact: [semantic report](../../artifacts/overnight_semantic_20260825/report.json) and [semantic results](../../artifacts/overnight_semantic_20260825/results.json). This is separate from LIVE_BROWSER L2/L3 results.
+Source layer: DETERMINISTIC semantic benchmark with 60 primary cases and 78 utterance variants. Artifact: [semantic report](../archive/evaluations/artifacts/overnight_semantic_20260825/report.json) and [semantic results](../archive/evaluations/artifacts/overnight_semantic_20260825/results.json). This is separate from LIVE_BROWSER L2/L3 results.
 
 | Metric | Numerator / denominator | Result |
 |---|---:|---|
@@ -500,7 +500,7 @@ No Top 3 item was started automatically tonight.
 
 Each metric below has an artifact, sample size, and explicit measurement definition.
 
-- Semantic benchmark: 60 primary cases / 78 utterances; strict exact 55/78 and core intent 68/78. Source: [semantic report](../../artifacts/overnight_semantic_20260825/report.json). Definition: deterministic evaluator result over the frozen dataset.
+- Semantic benchmark: 60 primary cases / 78 utterances; strict exact 55/78 and core intent 68/78. Source: [semantic report](../archive/evaluations/artifacts/overnight_semantic_20260825/report.json). Definition: deterministic evaluator result over the frozen dataset.
 - Live long-session coverage: L1 20 turns, L2 debug/resume 14 turns, L3 fresh 8 turns. Sources: [L1](../../.runtime/round1-final-v2/l1-context-phase2-fresh-certification-20260824.json), [L2](../../.runtime/round1-final-v2/l2-t14-resumed-after-reload-20260825.json), [L3](../../.runtime/round1-final-v2/l3-fresh-certification-20260825.json). Definition: real Frontend Browser turns in the canonical conversation.
 - Real business writes: 44 observed physical write steps, all 44 recorded COMPLETED. Source: the five live artifacts listed in section F. Definition: evidence.physical_write.steps across the Browser runs; duplicate debug/fresh evidence is not deduplicated.
 - Safety: wrong resource 0/58, wrong temporal 0/58, duplicate write 0/58, unsafe physical write 0/44, false success 0/58. Source: live evidence aggregate. Definition: runner flags and physical-write evidence.

@@ -44,3 +44,9 @@ aliases, and duplicate Java aliases are not supported.
 Additional Agent limits, model routing, tool HTTP, memory, approval, and
 publication tuning variables are listed once in `.env.example` under the
 `GREENBOOK_AGENT_*` namespace.
+
+`.env.example` contains safe local placeholders, not usable credentials.
+Startup validation rejects placeholder JWT/shared-secret values, and the
+Agent runtime token must match the Business MCP runtime token without either
+value being exposed in logs. Keep the default `GREENBOOK_AGENT_IN_PROCESS_WORKER=false`
+for the durable queue topology used by local acceptance tests.

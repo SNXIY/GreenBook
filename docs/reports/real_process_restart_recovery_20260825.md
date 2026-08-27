@@ -74,7 +74,7 @@ Semantic、Safety、Performance、UX 的昨夜 evidence 已保留并未重跑：
 - [L2 T11/T12 evidence](../../.runtime/round1-final-v2/l2-fresh-resume-after-reboot-t11-t14-20260825.json)
 - [L2 T13 reconcile evidence](../../.runtime/round1-final-v2/l2-fresh-resume-after-reboot-t13-t14-20260825.json)
 - [L3 reload recovery evidence](../../.runtime/round1-final-v2/l3-fresh-reload-recovery-after-reboot-direct-20260825.json)
-- [overnight semantic report](../../artifacts/overnight_semantic_20260825/report.json)
+- [overnight semantic report](../archive/evaluations/artifacts/overnight_semantic_20260825/report.json)
 - [overnight final report](./overnight_final_report_20260825.md)
 
 `git status` 已检查；worktree 原本存在大量用户变更。恢复过程没有执行 `reset`、`clean`、`restore`，也没有修改 production source。

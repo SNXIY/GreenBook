@@ -19,11 +19,11 @@ source or runtime contract was removed. The pre-existing untracked
 ## INVENTORY
 
 The baseline contained the following tracked areas (counts were obtained with
-`git ls-files`; generated `artifacts/` are tracked by the baseline):
+`git ls-files`; generated `artifacts/` were tracked by the baseline):
 
 - production/runtime: `apps/`, `packages/`, `services/`, `contracts/`, `infra/`, and `zhiguang-fe/src/`
 - tests: `tests/`, `zhiguang-fe/tests/`, Java tests under `apps/backend/src/test/`
-- evaluation: `evaluation/`, `artifacts/`, and the current evaluation scripts
+- evaluation: `evaluation/`, archived `docs/archive/evaluations/artifacts/`, and the current evaluation scripts
 - docs: `docs/`, `README.md`, `PROJECT_CONTEXT.md`
 - operations: `scripts/`, `.github/workflows/`, `pyproject.toml`, `uv.lock`, `docker-compose.yml`
 - archived/legacy areas: `docs/archive/`, architecture history, compatibility adapters,
@@ -77,8 +77,8 @@ frontend `dist/` directory.
   `docs/reports/real_process_restart_recovery_20260825.md`,
   `docs/reports/overnight_final_report_20260825.md`,
   `.runtime/round1-final-v2/`, `.runtime/stable-baseline/`,
-  `artifacts/overnight_semantic_20260825/`,
-  `artifacts/semantic_longtail_20260822/`, and the final L1 artifact.
+  `docs/archive/evaluations/artifacts/overnight_semantic_20260825/`,
+  `docs/archive/evaluations/artifacts/semantic_longtail_20260822/`, and the final L1 artifact.
 - `.runtime/edge-cdp-profile/`: active Edge/CDP process uses this path.
 - `apps/backend/target/`: the running Java process uses `target/classes`.
 - `zhiguang-fe/node_modules/`: the running Vite process uses the local install.
@@ -91,7 +91,7 @@ These were not deleted because they have historical evaluation or architectural
 review value, even where no active consumer was found. The proof scan was made
 with `rg`, `git ls-files`, package manifests, CI, scripts, and docs.
 
-- Older tracked benchmark/evaluation runs under `artifacts/`, including the
+- Older tracked benchmark/evaluation runs under archived `docs/archive/evaluations/artifacts/`, including the
   `residual_*`, `retry_*`, `semantic_interpreter_repair_*`, duplicate
   `semantic_longtail_*`, `semantic_phase2_*`, and duplicate
   `semantic_pipeline_*` sets. Active exceptions were retained where the

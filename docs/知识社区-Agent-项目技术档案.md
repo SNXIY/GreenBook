@@ -63,7 +63,7 @@ green-book/
 │  └─ java-openapi.yaml         Agent → Java Facade 的 HTTP 合同
 ├─ docs/                       架构、配置、测试、审计报告
 ├─ evaluation/                 long-tail benchmark 数据和运行器
-├─ artifacts/                  benchmark 结果产物
+├─ docs/archive/evaluations/artifacts/ benchmark 历史结果产物
 ├─ infra/                      基础设施辅助文件
 ├─ scripts/                    本地运行/检查脚本
 ├─ tests/                      Python 单元、契约、集成测试
@@ -1584,9 +1584,9 @@ Java 使用 Maven test；前端执行 lint/build；真实 E2E 需要运行 Java�
 产物：
 
 - evaluation/semantic_longtail/cases.json
-- artifacts/semantic_longtail_20260822/dataset_manifest.json
-- artifacts/semantic_longtail_20260822/report.json
-- artifacts/semantic_longtail_20260822/results.json
+- docs/archive/evaluations/artifacts/semantic_longtail_20260822/dataset_manifest.json
+- docs/archive/evaluations/artifacts/semantic_longtail_20260822/report.json
+- docs/archive/evaluations/artifacts/semantic_longtail_20260822/results.json
 - evaluation/semantic_longtail/run_benchmark.py
 
 Benchmark 只调用生产语义解析器、TargetResolver、TemporalResolver，不创建真实 Task、不调用 Java、不修改生产状态。
@@ -1756,4 +1756,3 @@ ActionLoop 内 READ 会通过 ActionObservation、Artifact、TaskResourceRef/res
 ~~~
 
 在这些 gate 完成前，不建议仅通过增加模型调用、扩大 ActionLoop 预算或新增 Tool 来扩展生产写操作范围。
-
