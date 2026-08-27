@@ -1,0 +1,143 @@
+{
+  "schema_version": "greenbook_merge_readiness_v1",
+  "generated_on": "2026-08-27",
+  "branch": "feature/hybrid-search-rag",
+  "head": "77da72b37b038c79d1cafe3f91f5bfe645f0e1b7",
+  "head_tag": "greenbook-final-system-evaluation-20260827",
+  "clean_baseline_tag": "greenbook-clean-baseline-20260827",
+  "verdict": "GREENBOOK_MERGE_READY_WITH_LIMITATIONS",
+  "performance_issue_classification": "PERFORMANCE_ENVIRONMENT_VARIANCE",
+  "performance_classification_confidence": "MODERATE",
+  "strict_performance_verdict": "INCONCLUSIVE",
+  "merge_main_performed": false,
+  "push_to_main_performed": false,
+  "repository": {
+    "working_tree_clean_before_review": true,
+    "working_tree_clean_after_report_generation": false,
+    "current_delta_from_clean_baseline": {
+      "production_runtime_files": 0,
+      "evaluation_or_report_files": 5,
+      "browser_harness_files": 2,
+      "total_files": 7
+    },
+    "diff_check": "PASS",
+    "tracked_secret_pattern_scan": "NO_MATCHES"
+  },
+  "correctness": {
+    "retained_unit_pass": 1602,
+    "retained_unit_fail": 0,
+    "retained_focused_pass": 143,
+    "retained_focused_fail": 0,
+    "mo08": "PASS",
+    "duplicate_objective_count": 0,
+    "wrong_dependency_or_resource_count": 0,
+    "duplicate_physical_mutation_count": 0,
+    "hitl_bypass": false,
+    "result_unknown_or_idempotency_regression": false,
+    "rag_canonical_admission": "PASS",
+    "rag_grounding": "RAG_CURRENT_LIMIT_ACCEPTED_PARTIAL",
+    "memory_semantics": "PASS",
+    "memory_leakage_count": 0,
+    "browser_smoke": "PASS"
+  },
+  "single_objective_control": {
+    "same_logic_shape": true,
+    "simple_read": {
+      "baseline_p50_e2e_ms": 38776.053,
+      "current_successful_e2e_ms": [111308.229, 194269.788],
+      "current_status_distribution": {"COMPLETED": 2, "FAILED": 1},
+      "current_counts": {"llm_calls": 2, "actionloop_iterations": 2, "tool_calls": 1, "java_calls": 1},
+      "current_stage_observations": {
+        "semantic_ms": [14160, 27926],
+        "actionloop_llm_ms": [7248, 6881],
+        "context_ms": [12404, 12373],
+        "memory_ms": [6762, 6425],
+        "queue_wait_ms": [6859, 6727],
+        "mcp_ms": [7342, 7367],
+        "java_ms": [76, 98]
+      }
+    },
+    "simple_write": {
+      "baseline_p50_e2e_ms": 44142.611,
+      "current_successful_e2e_ms": [62119.516, 69288.649],
+      "current_status_distribution": {"COMPLETED": 2, "FAILED": 1},
+      "current_counts": {"llm_calls": 2, "actionloop_iterations": 1, "tool_calls": 1, "java_calls": 1},
+      "current_stage_observations": {
+        "semantic_ms": [6649, 13766],
+        "actionloop_llm_ms": [6468, 7153],
+        "context_ms": [12277, 18537],
+        "memory_ms": [6309, 6353],
+        "queue_wait_ms": [6769, 153],
+        "mcp_ms": [15014, 8051],
+        "java_ms": [60, 54]
+      }
+    },
+    "scheduler_single_objective_gate": "PASS",
+    "focused_scheduler_tests": {"passed": 5, "failed": 0}
+  },
+  "parallel": {
+    "implementation_status": "PASS_BOUNDED_SCOPE",
+    "max_parallel_objectives": 2,
+    "eligibility": "deterministic independent dependency-free non-conflicting CREATE_DRAFT only",
+    "direct_write_bypass": false,
+    "retained_browser_serial_ms": 73859,
+    "retained_browser_parallel_ms": 55672,
+    "retained_observed_overlap_ms": 6730.941,
+    "wrong_resource_count": 0,
+    "duplicate_physical_mutation_count": 0,
+    "saved_controlled_artifacts": {
+      "completed_clean": 1,
+      "completed_with_submission_conflict": 1,
+      "running_or_incomplete": 1,
+      "three_clean_completed_runs": false
+    },
+    "limitation": "Three clean controlled Browser runs are not established; AFTER2 is RUNNING and AFTER contains a sibling TaskVersionConflictError."
+  },
+  "performance": {
+    "provider_variance_observed": true,
+    "provider_latency_observations_ms": {
+      "simple_read_semantic": [14156, 27922],
+      "simple_write_semantic": [6645, 13762],
+      "simple_read_actionloop": [7248, 6881],
+      "simple_write_actionloop": [6468, 7153]
+    },
+    "queue_metric_definition": "broad admission/runner interval, not pure worker claim wait",
+    "durable_created_to_claimed_ms_range": [5100, 8200],
+    "worker_claim_to_start_ms_range": [0, 1],
+    "context_ms_observed_range": [12277, 18537],
+    "memory_ms_observed_range": [6309, 6762],
+    "java_ms_observed_range": [54, 98],
+    "extra_llm_calls_found": false,
+    "extra_actionloop_iterations_found": false,
+    "extra_tool_calls_found": false,
+    "extra_durable_operations_found": false,
+    "new_production_code_in_review_delta": false
+  },
+  "ux": {
+    "browser_functional_smoke": "PASS",
+    "tuf_decision": "OBSERVABILITY_LIMITATION",
+    "tuf_formal_metric": "UNAVAILABLE",
+    "internal_identifier_or_error_code_leak": false
+  },
+  "limitations": [
+    "Strict equivalent performance acceptance is inconclusive because several current repeat sets contain timeout or incomplete samples.",
+    "Current performance issue is classified as environment/provider/admission variance, not a proven deterministic code regression.",
+    "Three clean controlled parallel Browser runs are not established.",
+    "Formal TUF rendered progress signal was unavailable.",
+    "RAG grounding/citation quality remains the accepted partial limitation."
+  ],
+  "evidence": [
+    "docs/evaluation/final_system_evaluation_results.json",
+    "docs/reports/GREENBOOK_FINAL_SYSTEM_EVALUATION.md",
+    "docs/reports/GREENBOOK_FINAL_PERFORMANCE_ACCEPTANCE.md",
+    ".runtime/agent_performance_baseline_v2_measurement.json",
+    ".runtime/final_perf_after_simple_read.json",
+    ".runtime/final_perf_after_simple_write.json",
+    ".runtime/final_perf_after_sequential_dependent.json",
+    ".runtime/final_perf_after_search_creation.json",
+    ".runtime/stable-baseline/round-20260827-RESUME-PARALLEL-AFTER.jsonl",
+    ".runtime/stable-baseline/round-20260827-RESUME-PARALLEL-AFTER2.jsonl",
+    ".runtime/stable-baseline/round-20260827-RESUME-PARALLEL-AFTER3.jsonl"
+  ],
+  "recommended_next_step": "Human merge feature/hybrid-search-rag into main, create the final stable tag after merge, then freeze the project."
+}
